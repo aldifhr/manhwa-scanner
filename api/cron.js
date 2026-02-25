@@ -54,6 +54,10 @@ async function sendDiscord(data) {
     descriptionText += `\n\n📄 **Synopsis:**\n${data.description}`;
   }
   descriptionText += `\n\n[Read Chapter](${data.url})`;
+  
+  // Add source badge
+  const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
+  const sourceText = data.source === "Project Updates" ? "From Your Library" : "Latest Release";
 
   const payload = {
     embeds: [
@@ -65,7 +69,7 @@ async function sendDiscord(data) {
         fields: fields,
         timestamp: new Date().toISOString(),
         footer: {
-          text: "🔔 New Chapter Alert • ikiru.wtf",
+          text: `${sourceEmoji} ${sourceText} • ikiru.wtf`,
           icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png"
         }
       },
@@ -108,6 +112,84 @@ function formatTimeAgo(datetime) {
   }
 }
 
+async function scrapeSection($, sectionName) {
+  const results = [];
+  let inSection = false;
+  
+  $("*").each((i, el) => {
+    // Check if we hit the section header
+    if ($(el).is("h1") && $(el).text().includes(sectionName)) {
+      inSection = true;
+    }
+    
+    // Check if we hit the next section (stop)
+    if (inSection && $(el).is("h1") && !$(el).text().includes(sectionName)) {
+      return false;
+    }
+    
+    // Process chapter links in this section
+    if (inSection && $(el).is("a")) {
+      const card = $(el);
+      const link = card.attr("href");
+      const chapterText = card.find("p").text().trim();
+      
+      if (chapterText.includes("Chapter")) {
+        const parent = card.parent();
+        
+        // Get title from h1 in parent element
+        let title = parent.find("h1").text().trim();
+        // Fallback to h3
+        if (!title) {
+          title = card.find("h3").text().trim();
+        }
+        
+        // Get cover from parent element
+        let cover = parent.find("img").first().attr("src");
+        
+        // Get rating from .numscore
+        const rating = parent.find(".numscore").text().trim();
+        
+        // Get status (Ongoing/Completed)
+        const status = parent.find("p.font-normal.text-xs").filter((_, el) => {
+          const text = $(el).text().trim();
+          return text === "Ongoing" || text === "Completed" || text === "Hiatus";
+        }).text().trim();
+        
+        // Get last updated time
+        const updatedTime = card.find("time").attr("datetime") || card.find("time").text().trim();
+
+        // Fix relative URLs
+        let fixedUrl = link;
+        if (fixedUrl && !fixedUrl.startsWith("http")) {
+          fixedUrl = "https://02.ikiru.wtf" + fixedUrl;
+        }
+        if (cover && !cover.startsWith("http")) {
+          cover = "https://02.ikiru.wtf" + cover;
+        }
+
+        // Get manga detail page URL for description
+        const mangaUrl = fixedUrl.replace(/\/chapter-[^/]+\/$/, '/');
+
+        if (link && title && chapterText) {
+          results.push({
+            title,
+            chapter: chapterText,
+            url: fixedUrl,
+            cover,
+            mangaUrl,
+            rating: rating || "N/A",
+            status: status || "Unknown",
+            updatedTime,
+            source: sectionName, // Track which section this came from
+          });
+        }
+      }
+    }
+  });
+  
+  return results;
+}
+
 async function scrape() {
   const res = await axios.get(SITE_URL, {
     headers: {
@@ -118,66 +200,20 @@ async function scrape() {
   const html = res.data;
   const $ = cheerio.load(html);
 
+  // Scrape both sections
+  const projectUpdates = await scrapeSection($, "Project Updates");
+  const latestUpdates = await scrapeSection($, "Latest Updates");
+  
+  // Merge and remove duplicates (same URL)
+  const seen = new Set();
   const results = [];
-
-  $("a:has(p:contains('Chapter'))").each((i, el) => {
-    const card = $(el);
-    const link = card.attr("href");
-    const chapterText = card.find("p").text().trim();
-
-    if (chapterText.includes("Chapter")) {
-      const parent = card.parent();
-      
-      // Get title from h1 in parent element
-      let title = parent.find("h1").text().trim();
-      // Fallback to h3
-      if (!title) {
-        title = card.find("h3").text().trim();
-      }
-      
-      // Get cover from parent element
-      let cover = parent.find("img").first().attr("src");
-      
-      // Get rating from .numscore
-      const rating = parent.find(".numscore").text().trim();
-      
-      // Get status (Ongoing/Completed)
-      const status = parent.find("p.font-normal.text-xs").filter((_, el) => {
-        const text = $(el).text().trim();
-        return text === "Ongoing" || text === "Completed" || text === "Hiatus";
-      }).text().trim();
-      
-      // Get last updated time
-      const updatedTime = card.find("time").attr("datetime") || card.find("time").text().trim();
-
-      // Fix relative URLs
-      let fixedUrl = link;
-      if (fixedUrl && !fixedUrl.startsWith("http")) {
-        fixedUrl = "https://02.ikiru.wtf" + fixedUrl;
-      }
-      if (cover && !cover.startsWith("http")) {
-        cover = "https://02.ikiru.wtf" + cover;
-      }
-
-      // Get manga detail page URL for description (extract from chapter URL)
-      // Chapter URL: https://02.ikiru.wtf/manga/hello-veterinarian/chapter-124.820368/
-      // Manga URL:   https://02.ikiru.wtf/manga/hello-veterinarian/
-      const mangaUrl = fixedUrl.replace(/\/chapter-[^/]+\/$/, '/');
-
-      if (link && title && chapterText) {
-        results.push({
-          title,
-          chapter: chapterText,
-          url: fixedUrl,
-          cover,
-          mangaUrl,
-          rating: rating || "N/A",
-          status: status || "Unknown",
-          updatedTime,
-        });
-      }
+  
+  for (const item of [...projectUpdates, ...latestUpdates]) {
+    if (!seen.has(item.url)) {
+      seen.add(item.url);
+      results.push(item);
     }
-  });
+  }
 
   return results;
 }
