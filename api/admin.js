@@ -248,6 +248,15 @@ function renderDashboard(whitelist, message = "") {
 }
 
 export default async function handler(req, res) {
+  // CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  
   // Simple session using cookie
   const cookies = req.headers.cookie || "";
   const isAuthenticated = cookies.includes("admin=1");
@@ -277,11 +286,11 @@ export default async function handler(req, res) {
     // Login
     if (body.password) {
       if (body.password === AUTH_PASSWORD) {
-        res.setHeader("Set-Cookie", "admin=1; Path=/; HttpOnly; Max-Age=86400");
+        res.setHeader("Set-Cookie", "admin=1; Path=/; Max-Age=86400; SameSite=Lax");
         const whitelist = loadWhitelist();
-        return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard(whitelist));
+        return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard(whitelist, { type: "success", text: "✅ Login successful!" }));
       } else {
-        return res.status(200).setHeader("Content-Type", "text/html").send(renderLogin());
+        return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard([], { type: "error", text: "❌ Wrong password!" }));
       }
     }
 
