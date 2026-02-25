@@ -3,6 +3,7 @@ import fs from "fs";
 
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPLICATION_ID = process.env.DISCORD_APPLICATION_ID;
+const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
 
 // Command definitions
 const COMMANDS = {
@@ -146,11 +147,12 @@ export default async function handler(req, res) {
   const rawBody = JSON.stringify(req.body);
   
   try {
-    const isValid = verifyKey(rawBody, signature, timestamp, APPLICATION_ID);
+    const isValid = verifyKey(rawBody, signature, timestamp, PUBLIC_KEY);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid signature" });
     }
-  } catch {
+  } catch (err) {
+    console.error("Signature verification failed:", err.message);
     return res.status(401).json({ error: "Invalid signature" });
   }
 
