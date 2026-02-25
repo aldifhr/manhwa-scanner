@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Call Vercel API
         run: |
-          curl -X GET "https://ikiru-bot.vercel.app/api/cron" \
+          curl -X GET "https://ikiru-bots.vercel.app/api/cron" \
             -H "User-Agent: GitHub-Actions" \
             --max-time 30 \
             --retry 3
