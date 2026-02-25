@@ -10,8 +10,13 @@ const redis = new Redis({
 async function loadWhitelist() {
   try {
     const data = await redis.get("whitelist:manga");
-    return data ? data : [];
-  } catch {
+    if (!data) return [];
+    // Handle both array and string formats
+    if (Array.isArray(data)) return data;
+    if (typeof data === "string") return JSON.parse(data);
+    return [];
+  } catch (err) {
+    console.error("Load whitelist error:", err.message);
     return [];
   }
 }
