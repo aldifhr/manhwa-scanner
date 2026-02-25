@@ -142,12 +142,11 @@ export const config = {
 };
 
 async function getRawBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", chunk => data += chunk);
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
+  const buffers = [];
+  for await (const chunk of req) {
+    buffers.push(chunk);
+  }
+  return Buffer.concat(buffers).toString("utf-8");
 }
 
 export default async function handler(req, res) {
