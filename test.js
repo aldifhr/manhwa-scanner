@@ -73,7 +73,7 @@ async function sendDiscordNotification(data) {
 
 async function main() {
   try {
-    const whitelist = loadWhitelist();
+    const whitelist = await loadWhitelist();
     console.log(`📋 Loaded ${whitelist.length} manga from whitelist\n`);
     
     console.log("🌐 Fetching from https://02.ikiru.wtf/ ...");

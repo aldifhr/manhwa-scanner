@@ -1,18 +1,29 @@
 import fs from "fs";
+import { Redis } from "@upstash/redis";
 
 const AUTH_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 
-function loadWhitelist() {
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
+async function loadWhitelist() {
   try {
-    const data = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
-    return data.manga;
+    const data = await redis.get("whitelist:manga");
+    if (data) return JSON.parse(data);
+    
+    // Fallback to file for initial load
+    const fileData = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
+    await redis.set("whitelist:manga", JSON.stringify(fileData.manga));
+    return fileData.manga;
   } catch {
     return [];
   }
 }
 
-function saveWhitelist(manga) {
-  fs.writeFileSync("./whitelist.json", JSON.stringify({ manga }, null, 2));
+async function saveWhitelist(manga) {
+  await redis.set("whitelist:manga", JSON.stringify(manga));
 }
 
 const HTML_TEMPLATE = `<!DOCTYPE html>
@@ -266,7 +277,7 @@ export default async function handler(req, res) {
     if (!isAuthenticated) {
       return res.status(200).setHeader("Content-Type", "text/html").send(renderLogin());
     }
-    const whitelist = loadWhitelist();
+    const whitelist = await loadWhitelist();
     return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard(whitelist));
   }
 
@@ -288,7 +299,7 @@ export default async function handler(req, res) {
     if (body.password) {
       if (body.password === AUTH_PASSWORD) {
         res.setHeader("Set-Cookie", "admin=1; Path=/; Max-Age=86400; SameSite=Lax");
-        const whitelist = loadWhitelist();
+        const whitelist = await loadWhitelist();
         return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard(whitelist, { type: "success", text: "✅ Login successful!" }));
       } else {
         return res.status(200).setHeader("Content-Type", "text/html").send(renderLogin({ error: "❌ Wrong password!" }));
@@ -300,14 +311,14 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const whitelist = loadWhitelist();
+    const whitelist = await loadWhitelist();
     let message = null;
 
     if (body.action === "add" && body.title) {
       const title = body.title.trim();
       if (!whitelist.some(w => w.toLowerCase() === title.toLowerCase())) {
         whitelist.push(title);
-        saveWhitelist(whitelist);
+        await saveWhitelist(whitelist);
         message = { type: "success", text: `✅ Added "${title}"` };
       } else {
         message = { type: "error", text: `⚠️ "${title}" already exists` };
@@ -318,7 +329,7 @@ export default async function handler(req, res) {
       const index = whitelist.findIndex(w => w === body.title);
       if (index > -1) {
         whitelist.splice(index, 1);
-        saveWhitelist(whitelist);
+        await saveWhitelist(whitelist);
         message = { type: "success", text: `✅ Removed "${body.title}"` };
       }
     }
