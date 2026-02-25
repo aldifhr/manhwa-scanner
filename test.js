@@ -1,8 +1,19 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
+
+// Load whitelist
+let whitelist = [];
+try {
+  const whitelistData = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
+  whitelist = whitelistData.manga.map(title => title.toLowerCase());
+  console.log(`📋 Loaded ${whitelist.length} manga from whitelist`);
+} catch (err) {
+  console.log("⚠️ No whitelist found, sending all updates");
+}
 
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
 
@@ -60,85 +71,175 @@ async function fetchDescription(mangaUrl) {
   }
 }
 
+async function scrapeSection($, sectionName) {
+  const results = [];
+  let inSection = false;
+  
+  $("*").each((i, el) => {
+    const tagName = el.tagName?.toLowerCase();
+    const text = $(el).text().trim();
+    
+    if (tagName === "h1" && text === sectionName) {
+      inSection = true;
+    }
+    
+    if (inSection && tagName === "h1" && text !== sectionName && text.includes("Updates")) {
+      return false;
+    }
+    
+    if (inSection && tagName === "a") {
+      const card = $(el);
+      const link = card.attr("href");
+      const chapterText = card.find("p").text().trim();
+      
+      if (chapterText.includes("Chapter")) {
+        const parent = card.parent();
+        let title = parent.find("h1").text().trim();
+        if (!title) title = card.find("h3").text().trim();
+        let cover = parent.find("img").first().attr("src");
+        const rating = parent.find(".numscore").text().trim();
+        const status = parent.find("p.font-normal.text-xs").filter((_, el) => {
+          const text = $(el).text().trim();
+          return ["Ongoing", "Completed", "Hiatus"].includes(text);
+        }).text().trim() || "Unknown";
+        const updatedTime = card.find("time").attr("datetime");
+        
+        let fixedUrl = link;
+        if (fixedUrl && !fixedUrl.startsWith("http")) {
+          fixedUrl = "https://02.ikiru.wtf" + fixedUrl;
+        }
+        if (cover && !cover.startsWith("http")) cover = "https://02.ikiru.wtf" + cover;
+        
+        const mangaLink = fixedUrl.replace(/\/chapter-[^/]+\/$/, '/');
+        
+        if (link && title && chapterText) {
+          results.push({
+            title,
+            chapter: chapterText,
+            url: fixedUrl,
+            cover,
+            mangaLink,
+            rating: rating || "N/A",
+            status,
+            updatedTime,
+            source: sectionName,
+          });
+        }
+      }
+    }
+  });
+  
+  return results;
+}
+
 async function main() {
   try {
+    console.log("🌐 Fetching from https://02.ikiru.wtf/ ...");
     const res = await axios.get("https://02.ikiru.wtf/", {
       headers: { "User-Agent": "Mozilla/5.0" },
     });
+    console.log("✅ Data fetched successfully!\n");
 
     const $ = cheerio.load(res.data);
-    const card = $("a:has(p:contains('Chapter'))").first();
-    const parent = card.parent();
-
-    const chapter = card.find("p").text().trim();
-    let url = card.attr("href");
-    let title = parent.find("h1").text().trim();
-    if (!title) title = card.find("h3").text().trim();
     
-    let cover = parent.find("img").first().attr("src");
-    const rating = parent.find(".numscore").text().trim();
-    const status = parent.find("p.font-normal.text-xs").filter((_, el) => {
-      const text = $(el).text().trim();
-      return ["Ongoing", "Completed", "Hiatus"].includes(text);
-    }).text().trim() || "Unknown";
-    const updatedTime = card.find("time").attr("datetime");
-
-    // Get manga URL for description (extract base manga URL from chapter URL)
-    // Chapter URL: https://02.ikiru.wtf/manga/hello-veterinarian/chapter-124.820368/
-    // Manga URL:   https://02.ikiru.wtf/manga/hello-veterinarian/
-    const mangaLink = url.replace(/\/chapter-[^/]+\/$/, '/');
-
-    if (!url.startsWith("http")) url = "https://02.ikiru.wtf" + url;
-    if (cover && !cover.startsWith("http")) cover = "https://02.ikiru.wtf" + cover;
-
-    console.log("TITLE:", title);
-    console.log("CHAPTER:", chapter);
-    console.log("RATING:", rating);
-    console.log("STATUS:", status);
-    console.log("UPDATED:", updatedTime);
-    console.log("COVER:", cover);
-
-    // Fetch description
-    console.log("Fetching description...");
-    const description = await fetchDescription(mangaLink);
-    console.log("DESCRIPTION:", description ? description.substring(0, 50) + "..." : "None");
-
-    // Build embed
-    const statusEmoji = { "Ongoing": "🟢", "Completed": "🔵", "Hiatus": "🟡", "Unknown": "⚪" };
+    // Scrape both sections
+    const projectUpdates = await scrapeSection($, "Project Updates");
+    const latestUpdates = await scrapeSection($, "Latest Updates");
     
-    const fields = [
-      { name: "⭐ Rating", value: rating ? `**${rating}** / 10` : "No rating", inline: true },
-      { name: "📊 Status", value: `${statusEmoji[status] || "⚪"} ${status}`, inline: true }
-    ];
+    console.log(`📌 Project Updates: ${projectUpdates.length} chapters`);
+    console.log(`🆕 Latest Updates: ${latestUpdates.length} chapters`);
     
-    if (updatedTime) {
-      fields.push({ name: "🕐 Updated", value: formatTimeAgo(updatedTime), inline: true });
+    // Merge and remove duplicates
+    const seen = new Set();
+    const allResults = [];
+    
+    for (const item of [...projectUpdates, ...latestUpdates]) {
+      if (!seen.has(item.url)) {
+        seen.add(item.url);
+        allResults.push(item);
+      }
     }
-
-    let descriptionText = `**${chapter}**`;
-    if (description) {
-      descriptionText += `\n\n📄 **Synopsis:**\n${description}`;
+    
+    console.log(`\n📊 Total unique chapters: ${allResults.length}`);
+    
+    // Filter: only chapters updated today (within last 24 hours)
+    const now = new Date();
+    let todayResults = allResults.filter(item => {
+      if (!item.updatedTime) return false;
+      const updateDate = new Date(item.updatedTime);
+      const diffHours = (now - updateDate) / (1000 * 60 * 60);
+      return diffHours <= 24; // Within last 24 hours
+    });
+    
+    // Filter by whitelist if exists
+    if (whitelist.length > 0) {
+      todayResults = todayResults.filter(item => 
+        whitelist.some(w => item.title.toLowerCase().includes(w))
+      );
     }
-    descriptionText += `\n\n[Read Chapter](${url})`;
+    
+    console.log(`📅 Chapters updated today (≤24h): ${todayResults.length}`);
+    
+    if (todayResults.length === 0) {
+      console.log("ℹ️ No new chapters today. Exiting.");
+      return;
+    }
+    
+    // Sort: Project Updates first, then Latest Updates
+    const sortedResults = todayResults.sort((a, b) => {
+      if (a.source === "Project Updates" && b.source !== "Project Updates") return -1;
+      if (a.source !== "Project Updates" && b.source === "Project Updates") return 1;
+      return 0;
+    });
+    
+    // Send all chapters updated today (no limit)
+    const testItems = sortedResults;
+    
+    for (const data of testItems) {
+      console.log(`\n📝 Sending: ${data.title} - ${data.chapter} (${data.source})`);
+      
+      const description = await fetchDescription(data.mangaLink);
+      
+      const statusEmoji = { "Ongoing": "🟢", "Completed": "🔵", "Hiatus": "🟡", "Unknown": "⚪" };
+      const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
+      const sourceText = data.source === "Project Updates" ? "From Your Library" : "Latest Release";
+      
+      const fields = [
+        { name: "⭐ Rating", value: data.rating ? `**${data.rating}** / 10` : "No rating", inline: true },
+        { name: "📊 Status", value: `${statusEmoji[data.status] || "⚪"} ${data.status}`, inline: true }
+      ];
+      
+      if (data.updatedTime) {
+        fields.push({ name: "🕐 Updated", value: formatTimeAgo(data.updatedTime), inline: true });
+      }
 
-    const payload = {
-      embeds: [{
-        title: `📖 ${title}`,
-        description: descriptionText,
-        url: url,
-        color: getStatusColor(status),
-        fields: fields,
-        timestamp: new Date().toISOString(),
-        footer: {
-          text: "🔔 New Chapter Alert • ikiru.wtf",
-          icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png"
-        },
-        thumbnail: cover && cover.startsWith("http") ? { url: cover } : undefined
-      }],
-    };
+      let descriptionText = `**${data.chapter}**`;
+      if (description) {
+        descriptionText += `\n\n📄 **Synopsis:**\n${description}`;
+      }
+      descriptionText += `\n\n[Read Chapter](${data.url})`;
 
-    await axios.post(WEBHOOK, payload);
-    console.log("✅ Sent to Discord with full embed!");
+      const payload = {
+        embeds: [{
+          title: `📖 ${data.title}`,
+          description: descriptionText,
+          url: data.url,
+          color: getStatusColor(data.status),
+          fields: fields,
+          timestamp: new Date().toISOString(),
+          footer: {
+            text: `${sourceEmoji} ${sourceText} • ikiru.wtf`,
+            icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png"
+          },
+          thumbnail: data.cover && data.cover.startsWith("http") ? { url: data.cover } : undefined
+        }],
+      };
+
+      await axios.post(WEBHOOK, payload);
+      console.log("✅ Sent!");
+    }
+    
+    console.log("\n🎉 All test notifications sent!");
   } catch (err) {
     console.error("❌ ERROR:", err.message);
   }

@@ -117,18 +117,21 @@ async function scrapeSection($, sectionName) {
   let inSection = false;
   
   $("*").each((i, el) => {
+    const tagName = el.tagName?.toLowerCase();
+    const text = $(el).text().trim();
+    
     // Check if we hit the section header
-    if ($(el).is("h1") && $(el).text().includes(sectionName)) {
+    if (tagName === "h1" && text === sectionName) {
       inSection = true;
     }
     
     // Check if we hit the next section (stop)
-    if (inSection && $(el).is("h1") && !$(el).text().includes(sectionName)) {
+    if (inSection && tagName === "h1" && text !== sectionName && text.includes("Updates")) {
       return false;
     }
     
     // Process chapter links in this section
-    if (inSection && $(el).is("a")) {
+    if (inSection && tagName === "a") {
       const card = $(el);
       const link = card.attr("href");
       const chapterText = card.find("p").text().trim();
@@ -206,16 +209,32 @@ async function scrape() {
   
   // Merge and remove duplicates (same URL)
   const seen = new Set();
-  const results = [];
+  const allResults = [];
   
   for (const item of [...projectUpdates, ...latestUpdates]) {
     if (!seen.has(item.url)) {
       seen.add(item.url);
-      results.push(item);
+      allResults.push(item);
     }
   }
+  
+  // Filter: only chapters updated within last 24 hours (fresh)
+  const now = new Date();
+  const freshResults = allResults.filter(item => {
+    if (!item.updatedTime) return false;
+    const updateDate = new Date(item.updatedTime);
+    const diffHours = (now - updateDate) / (1000 * 60 * 60);
+    return diffHours <= 24;
+  });
+  
+  // Sort: Project Updates first, then Latest Updates
+  const sortedResults = freshResults.sort((a, b) => {
+    if (a.source === "Project Updates" && b.source !== "Project Updates") return -1;
+    if (a.source !== "Project Updates" && b.source === "Project Updates") return 1;
+    return 0;
+  });
 
-  return results;
+  return sortedResults;
 }
 
 async function fetchDescription(mangaUrl) {
