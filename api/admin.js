@@ -179,10 +179,11 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function renderLogin() {
+function renderLogin(message = null) {
   const content = `
     <div class="login-form">
       <h2>🔐 Admin Login</h2>
+      ${message ? `<div class="message error">${message.error}</div>` : ''}
       <form method="POST" action="/api/admin">
         <div class="input-group">
           <input type="password" name="password" placeholder="Enter password" required>
@@ -290,7 +291,7 @@ export default async function handler(req, res) {
         const whitelist = loadWhitelist();
         return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard(whitelist, { type: "success", text: "✅ Login successful!" }));
       } else {
-        return res.status(200).setHeader("Content-Type", "text/html").send(renderDashboard([], { type: "error", text: "❌ Wrong password!" }));
+        return res.status(200).setHeader("Content-Type", "text/html").send(renderLogin({ error: "❌ Wrong password!" }));
       }
     }
 
