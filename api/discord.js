@@ -135,41 +135,59 @@ async function handleCommand(command, options) {
   }
 }
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", chunk => data += chunk);
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
+
 export default async function handler(req, res) {
   // Only accept POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Verify Discord signature
-  const signature = req.headers["x-signature-ed25519"];
-  const timestamp = req.headers["x-signature-timestamp"];
-  const rawBody = JSON.stringify(req.body);
-  
   try {
+    // Get raw body for signature verification
+    const rawBody = await getRawBody(req);
+    const body = JSON.parse(rawBody);
+    
+    // Verify Discord signature
+    const signature = req.headers["x-signature-ed25519"];
+    const timestamp = req.headers["x-signature-timestamp"];
+    
     const isValid = verifyKey(rawBody, signature, timestamp, PUBLIC_KEY);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid signature" });
     }
+
+    const { type, data } = body;
+
+    // Handle ping (Discord verification)
+    if (type === 1) {
+      return res.status(200).json({ type: 1 });
+    }
+
+    // Handle commands
+    if (type === 2) {
+      const response = await handleCommand(data.name, data.options || []);
+      return res.status(200).json(response);
+    }
+
+    return res.status(400).json({ error: "Unknown interaction type" });
   } catch (err) {
-    console.error("Signature verification failed:", err.message);
-    return res.status(401).json({ error: "Invalid signature" });
+    console.error("Error:", err.message);
+    return res.status(500).json({ error: "Internal server error" });
   }
-
-  const { type, data } = req.body;
-
-  // Handle ping (Discord verification)
-  if (type === 1) {
-    return res.status(200).json({ type: 1 });
-  }
-
-  // Handle commands
-  if (type === 2) {
-    const response = await handleCommand(data.name, data.options || []);
-    return res.status(200).json(response);
-  }
-
-  return res.status(400).json({ error: "Unknown interaction type" });
 }
 
 // Register commands on startup
