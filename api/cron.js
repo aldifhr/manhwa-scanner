@@ -87,7 +87,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const items = await scrapeMangaUpdates();
+    const items = await scrapeMangaUpdates(redis);
     const sortedItems = sortBySource(items);
 
     const pageHash = hash(JSON.stringify(sortedItems));

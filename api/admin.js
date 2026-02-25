@@ -1,4 +1,3 @@
-import fs from "fs";
 import { Redis } from "@upstash/redis";
 
 const AUTH_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
@@ -11,19 +10,14 @@ const redis = new Redis({
 async function loadWhitelist() {
   try {
     const data = await redis.get("whitelist:manga");
-    if (data) return JSON.parse(data);
-    
-    // Fallback to file for initial load
-    const fileData = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
-    await redis.set("whitelist:manga", JSON.stringify(fileData.manga));
-    return fileData.manga;
+    return data ? data : [];
   } catch {
     return [];
   }
 }
 
 async function saveWhitelist(manga) {
-  await redis.set("whitelist:manga", JSON.stringify(manga));
+  await redis.set("whitelist:manga", manga);
 }
 
 const HTML_TEMPLATE = `<!DOCTYPE html>
