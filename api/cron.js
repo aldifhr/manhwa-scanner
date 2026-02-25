@@ -6,7 +6,8 @@ import {
   getStatusColor, 
   fetchDescription, 
   scrapeMangaUpdates, 
-  sortBySource 
+  sortBySource,
+  sendErrorLog
 } from "../lib/scraper.js";
 
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
@@ -101,7 +102,7 @@ export default async function handler(req, res) {
       const exists = await redis.get(key);
 
       if (!exists) {
-        const description = await fetchDescription(item.mangaUrl);
+        const description = await fetchDescription(item.mangaUrl, redis);
         item.description = description;
         
         await sendDiscord(item);
@@ -117,6 +118,7 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error(err);
+    await sendErrorLog(WEBHOOK, err, "API Handler");
     return res.status(500).json({ error: err.message });
   }
 }
