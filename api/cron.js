@@ -212,6 +212,14 @@ async function fetchDescription(mangaUrl) {
 }
 
 export default async function handler(req, res) {
+  // Proteksi: hanya izinkan dari GitHub Actions atau manual trigger dengan secret
+  const userAgent = req.headers["user-agent"] || "";
+  const isGitHubActions = userAgent.includes("GitHub-Actions");
+  
+  if (!isGitHubActions) {
+    return res.status(403).json({ error: "Forbidden - Only GitHub Actions allowed" });
+  }
+
   try {
     const items = await scrape();
 
