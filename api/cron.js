@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       const exists = await redis.get(key);
 
       if (!exists) {
-        const description = await fetchDescription(item.mangaUrl, redis);
+        const description = await fetchDescription(item.mangaUrl);
         item.description = description;
         
         await sendDiscord(item);
