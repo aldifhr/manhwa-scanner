@@ -1,8 +1,8 @@
 import { verifyKey, InteractionType } from "discord-interactions";
 import { waitUntil }                  from "@vercel/functions";
-import { loadWhitelist, saveWhitelist } from "../../lib/redis.js";
-import { editInteractionResponse }    from "../../lib/discord.js";
-import commands                       from "../../lib/commands/index.js";
+import { loadWhitelist, saveWhitelist } from "../lib/redis.js";
+import { editInteractionResponse }    from "../lib/discord.js";
+import commands                       from "../lib/commands/index.js";
 
 export const config = { api: { bodyParser: false } };
 
