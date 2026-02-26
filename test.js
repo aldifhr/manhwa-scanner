@@ -6,19 +6,16 @@ import {
   getStatusColor, 
   fetchDescription, 
   scrapeMangaUpdates, 
-  sortBySource 
+  sortBySource,
+  sendTelegram,
+  STATUS_EMOJI
 } from "./lib/scraper.js";
 
 dotenv.config();
 
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-
-const STATUS_EMOJI = { 
-  "Ongoing": "🟢", 
-  "Completed": "🔵", 
-  "Hiatus": "🟡", 
-  "Unknown": "⚪" 
-};
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendDiscordNotification(data) {
   const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
@@ -89,8 +86,17 @@ async function main() {
     
     for (const data of sortedResults) {
       console.log(`📝 Sending: ${data.title} - ${data.chapter} (${data.source})`);
+      
+      // Send to Discord
       await sendDiscordNotification(data);
-      console.log("✅ Sent!\n");
+      
+      // Send to Telegram (if configured)
+      if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+        await sendTelegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data);
+        console.log("✅ Discord + Telegram sent!\n");
+      } else {
+        console.log("✅ Discord sent!\n");
+      }
     }
     
     console.log("🎉 All notifications sent!");

@@ -7,10 +7,14 @@ import {
   fetchDescription, 
   scrapeMangaUpdates, 
   sortBySource,
-  sendErrorLog
+  sendErrorLog,
+  sendTelegram,
+  STATUS_EMOJI
 } from "../lib/scraper.js";
 
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -20,13 +24,6 @@ const redis = new Redis({
 function hash(text) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
-
-const STATUS_EMOJI = { 
-  "Ongoing": "🟢", 
-  "Completed": "🔵", 
-  "Hiatus": "🟡", 
-  "Unknown": "⚪" 
-};
 
 async function sendDiscord(data) {
   const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
@@ -105,7 +102,14 @@ export default async function handler(req, res) {
         const description = await fetchDescription(item.mangaUrl);
         item.description = description;
         
+        // Send to Discord
         await sendDiscord(item);
+        
+        // Send to Telegram (if configured)
+        if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+          await sendTelegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, item);
+        }
+        
         await redis.set(key, "sent");
       }
     }
