@@ -39,6 +39,34 @@ const commands = [
   {
     name: "status",
     description: "Show bot status",
+  },
+  {
+    name: "search",
+    description: "Search manga on ikiru.wtf",
+    options: [{
+      name: "query",
+      description: "Search query",
+      type: 3, // STRING
+      required: true
+    }]
+  },
+  {
+    name: "info",
+    description: "Get manga info",
+    options: [{
+      name: "title",
+      description: "Manga title",
+      type: 3, // STRING
+      required: true
+    }]
+  },
+  {
+    name: "clear",
+    description: "Clear all whitelist",
+  },
+  {
+    name: "recent",
+    description: "Show 5 latest chapters",
   }
 ];
 

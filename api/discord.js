@@ -4,8 +4,11 @@ import {
   InteractionResponseType,
 } from "discord-interactions";
 import { Redis } from "@upstash/redis";
+import axios from "axios";
+import * as cheerio from "cheerio";
 
 const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
+const SITE_URL = "https://02.ikiru.wtf/";
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -162,6 +165,159 @@ export default async function handler(req, res) {
             content: `📊 **Bot Status**\n\n📋 Whitelisted: ${whitelist.length} manga\n⏱️ Check interval: Every 5 minutes\n🔔 Notifications: Discord + Telegram`,
           },
         });
+      }
+
+      if (name === "search") {
+        const query = options?.[0]?.value;
+        if (!query) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a search query!" },
+          });
+        }
+
+        try {
+          const response = await axios.get(SITE_URL, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          });
+          const $ = cheerio.load(response.data);
+          
+          const results = [];
+          $("a").each((i, el) => {
+            const title = $(el).find("h3").text().trim();
+            const chapter = $(el).find("p").text().trim();
+            if (title && chapter.includes("Chapter") && title.toLowerCase().includes(query.toLowerCase())) {
+              const link = $(el).attr("href");
+              results.push({ title, chapter, link });
+            }
+          });
+
+          if (results.length === 0) {
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: { content: `🔍 No manga found for "${query}"` },
+            });
+          }
+
+          const list = results.slice(0, 5).map(r => `• **${r.title}** - ${r.chapter}`).join("\n");
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `🔍 **Search results for "${query}":**\n\n${list}`,
+            },
+          });
+        } catch (err) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Error searching: ${err.message}` },
+          });
+        }
+      }
+
+      if (name === "info") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
+
+        try {
+          const response = await axios.get(SITE_URL, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          });
+          const $ = cheerio.load(response.data);
+          
+          let mangaInfo = null;
+          $("a").each((i, el) => {
+            const mangaTitle = $(el).find("h3").text().trim();
+            if (mangaTitle.toLowerCase().includes(title.toLowerCase())) {
+              const parent = $(el).parent();
+              mangaInfo = {
+                title: mangaTitle,
+                chapter: $(el).find("p").text().trim(),
+                rating: parent.find(".numscore").text().trim() || "N/A",
+                status: parent.find("p.font-normal.text-xs").filter((_, el) => {
+                  const t = $(el).text().trim();
+                  return ["Ongoing", "Completed", "Hiatus"].includes(t);
+                }).text().trim() || "Unknown",
+                cover: parent.find("img").first().attr("src"),
+              };
+              return false;
+            }
+          });
+
+          if (!mangaInfo) {
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: { content: `🔍 Manga "${title}" not found` },
+            });
+          }
+
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `📖 **${mangaInfo.title}**\n\n📚 Latest: ${mangaInfo.chapter}\n⭐ Rating: ${mangaInfo.rating}/10\n📊 Status: ${mangaInfo.status}`,
+            },
+          });
+        } catch (err) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Error getting info: ${err.message}` },
+          });
+        }
+      }
+
+      if (name === "clear") {
+        const whitelist = await loadWhitelist();
+        const count = whitelist.length;
+        
+        await saveWhitelist([]);
+        
+        return res.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: `🗑️ **Whitelist cleared!**\nRemoved ${count} manga from whitelist.`,
+          },
+        });
+      }
+
+      if (name === "recent") {
+        try {
+          const response = await axios.get(SITE_URL, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          });
+          const $ = cheerio.load(response.data);
+          
+          const results = [];
+          $("a").each((i, el) => {
+            const title = $(el).find("h3").text().trim();
+            const chapter = $(el).find("p").text().trim();
+            if (title && chapter.includes("Chapter")) {
+              const updatedTime = $(el).find("time").attr("datetime");
+              results.push({ title, chapter, updatedTime });
+            }
+          });
+
+          const recent = results.slice(0, 5);
+          const list = recent.map(r => `• **${r.title}** - ${r.chapter}`).join("\n");
+          
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `🕐 **5 Latest Chapters:**\n\n${list}`,
+            },
+          });
+        } catch (err) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Error fetching recent: ${err.message}` },
+          });
+        }
       }
     }
 
