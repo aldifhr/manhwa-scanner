@@ -4,8 +4,9 @@ import {
   formatTimeAgo,
   fetchDescription,
   scrapeMangaUpdates,
-} from "../../lib/scraper.js";
+} from "../lib/scraper.js";
 
+// ✅ shorthand
 const cl = console.log;
 
 const BOT_TOKEN   = process.env.DISCORD_BOT_TOKEN;
