@@ -81,14 +81,18 @@ async function getRawBody(req) {
 
 async function loadWhitelist() {
   try {
-    return (await redis.get("whitelist:manga")) || [];
+    const raw = await redis.get("whitelist:manga");
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") return JSON.parse(raw);
+    return [];
   } catch {
     return [];
   }
 }
 
 async function saveWhitelist(list) {
-  await redis.set("whitelist:manga", list);
+  await redis.set("whitelist:manga", JSON.stringify(list));
 }
 
 async function getNotificationChannel(guildId) {
@@ -118,13 +122,21 @@ async function getAllGuildChannels() {
 
 async function editInteractionResponse(token, content) {
   try {
+    const safeContent = content.length > 2000
+      ? content.substring(0, 1997) + "..."
+      : content;
+
     await axios.patch(
       `https://discord.com/api/v10/webhooks/${APP_ID}/${token}/messages/@original`,
-      { content },
+      { content: safeContent },
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error(`❌ editInteractionResponse failed: ${err.message}`);
+    if (err.response) {
+      console.error(`Status: ${err.response.status}`);
+      console.error(`Body: ${JSON.stringify(err.response.data)}`);
+    }
   }
 }
 
