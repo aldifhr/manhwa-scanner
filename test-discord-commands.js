@@ -4,7 +4,7 @@ import fs from "fs";
 dotenv.config();
 
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const APP_ID = process.env.DISCORD_APPLICATION_ID;
+const APP_ID    = process.env.DISCORD_APPLICATION_ID;
 
 if (!BOT_TOKEN || !APP_ID) {
   console.error("❌ Please set DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID in .env");
@@ -13,12 +13,20 @@ if (!BOT_TOKEN || !APP_ID) {
 
 const commands = [
   {
+    name: "ping",
+    description: "Cek status bot dan Redis",
+  },
+  {
+    name: "check",
+    description: "Cek chapter baru sekarang tanpa nunggu cron",
+  },
+  {
     name: "add",
     description: "Add manga to whitelist",
     options: [{
       name: "title",
       description: "Manga title to add",
-      type: 3, // STRING
+      type: 3,
       required: true
     }]
   },
@@ -28,7 +36,7 @@ const commands = [
     options: [{
       name: "title",
       description: "Manga title to remove",
-      type: 3, // STRING
+      type: 3,
       required: true
     }]
   },
@@ -46,7 +54,7 @@ const commands = [
     options: [{
       name: "title",
       description: "Manga title to search",
-      type: 3, // STRING
+      type: 3,
       required: true
     }]
   },
@@ -64,9 +72,9 @@ const commands = [
     options: [{
       name: "channel",
       description: "Channel to send notifications",
-      type: 7, // CHANNEL
+      type: 7,
       required: true,
-      channel_types: [0] // Text channels only
+      channel_types: [0]
     }]
   },
   {
@@ -79,11 +87,11 @@ const commands = [
     options: [{
       name: "period",
       description: "Time period",
-      type: 3, // STRING
+      type: 3,
       required: false,
       choices: [
-        { name: "Today", value: "daily" },
-        { name: "Weekly", value: "weekly" },
+        { name: "Today",   value: "daily"   },
+        { name: "Weekly",  value: "weekly"  },
         { name: "Monthly", value: "monthly" }
       ]
     }]
@@ -91,20 +99,20 @@ const commands = [
   {
     name: "topseries",
     description: "Show top series of all time",
-  }
+  },
 ];
 
 async function registerCommands() {
   try {
     console.log("📝 Registering Discord slash commands...\n");
-    
+
     const response = await fetch(
       `https://discord.com/api/v10/applications/${APP_ID}/commands`,
       {
         method: "PUT",
         headers: {
           "Authorization": `Bot ${BOT_TOKEN}`,
-          "Content-Type": "application/json"
+          "Content-Type":  "application/json"
         },
         body: JSON.stringify(commands)
       }

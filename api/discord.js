@@ -6,6 +6,7 @@ import {
 import { Redis } from "@upstash/redis";
 import axios from "axios";
 import * as cheerio from "cheerio";
+import { waitUntil } from "@vercel/functions";
 import {
   formatTimeAgo,
   fetchDescription,
@@ -26,6 +27,8 @@ export const config = {
   api: { bodyParser: false },
 };
 
+const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
+
 // ─────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────
@@ -43,8 +46,6 @@ const statusBar = {
   "Hiatus":    "🟡 Hiatus",
   "Unknown":   "⚪ Unknown",
 };
-
-const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari dalam detik
 
 // ─────────────────────────────────────────────────────────
 // HELPERS
@@ -112,8 +113,20 @@ async function getAllGuildChannels() {
 }
 
 // ─────────────────────────────────────────────────────────
-// DISCORD EMBED
+// DISCORD HELPERS
 // ─────────────────────────────────────────────────────────
+
+async function editInteractionResponse(token, content) {
+  try {
+    await axios.patch(
+      `https://discord.com/api/v10/webhooks/${APP_ID}/${token}/messages/@original`,
+      { content },
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error(`❌ editInteractionResponse failed: ${err.message}`);
+  }
+}
 
 async function sendDiscordEmbed(data, channelId) {
   const description = data.description || (await fetchDescription(data.mangaUrl));
@@ -142,21 +155,9 @@ async function sendDiscordEmbed(data, channelId) {
         `**[→ Baca Sekarang](${data.url})**`,
       ].filter(Boolean).join("\n"),
       fields: [
-        {
-          name:   "⭐ Rating",
-          value:  ratingStars(data.rating),
-          inline: true,
-        },
-        {
-          name:   "📊 Status",
-          value:  `\`${statusBar[data.status] || "⚪ Unknown"}\``,
-          inline: true,
-        },
-        {
-          name:   "🕐 Updated",
-          value:  data.updatedTime ? `\`${formatTimeAgo(data.updatedTime)}\`` : "`Unknown`",
-          inline: true,
-        },
+        { name: "⭐ Rating",  value: ratingStars(data.rating),                                                  inline: true },
+        { name: "📊 Status",  value: `\`${statusBar[data.status] || "⚪ Unknown"}\``,                           inline: true },
+        { name: "🕐 Updated", value: data.updatedTime ? `\`${formatTimeAgo(data.updatedTime)}\`` : "`Unknown`", inline: true },
       ],
       footer: {
         text:     "ikiru.wtf  •  Manga Tracker",
@@ -205,7 +206,6 @@ export default async function handler(req, res) {
 
     const payload = JSON.parse(body);
 
-    // Discord ping verification
     if (payload.type === 1) {
       return res.json({ type: 1 });
     }
@@ -214,6 +214,116 @@ export default async function handler(req, res) {
 
     if (type === InteractionType.APPLICATION_COMMAND) {
       const { name, options } = interactionData;
+
+      // ───────────────────────────────────────
+      // /ping
+      // ───────────────────────────────────────
+      if (name === "ping") {
+        const start = Date.now();
+
+        let redisStatus = "✅ Online";
+        try {
+          await redis.ping();
+        } catch {
+          redisStatus = "❌ Offline";
+        }
+
+        const latency = Date.now() - start;
+
+        return res.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content:
+              `🏓 **Pong!**\n\n` +
+              `⚡ Latency  : \`${latency}ms\`\n` +
+              `🗄️ Redis    : ${redisStatus}\n` +
+              `🤖 Bot      : \`Online\``,
+          },
+        });
+      }
+
+      // ───────────────────────────────────────
+      // /check
+      // ───────────────────────────────────────
+      if (name === "check") {
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            if (whitelist.length === 0) {
+              await editInteractionResponse(payload.token,
+                "⚠️ Whitelist kosong! Tambahkan manga dulu dengan `/add`"
+              );
+              return;
+            }
+
+            const allResults = await scrapeMangaUpdates(redis);
+            const matched    = allResults.filter((item) =>
+              whitelist.some((title) =>
+                item.title.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(item.title.toLowerCase())
+              )
+            );
+
+            if (matched.length === 0) {
+              await editInteractionResponse(payload.token,
+                "📭 Tidak ada chapter baru saat ini."
+              );
+              return;
+            }
+
+            const guildChannels = await getAllGuildChannels();
+            if (Object.keys(guildChannels).length === 0) {
+              await editInteractionResponse(payload.token,
+                "⚠️ Belum ada notification channel. Gunakan `/setchannel #channel` dulu."
+              );
+              return;
+            }
+
+            let sentCount    = 0;
+            let skippedCount = 0;
+
+            for (const item of matched) {
+              const key         = `chapter:${item.url}`;
+              const alreadySent = await redis.get(key);
+
+              if (alreadySent) {
+                skippedCount++;
+                continue;
+              }
+
+              for (const [guildId, channelId] of Object.entries(guildChannels)) {
+                try {
+                  await sendDiscordEmbed(item, channelId);
+                } catch (err) {
+                  console.error(`❌ [check] Failed guild ${guildId}: ${err.message}`);
+                }
+              }
+
+              await redis.set(key, Date.now().toString(), { ex: CHAPTER_TTL });
+              sentCount++;
+            }
+
+            if (sentCount > 0) {
+              await editInteractionResponse(payload.token,
+                `✅ Selesai! Ditemukan **${sentCount}** chapter baru — notifikasi dikirim!\n` +
+                `⏭️ Skipped: **${skippedCount}** (sudah pernah dikirim)`
+              );
+            } else {
+              await editInteractionResponse(payload.token,
+                `📭 Semua chapter sudah pernah dikirim (**${skippedCount}** skipped).\n` +
+                `Notifikasi otomatis saat chapter berikutnya rilis!`
+              );
+            }
+          } catch (err) {
+            console.error(`❌ [check] Fatal: ${err.message}`);
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+
+        return;
+      }
 
       // ───────────────────────────────────────
       // /add <title>
@@ -241,7 +351,9 @@ export default async function handler(req, res) {
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
-            content: `✅ **"${title}"** ditambahkan ke whitelist!\n🔔 Notifikasi otomatis saat chapter baru rilis!`,
+            content:
+              `✅ **"${title}"** ditambahkan ke whitelist!\n` +
+              `🔔 Notifikasi otomatis saat chapter baru rilis!`,
           },
         });
       }
@@ -325,10 +437,10 @@ export default async function handler(req, res) {
           data: {
             content:
               `📊 **Bot Status**\n\n` +
-              `📋 Whitelisted: **${whitelist.length}** manga\n` +
-              `⏱️ Check interval: Every 5 minutes\n` +
-              `🗑️ Chapter cache TTL: **3 hari**\n` +
-              `🔔 Notifications: Discord`,
+              `📋 Whitelisted : **${whitelist.length}** manga\n` +
+              `⏱️ Check interval : Every 5 minutes\n` +
+              `🗑️ Chapter cache TTL : **3 hari**\n` +
+              `🔔 Notifications : Discord`,
           },
         });
       }
