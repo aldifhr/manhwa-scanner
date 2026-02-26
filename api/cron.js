@@ -6,11 +6,10 @@ import {
   scrapeMangaUpdates,
 } from "../../lib/scraper.js";
 
-const BOT_TOKEN   = process.env.DISCORD_BOT_TOKEN;
-const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
-
 const cl = console.log;
 
+const BOT_TOKEN   = process.env.DISCORD_BOT_TOKEN;
+const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
 
 const redis = new Redis({
   url:   process.env.UPSTASH_REDIS_REST_URL,
@@ -111,32 +110,31 @@ async function sendDiscordEmbed(data, channelId) {
 }
 
 export default async function handler(req, res) {
-  // ✅ Support GET (GitHub Actions curl) dan POST (Vercel Cron)
+  // ✅ Support GET (GitHub Actions) dan POST (Vercel Cron)
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   // ✅ Validasi secret
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
-    console.log("🤖 [CRON] Starting manga check...");
-    console.log(`   📅 ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB`);
+    cl("🤖 [CRON] Starting manga check...");
+    cl(`   📅 ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB`);
 
     // 1. Load whitelist
     const whitelist = await redis.get("whitelist:manga") || [];
     if (whitelist.length === 0) {
-      console.log("⚠️ [CRON] Whitelist empty, skipping.");
+      cl("⚠️ [CRON] Whitelist empty, skipping.");
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
-    console.log(`📋 [CRON] Whitelist: ${whitelist.length} manga`);
+    cl(`📋 [CRON] Whitelist: ${whitelist.length} manga`);
 
     // 2. Scrape chapter terbaru
     const allResults = await scrapeMangaUpdates(redis);
-    console.log(`📦 [CRON] Scraped ${allResults.length} chapters`);
+    cl(`📦 [CRON] Scraped ${allResults.length} chapters`);
 
     // 3. Filter sesuai whitelist
     const matched = allResults.filter((item) =>
@@ -145,7 +143,7 @@ export default async function handler(req, res) {
         title.toLowerCase().includes(item.title.toLowerCase())
       )
     );
-    console.log(`🎯 [CRON] Matched ${matched.length} chapters`);
+    cl(`🎯 [CRON] Matched ${matched.length} chapters`);
 
     if (matched.length === 0) {
       return res.status(200).json({ ok: true, message: "No matching chapters" });
@@ -154,10 +152,10 @@ export default async function handler(req, res) {
     // 4. Load semua guild channels
     const guildChannels = await getAllGuildChannels();
     if (Object.keys(guildChannels).length === 0) {
-      console.log("⚠️ [CRON] No channels registered.");
+      cl("⚠️ [CRON] No channels registered.");
       return res.status(200).json({ ok: true, message: "No channels registered" });
     }
-    console.log(`📢 [CRON] Channels: ${Object.keys(guildChannels).length} guild(s)`);
+    cl(`📢 [CRON] Channels: ${Object.keys(guildChannels).length} guild(s)`);
 
     // 5. Kirim notif untuk tiap chapter yang belum dikirim
     let sentCount    = 0;
@@ -169,7 +167,7 @@ export default async function handler(req, res) {
       const alreadySent = await redis.get(key);
 
       if (alreadySent) {
-        console.log(`⏭️ [CRON] Skipped: ${item.title} - ${item.chapter}`);
+        cl(`⏭️ [CRON] Skipped: ${item.title} - ${item.chapter}`);
         skippedCount++;
         continue;
       }
@@ -178,7 +176,7 @@ export default async function handler(req, res) {
       for (const [guildId, channelId] of Object.entries(guildChannels)) {
         try {
           await sendDiscordEmbed(item, channelId);
-          console.log(`✅ [CRON] Sent: ${item.title} → guild ${guildId}`);
+          cl(`✅ [CRON] Sent: ${item.title} → guild ${guildId}`);
           success = true;
         } catch (err) {
           console.error(`❌ [CRON] Failed guild ${guildId}: ${err.message}`);
@@ -193,7 +191,7 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log(`📊 [CRON] Done — sent: ${sentCount}, skipped: ${skippedCount}, failed: ${failedCount}`);
+    cl(`📊 [CRON] Done — sent: ${sentCount}, skipped: ${skippedCount}, failed: ${failedCount}`);
 
     return res.status(200).json({
       ok:      true,
