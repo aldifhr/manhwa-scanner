@@ -414,6 +414,9 @@ export default async function handler(req, res) {
 
       if (name === "popular") {
         try {
+          const period = options?.[0]?.value || "daily";
+          const periodText = period === "daily" ? "Today" : period === "weekly" ? "Weekly" : "Monthly";
+          
           const response = await axios.get(SITE_URL, {
             headers: { "User-Agent": "Mozilla/5.0" },
             timeout: 10000,
@@ -422,8 +425,8 @@ export default async function handler(req, res) {
           
           const results = [];
           
-          // Scrape from trending chart (Popular Today)
-          $('[data-trending-chart="daily"] li').each((i, el) => {
+          // Scrape from trending chart
+          $(`[data-trending-chart="${period}"] li`).each((i, el) => {
             const link = $(el).find("a").attr("href");
             const title = $(el).find("h3").text().trim();
             const rank = i + 1;
@@ -437,7 +440,7 @@ export default async function handler(req, res) {
           if (results.length === 0) {
             return res.json({
               type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: "🔥 No popular manga found." },
+              data: { content: `🔥 No popular manga found for ${periodText}.` },
             });
           }
 
@@ -449,7 +452,7 @@ export default async function handler(req, res) {
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: `🔥 **Popular Manga Today:**\n\n${list}`,
+              content: `🔥 **Popular Manga ${periodText}:**\n\n${list}`,
             },
           });
         } catch (err) {

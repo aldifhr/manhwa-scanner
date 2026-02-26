@@ -75,7 +75,18 @@ const commands = [
   },
   {
     name: "popular",
-    description: "Show popular manga today",
+    description: "Show popular manga",
+    options: [{
+      name: "period",
+      description: "Time period",
+      type: 3, // STRING
+      required: false,
+      choices: [
+        { name: "Today", value: "daily" },
+        { name: "Weekly", value: "weekly" },
+        { name: "Monthly", value: "monthly" }
+      ]
+    }]
   }
 ];
 
