@@ -30,16 +30,6 @@ const commands = [
     }],
   },
   {
-    name:        "add",
-    description: "Add manga to whitelist",
-    options: [{
-      name:        "title",
-      description: "Manga title to add",
-      type:        3,
-      required:    true,
-    }],
-  },
-  {
     name:        "remove",
     description: "Remove manga from whitelist (by title or number)",
     options: [{
@@ -62,7 +52,7 @@ const commands = [
   },
   {
     name:        "search",
-    description: "Cari manga di update terbaru berdasarkan keyword",
+    description: "Cari manga di Ikiru berdasarkan keyword",
     options: [{
       name:        "keyword",
       description: "Keyword pencarian",

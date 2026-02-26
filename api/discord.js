@@ -2,6 +2,7 @@ import { verifyKey, InteractionType } from "discord-interactions";
 import { waitUntil }                  from "@vercel/functions";
 import { loadWhitelist, saveWhitelist } from "../lib/redis.js";
 import { editInteractionResponse }    from "../lib/discord.js";
+import handleSearchPage               from "../lib/commands/searchPage.js";
 import commands                       from "../lib/commands/index.js";
 
 export const config = { api: { bodyParser: false } };
@@ -36,6 +37,17 @@ export default async function handler(req, res) {
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
 
+    // Pagination search
+    if (custom_id.startsWith("search:")) {
+      const parts   = custom_id.split(":");
+      const keyword = parts[1];
+      const page    = parseInt(parts[2]);
+      res.json({ type: 6 });
+      waitUntil(handleSearchPage(payload, keyword, page));
+      return;
+    }
+
+    // Add manga via tombol
     if (custom_id.startsWith("add:")) {
       const title = custom_id.replace("add:", "");
       res.json({ type: 5, data: { flags: 64 } });
