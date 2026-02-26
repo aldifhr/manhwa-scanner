@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node test.js",
-    "dev": "node --watch test.js"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "dev": "npm run lint && vercel dev"
   },
   "keywords": [],
   "author": "",
@@ -18,5 +19,10 @@
     "cheerio": "^1.2.0",
     "discord-interactions": "^4.4.0",
     "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.2",
+    "globals": "^17.3.0"
   }
 }
