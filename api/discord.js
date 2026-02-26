@@ -297,12 +297,38 @@ export default async function handler(req, res) {
           const $ = cheerio.load(response.data);
           
           const results = [];
-          $("a").each((i, el) => {
-            const title = $(el).find("h3").text().trim();
-            const chapter = $(el).find("p").text().trim();
-            if (title && chapter.includes("Chapter")) {
-              const updatedTime = $(el).find("time").attr("datetime");
-              results.push({ title, chapter, updatedTime });
+          let inSection = false;
+          
+          $("*").each((i, el) => {
+            const tagName = el.tagName?.toLowerCase();
+            const text = $(el).text().trim();
+            
+            // Look for section headers
+            if (tagName === "h1" && (text === "Project Updates" || text === "Latest Updates")) {
+              inSection = true;
+            }
+            
+            // Stop when we hit the next section
+            if (inSection && tagName === "h1" && text !== "Project Updates" && text !== "Latest Updates" && text.includes("Updates")) {
+              inSection = false;
+            }
+            
+            // Find chapter cards
+            if (inSection && tagName === "a") {
+              const card = $(el);
+              const chapterText = card.find("p").text().trim();
+              
+              if (chapterText.includes("Chapter")) {
+                const parent = card.parent();
+                let title = parent.find("h1").text().trim();
+                if (!title) title = card.find("h3").text().trim();
+                
+                const updatedTime = card.find("time").attr("datetime");
+                
+                if (title && chapterText) {
+                  results.push({ title, chapter: chapterText, updatedTime });
+                }
+              }
             }
           });
 
