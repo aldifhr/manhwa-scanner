@@ -7,13 +7,10 @@ import {
   fetchDescription, 
   scrapeMangaUpdates, 
   sendErrorLog,
-  sendTelegram,
   STATUS_EMOJI
 } from "../lib/scraper.js";
 
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 const redis = new Redis({
@@ -131,11 +128,6 @@ export default async function handler(req, res) {
         } else if (WEBHOOK) {
           // Fallback to webhook if no channels set
           await sendDiscord(item);
-        }
-        
-        // Send to Telegram (if configured)
-        if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-          await sendTelegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, item);
         }
         
         await redis.set(key, "sent");

@@ -6,21 +6,14 @@ import {
   getStatusColor, 
   fetchDescription, 
   scrapeMangaUpdates, 
-  sortBySource,
-  sendTelegram,
   STATUS_EMOJI
 } from "./lib/scraper.js";
 
 dotenv.config();
 
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendDiscordNotification(data) {
-  const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
-  const sourceText = data.source === "Project Updates" ? "From Your Library" : "Latest Release";
-  
   const fields = [
     { 
       name: "⭐ Rating", 
@@ -58,7 +51,7 @@ async function sendDiscordNotification(data) {
       fields,
       timestamp: new Date().toISOString(),
       footer: {
-        text: `${sourceEmoji} ${sourceText} • ikiru.wtf`,
+        text: `🆕 Latest Release • ikiru.wtf`,
         icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png"
       },
       thumbnail: data.cover?.startsWith("http") ? { url: data.cover } : undefined
@@ -82,21 +75,12 @@ async function main() {
       return;
     }
 
-    const sortedResults = sortBySource(results);
-    
-    for (const data of sortedResults) {
-      console.log(`📝 Sending: ${data.title} - ${data.chapter} (${data.source})`);
+    for (const data of results) {
+      console.log(`📝 Sending: ${data.title} - ${data.chapter}`);
       
       // Send to Discord
       await sendDiscordNotification(data);
-      
-      // Send to Telegram (if configured)
-      if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-        await sendTelegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data);
-        console.log("✅ Discord + Telegram sent!\n");
-      } else {
-        console.log("✅ Discord sent!\n");
-      }
+      console.log("✅ Discord sent!\n");
     }
     
     console.log("🎉 All notifications sent!");
