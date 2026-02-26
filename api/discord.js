@@ -27,7 +27,7 @@ export const config = {
   api: { bodyParser: false },
 };
 
-const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
+const CHAPTER_TTL = 60 * 60 * 24 * 3;
 
 // ─────────────────────────────────────────────────────────
 // CONSTANTS
@@ -243,6 +243,137 @@ export default async function handler(req, res) {
       }
 
       // ───────────────────────────────────────
+      // /list
+      // ───────────────────────────────────────
+      if (name === "list") {
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            const content = whitelist.length === 0
+              ? "📋 Whitelist kosong!"
+              : `📋 **Whitelisted Manga (${whitelist.length}):**\n\n${whitelist.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
+            await editInteractionResponse(payload.token, content);
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /add <title>
+      // ───────────────────────────────────────
+      if (name === "add") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
+
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            if (whitelist.some((t) => t.toLowerCase() === title.toLowerCase())) {
+              await editInteractionResponse(payload.token, `⚠️ **"${title}"** sudah ada di whitelist!`);
+              return;
+            }
+            whitelist.push(title);
+            await saveWhitelist(whitelist);
+            await editInteractionResponse(payload.token,
+              `✅ **"${title}"** ditambahkan ke whitelist!\n🔔 Notifikasi otomatis saat chapter baru rilis!`
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /remove <title>
+      // ───────────────────────────────────────
+      if (name === "remove") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
+
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            const index = whitelist.findIndex((t) => t.toLowerCase() === title.toLowerCase());
+            if (index === -1) {
+              await editInteractionResponse(payload.token, `⚠️ **"${title}"** tidak ada di whitelist!`);
+              return;
+            }
+            whitelist.splice(index, 1);
+            await saveWhitelist(whitelist);
+            await editInteractionResponse(payload.token,
+              `✅ Removed **"${title}"** dari whitelist!\n📋 Total: **${whitelist.length}** manga`
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /clear
+      // ───────────────────────────────────────
+      if (name === "clear") {
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            const count = whitelist.length;
+            await saveWhitelist([]);
+            await editInteractionResponse(payload.token,
+              `🗑️ **Whitelist cleared!**\nRemoved **${count}** manga dari whitelist.`
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /status
+      // ───────────────────────────────────────
+      if (name === "status") {
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            await editInteractionResponse(payload.token,
+              `📊 **Bot Status**\n\n` +
+              `📋 Whitelisted : **${whitelist.length}** manga\n` +
+              `⏱️ Check interval : Every 5 minutes\n` +
+              `🗑️ Chapter cache TTL : **3 hari**\n` +
+              `🔔 Notifications : Discord`
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
       // /check
       // ───────────────────────────────────────
       if (name === "check") {
@@ -267,9 +398,7 @@ export default async function handler(req, res) {
             );
 
             if (matched.length === 0) {
-              await editInteractionResponse(payload.token,
-                "📭 Tidak ada chapter baru saat ini."
-              );
+              await editInteractionResponse(payload.token, "📭 Tidak ada chapter baru saat ini.");
               return;
             }
 
@@ -321,128 +450,7 @@ export default async function handler(req, res) {
             await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
           }
         })());
-
         return;
-      }
-
-      // ───────────────────────────────────────
-      // /add <title>
-      // ───────────────────────────────────────
-      if (name === "add") {
-        const title = options?.[0]?.value;
-        if (!title) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "❌ Please provide a manga title!" },
-          });
-        }
-
-        const whitelist = await loadWhitelist();
-        if (whitelist.some((t) => t.toLowerCase() === title.toLowerCase())) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `⚠️ **"${title}"** sudah ada di whitelist!` },
-          });
-        }
-
-        whitelist.push(title);
-        await saveWhitelist(whitelist);
-
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content:
-              `✅ **"${title}"** ditambahkan ke whitelist!\n` +
-              `🔔 Notifikasi otomatis saat chapter baru rilis!`,
-          },
-        });
-      }
-
-      // ───────────────────────────────────────
-      // /remove <title>
-      // ───────────────────────────────────────
-      if (name === "remove") {
-        const title = options?.[0]?.value;
-        if (!title) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "❌ Please provide a manga title!" },
-          });
-        }
-
-        const whitelist = await loadWhitelist();
-        const index     = whitelist.findIndex((t) => t.toLowerCase() === title.toLowerCase());
-
-        if (index === -1) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `⚠️ **"${title}"** tidak ada di whitelist!` },
-          });
-        }
-
-        whitelist.splice(index, 1);
-        await saveWhitelist(whitelist);
-
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: `✅ Removed **"${title}"** dari whitelist!\n📋 Total: **${whitelist.length}** manga`,
-          },
-        });
-      }
-
-      // ───────────────────────────────────────
-      // /list
-      // ───────────────────────────────────────
-      if (name === "list") {
-        const whitelist = await loadWhitelist();
-        if (whitelist.length === 0) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "📋 Whitelist kosong!" },
-          });
-        }
-
-        const list = whitelist.map((t, i) => `${i + 1}. ${t}`).join("\n");
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: `📋 **Whitelisted Manga (${whitelist.length}):**\n\n${list}`,
-          },
-        });
-      }
-
-      // ───────────────────────────────────────
-      // /clear
-      // ───────────────────────────────────────
-      if (name === "clear") {
-        const whitelist = await loadWhitelist();
-        const count     = whitelist.length;
-        await saveWhitelist([]);
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: `🗑️ **Whitelist cleared!**\nRemoved **${count}** manga dari whitelist.`,
-          },
-        });
-      }
-
-      // ───────────────────────────────────────
-      // /status
-      // ───────────────────────────────────────
-      if (name === "status") {
-        const whitelist = await loadWhitelist();
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content:
-              `📊 **Bot Status**\n\n` +
-              `📋 Whitelisted : **${whitelist.length}** manga\n` +
-              `⏱️ Check interval : Every 5 minutes\n` +
-              `🗑️ Chapter cache TTL : **3 hari**\n` +
-              `🔔 Notifications : Discord`,
-          },
-        });
       }
 
       // ───────────────────────────────────────
@@ -457,139 +465,131 @@ export default async function handler(req, res) {
           });
         }
 
-        try {
-          const searchResponse = await axios.post(
-            "https://02.ikiru.wtf/wp-admin/admin-ajax.php?nonce=eecc652792&action=search",
-            new URLSearchParams({ query: title }),
-            {
-              headers: {
-                "User-Agent":   "Mozilla/5.0",
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              timeout: 10000,
-            }
-          );
+        res.json({ type: 5 });
 
-          const $search  = cheerio.load(searchResponse.data);
-          let mangaUrl   = null;
-          let mangaTitle = null;
+        waitUntil((async () => {
+          try {
+            const searchResponse = await axios.post(
+              "https://02.ikiru.wtf/wp-admin/admin-ajax.php?nonce=eecc652792&action=search",
+              new URLSearchParams({ query: title }),
+              {
+                headers: {
+                  "User-Agent":   "Mozilla/5.0",
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                timeout: 10000,
+              }
+            );
 
-          $search("a").each((i, el) => {
-            const foundTitle = $search(el).find("h3, .title, h2").text().trim();
-            if (foundTitle && foundTitle.toLowerCase().includes(title.toLowerCase())) {
-              mangaUrl   = $search(el).attr("href");
-              mangaTitle = foundTitle;
-              return false;
-            }
-          });
+            const $search  = cheerio.load(searchResponse.data);
+            let mangaUrl   = null;
+            let mangaTitle = null;
 
-          if (!mangaUrl) {
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: `🔍 Manga **"${title}"** tidak ditemukan.` },
+            $search("a").each((i, el) => {
+              const foundTitle = $search(el).find("h3, .title, h2").text().trim();
+              if (foundTitle && foundTitle.toLowerCase().includes(title.toLowerCase())) {
+                mangaUrl   = $search(el).attr("href");
+                mangaTitle = foundTitle;
+                return false;
+              }
             });
+
+            if (!mangaUrl) {
+              await editInteractionResponse(payload.token, `🔍 Manga **"${title}"** tidak ditemukan.`);
+              return;
+            }
+
+            const fullUrl        = mangaUrl.startsWith("http") ? mangaUrl : `https://02.ikiru.wtf${mangaUrl}`;
+            const detailResponse = await axios.get(fullUrl, {
+              headers: { "User-Agent": "Mozilla/5.0" },
+              timeout: 10000,
+            });
+
+            const $detail     = cheerio.load(detailResponse.data);
+            const description =
+              $detail('meta[name="description"]').attr("content") ||
+              $detail(".description, .summary, [class*='description']").first().text().trim() ||
+              "No synopsis available";
+            const rating   = $detail(".numscore").first().text().trim() || "N/A";
+            const status   = $detail("p.font-normal.text-xs, .status")
+              .filter((_, el) => ["Ongoing", "Completed", "Hiatus", "Dropped"].includes($detail(el).text().trim()))
+              .first()
+              .text()
+              .trim() || "Unknown";
+            const chapters  = $detail("a[href*='chapter']").length || "Unknown";
+            const shortDesc = description.length > 200 ? description.substring(0, 197) + "..." : description;
+
+            await editInteractionResponse(payload.token,
+              `📖 **[${mangaTitle}](${fullUrl})**\n\n` +
+              `⭐ **Rating:** ${rating}/10\n` +
+              `📊 **Status:** ${status}\n` +
+              `📚 **Chapters:** ${chapters}\n\n` +
+              `📝 **Synopsis:**\n${shortDesc}\n\n` +
+              `💡 Use \`/add "${mangaTitle}"\` to add to whitelist`
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error getting manga info: ${err.message}`);
           }
-
-          const fullUrl        = mangaUrl.startsWith("http") ? mangaUrl : `https://02.ikiru.wtf${mangaUrl}`;
-          const detailResponse = await axios.get(fullUrl, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 10000,
-          });
-
-          const $detail     = cheerio.load(detailResponse.data);
-          const description =
-            $detail('meta[name="description"]').attr("content") ||
-            $detail(".description, .summary, [class*='description']").first().text().trim() ||
-            "No synopsis available";
-          const rating    = $detail(".numscore").first().text().trim() || "N/A";
-          const status    = $detail("p.font-normal.text-xs, .status")
-            .filter((_, el) => ["Ongoing", "Completed", "Hiatus", "Dropped"].includes($detail(el).text().trim()))
-            .first()
-            .text()
-            .trim() || "Unknown";
-          const chapters  = $detail("a[href*='chapter']").length || "Unknown";
-          const shortDesc = description.length > 200 ? description.substring(0, 197) + "..." : description;
-
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              content:
-                `📖 **[${mangaTitle}](${fullUrl})**\n\n` +
-                `⭐ **Rating:** ${rating}/10\n` +
-                `📊 **Status:** ${status}\n` +
-                `📚 **Chapters:** ${chapters}\n\n` +
-                `📝 **Synopsis:**\n${shortDesc}\n\n` +
-                `💡 Use \`/add "${mangaTitle}"\` to add to whitelist`,
-            },
-          });
-        } catch (err) {
-          console.error("Info error:", err);
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error getting manga info: ${err.message}` },
-          });
-        }
+        })());
+        return;
       }
 
       // ───────────────────────────────────────
       // /recent
       // ───────────────────────────────────────
       if (name === "recent") {
-        try {
-          const response = await axios.get(SITE_URL, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 10000,
-          });
-          const $       = cheerio.load(response.data);
-          const results = [];
-          let inSection = false;
+        res.json({ type: 5 });
 
-          $("*").each((i, el) => {
-            const tagName = el.tagName?.toLowerCase();
-            const text    = $(el).text().trim();
+        waitUntil((async () => {
+          try {
+            const response = await axios.get(SITE_URL, {
+              headers: { "User-Agent": "Mozilla/5.0" },
+              timeout: 10000,
+            });
+            const $       = cheerio.load(response.data);
+            const results = [];
+            let inSection = false;
 
-            if (tagName === "h1" && (text === "Project Updates" || text === "Latest Updates")) {
-              inSection = true;
-            }
-            if (inSection && tagName === "h1" && text !== "Project Updates" && text !== "Latest Updates" && text.includes("Updates")) {
-              inSection = false;
-            }
-            if (inSection && tagName === "a") {
-              const card        = $(el);
-              const chapterText = card.find("p").text().trim();
-              if (chapterText.includes("Chapter")) {
-                const parent = card.parent();
-                let t        = parent.find("h1").text().trim() || card.find("h3").text().trim();
-                const updatedTime = card.find("time").attr("datetime");
-                if (t && chapterText) {
-                  results.push({ title: t, chapter: chapterText, updatedTime });
+            $("*").each((i, el) => {
+              const tagName = el.tagName?.toLowerCase();
+              const text    = $(el).text().trim();
+
+              if (tagName === "h1" && (text === "Project Updates" || text === "Latest Updates")) {
+                inSection = true;
+              }
+              if (inSection && tagName === "h1" && text !== "Project Updates" && text !== "Latest Updates" && text.includes("Updates")) {
+                inSection = false;
+              }
+              if (inSection && tagName === "a") {
+                const card        = $(el);
+                const chapterText = card.find("p").text().trim();
+                if (chapterText.includes("Chapter")) {
+                  const parent = card.parent();
+                  let t        = parent.find("h1").text().trim() || card.find("h3").text().trim();
+                  const updatedTime = card.find("time").attr("datetime");
+                  if (t && chapterText) {
+                    results.push({ title: t, chapter: chapterText, updatedTime });
+                  }
                 }
               }
-            }
-          });
-
-          if (results.length === 0) {
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: "🕐 No recent chapters found." },
             });
+
+            if (results.length === 0) {
+              await editInteractionResponse(payload.token, "🕐 No recent chapters found.");
+              return;
+            }
+
+            const list = results
+              .slice(0, 5)
+              .map((r) => `• **${r.title}** — ${r.chapter}`)
+              .join("\n");
+
+            await editInteractionResponse(payload.token, `🕐 **5 Latest Chapters:**\n\n${list}`);
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error fetching recent chapters: ${err.message}`);
           }
-
-          const list = results
-            .slice(0, 5)
-            .map((r) => `• **${r.title}** — ${r.chapter}`)
-            .join("\n");
-
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `🕐 **5 Latest Chapters:**\n\n${list}` },
-          });
-        } catch (err) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error fetching recent chapters: ${err.message}` },
-          });
-        }
+        })());
+        return;
       }
 
       // ───────────────────────────────────────
@@ -612,13 +612,19 @@ export default async function handler(req, res) {
           });
         }
 
-        await setNotificationChannel(guildId, channelId);
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: `✅ **Notification channel set!**\nManga updates akan dikirim ke <#${channelId}>`,
-          },
-        });
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            await setNotificationChannel(guildId, channelId);
+            await editInteractionResponse(payload.token,
+              `✅ **Notification channel set!**\nManga updates akan dikirim ke <#${channelId}>`
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
       }
 
       // ───────────────────────────────────────
@@ -633,129 +639,126 @@ export default async function handler(req, res) {
           });
         }
 
-        const channelId = await getNotificationChannel(guildId);
-        if (!channelId) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              content: "⚠️ Belum ada notification channel. Gunakan `/setchannel #channel`",
-            },
-          });
-        }
+        res.json({ type: 5 });
 
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: `📢 **Current notification channel:** <#${channelId}>` },
-        });
+        waitUntil((async () => {
+          try {
+            const channelId = await getNotificationChannel(guildId);
+            if (!channelId) {
+              await editInteractionResponse(payload.token,
+                "⚠️ Belum ada notification channel. Gunakan `/setchannel #channel`"
+              );
+              return;
+            }
+            await editInteractionResponse(payload.token, `📢 **Current notification channel:** <#${channelId}>`);
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
       }
 
       // ───────────────────────────────────────
       // /popular [period]
       // ───────────────────────────────────────
       if (name === "popular") {
-        try {
-          const period     = options?.[0]?.value || "daily";
-          const periodText = period === "daily" ? "Today" : period === "weekly" ? "This Week" : "This Month";
-          const response   = await axios.get(SITE_URL, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 10000,
-          });
-          const $       = cheerio.load(response.data);
-          const results = [];
+        res.json({ type: 5 });
 
-          $(`[data-trending-chart="${period}"] li`).each((i, el) => {
-            const link  = $(el).find("a").attr("href");
-            const title = $(el).find("h3").text().trim();
-            if (title && link) {
-              results.push({
-                rank:  i + 1,
-                title,
-                url:   link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`,
-              });
-            }
-          });
-
-          if (results.length === 0) {
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: `🔥 No popular manga found for **${periodText}**.` },
+        waitUntil((async () => {
+          try {
+            const period     = options?.[0]?.value || "daily";
+            const periodText = period === "daily" ? "Today" : period === "weekly" ? "This Week" : "This Month";
+            const response   = await axios.get(SITE_URL, {
+              headers: { "User-Agent": "Mozilla/5.0" },
+              timeout: 10000,
             });
+            const $       = cheerio.load(response.data);
+            const results = [];
+
+            $(`[data-trending-chart="${period}"] li`).each((i, el) => {
+              const link  = $(el).find("a").attr("href");
+              const title = $(el).find("h3").text().trim();
+              if (title && link) {
+                results.push({
+                  rank:  i + 1,
+                  title,
+                  url:   link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`,
+                });
+              }
+            });
+
+            if (results.length === 0) {
+              await editInteractionResponse(payload.token, `🔥 No popular manga found for **${periodText}**.`);
+              return;
+            }
+
+            const list = results
+              .map((r) => {
+                const medal = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`;
+                return `${medal} **[${r.title}](${r.url})**`;
+              })
+              .join("\n");
+
+            await editInteractionResponse(payload.token, `🔥 **Popular Manga — ${periodText}:**\n\n${list}`);
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
           }
-
-          const list = results
-            .map((r) => {
-              const medal = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`;
-              return `${medal} **[${r.title}](${r.url})**`;
-            })
-            .join("\n");
-
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `🔥 **Popular Manga — ${periodText}:**\n\n${list}` },
-          });
-        } catch (err) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error: ${err.message}` },
-          });
-        }
+        })());
+        return;
       }
 
       // ───────────────────────────────────────
       // /topseries
       // ───────────────────────────────────────
       if (name === "topseries") {
-        try {
-          const response = await axios.get(SITE_URL, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 10000,
-          });
-          const $       = cheerio.load(response.data);
-          const results = [];
+        res.json({ type: 5 });
 
-          $('section:has(h2:contains("Top Series")) a[href*="/manga/"]').each((i, el) => {
-            const link   = $(el).attr("href");
-            const title  = $(el).find(".font-bold").text().trim();
-            const rank   = $(el).find(".index-name").text().trim();
-            const genres = [];
-            $(el).find(".rounded-full span").each((_, g) => genres.push($(g).text().trim()));
-
-            if (title && link) {
-              results.push({
-                rank:   parseInt(rank) || i + 1,
-                title,
-                url:    link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`,
-                genres,
-              });
-            }
-          });
-
-          if (results.length === 0) {
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: "⭐ No top series found." },
+        waitUntil((async () => {
+          try {
+            const response = await axios.get(SITE_URL, {
+              headers: { "User-Agent": "Mozilla/5.0" },
+              timeout: 10000,
             });
+            const $       = cheerio.load(response.data);
+            const results = [];
+
+            $('section:has(h2:contains("Top Series")) a[href*="/manga/"]').each((i, el) => {
+              const link   = $(el).attr("href");
+              const title  = $(el).find(".font-bold").text().trim();
+              const rank   = $(el).find(".index-name").text().trim();
+              const genres = [];
+              $(el).find(".rounded-full span").each((_, g) => genres.push($(g).text().trim()));
+
+              if (title && link) {
+                results.push({
+                  rank:   parseInt(rank) || i + 1,
+                  title,
+                  url:    link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`,
+                  genres,
+                });
+              }
+            });
+
+            if (results.length === 0) {
+              await editInteractionResponse(payload.token, "⭐ No top series found.");
+              return;
+            }
+
+            const list = results
+              .slice(0, 10)
+              .map((r) => {
+                const medal     = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`;
+                const genreText = r.genres.length > 0 ? `*${r.genres.slice(0, 3).join(", ")}*` : "";
+                return `${medal} **[${r.title}](${r.url})** ${genreText}`;
+              })
+              .join("\n");
+
+            await editInteractionResponse(payload.token, `⭐ **Top Series:**\n\n${list}`);
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
           }
-
-          const list = results
-            .slice(0, 10)
-            .map((r) => {
-              const medal     = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`;
-              const genreText = r.genres.length > 0 ? `*${r.genres.slice(0, 3).join(", ")}*` : "";
-              return `${medal} **[${r.title}](${r.url})** ${genreText}`;
-            })
-            .join("\n");
-
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `⭐ **Top Series:**\n\n${list}` },
-          });
-        } catch (err) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error: ${err.message}` },
-          });
-        }
+        })());
+        return;
       }
     }
 
