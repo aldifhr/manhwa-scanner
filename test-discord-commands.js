@@ -20,16 +20,6 @@ const commands = [
     description: "Cek chapter baru sekarang tanpa nunggu cron",
   },
   {
-    name:        "checksingle",
-    description: "Cek chapter baru untuk 1 manga spesifik (respect cache)",
-    options: [{
-      name:        "title",
-      description: "Manga title to check",
-      type:        3,
-      required:    true,
-    }],
-  },
-  {
     name:        "forcescrape",
     description: "Force scrape 1 manga dan kirim notif (ignore cache)",
     options: [{
@@ -51,10 +41,10 @@ const commands = [
   },
   {
     name:        "remove",
-    description: "Remove manga from whitelist",
+    description: "Remove manga from whitelist (by title or number)",
     options: [{
       name:        "title",
-      description: "Manga title to remove",
+      description: "Manga title or number from /list",
       type:        3,
       required:    true,
     }],
@@ -65,14 +55,14 @@ const commands = [
     options: [{
       name:        "page",
       description: "Halaman ke berapa (default: 1)",
-      type:        4, // INTEGER
+      type:        4,
       required:    false,
       min_value:   1,
     }],
   },
   {
     name:        "search",
-    description: "Cari manga di whitelist berdasarkan keyword",
+    description: "Cari manga di update terbaru berdasarkan keyword",
     options: [{
       name:        "keyword",
       description: "Keyword pencarian",
@@ -86,7 +76,7 @@ const commands = [
   },
   {
     name:        "status",
-    description: "Show bot status",
+    description: "Show bot status dan notification channel",
   },
   {
     name:        "info",
@@ -114,10 +104,6 @@ const commands = [
     }],
   },
   {
-    name:        "getchannel",
-    description: "Get current notification channel",
-  },
-  {
     name:        "popular",
     description: "Show popular manga",
     options: [{
@@ -131,10 +117,6 @@ const commands = [
         { name: "Monthly", value: "monthly" },
       ],
     }],
-  },
-  {
-    name:        "topseries",
-    description: "Show top series of all time",
   },
 ];
 
