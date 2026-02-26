@@ -13,10 +13,11 @@ import {
   scrapeMangaUpdates,
 } from "../lib/scraper.js";
 
-const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
-const SITE_URL   = "https://02.ikiru.wtf/";
-const BOT_TOKEN  = process.env.DISCORD_BOT_TOKEN;
-const APP_ID     = process.env.DISCORD_APPLICATION_ID;
+const PUBLIC_KEY  = process.env.DISCORD_PUBLIC_KEY;
+const SITE_URL    = "https://02.ikiru.wtf/";
+const BOT_TOKEN   = process.env.DISCORD_BOT_TOKEN;
+const APP_ID      = process.env.DISCORD_APPLICATION_ID;
+const OWNER_ID    = process.env.DISCORD_OWNER_ID;
 
 const redis = new Redis({
   url:   process.env.UPSTASH_REDIS_REST_URL,
@@ -73,6 +74,18 @@ async function getRawBody(req) {
     req.on("end",   () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
+}
+
+function isOwner(payload) {
+  const userId = payload.member?.user?.id || payload.user?.id;
+  return userId === OWNER_ID;
+}
+
+function matchTitle(itemTitle, searchTitle) {
+  return (
+    itemTitle.toLowerCase().includes(searchTitle.toLowerCase()) ||
+    searchTitle.toLowerCase().includes(itemTitle.toLowerCase())
+  );
 }
 
 // ─────────────────────────────────────────────────────────
@@ -255,7 +268,7 @@ export default async function handler(req, res) {
       }
 
       // ───────────────────────────────────────
-      // /list
+      // /list [page]
       // ───────────────────────────────────────
       if (name === "list") {
         res.json({ type: 5 });
@@ -263,10 +276,62 @@ export default async function handler(req, res) {
         waitUntil((async () => {
           try {
             const whitelist = await loadWhitelist();
-            const content = whitelist.length === 0
-              ? "📋 Whitelist kosong!"
-              : `📋 **Whitelisted Manga (${whitelist.length}):**\n\n${whitelist.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
-            await editInteractionResponse(payload.token, content);
+
+            if (whitelist.length === 0) {
+              await editInteractionResponse(payload.token, "📋 Whitelist kosong!");
+              return;
+            }
+
+            const pageSize  = 20;
+            const page      = Math.max(1, options?.[0]?.value || 1);
+            const totalPage = Math.ceil(whitelist.length / pageSize);
+            const start     = (page - 1) * pageSize;
+            const slice     = whitelist.slice(start, start + pageSize);
+            const list      = slice.map((t, i) => `${start + i + 1}. ${t}`).join("\n");
+
+            await editInteractionResponse(payload.token,
+              `📋 **Whitelisted Manga (${whitelist.length} total) — Page ${page}/${totalPage}:**\n\n${list}` +
+              (totalPage > 1 ? `\n\n*Gunakan \`/list <page>\` untuk halaman lain*` : "")
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /search <keyword>
+      // ───────────────────────────────────────
+      if (name === "search") {
+        const keyword = options?.[0]?.value;
+        if (!keyword) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a keyword!" },
+          });
+        }
+
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const whitelist = await loadWhitelist();
+            const results   = whitelist.filter((t) =>
+              t.toLowerCase().includes(keyword.toLowerCase())
+            );
+
+            if (results.length === 0) {
+              await editInteractionResponse(payload.token,
+                `🔍 Tidak ada manga dengan keyword **"${keyword}"** di whitelist.`
+              );
+              return;
+            }
+
+            const list = results.map((t, i) => `${i + 1}. ${t}`).join("\n");
+            await editInteractionResponse(payload.token,
+              `🔍 **Hasil pencarian "${keyword}" (${results.length} ditemukan):**\n\n${list}`
+            );
           } catch (err) {
             await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
           }
@@ -324,7 +389,7 @@ export default async function handler(req, res) {
         waitUntil((async () => {
           try {
             const whitelist = await loadWhitelist();
-            const index = whitelist.findIndex((t) => t.toLowerCase() === title.toLowerCase());
+            const index     = whitelist.findIndex((t) => t.toLowerCase() === title.toLowerCase());
             if (index === -1) {
               await editInteractionResponse(payload.token, `⚠️ **"${title}"** tidak ada di whitelist!`);
               return;
@@ -342,15 +407,25 @@ export default async function handler(req, res) {
       }
 
       // ───────────────────────────────────────
-      // /clear
+      // /clear [OWNER ONLY]
       // ───────────────────────────────────────
       if (name === "clear") {
-        res.json({ type: 5 });
+        if (!isOwner(payload)) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: "❌ Command ini hanya untuk owner bot.",
+              flags: 64,
+            },
+          });
+        }
+
+        res.json({ type: 5, data: { flags: 64 } });
 
         waitUntil((async () => {
           try {
             const whitelist = await loadWhitelist();
-            const count = whitelist.length;
+            const count     = whitelist.length;
             await saveWhitelist([]);
             await editInteractionResponse(payload.token,
               `🗑️ **Whitelist cleared!**\nRemoved **${count}** manga dari whitelist.`
@@ -403,10 +478,7 @@ export default async function handler(req, res) {
 
             const allResults = await scrapeMangaUpdates(redis);
             const matched    = allResults.filter((item) =>
-              whitelist.some((title) =>
-                item.title.toLowerCase().includes(title.toLowerCase()) ||
-                title.toLowerCase().includes(item.title.toLowerCase())
-              )
+              whitelist.some((title) => matchTitle(item.title, title))
             );
 
             if (matched.length === 0) {
@@ -459,6 +531,139 @@ export default async function handler(req, res) {
             }
           } catch (err) {
             console.error(`❌ [check] Fatal: ${err.message}`);
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /checksingle <title>
+      // ───────────────────────────────────────
+      if (name === "checksingle") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
+
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const allResults = await scrapeMangaUpdates(redis);
+            const matched    = allResults.filter((item) => matchTitle(item.title, title));
+
+            if (matched.length === 0) {
+              await editInteractionResponse(payload.token,
+                `🔍 **"${title}"** tidak ditemukan di update terbaru.\n` +
+                `Kemungkinan belum ada chapter baru atau judul tidak cocok.`
+              );
+              return;
+            }
+
+            const guildChannels = await getAllGuildChannels();
+            if (Object.keys(guildChannels).length === 0) {
+              await editInteractionResponse(payload.token,
+                "⚠️ Belum ada notification channel. Gunakan `/setchannel #channel` dulu."
+              );
+              return;
+            }
+
+            let sentCount    = 0;
+            let skippedCount = 0;
+
+            for (const item of matched) {
+              const key         = `chapter:${item.url}`;
+              const alreadySent = await redis.get(key);
+
+              if (alreadySent) {
+                skippedCount++;
+                continue;
+              }
+
+              for (const [guildId, channelId] of Object.entries(guildChannels)) {
+                try {
+                  await sendDiscordEmbed(item, channelId);
+                } catch (err) {
+                  console.error(`❌ [checksingle] Failed guild ${guildId}: ${err.message}`);
+                }
+              }
+
+              await redis.set(key, Date.now().toString(), { ex: CHAPTER_TTL });
+              sentCount++;
+            }
+
+            if (sentCount > 0) {
+              await editInteractionResponse(payload.token,
+                `✅ **"${title}"** — **${sentCount}** chapter baru dikirim!`
+              );
+            } else {
+              await editInteractionResponse(payload.token,
+                `📭 **"${title}"** — Tidak ada chapter baru.\n` +
+                `⏭️ ${skippedCount} chapter sudah pernah dikirim sebelumnya.`
+              );
+            }
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+          }
+        })());
+        return;
+      }
+
+      // ───────────────────────────────────────
+      // /forcescrape <title>
+      // ───────────────────────────────────────
+      if (name === "forcescrape") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
+
+        res.json({ type: 5 });
+
+        waitUntil((async () => {
+          try {
+            const allResults = await scrapeMangaUpdates(redis);
+            const matched    = allResults.filter((item) => matchTitle(item.title, title));
+
+            if (matched.length === 0) {
+              await editInteractionResponse(payload.token,
+                `🔍 **"${title}"** tidak ditemukan di update terbaru.\n` +
+                `Kemungkinan belum ada chapter baru atau judul tidak cocok.`
+              );
+              return;
+            }
+
+            const guildChannels = await getAllGuildChannels();
+            if (Object.keys(guildChannels).length === 0) {
+              await editInteractionResponse(payload.token,
+                "⚠️ Belum ada notification channel. Gunakan `/setchannel #channel` dulu."
+              );
+              return;
+            }
+
+            for (const item of matched) {
+              for (const [guildId, channelId] of Object.entries(guildChannels)) {
+                try {
+                  await sendDiscordEmbed(item, channelId);
+                } catch (err) {
+                  console.error(`❌ [forcescrape] Failed guild ${guildId}: ${err.message}`);
+                }
+              }
+              await redis.set(`chapter:${item.url}`, Date.now().toString(), { ex: CHAPTER_TTL });
+            }
+
+            await editInteractionResponse(payload.token,
+              `✅ **Force scrape selesai!**\n` +
+              `📖 Ditemukan **${matched.length}** result untuk **"${title}"** — notifikasi dikirim!`
+            );
+          } catch (err) {
             await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
           }
         })());
@@ -576,8 +781,8 @@ export default async function handler(req, res) {
                 const card        = $(el);
                 const chapterText = card.find("p").text().trim();
                 if (chapterText.includes("Chapter")) {
-                  const parent = card.parent();
-                  let t        = parent.find("h1").text().trim() || card.find("h3").text().trim();
+                  const parent      = card.parent();
+                  const t           = parent.find("h1").text().trim() || card.find("h3").text().trim();
                   const updatedTime = card.find("time").attr("datetime");
                   if (t && chapterText) {
                     results.push({ title: t, chapter: chapterText, updatedTime });
