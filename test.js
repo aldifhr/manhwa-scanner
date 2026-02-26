@@ -1,15 +1,14 @@
 import axios from "axios";
 import dotenv from "dotenv";
-import { 
-  formatTimeAgo, 
-  fetchDescription, 
-  scrapeMangaUpdates, 
+import {
+  formatTimeAgo,
+  fetchDescription,
+  scrapeMangaUpdates,
 } from "./lib/scraper.js";
 import { Redis } from "@upstash/redis";
 
 dotenv.config();
 
-const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -48,9 +47,9 @@ const ratingStars = (rating) => {
 
 const shortSynopsis = (description) => {
   if (!description) return null;
-  const sentences = description.split('. ');
-  const short = sentences.slice(0, 2).join('. ');
-  return short.endsWith('.') ? short : short + '.';
+  const sentences = description.split(". ");
+  const short = sentences.slice(0, 2).join(". ");
+  return short.endsWith(".") ? short : short + ".";
 };
 
 async function sendDiscordNotification(data) {
@@ -59,7 +58,6 @@ async function sendDiscordNotification(data) {
   const synopsis = shortSynopsis(description);
 
   const embeds = [
-    // Embed 1: cover image + author bar
     {
       color,
       author: {
@@ -69,7 +67,6 @@ async function sendDiscordNotification(data) {
       },
       image: data.cover?.startsWith("http") ? { url: data.cover } : undefined,
     },
-    // Embed 2: info utama
     {
       color,
       title: data.title,
@@ -106,7 +103,26 @@ async function sendDiscordNotification(data) {
     },
   ];
 
-  await axios.post(WEBHOOK, { embeds });
+  const keys = await redis.keys("channel:*");
+  if (keys.length === 0) {
+    log.warn("Tidak ada channel terdaftar di Redis!");
+    return;
+  }
+
+  for (const key of keys) {
+    const channelId = await redis.get(key);
+    log.item(`Sending to channel ${channelId}...`);
+    await axios.post(
+      `https://discord.com/api/v10/channels/${channelId}/messages`,
+      { embeds },
+      {
+        headers: {
+          "Authorization": `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
 }
 
 async function main() {
@@ -117,7 +133,7 @@ async function main() {
 
   log.info("Connecting to Redis...");
   const whitelist = await redis.get("whitelist:manga") || [];
-  
+
   if (whitelist.length === 0) {
     log.warn("Whitelist is EMPTY — semua manga akan dikirim!");
   } else {
@@ -151,38 +167,117 @@ async function main() {
 
   log.title(`📨 SENDING ${results.length} NOTIFICATION(S)`);
 
-  let sent = 0;
-  let failed = 0;
+  let sentCount = 0;
 
-  for (const [i, data] of results.entries()) {
-    console.log(`\n   [${i + 1}/${results.length}] 📖 ${data.title}`);
-    log.item(`Chapter : ${data.chapter}`);
-    log.item(`Status  : ${data.status}`);
-    log.item(`Rating  : ${data.rating || "N/A"}`);
-    log.item(`Updated : ${data.updatedTime ? formatTimeAgo(data.updatedTime) : "Unknown"}`);
-    log.item(`URL     : ${data.url}`);
+  // ✅ FIX: gunakan `results`, bukan `matched` (matched tidak ada di main)
+  for (const item of results) {
+    const key = `chapter:${item.url}`;
+    log.item(`${item.title} - ${item.chapter}`);
 
     try {
-      await sendDiscordNotification(data);
-      log.success("Discord notification sent!");
-      sent++;
+      log.info(`Sending notification for "${item.title}"...`);
+      await sendDiscordNotification(item);
+      await redis.set(key, "sent");
+      log.success(`Sent: ${item.title}`);
+      sentCount++;
     } catch (err) {
-      log.error(`Failed to send: ${err.message}`);
-      failed++;
+      log.error(`Failed: ${err.message}`);
     }
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   log.title("📊 SUMMARY");
-  log.item(`Total scraped  : ${allResults.length} chapters`);
-  log.item(`Whitelist match: ${results.length} chapters`);
-  log.success(`Sent           : ${sent} notifications`);
-  if (failed > 0) log.error(`Failed         : ${failed} notifications`);
-  log.item(`Duration       : ${elapsed}s`);
-  console.log("");
+  log.item(`Matched  : ${results.length} chapters`);
+  log.success(`Sent     : ${sentCount} notifications`);
+  log.item(`Duration : ${elapsed}s`);
 }
 
-main().catch(err => {
-  log.error(`FATAL: ${err.message}`);
-  process.exit(1);
-});
+async function testAdd(title) {
+  const startTime = Date.now();
+
+  log.title(`🧪 TEST /add "${title}"`);
+
+  log.info("Loading whitelist from Redis...");
+  const whitelist = await redis.get("whitelist:manga") || [];
+
+  if (whitelist.some(t => t.toLowerCase() === title.toLowerCase())) {
+    log.warn(`"${title}" sudah ada di whitelist!`);
+  } else {
+    whitelist.push(title);
+    await redis.set("whitelist:manga", whitelist);
+    log.success(`"${title}" ditambahkan ke whitelist!`);
+  }
+
+  log.info("Clearing cache...");
+  await redis.del("cache:updates");
+
+  log.info("Scraping manga updates...");
+  const allResults = await scrapeMangaUpdates(redis);
+  log.success(`Scraped ${allResults.length} items (last 24h)`);
+
+  log.title("🔍 RAW RESULTS");
+  allResults.forEach((item, i) => {
+    log.item(`${i + 1}. ${item.title} | ${item.chapter} | ${item.updatedTime}`);
+  });
+
+  const matched = allResults.filter(item =>
+    item.title.toLowerCase().includes(title.toLowerCase()) ||
+    title.toLowerCase().includes(item.title.toLowerCase())
+  );
+  log.info(`\nMatched ${matched.length} items untuk "${title}"`);
+
+  if (matched.length === 0) {
+    log.warn("Tidak ada chapter baru saat ini. Notifikasi otomatis saat chapter baru rilis!");
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    log.item(`Duration: ${elapsed}s`);
+    return;
+  }
+
+  let sentCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0; // ✅ FIX: deklarasikan variabel failed
+
+  for (const item of matched) {
+    const key = `chapter:${item.url}`;
+    const exists = await redis.get(key);
+    log.item(`${item.title} - ${item.chapter} | exists: ${!!exists}`);
+
+    if (!exists) {
+      try {
+        log.info(`Sending notification for "${item.title}"...`);
+        await sendDiscordNotification(item);
+        await redis.set(key, "sent");
+        log.success(`Sent: ${item.title}`);
+        sentCount++;
+      } catch (err) {
+        log.error(`Failed: ${err.message}`);
+        failedCount++; // ✅ FIX
+      }
+    } else {
+      log.warn(`Skipped (already sent): ${item.title}`);
+      skippedCount++;
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  log.title("📊 SUMMARY");
+  log.item(`Matched  : ${matched.length} chapters`);
+  log.success(`Sent     : ${sentCount} notifications`);
+  if (skippedCount > 0) log.warn(`Skipped  : ${skippedCount} (already sent)`);
+  if (failedCount > 0) log.error(`Failed   : ${failedCount} items`);
+  log.item(`Duration : ${elapsed}s`);
+}
+
+// Entry point
+const args = process.argv.slice(2);
+if (args.length > 0) {
+  testAdd(args[0]).catch(err => {
+    log.error(`FATAL: ${err.message}`);
+    process.exit(1);
+  });
+} else {
+  main().catch(err => {
+    log.error(`FATAL: ${err.message}`);
+    process.exit(1);
+  });
+}

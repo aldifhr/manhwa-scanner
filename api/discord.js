@@ -10,7 +10,6 @@ import {
   formatTimeAgo,
   fetchDescription,
   scrapeMangaUpdates,
-  STATUS_EMOJI,
 } from "../lib/scraper.js";
 
 const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
@@ -24,9 +23,7 @@ const redis = new Redis({
 });
 
 export const config = {
-  api: {
-    bodyParser: false,
-  },
+  api: { bodyParser: false },
 };
 
 const STATUS_COLORS = {
@@ -53,9 +50,9 @@ const ratingStars = (rating) => {
 
 const shortSynopsis = (description) => {
   if (!description) return null;
-  const sentences = description.split('. ');
-  const short = sentences.slice(0, 2).join('. ');
-  return short.endsWith('.') ? short : short + '.';
+  const sentences = description.split(". ");
+  const short = sentences.slice(0, 2).join(". ");
+  return short.endsWith(".") ? short : short + ".";
 };
 
 async function getRawBody(req) {
@@ -69,8 +66,7 @@ async function getRawBody(req) {
 
 async function loadWhitelist() {
   try {
-    const data = await redis.get("whitelist:manga");
-    return data || [];
+    return (await redis.get("whitelist:manga")) || [];
   } catch {
     return [];
   }
@@ -110,7 +106,9 @@ async function editInteractionResponse(token, content) {
 }
 
 async function sendDiscord(data, channelId) {
-  const synopsis = shortSynopsis(data.description);
+  // ✅ Fetch description di sini supaya konsisten
+  const description = data.description || (await fetchDescription(data.mangaUrl));
+  const synopsis = shortSynopsis(description);
   const color = STATUS_COLORS[data.status] || STATUS_COLORS["Unknown"];
 
   const embeds = [
@@ -173,46 +171,92 @@ async function sendDiscord(data, channelId) {
   }
 }
 
+// ✅ Flow /add:
+// 1. Tambah ke whitelist
+// 2. Scrape manga terbaru
+// 3. Kalau ada chapter baru → kirim notif ke semua channel
+// 4. Edit response slash command dengan hasilnya
 async function checkAndNotify(title, token) {
   try {
-    const allResults = await scrapeMangaUpdates();
+    console.log(`🔍 [checkAndNotify] Started for: "${title}"`);
+
+    const allResults = await scrapeMangaUpdates(redis);
+    console.log(`📦 [checkAndNotify] Scraped ${allResults.length} items`);
+
     const matched = allResults.filter(item =>
       item.title.toLowerCase().includes(title.toLowerCase()) ||
       title.toLowerCase().includes(item.title.toLowerCase())
     );
+    console.log(`🎯 [checkAndNotify] Matched ${matched.length} items for "${title}"`);
 
+    // Tidak ada chapter baru
     if (matched.length === 0) {
-      await editInteractionResponse(token,
-        `✅ **"${title}"** ditambahkan ke whitelist!\n📭 Belum ada chapter baru saat ini.`
+      await editInteractionResponse(
+        token,
+        `✅ **"${title}"** ditambahkan ke whitelist!\n📭 Belum ada chapter baru saat ini. Notifikasi otomatis saat chapter baru rilis!`
       );
       return;
     }
 
     const guildChannels = await getAllGuildChannels();
+    console.log(`📢 [checkAndNotify] Guild channels: ${JSON.stringify(guildChannels)}`);
+
+    if (Object.keys(guildChannels).length === 0) {
+      await editInteractionResponse(
+        token,
+        `✅ **"${title}"** ditambahkan ke whitelist!\n⚠️ Belum ada channel notifikasi yang diset. Gunakan \`/setchannel #channel\` dulu.`
+      );
+      return;
+    }
+
+    let sentCount = 0;
 
     for (const item of matched) {
       const key = `chapter:${item.url}`;
-      const exists = await redis.get(key);
+      const alreadySent = await redis.get(key);
 
-      if (!exists) {
-        // const description = await fetchDescription(item.mangaUrl);
-        // item.description = description;
-
-        for (const channelId of Object.values(guildChannels)) {
-          await sendDiscord(item, channelId);
-        }
-
-        await redis.set(key, "sent"); // ✅ mark sebagai sudah dikirim
+      if (alreadySent) {
+        console.log(`⏭️ [checkAndNotify] Skipped (already sent): ${item.title} - ${item.chapter}`);
+        continue;
       }
+
+      console.log(`📤 [checkAndNotify] Sending: "${item.title}" - ${item.chapter}`);
+
+      for (const [guildId, channelId] of Object.entries(guildChannels)) {
+        try {
+          await sendDiscord(item, channelId);
+          console.log(`✅ [checkAndNotify] Sent to guild ${guildId}, channel ${channelId}`);
+        } catch (err) {
+          console.error(`❌ [checkAndNotify] Failed to send to guild ${guildId}: ${err.message}`);
+        }
+      }
+
+      // Mark sebagai sudah dikirim supaya cron tidak duplikat
+      await redis.set(key, "sent");
+      sentCount++;
     }
 
-    await editInteractionResponse(token,
-      `✅ **"${title}"** ditambahkan ke whitelist!\n📬 Ditemukan **${matched.length}** chapter baru — notifikasi dikirim!`
+    console.log(`📊 [checkAndNotify] Total sent: ${sentCount}`);
+
+    await editInteractionResponse(
+      token,
+      sentCount > 0
+        ? `✅ **"${title}"** ditambahkan ke whitelist!\n📬 Ditemukan **${sentCount}** chapter baru — notifikasi dikirim ke semua channel!`
+        : `✅ **"${title}"** ditambahkan ke whitelist!\n📭 Chapter baru sudah pernah dikirim sebelumnya. Notifikasi otomatis saat chapter berikutnya rilis!`
     );
+
+    console.log(`✅ [checkAndNotify] Finished for: "${title}"`);
   } catch (err) {
-    await editInteractionResponse(token,
-      `✅ **"${title}"** ditambahkan ke whitelist!\n⚠️ Gagal cek chapter: ${err.message}`
-    );
+    console.error(`❌ [checkAndNotify] Error: ${err.message}`);
+    console.error(err.stack);
+    try {
+      await editInteractionResponse(
+        token,
+        `✅ **"${title}"** ditambahkan ke whitelist!\n⚠️ Gagal cek chapter: ${err.message}`
+      );
+    } catch (editErr) {
+      console.error(`❌ [checkAndNotify] Failed to edit response: ${editErr.message}`);
+    }
   }
 }
 
@@ -239,6 +283,7 @@ export default async function handler(req, res) {
 
     const payload = JSON.parse(body);
 
+    // Discord ping verification
     if (payload.type === 1) {
       return res.json({ type: 1 });
     }
@@ -248,6 +293,9 @@ export default async function handler(req, res) {
     if (type === InteractionType.APPLICATION_COMMAND) {
       const { name, options } = interactionData;
 
+      // ─────────────────────────────────────────
+      // /add <title>
+      // ─────────────────────────────────────────
       if (name === "add") {
         const title = options?.[0]?.value;
         if (!title) {
@@ -261,21 +309,24 @@ export default async function handler(req, res) {
         if (whitelist.some(t => t.toLowerCase() === title.toLowerCase())) {
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `⚠️ "${title}" sudah ada di whitelist!` },
+            data: { content: `⚠️ **"${title}"** sudah ada di whitelist!` },
           });
         }
 
         whitelist.push(title);
         await saveWhitelist(whitelist);
 
-        // Deferred response — reply dulu, scrape di background
+        // Kirim deferred response dulu (type 5) supaya tidak timeout
         res.json({ type: 5 });
 
-        // Jalankan scrape + notify di background
+        // Scrape + notify di background
         checkAndNotify(title, payload.token);
         return;
       }
 
+      // ─────────────────────────────────────────
+      // /remove <title>
+      // ─────────────────────────────────────────
       if (name === "remove") {
         const title = options?.[0]?.value;
         if (!title) {
@@ -291,7 +342,7 @@ export default async function handler(req, res) {
         if (index === -1) {
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `⚠️ "${title}" tidak ada di whitelist!` },
+            data: { content: `⚠️ **"${title}"** tidak ada di whitelist!` },
           });
         }
 
@@ -301,11 +352,14 @@ export default async function handler(req, res) {
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
-            content: `✅ Removed "${title}" dari whitelist!\n📋 Total: ${whitelist.length} manga`,
+            content: `✅ Removed **"${title}"** dari whitelist!\n📋 Total: **${whitelist.length}** manga`,
           },
         });
       }
 
+      // ─────────────────────────────────────────
+      // /list
+      // ─────────────────────────────────────────
       if (name === "list") {
         const whitelist = await loadWhitelist();
         if (whitelist.length === 0) {
@@ -324,16 +378,37 @@ export default async function handler(req, res) {
         });
       }
 
+      // ─────────────────────────────────────────
+      // /clear
+      // ─────────────────────────────────────────
+      if (name === "clear") {
+        const whitelist = await loadWhitelist();
+        const count = whitelist.length;
+        await saveWhitelist([]);
+        return res.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: `🗑️ **Whitelist cleared!**\nRemoved **${count}** manga dari whitelist.`,
+          },
+        });
+      }
+
+      // ─────────────────────────────────────────
+      // /status
+      // ─────────────────────────────────────────
       if (name === "status") {
         const whitelist = await loadWhitelist();
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
-            content: `📊 **Bot Status**\n\n📋 Whitelisted: ${whitelist.length} manga\n⏱️ Check interval: Every 5 minutes\n🔔 Notifications: Discord`,
+            content: `📊 **Bot Status**\n\n📋 Whitelisted: **${whitelist.length}** manga\n⏱️ Check interval: Every 5 minutes\n🔔 Notifications: Discord`,
           },
         });
       }
 
+      // ─────────────────────────────────────────
+      // /info <title>
+      // ─────────────────────────────────────────
       if (name === "info") {
         const title = options?.[0]?.value;
         if (!title) {
@@ -372,7 +447,7 @@ export default async function handler(req, res) {
           if (!mangaUrl) {
             return res.json({
               type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: `🔍 Manga "${title}" tidak ditemukan` },
+              data: { content: `🔍 Manga **"${title}"** tidak ditemukan.` },
             });
           }
 
@@ -383,21 +458,27 @@ export default async function handler(req, res) {
           });
 
           const $detail = cheerio.load(detailResponse.data);
-          const description = $detail('meta[name="description"]').attr("content") ||
+          const description =
+            $detail('meta[name="description"]').attr("content") ||
             $detail(".description, .summary, [class*='description']").first().text().trim() ||
             "No synopsis available";
           const rating = $detail(".numscore").first().text().trim() || "N/A";
-          const status = $detail("p.font-normal.text-xs, .status").filter((_, el) => {
-            const t = $detail(el).text().trim();
-            return ["Ongoing", "Completed", "Hiatus", "Dropped"].includes(t);
-          }).first().text().trim() || "Unknown";
+          const status = $detail("p.font-normal.text-xs, .status")
+            .filter((_, el) => {
+              const t = $detail(el).text().trim();
+              return ["Ongoing", "Completed", "Hiatus", "Dropped"].includes(t);
+            })
+            .first()
+            .text()
+            .trim() || "Unknown";
           const chapters = $detail("a[href*='chapter']").length || "Unknown";
           const shortDesc = description.length > 200 ? description.substring(0, 197) + "..." : description;
 
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: `📖 **[${mangaTitle}](${fullUrl})**\n\n` +
+              content:
+                `📖 **[${mangaTitle}](${fullUrl})**\n\n` +
                 `⭐ **Rating:** ${rating}/10\n` +
                 `📊 **Status:** ${status}\n` +
                 `📚 **Chapters:** ${chapters}\n\n` +
@@ -409,23 +490,14 @@ export default async function handler(req, res) {
           console.error("Info error:", err);
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error getting manga info` },
+            data: { content: `❌ Error getting manga info: ${err.message}` },
           });
         }
       }
 
-      if (name === "clear") {
-        const whitelist = await loadWhitelist();
-        const count = whitelist.length;
-        await saveWhitelist([]);
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: `🗑️ **Whitelist cleared!**\nRemoved ${count} manga dari whitelist.`,
-          },
-        });
-      }
-
+      // ─────────────────────────────────────────
+      // /recent
+      // ─────────────────────────────────────────
       if (name === "recent") {
         try {
           const response = await axios.get(SITE_URL, {
@@ -469,7 +541,7 @@ export default async function handler(req, res) {
           }
 
           const recent = results.slice(0, 5);
-          const list = recent.map(r => `• **${r.title}** - ${r.chapter}`).join("\n");
+          const list = recent.map(r => `• **${r.title}** — ${r.chapter}`).join("\n");
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: { content: `🕐 **5 Latest Chapters:**\n\n${list}` },
@@ -477,11 +549,14 @@ export default async function handler(req, res) {
         } catch (err) {
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error fetching recent chapters` },
+            data: { content: `❌ Error fetching recent chapters: ${err.message}` },
           });
         }
       }
 
+      // ─────────────────────────────────────────
+      // /setchannel <channel>
+      // ─────────────────────────────────────────
       if (name === "setchannel") {
         const guildId = payload.guild_id;
         const channelId = options?.[0]?.value;
@@ -508,6 +583,9 @@ export default async function handler(req, res) {
         });
       }
 
+      // ─────────────────────────────────────────
+      // /getchannel
+      // ─────────────────────────────────────────
       if (name === "getchannel") {
         const guildId = payload.guild_id;
         if (!guildId) {
@@ -531,10 +609,13 @@ export default async function handler(req, res) {
         });
       }
 
+      // ─────────────────────────────────────────
+      // /popular [period]
+      // ─────────────────────────────────────────
       if (name === "popular") {
         try {
           const period = options?.[0]?.value || "daily";
-          const periodText = period === "daily" ? "Today" : period === "weekly" ? "Weekly" : "Monthly";
+          const periodText = period === "daily" ? "Today" : period === "weekly" ? "This Week" : "This Month";
           const response = await axios.get(SITE_URL, {
             headers: { "User-Agent": "Mozilla/5.0" },
             timeout: 10000,
@@ -546,14 +627,18 @@ export default async function handler(req, res) {
             const link = $(el).find("a").attr("href");
             const title = $(el).find("h3").text().trim();
             if (title && link) {
-              results.push({ rank: i + 1, title, url: link.startsWith("http") ? link : `https://02.ikiru.wtf${link}` });
+              results.push({
+                rank: i + 1,
+                title,
+                url: link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`,
+              });
             }
           });
 
           if (results.length === 0) {
             return res.json({
               type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: `🔥 No popular manga found for ${periodText}.` },
+              data: { content: `🔥 No popular manga found for **${periodText}**.` },
             });
           }
 
@@ -564,7 +649,7 @@ export default async function handler(req, res) {
 
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `🔥 **Popular Manga ${periodText}:**\n\n${list}` },
+            data: { content: `🔥 **Popular Manga — ${periodText}:**\n\n${list}` },
           });
         } catch (err) {
           return res.json({
@@ -574,6 +659,9 @@ export default async function handler(req, res) {
         }
       }
 
+      // ─────────────────────────────────────────
+      // /topseries
+      // ─────────────────────────────────────────
       if (name === "topseries") {
         try {
           const response = await axios.get(SITE_URL, {
@@ -585,10 +673,10 @@ export default async function handler(req, res) {
 
           $('section:has(h2:contains("Top Series")) a[href*="/manga/"]').each((i, el) => {
             const link = $(el).attr("href");
-            const title = $(el).find('.font-bold').text().trim();
-            const rank = $(el).find('.index-name').text().trim();
+            const title = $(el).find(".font-bold").text().trim();
+            const rank = $(el).find(".index-name").text().trim();
             const genres = [];
-            $(el).find('.rounded-full span').each((_, genreEl) => genres.push($(genreEl).text().trim()));
+            $(el).find(".rounded-full span").each((_, genreEl) => genres.push($(genreEl).text().trim()));
 
             if (title && link) {
               results.push({
@@ -628,7 +716,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: "Unknown interaction type" });
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Handler error:", err);
     return res.status(500).json({ error: err.message });
   }
 }
