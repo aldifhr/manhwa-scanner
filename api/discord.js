@@ -421,15 +421,16 @@ export default async function handler(req, res) {
           const $ = cheerio.load(response.data);
           
           const results = [];
-          $(".swiper-slide a[href*='/manga/'], .manga-swipe a[href*='/manga/']").each((i, el) => {
-            const card = $(el);
-            const title = card.attr("title") || card.find("h4").text().trim();
-            const link = card.attr("href");
-            const rating = card.find(".details p").text().trim();
+          
+          // Scrape from trending chart (Popular Today)
+          $('[data-trending-chart="daily"] li').each((i, el) => {
+            const link = $(el).find("a").attr("href");
+            const title = $(el).find("h3").text().trim();
+            const rank = i + 1;
             
-            if (title && link && !results.find(r => r.title === title)) {
+            if (title && link) {
               const url = link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`;
-              results.push({ title, url, rating: rating || "N/A" });
+              results.push({ rank, title, url });
             }
           });
 
@@ -440,8 +441,10 @@ export default async function handler(req, res) {
             });
           }
 
-          const top10 = results.slice(0, 10);
-          const list = top10.map((r, i) => `${i + 1}. **[${r.title}](${r.url})** ⭐ ${r.rating}`).join("\n");
+          const list = results.map(r => {
+            const medal = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`;
+            return `${medal} **[${r.title}](${r.url})**`;
+          }).join("\n");
           
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
