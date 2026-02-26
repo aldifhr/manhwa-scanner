@@ -462,6 +462,59 @@ export default async function handler(req, res) {
           });
         }
       }
+
+      if (name === "topseries") {
+        try {
+          const response = await axios.get(SITE_URL, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          });
+          const $ = cheerio.load(response.data);
+          
+          const results = [];
+          
+          // Scrape Top Series section
+          $('section:has(h2:contains("Top Series")) a[href*="/manga/"]').each((i, el) => {
+            const link = $(el).attr("href");
+            const title = $(el).find('.font-bold').text().trim();
+            const rank = $(el).find('.index-name').text().trim();
+            const genres = [];
+            $(el).find('.rounded-full span').each((_, genreEl) => {
+              genres.push($(genreEl).text().trim());
+            });
+            
+            if (title && link) {
+              const url = link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`;
+              results.push({ rank: parseInt(rank) || i + 1, title, url, genres });
+            }
+          });
+
+          if (results.length === 0) {
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: { content: "⭐ No top series found." },
+            });
+          }
+
+          const list = results.slice(0, 10).map(r => {
+            const medal = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : `#${r.rank}`;
+            const genreText = r.genres.length > 0 ? `*${r.genres.slice(0, 3).join(", ")}*` : "";
+            return `${medal} **[${r.title}](${r.url})** ${genreText}`;
+          }).join("\n");
+          
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `⭐ **Top Series:**\n\n${list}`,
+            },
+          });
+        } catch (err) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Error fetching top series: ${err.message}` },
+          });
+        }
+      }
     }
 
     return res.status(400).json({ error: "Unknown interaction type" });

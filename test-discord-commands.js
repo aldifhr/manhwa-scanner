@@ -87,6 +87,10 @@ const commands = [
         { name: "Monthly", value: "monthly" }
       ]
     }]
+  },
+  {
+    name: "topseries",
+    description: "Show top series of all time",
   }
 ];
 
