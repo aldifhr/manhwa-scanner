@@ -190,19 +190,27 @@ export default async function handler(req, res) {
         }
 
         try {
-          const response = await axios.get(SITE_URL, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 10000,
-          });
-          const $ = cheerio.load(response.data);
+          // Use the website's search API
+          const searchResponse = await axios.post(
+            "https://02.ikiru.wtf/wp-admin/admin-ajax.php?nonce=eecc652792&action=search",
+            new URLSearchParams({ query }),
+            {
+              headers: { 
+                "User-Agent": "Mozilla/5.0",
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              timeout: 10000,
+            }
+          );
           
+          const $ = cheerio.load(searchResponse.data);
           const results = [];
+          
           $("a").each((i, el) => {
-            const title = $(el).find("h3").text().trim();
-            const chapter = $(el).find("p").text().trim();
-            if (title && chapter.includes("Chapter") && title.toLowerCase().includes(query.toLowerCase())) {
-              const link = $(el).attr("href");
-              results.push({ title, chapter, link });
+            const title = $(el).find("h3, .title, h2").text().trim();
+            const link = $(el).attr("href");
+            if (title && link) {
+              results.push({ title, link });
             }
           });
 
@@ -213,7 +221,7 @@ export default async function handler(req, res) {
             });
           }
 
-          const list = results.slice(0, 5).map(r => `• **${r.title}** - ${r.chapter}`).join("\n");
+          const list = results.slice(0, 5).map(r => `• **${r.title}**`).join("\n");
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
