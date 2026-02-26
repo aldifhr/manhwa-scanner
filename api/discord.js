@@ -411,6 +411,51 @@ export default async function handler(req, res) {
           },
         });
       }
+
+      if (name === "popular") {
+        try {
+          const response = await axios.get(SITE_URL, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          });
+          const $ = cheerio.load(response.data);
+          
+          const results = [];
+          $(".swiper-slide a[href*='/manga/'], .manga-swipe a[href*='/manga/']").each((i, el) => {
+            const card = $(el);
+            const title = card.attr("title") || card.find("h4").text().trim();
+            const link = card.attr("href");
+            const rating = card.find(".details p").text().trim();
+            
+            if (title && link && !results.find(r => r.title === title)) {
+              const url = link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`;
+              results.push({ title, url, rating: rating || "N/A" });
+            }
+          });
+
+          if (results.length === 0) {
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: { content: "🔥 No popular manga found." },
+            });
+          }
+
+          const top10 = results.slice(0, 10);
+          const list = top10.map((r, i) => `${i + 1}. **[${r.title}](${r.url})** ⭐ ${r.rating}`).join("\n");
+          
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `🔥 **Popular Manga Today:**\n\n${list}`,
+            },
+          });
+        } catch (err) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Error fetching popular manga: ${err.message}` },
+          });
+        }
+      }
     }
 
     return res.status(400).json({ error: "Unknown interaction type" });

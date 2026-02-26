@@ -72,6 +72,10 @@ const commands = [
   {
     name: "getchannel",
     description: "Get current notification channel",
+  },
+  {
+    name: "popular",
+    description: "Show popular manga today",
   }
 ];
 
