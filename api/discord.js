@@ -7,19 +7,6 @@ import fs from "fs";
 
 const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
 
-function loadWhitelist() {
-  try {
-    const data = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
-    return data.manga || [];
-  } catch {
-    return [];
-  }
-}
-
-function saveWhitelist(manga) {
-  fs.writeFileSync("./whitelist.json", JSON.stringify({ manga }, null, 2));
-}
-
 export const config = {
   api: {
     bodyParser: false,
@@ -35,6 +22,19 @@ async function getRawBody(req) {
   });
 }
 
+function loadWhitelist() {
+  try {
+    const data = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
+    return data.manga || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveWhitelist(manga) {
+  fs.writeFileSync("./whitelist.json", JSON.stringify({ manga }, null, 2));
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -44,122 +44,120 @@ export default async function handler(req, res) {
     const signature = req.headers["x-signature-ed25519"];
     const timestamp = req.headers["x-signature-timestamp"];
     
-    if (!signature || !timestamp || !PUBLIC_KEY) {
-      console.error("Missing:", { signature: !!signature, timestamp: !!timestamp, publicKey: !!PUBLIC_KEY });
-      return res.status(401).json({ error: "Missing signature or public key" });
-    }
-
     const rawBody = await getRawBody(req);
     const body = rawBody.toString();
+    const payload = JSON.parse(body);
 
-    console.log("Received request:", { signature, timestamp, bodyLength: body.length });
+    // Handle PING immediately for Discord verification
+    if (payload.type === 1) {
+      return res.json({ type: 1 });
+    }
+
+    // Verify signature for other requests
+    if (!PUBLIC_KEY) {
+      return res.status(401).json({ error: "Public key not configured" });
+    }
 
     const isValid = verifyKey(body, signature, timestamp, PUBLIC_KEY);
     if (!isValid) {
-      console.error("Invalid signature");
-      return res.status(401).json({ error: "Invalid request signature" });
+      return res.status(401).json({ error: "Invalid signature" });
     }
 
-    const { type, data: interactionData, member } = JSON.parse(body);
+    const { type, data: interactionData, member } = payload;
 
-  if (type === InteractionType.PING) {
-    return res.json({ type: InteractionResponseType.PONG });
-  }
+    if (type === InteractionType.APPLICATION_COMMAND) {
+      const { name, options } = interactionData;
 
-  if (type === InteractionType.APPLICATION_COMMAND) {
-    const { name, options } = interactionData;
-    const user = member?.user?.username || "Unknown";
+      if (name === "add") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
 
-    if (name === "add") {
-      const title = options?.[0]?.value;
-      if (!title) {
+        const whitelist = loadWhitelist();
+        if (whitelist.some(t => t.toLowerCase() === title.toLowerCase())) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `⚠️ "${title}" is already in the whitelist!` },
+          });
+        }
+
+        whitelist.push(title);
+        saveWhitelist(whitelist);
+
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "❌ Please provide a manga title!" },
+          data: {
+            content: `✅ Added "${title}" to the whitelist!\n📋 Total: ${whitelist.length} manga`,
+          },
         });
       }
 
-      const whitelist = loadWhitelist();
-      if (whitelist.some(t => t.toLowerCase() === title.toLowerCase())) {
+      if (name === "remove") {
+        const title = options?.[0]?.value;
+        if (!title) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a manga title!" },
+          });
+        }
+
+        const whitelist = loadWhitelist();
+        const index = whitelist.findIndex(
+          t => t.toLowerCase() === title.toLowerCase()
+        );
+
+        if (index === -1) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `⚠️ "${title}" is not in the whitelist!` },
+          });
+        }
+
+        whitelist.splice(index, 1);
+        saveWhitelist(whitelist);
+
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: `⚠️ "${title}" is already in the whitelist!` },
+          data: {
+            content: `✅ Removed "${title}" from the whitelist!\n📋 Total: ${whitelist.length} manga`,
+          },
         });
       }
 
-      whitelist.push(title);
-      saveWhitelist(whitelist);
+      if (name === "list") {
+        const whitelist = loadWhitelist();
+        if (whitelist.length === 0) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "📋 Whitelist is empty!" },
+          });
+        }
 
-      return res.json({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: `✅ Added "${title}" to the whitelist!\n📋 Total: ${whitelist.length} manga`,
-        },
-      });
-    }
-
-    if (name === "remove") {
-      const title = options?.[0]?.value;
-      if (!title) {
+        const list = whitelist.map((t, i) => `${i + 1}. ${t}`).join("\n");
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "❌ Please provide a manga title!" },
+          data: {
+            content: `📋 **Whitelisted Manga (${whitelist.length}):**\n\n${list}`,
+          },
         });
       }
 
-      const whitelist = loadWhitelist();
-      const index = whitelist.findIndex(
-        t => t.toLowerCase() === title.toLowerCase()
-      );
-
-      if (index === -1) {
+      if (name === "status") {
+        const whitelist = loadWhitelist();
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: `⚠️ "${title}" is not in the whitelist!` },
+          data: {
+            content: `📊 **Bot Status**\n\n📋 Whitelisted: ${whitelist.length} manga\n⏱️ Check interval: Every 5 minutes\n🔔 Notifications: Discord + Telegram`,
+          },
         });
       }
-
-      whitelist.splice(index, 1);
-      saveWhitelist(whitelist);
-
-      return res.json({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: `✅ Removed "${title}" from the whitelist!\n📋 Total: ${whitelist.length} manga`,
-        },
-      });
     }
 
-    if (name === "list") {
-      const whitelist = loadWhitelist();
-      if (whitelist.length === 0) {
-        return res.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "📋 Whitelist is empty!" },
-        });
-      }
-
-      const list = whitelist.map((t, i) => `${i + 1}. ${t}`).join("\n");
-      return res.json({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: `📋 **Whitelisted Manga (${whitelist.length}):**\n\n${list}`,
-        },
-      });
-    }
-
-    if (name === "status") {
-      const whitelist = loadWhitelist();
-      return res.json({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: `📊 **Bot Status**\n\n📋 Whitelisted: ${whitelist.length} manga\n⏱️ Check interval: Every 5 minutes\n🔔 Notifications: Discord + Telegram`,
-        },
-      });
-    }
-  }
-
-  return res.status(400).json({ error: "Unknown interaction type" });
+    return res.status(400).json({ error: "Unknown interaction type" });
   } catch (err) {
     console.error("Error:", err);
     return res.status(500).json({ error: err.message });
