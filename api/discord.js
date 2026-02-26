@@ -250,48 +250,86 @@ export default async function handler(req, res) {
         }
 
         try {
-          const response = await axios.get(SITE_URL, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-            timeout: 10000,
-          });
-          const $ = cheerio.load(response.data);
+          // First, search for the manga
+          const searchResponse = await axios.post(
+            "https://02.ikiru.wtf/wp-admin/admin-ajax.php?nonce=eecc652792&action=search",
+            new URLSearchParams({ query: title }),
+            {
+              headers: { 
+                "User-Agent": "Mozilla/5.0",
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              timeout: 10000,
+            }
+          );
           
-          let mangaInfo = null;
-          $("a").each((i, el) => {
-            const mangaTitle = $(el).find("h3").text().trim();
-            if (mangaTitle.toLowerCase().includes(title.toLowerCase())) {
-              const parent = $(el).parent();
-              mangaInfo = {
-                title: mangaTitle,
-                chapter: $(el).find("p").text().trim(),
-                rating: parent.find(".numscore").text().trim() || "N/A",
-                status: parent.find("p.font-normal.text-xs").filter((_, el) => {
-                  const t = $(el).text().trim();
-                  return ["Ongoing", "Completed", "Hiatus"].includes(t);
-                }).text().trim() || "Unknown",
-                cover: parent.find("img").first().attr("src"),
-              };
+          const $search = cheerio.load(searchResponse.data);
+          let mangaUrl = null;
+          let mangaTitle = null;
+          
+          $search("a").each((i, el) => {
+            const foundTitle = $search(el).find("h3, .title, h2").text().trim();
+            if (foundTitle && foundTitle.toLowerCase().includes(title.toLowerCase())) {
+              mangaUrl = $search(el).attr("href");
+              mangaTitle = foundTitle;
               return false;
             }
           });
 
-          if (!mangaInfo) {
+          if (!mangaUrl) {
             return res.json({
               type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
               data: { content: `🔍 Manga "${title}" not found` },
             });
           }
 
+          // Fix URL if needed
+          const fullUrl = mangaUrl.startsWith("http") ? mangaUrl : `https://02.ikiru.wtf${mangaUrl}`;
+          
+          // Scrape the manga detail page
+          const detailResponse = await axios.get(fullUrl, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          });
+          
+          const $detail = cheerio.load(detailResponse.data);
+          
+          // Extract all information
+          const description = $detail('meta[name="description"]').attr("content") || 
+                             $detail(".description, .summary, [class*='description']").first().text().trim() ||
+                             "No synopsis available";
+          
+          const rating = $detail(".numscore").first().text().trim() || "N/A";
+          const status = $detail("p.font-normal.text-xs, .status").filter((_, el) => {
+            const t = $detail(el).text().trim();
+            return ["Ongoing", "Completed", "Hiatus", "Dropped"].includes(t);
+          }).first().text().trim() || "Unknown";
+          
+          // Count chapters
+          const chapters = $detail("a[href*='chapter']").length || "Unknown";
+          
+          // Get cover image
+          const cover = $detail("img").first().attr("src") || $detail(".cover img").first().attr("src");
+          
+          // Format description (truncate if too long)
+          const shortDesc = description.length > 200 ? description.substring(0, 197) + "..." : description;
+          
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: `📖 **${mangaInfo.title}**\n\n📚 Latest: ${mangaInfo.chapter}\n⭐ Rating: ${mangaInfo.rating}/10\n📊 Status: ${mangaInfo.status}`,
+              content: `📖 **[${mangaTitle}](${fullUrl})**\n\n` +
+                       `⭐ **Rating:** ${rating}/10\n` +
+                       `📊 **Status:** ${status}\n` +
+                       `📚 **Chapters:** ${chapters}\n\n` +
+                       `📝 **Synopsis:**\n${shortDesc}\n\n` +
+                       `💡 Use \`/add "${mangaTitle}"\` to add to whitelist`,
             },
           });
         } catch (err) {
+          console.error("Info error:", err);
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error getting info: ${err.message}` },
+            data: { content: `❌ Error getting manga info` },
           });
         }
       }
