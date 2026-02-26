@@ -9,6 +9,9 @@ import {
 const BOT_TOKEN   = process.env.DISCORD_BOT_TOKEN;
 const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
 
+const cl = console.log;
+
+
 const redis = new Redis({
   url:   process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
