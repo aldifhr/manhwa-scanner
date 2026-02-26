@@ -41,21 +41,11 @@ const commands = [
     description: "Show bot status",
   },
   {
-    name: "search",
-    description: "Search manga on ikiru.wtf",
-    options: [{
-      name: "query",
-      description: "Search query",
-      type: 3, // STRING
-      required: true
-    }]
-  },
-  {
     name: "info",
-    description: "Get manga info",
+    description: "Search and get manga details",
     options: [{
       name: "title",
-      description: "Manga title",
+      description: "Manga title to search",
       type: 3, // STRING
       required: true
     }]

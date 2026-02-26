@@ -180,66 +180,6 @@ export default async function handler(req, res) {
         });
       }
 
-      if (name === "search") {
-        const query = options?.[0]?.value;
-        if (!query) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "❌ Please provide a search query!" },
-          });
-        }
-
-        try {
-          // Use the website's search API
-          const searchResponse = await axios.post(
-            "https://02.ikiru.wtf/wp-admin/admin-ajax.php?nonce=eecc652792&action=search",
-            new URLSearchParams({ query }),
-            {
-              headers: { 
-                "User-Agent": "Mozilla/5.0",
-                "Content-Type": "application/x-www-form-urlencoded"
-              },
-              timeout: 10000,
-            }
-          );
-          
-          const $ = cheerio.load(searchResponse.data);
-          const results = [];
-          
-          $("a").each((i, el) => {
-            const title = $(el).find("h3, .title, h2").text().trim();
-            const link = $(el).attr("href");
-            if (title && link) {
-              results.push({ title, link });
-            }
-          });
-
-          if (results.length === 0) {
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: `🔍 No manga found for "${query}"` },
-            });
-          }
-
-          const list = results.slice(0, 5).map(r => {
-            const url = r.link.startsWith("http") ? r.link : `https://02.ikiru.wtf${r.link}`;
-            return `• **[${r.title}](${url})**`;
-          }).join("\n");
-          
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              content: `🔍 **Search results for "${query}":**\n\n${list}\n\n💡 Use \`/add "title"\` to add to whitelist`,
-            },
-          });
-        } catch (err) {
-          return res.json({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error searching: ${err.message}` },
-          });
-        }
-      }
-
       if (name === "info") {
         const title = options?.[0]?.value;
         if (!title) {
