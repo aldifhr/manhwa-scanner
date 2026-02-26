@@ -44,23 +44,24 @@ export default async function handler(req, res) {
     const signature = req.headers["x-signature-ed25519"];
     const timestamp = req.headers["x-signature-timestamp"];
     
-    const rawBody = await getRawBody(req);
-    const body = rawBody.toString();
-    const payload = JSON.parse(body);
-
-    // Handle PING immediately for Discord verification
-    if (payload.type === 1) {
-      return res.json({ type: 1 });
-    }
-
-    // Verify signature for other requests
     if (!PUBLIC_KEY) {
       return res.status(401).json({ error: "Public key not configured" });
     }
 
+    const rawBody = await getRawBody(req);
+    const body = rawBody.toString();
+
+    // Verify signature FIRST (Discord requires this even for PING)
     const isValid = verifyKey(body, signature, timestamp, PUBLIC_KEY);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid signature" });
+    }
+
+    const payload = JSON.parse(body);
+
+    // Handle PING after verification
+    if (payload.type === 1) {
+      return res.json({ type: 1 });
     }
 
     const { type, data: interactionData, member } = payload;
