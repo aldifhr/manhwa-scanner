@@ -52,7 +52,9 @@ export default async function handler(req, res) {
     const body = rawBody.toString();
 
     // Verify signature FIRST (Discord requires this even for PING)
+    console.log("Verifying with public key:", PUBLIC_KEY?.slice(0, 20) + "...");
     const isValid = verifyKey(body, signature, timestamp, PUBLIC_KEY);
+    console.log("Signature valid:", isValid);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid signature" });
     }
