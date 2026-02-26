@@ -195,8 +195,8 @@ async function checkAndNotify(title, token) {
       const exists = await redis.get(key);
 
       if (!exists) {
-        const description = await fetchDescription(item.mangaUrl);
-        item.description = description;
+        // const description = await fetchDescription(item.mangaUrl);
+        // item.description = description;
 
         for (const channelId of Object.values(guildChannels)) {
           await sendDiscord(item, channelId);
