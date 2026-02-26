@@ -40,18 +40,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const signature = req.headers["x-signature-ed25519"];
-  const timestamp = req.headers["x-signature-timestamp"];
-  
-  const rawBody = await getRawBody(req);
-  const body = rawBody.toString();
+  try {
+    const signature = req.headers["x-signature-ed25519"];
+    const timestamp = req.headers["x-signature-timestamp"];
+    
+    if (!signature || !timestamp || !PUBLIC_KEY) {
+      console.error("Missing:", { signature: !!signature, timestamp: !!timestamp, publicKey: !!PUBLIC_KEY });
+      return res.status(401).json({ error: "Missing signature or public key" });
+    }
 
-  const isValid = verifyKey(body, signature, timestamp, PUBLIC_KEY);
-  if (!isValid) {
-    return res.status(401).json({ error: "Invalid request signature" });
-  }
+    const rawBody = await getRawBody(req);
+    const body = rawBody.toString();
 
-  const { type, data: interactionData, member } = JSON.parse(body);
+    console.log("Received request:", { signature, timestamp, bodyLength: body.length });
+
+    const isValid = verifyKey(body, signature, timestamp, PUBLIC_KEY);
+    if (!isValid) {
+      console.error("Invalid signature");
+      return res.status(401).json({ error: "Invalid request signature" });
+    }
+
+    const { type, data: interactionData, member } = JSON.parse(body);
 
   if (type === InteractionType.PING) {
     return res.json({ type: InteractionResponseType.PONG });
@@ -151,4 +160,8 @@ export default async function handler(req, res) {
   }
 
   return res.status(400).json({ error: "Unknown interaction type" });
+  } catch (err) {
+    console.error("Error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
