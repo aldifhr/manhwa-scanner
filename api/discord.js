@@ -20,6 +20,21 @@ function saveWhitelist(manga) {
   fs.writeFileSync("./whitelist.json", JSON.stringify({ manga }, null, 2));
 }
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", chunk => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -27,14 +42,16 @@ export default async function handler(req, res) {
 
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
-  const body = JSON.stringify(req.body);
+  
+  const rawBody = await getRawBody(req);
+  const body = rawBody.toString();
 
   const isValid = verifyKey(body, signature, timestamp, PUBLIC_KEY);
   if (!isValid) {
     return res.status(401).json({ error: "Invalid request signature" });
   }
 
-  const { type, data: interactionData, member } = req.body;
+  const { type, data: interactionData, member } = JSON.parse(body);
 
   if (type === InteractionType.PING) {
     return res.json({ type: InteractionResponseType.PONG });
