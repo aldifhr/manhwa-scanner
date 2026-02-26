@@ -1,18 +1,18 @@
-name: Manga Chapter Checker
+name: Manga Cron Job
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Run every 5 minutes
-  workflow_dispatch:  # Allow manual trigger
+    - cron: "*/5 * * * *"  # setiap 5 menit
+  workflow_dispatch:        # bisa trigger manual dari GitHub
 
 jobs:
-  check-chapters:
+  check-manga:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Call Vercel API
+      - name: Trigger cron endpoint
         run: |
-          curl -X GET "https://ikiru-bots.vercel.app/api/cron" \
-            -H "User-Agent: GitHub-Actions" \
-            --max-time 30 \
-            --retry 3
+          curl -X GET "${{ secrets.APP_URL }}/api/cron" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            --fail \
+            --silent \
+            --show-error

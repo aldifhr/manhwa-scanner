@@ -6,17 +6,16 @@ import {
 import { Redis } from "@upstash/redis";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { waitUntil } from "@vercel/functions";
 import {
   formatTimeAgo,
   fetchDescription,
   scrapeMangaUpdates,
 } from "../lib/scraper.js";
 
-const PUBLIC_KEY    = process.env.DISCORD_PUBLIC_KEY;
-const SITE_URL      = "https://02.ikiru.wtf/";
-const BOT_TOKEN     = process.env.DISCORD_BOT_TOKEN;
-const APP_ID        = process.env.DISCORD_APPLICATION_ID;
+const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
+const SITE_URL   = "https://02.ikiru.wtf/";
+const BOT_TOKEN  = process.env.DISCORD_BOT_TOKEN;
+const APP_ID     = process.env.DISCORD_APPLICATION_ID;
 
 const redis = new Redis({
   url:   process.env.UPSTASH_REDIS_REST_URL,
@@ -25,8 +24,6 @@ const redis = new Redis({
 
 export const config = {
   api: { bodyParser: false },
-  // ✅ Maksimal durasi fungsi di Vercel (Pro: 300s, Hobby: 60s)
-  maxDuration: 60,
 };
 
 // ─────────────────────────────────────────────────────────
@@ -47,14 +44,16 @@ const statusBar = {
   "Unknown":   "⚪ Unknown",
 };
 
+const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari dalam detik
+
 // ─────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────
 
 const ratingStars = (rating) => {
   if (!rating || rating === "N/A") return "`No rating`";
-  const num = parseFloat(rating);
-  const filled = Math.round(num / 2);
+  const num     = parseFloat(rating);
+  const filled  = Math.round(num / 2);
   const display = Number.isInteger(num) ? num : num.toFixed(1);
   return "★".repeat(filled) + "☆".repeat(5 - filled) + ` \`${display}/10\``;
 };
@@ -62,15 +61,15 @@ const ratingStars = (rating) => {
 const shortSynopsis = (description) => {
   if (!description) return null;
   const sentences = description.split(". ");
-  const short = sentences.slice(0, 2).join(". ");
+  const short     = sentences.slice(0, 2).join(". ");
   return short.endsWith(".") ? short : short + ".";
 };
 
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on("data", (chunk) => chunks.push(chunk));
-    req.on("end",  () => resolve(Buffer.concat(chunks)));
+    req.on("data",  (chunk) => chunks.push(chunk));
+    req.on("end",   () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
@@ -104,7 +103,7 @@ async function setNotificationChannel(guildId, channelId) {
 }
 
 async function getAllGuildChannels() {
-  const keys = await redis.keys("channel:*");
+  const keys   = await redis.keys("channel:*");
   const result = {};
   for (const key of keys) {
     result[key.replace("channel:", "")] = await redis.get(key);
@@ -113,20 +112,8 @@ async function getAllGuildChannels() {
 }
 
 // ─────────────────────────────────────────────────────────
-// DISCORD HELPERS
+// DISCORD EMBED
 // ─────────────────────────────────────────────────────────
-
-async function editInteractionResponse(token, content) {
-  try {
-    await axios.patch(
-      `https://discord.com/api/v10/webhooks/${APP_ID}/${token}/messages/@original`,
-      { content },
-      { headers: { "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    console.error(`❌ editInteractionResponse failed: ${err.message}`);
-  }
-}
 
 async function sendDiscordEmbed(data, channelId) {
   const description = data.description || (await fetchDescription(data.mangaUrl));
@@ -192,109 +179,6 @@ async function sendDiscordEmbed(data, channelId) {
 }
 
 // ─────────────────────────────────────────────────────────
-// CORE: checkAndNotify
-// Dipanggil via waitUntil() supaya Vercel tidak kill prosesnya
-// ─────────────────────────────────────────────────────────
-
-async function checkAndNotify(title, token) {
-  try {
-    console.log(`🔍 [checkAndNotify] Start: "${title}"`);
-
-    // 1. Scrape chapter terbaru
-    const allResults = await scrapeMangaUpdates(redis);
-    console.log(`📦 [checkAndNotify] Scraped ${allResults.length} items`);
-
-    // 2. Filter yang cocok dengan title
-    const matched = allResults.filter((item) =>
-      item.title.toLowerCase().includes(title.toLowerCase()) ||
-      title.toLowerCase().includes(item.title.toLowerCase())
-    );
-    console.log(`🎯 [checkAndNotify] Matched ${matched.length} items`);
-
-    // 3. Tidak ada chapter baru sama sekali
-    if (matched.length === 0) {
-      await editInteractionResponse(
-        token,
-        `✅ **"${title}"** ditambahkan ke whitelist!\n📭 Belum ada chapter baru saat ini. Notifikasi otomatis saat chapter baru rilis!`
-      );
-      return;
-    }
-
-    // 4. Cek channel terdaftar
-    const guildChannels = await getAllGuildChannels();
-    console.log(`📢 [checkAndNotify] Channels: ${JSON.stringify(guildChannels)}`);
-
-    if (Object.keys(guildChannels).length === 0) {
-      await editInteractionResponse(
-        token,
-        `✅ **"${title}"** ditambahkan ke whitelist!\n⚠️ Belum ada notification channel. Gunakan \`/setchannel #channel\` dulu.`
-      );
-      return;
-    }
-
-    // 5. Kirim notif untuk setiap chapter yang belum dikirim
-    let sentCount    = 0;
-    let skippedCount = 0;
-
-    for (const item of matched) {
-      const key         = `chapter:${item.url}`;
-      const alreadySent = await redis.get(key);
-
-      if (alreadySent) {
-        console.log(`⏭️ [checkAndNotify] Already sent: ${item.title} - ${item.chapter}`);
-        skippedCount++;
-        continue;
-      }
-
-      let successCount = 0;
-      for (const [guildId, channelId] of Object.entries(guildChannels)) {
-        try {
-          await sendDiscordEmbed(item, channelId);
-          console.log(`✅ [checkAndNotify] Sent to guild ${guildId} channel ${channelId}`);
-          successCount++;
-        } catch (err) {
-          console.error(`❌ [checkAndNotify] Failed guild ${guildId}: ${err.message}`);
-        }
-      }
-
-      if (successCount > 0) {
-        await redis.set(key, "sent");
-        sentCount++;
-      }
-    }
-
-    console.log(`📊 [checkAndNotify] sent=${sentCount} skipped=${skippedCount}`);
-
-    // 6. Edit response slash command dengan hasil akhir
-    if (sentCount > 0) {
-      await editInteractionResponse(
-        token,
-        `✅ **"${title}"** ditambahkan ke whitelist!\n📬 Ditemukan **${sentCount}** chapter baru — notifikasi dikirim ke semua channel!`
-      );
-    } else if (skippedCount > 0) {
-      await editInteractionResponse(
-        token,
-        `✅ **"${title}"** ditambahkan ke whitelist!\n📭 Chapter yang ada sudah pernah dikirim sebelumnya. Notifikasi otomatis saat chapter berikutnya rilis!`
-      );
-    } else {
-      await editInteractionResponse(
-        token,
-        `✅ **"${title}"** ditambahkan ke whitelist!\n📭 Belum ada chapter baru saat ini. Notifikasi otomatis saat chapter baru rilis!`
-      );
-    }
-
-    console.log(`✅ [checkAndNotify] Done: "${title}"`);
-  } catch (err) {
-    console.error(`❌ [checkAndNotify] Fatal: ${err.message}`);
-    console.error(err.stack);
-    await editInteractionResponse(
-      token,
-      `✅ **"${title}"** ditambahkan ke whitelist!\n⚠️ Gagal cek chapter: ${err.message}`
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
 // MAIN HANDLER
 // ─────────────────────────────────────────────────────────
 
@@ -354,13 +238,12 @@ export default async function handler(req, res) {
         whitelist.push(title);
         await saveWhitelist(whitelist);
 
-        // ✅ Kirim deferred response dulu (type 5)
-        res.json({ type: 5 });
-
-        // ✅ waitUntil memastikan Vercel tidak kill proses
-        // sebelum checkAndNotify selesai
-        waitUntil(checkAndNotify(title, payload.token));
-        return;
+        return res.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: `✅ **"${title}"** ditambahkan ke whitelist!\n🔔 Notifikasi otomatis saat chapter baru rilis!`,
+          },
+        });
       }
 
       // ───────────────────────────────────────
@@ -440,7 +323,12 @@ export default async function handler(req, res) {
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
-            content: `📊 **Bot Status**\n\n📋 Whitelisted: **${whitelist.length}** manga\n⏱️ Check interval: Every 5 minutes\n🔔 Notifications: Discord`,
+            content:
+              `📊 **Bot Status**\n\n` +
+              `📋 Whitelisted: **${whitelist.length}** manga\n` +
+              `⏱️ Check interval: Every 5 minutes\n` +
+              `🗑️ Chapter cache TTL: **3 hari**\n` +
+              `🔔 Notifications: Discord`,
           },
         });
       }
@@ -496,13 +384,13 @@ export default async function handler(req, res) {
             timeout: 10000,
           });
 
-          const $detail   = cheerio.load(detailResponse.data);
+          const $detail     = cheerio.load(detailResponse.data);
           const description =
             $detail('meta[name="description"]').attr("content") ||
             $detail(".description, .summary, [class*='description']").first().text().trim() ||
             "No synopsis available";
-          const rating  = $detail(".numscore").first().text().trim() || "N/A";
-          const status  = $detail("p.font-normal.text-xs, .status")
+          const rating    = $detail(".numscore").first().text().trim() || "N/A";
+          const status    = $detail("p.font-normal.text-xs, .status")
             .filter((_, el) => ["Ongoing", "Completed", "Hiatus", "Dropped"].includes($detail(el).text().trim()))
             .first()
             .text()
@@ -559,10 +447,10 @@ export default async function handler(req, res) {
               const chapterText = card.find("p").text().trim();
               if (chapterText.includes("Chapter")) {
                 const parent = card.parent();
-                let title    = parent.find("h1").text().trim() || card.find("h3").text().trim();
+                let t        = parent.find("h1").text().trim() || card.find("h3").text().trim();
                 const updatedTime = card.find("time").attr("datetime");
-                if (title && chapterText) {
-                  results.push({ title, chapter: chapterText, updatedTime });
+                if (t && chapterText) {
+                  results.push({ title: t, chapter: chapterText, updatedTime });
                 }
               }
             }
@@ -722,7 +610,7 @@ export default async function handler(req, res) {
 
             if (title && link) {
               results.push({
-                rank: parseInt(rank) || i + 1,
+                rank:   parseInt(rank) || i + 1,
                 title,
                 url:    link.startsWith("http") ? link : `https://02.ikiru.wtf${link}`,
                 genres,
