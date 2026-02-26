@@ -13,6 +13,7 @@
   "type": "module",
   "dependencies": {
     "@upstash/redis": "^1.36.2",
+    "@vercel/functions": "^3.4.3",
     "axios": "^1.13.5",
     "cheerio": "^1.2.0",
     "discord-interactions": "^4.4.0",
