@@ -66,7 +66,6 @@ async function sendDiscord(data, channelId) {
     }],
   };
 
-  // If channelId is provided, use bot API to send to specific channel
   if (channelId && DISCORD_BOT_TOKEN) {
     await axios.post(
       `https://discord.com/api/v10/channels/${channelId}/messages`,
@@ -79,7 +78,6 @@ async function sendDiscord(data, channelId) {
       }
     );
   } else if (WEBHOOK) {
-    // Fallback to webhook
     await axios.post(WEBHOOK, payload);
   }
 }
@@ -94,8 +92,7 @@ export default async function handler(req, res) {
 
   try {
     const items = await scrapeMangaUpdates();
-    // No need to sort by source since we only scrape Latest Updates now
-        const sortedItems = items;
+    const sortedItems = items;
 
     const pageHash = hash(JSON.stringify(sortedItems));
     const lastHash = await redis.get("page_hash");
@@ -112,11 +109,28 @@ export default async function handler(req, res) {
       guildChannels[guildId] = await redis.get(key);
     }
 
+    // Load whitelist from Redis
+    const whitelist = await redis.get("whitelist:manga") || [];
+
     for (const item of sortedItems) {
       const key = `chapter:${item.url}`;
       const exists = await redis.get(key);
 
       if (!exists) {
+        // Check whitelist if it's not empty
+        if (whitelist.length > 0) {
+          const isWhitelisted = whitelist.some(title =>
+            item.title.toLowerCase().includes(title.toLowerCase()) ||
+            title.toLowerCase().includes(item.title.toLowerCase())
+          );
+
+          if (!isWhitelisted) {
+            // Not in whitelist, skip without marking as sent
+            // so it can be re-checked if user adds it to whitelist later
+            continue;
+          }
+        }
+
         const description = await fetchDescription(item.mangaUrl);
         item.description = description;
         
@@ -126,7 +140,6 @@ export default async function handler(req, res) {
             await sendDiscord(item, channelId);
           }
         } else if (WEBHOOK) {
-          // Fallback to webhook if no channels set
           await sendDiscord(item);
         }
         
@@ -145,4 +158,4 @@ export default async function handler(req, res) {
     await sendErrorLog(WEBHOOK, err, "API Handler");
     return res.status(500).json({ error: err.message });
   }
-}
+}cl
