@@ -43,6 +43,19 @@ async function saveWhitelist(manga) {
   await redis.set("whitelist:manga", manga);
 }
 
+async function getNotificationChannel(guildId) {
+  try {
+    const channelId = await redis.get(`channel:${guildId}`);
+    return channelId;
+  } catch {
+    return null;
+  }
+}
+
+async function setNotificationChannel(guildId, channelId) {
+  await redis.set(`channel:${guildId}`, channelId);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -318,6 +331,61 @@ export default async function handler(req, res) {
             data: { content: `❌ Error fetching recent: ${err.message}` },
           });
         }
+      }
+
+      if (name === "setchannel") {
+        const guildId = payload.guild_id;
+        const channelId = options?.[0]?.value;
+        
+        if (!guildId) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ This command only works in servers!" },
+          });
+        }
+        
+        if (!channelId) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ Please provide a channel!" },
+          });
+        }
+
+        await setNotificationChannel(guildId, channelId);
+        
+        return res.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: `✅ **Notification channel set!**\nManga updates will be sent to <#${channelId}>`,
+          },
+        });
+      }
+
+      if (name === "getchannel") {
+        const guildId = payload.guild_id;
+        
+        if (!guildId) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "❌ This command only works in servers!" },
+          });
+        }
+
+        const channelId = await getNotificationChannel(guildId);
+        
+        if (!channelId) {
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "⚠️ No notification channel set. Use `/setchannel #channel`" },
+          });
+        }
+        
+        return res.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: `📢 **Current notification channel:** <#${channelId}>`,
+          },
+        });
       }
     }
 

@@ -15,6 +15,7 @@ import {
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -25,7 +26,7 @@ function hash(text) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-async function sendDiscord(data) {
+async function sendDiscord(data, channelId) {
   const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
   const sourceText = data.source === "Project Updates" ? "From Your Library" : "Latest Release";
   
@@ -72,7 +73,22 @@ async function sendDiscord(data) {
     }],
   };
 
-  await axios.post(WEBHOOK, payload);
+  // If channelId is provided, use bot API to send to specific channel
+  if (channelId && DISCORD_BOT_TOKEN) {
+    await axios.post(
+      `https://discord.com/api/v10/channels/${channelId}/messages`,
+      payload,
+      {
+        headers: {
+          "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+  } else if (WEBHOOK) {
+    // Fallback to webhook
+    await axios.post(WEBHOOK, payload);
+  }
 }
 
 export default async function handler(req, res) {
@@ -94,6 +110,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: "No changes" });
     }
 
+    // Get all guilds with notification channels
+    const guildKeys = await redis.keys("channel:*");
+    const guildChannels = {};
+    for (const key of guildKeys) {
+      const guildId = key.replace("channel:", "");
+      guildChannels[guildId] = await redis.get(key);
+    }
+
     for (const item of sortedItems) {
       const key = `chapter:${item.url}`;
       const exists = await redis.get(key);
@@ -102,8 +126,15 @@ export default async function handler(req, res) {
         const description = await fetchDescription(item.mangaUrl);
         item.description = description;
         
-        // Send to Discord
-        await sendDiscord(item);
+        // Send to Discord channels
+        if (Object.keys(guildChannels).length > 0) {
+          for (const channelId of Object.values(guildChannels)) {
+            await sendDiscord(item, channelId);
+          }
+        } else if (WEBHOOK) {
+          // Fallback to webhook if no channels set
+          await sendDiscord(item);
+        }
         
         // Send to Telegram (if configured)
         if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {

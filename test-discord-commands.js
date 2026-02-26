@@ -67,6 +67,21 @@ const commands = [
   {
     name: "recent",
     description: "Show 5 latest chapters",
+  },
+  {
+    name: "setchannel",
+    description: "Set notification channel for manga updates",
+    options: [{
+      name: "channel",
+      description: "Channel to send notifications",
+      type: 7, // CHANNEL
+      required: true,
+      channel_types: [0] // Text channels only
+    }]
+  },
+  {
+    name: "getchannel",
+    description: "Get current notification channel",
   }
 ];
 
