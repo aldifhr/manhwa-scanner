@@ -6,7 +6,6 @@ import {
   getStatusColor, 
   fetchDescription, 
   scrapeMangaUpdates, 
-  sortBySource,
   sendErrorLog,
   sendTelegram,
   STATUS_EMOJI
@@ -27,9 +26,6 @@ function hash(text) {
 }
 
 async function sendDiscord(data, channelId) {
-  const sourceEmoji = data.source === "Project Updates" ? "📌" : "🆕";
-  const sourceText = data.source === "Project Updates" ? "From Your Library" : "Latest Release";
-  
   const fields = [
     { 
       name: "⭐ Rating", 
@@ -66,7 +62,7 @@ async function sendDiscord(data, channelId) {
       fields,
       timestamp: new Date().toISOString(),
       footer: {
-        text: `${sourceEmoji} ${sourceText} • ikiru.wtf`,
+        text: `🆕 Latest Release • ikiru.wtf`,
         icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png"
       },
       thumbnail: data.cover?.startsWith("http") ? { url: data.cover } : undefined
@@ -101,7 +97,8 @@ export default async function handler(req, res) {
 
   try {
     const items = await scrapeMangaUpdates();
-    const sortedItems = sortBySource(items);
+    // No need to sort by source since we only scrape Latest Updates now
+        const sortedItems = items;
 
     const pageHash = hash(JSON.stringify(sortedItems));
     const lastHash = await redis.get("page_hash");
