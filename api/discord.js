@@ -33,9 +33,35 @@ export default async function handler(req, res) {
 
   const { type, data: interactionData } = payload;
 
-  // ── Button interactions ──
+  // ── Button & Select interactions ──
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
+
+    // ← BARU: Select menu — add manga
+    if (custom_id === "select_add") {
+      const title = interactionData.values[0];
+      res.json({ type: 5, data: { flags: 64 } });
+
+      waitUntil((async () => {
+        try {
+          const whitelist = await loadWhitelist();
+          if (whitelist.some((t) => t.toLowerCase() === title.toLowerCase())) {
+            await editInteractionResponse(payload.token,
+              `⚠️ **"${title}"** sudah ada di whitelist!`
+            );
+            return;
+          }
+          whitelist.push(title);
+          await saveWhitelist(whitelist);
+          await editInteractionResponse(payload.token,
+            `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`
+          );
+        } catch (err) {
+          await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+        }
+      })());
+      return;
+    }
 
     // Pagination search
     if (custom_id.startsWith("search:")) {
@@ -47,7 +73,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Add manga via tombol
+    // Add manga via tombol (legacy)
     if (custom_id.startsWith("add:")) {
       const title = custom_id.replace("add:", "");
       res.json({ type: 5, data: { flags: 64 } });
@@ -56,7 +82,9 @@ export default async function handler(req, res) {
         try {
           const whitelist = await loadWhitelist();
           if (whitelist.some((t) => t.toLowerCase() === title.toLowerCase())) {
-            await editInteractionResponse(payload.token, `⚠️ **"${title}"** sudah ada di whitelist!`);
+            await editInteractionResponse(payload.token,
+              `⚠️ **"${title}"** sudah ada di whitelist!`
+            );
             return;
           }
           whitelist.push(title);
