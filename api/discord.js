@@ -3,9 +3,14 @@ import {
   InteractionType,
   InteractionResponseType,
 } from "discord-interactions";
-import fs from "fs";
+import { Redis } from "@upstash/redis";
 
 const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 export const config = {
   api: {
@@ -22,17 +27,17 @@ async function getRawBody(req) {
   });
 }
 
-function loadWhitelist() {
+async function loadWhitelist() {
   try {
-    const data = JSON.parse(fs.readFileSync("./whitelist.json", "utf-8"));
-    return data.manga || [];
+    const data = await redis.get("whitelist:manga");
+    return data || [];
   } catch {
     return [];
   }
 }
 
-function saveWhitelist(manga) {
-  fs.writeFileSync("./whitelist.json", JSON.stringify({ manga }, null, 2));
+async function saveWhitelist(manga) {
+  await redis.set("whitelist:manga", manga);
 }
 
 export default async function handler(req, res) {
@@ -80,7 +85,7 @@ export default async function handler(req, res) {
           });
         }
 
-        const whitelist = loadWhitelist();
+        const whitelist = await loadWhitelist();
         if (whitelist.some(t => t.toLowerCase() === title.toLowerCase())) {
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -89,7 +94,7 @@ export default async function handler(req, res) {
         }
 
         whitelist.push(title);
-        saveWhitelist(whitelist);
+        await saveWhitelist(whitelist);
 
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -108,7 +113,7 @@ export default async function handler(req, res) {
           });
         }
 
-        const whitelist = loadWhitelist();
+        const whitelist = await loadWhitelist();
         const index = whitelist.findIndex(
           t => t.toLowerCase() === title.toLowerCase()
         );
@@ -121,7 +126,7 @@ export default async function handler(req, res) {
         }
 
         whitelist.splice(index, 1);
-        saveWhitelist(whitelist);
+        await saveWhitelist(whitelist);
 
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -132,7 +137,7 @@ export default async function handler(req, res) {
       }
 
       if (name === "list") {
-        const whitelist = loadWhitelist();
+        const whitelist = await loadWhitelist();
         if (whitelist.length === 0) {
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -150,7 +155,7 @@ export default async function handler(req, res) {
       }
 
       if (name === "status") {
-        const whitelist = loadWhitelist();
+        const whitelist = await loadWhitelist();
         return res.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
