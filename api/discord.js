@@ -221,11 +221,15 @@ export default async function handler(req, res) {
             });
           }
 
-          const list = results.slice(0, 5).map(r => `• **${r.title}**`).join("\n");
+          const list = results.slice(0, 5).map(r => {
+            const url = r.link.startsWith("http") ? r.link : `https://02.ikiru.wtf${r.link}`;
+            return `• **[${r.title}](${url})**`;
+          }).join("\n");
+          
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: `🔍 **Search results for "${query}":**\n\n${list}`,
+              content: `🔍 **Search results for "${query}":**\n\n${list}\n\n💡 Use \`/add "title"\` to add to whitelist`,
             },
           });
         } catch (err) {
@@ -324,6 +328,13 @@ export default async function handler(req, res) {
             }
           });
 
+          if (results.length === 0) {
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: { content: "🕐 No recent chapters found." },
+            });
+          }
+
           const recent = results.slice(0, 5);
           const list = recent.map(r => `• **${r.title}** - ${r.chapter}`).join("\n");
           
@@ -334,9 +345,10 @@ export default async function handler(req, res) {
             },
           });
         } catch (err) {
+          console.error("Recent error:", err);
           return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Error fetching recent: ${err.message}` },
+            data: { content: `❌ Error fetching recent chapters` },
           });
         }
       }
