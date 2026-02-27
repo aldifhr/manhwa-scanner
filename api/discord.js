@@ -45,36 +45,28 @@ export default async function handler(req, res) {
 
     // ← BARU: Select menu — add manga
     if (custom_id === "select_add") {
-      const title = interactionData.values[0];
+      const value = interactionData.values[0]; // "title|||url"
+      const [title, url] = value.split("|||");
       res.json({ type: 5, data: { flags: 64 } });
 
-      waitUntil(
-        (async () => {
-          try {
-            const whitelist = await loadWhitelist();
-            if (
-              whitelist.some((t) => t.toLowerCase() === title.toLowerCase())
-            ) {
-              await editInteractionResponse(
-                payload.token,
-                `⚠️ **"${title}"** sudah ada di whitelist!`,
-              );
-              return;
-            }
-            whitelist.push(title);
-            await saveWhitelist(whitelist);
-            await editInteractionResponse(
-              payload.token,
-              `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`,
+      waitUntil((async () => {
+        try {
+          const whitelist = await loadWhitelist();
+          if (whitelist.some(w => w.url === url || w.title.toLowerCase() === title.toLowerCase())) {
+            await editInteractionResponse(payload.token,
+              `⚠️ **"${title}"** sudah ada di whitelist!`
             );
-          } catch (err) {
-            await editInteractionResponse(
-              payload.token,
-              `❌ Error: ${err.message}`,
-            );
+            return;
           }
-        })(),
-      );
+          whitelist.push({ title, url });
+          await saveWhitelist(whitelist);
+          await editInteractionResponse(payload.token,
+            `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`
+          );
+        } catch (err) {
+          await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
+        }
+      })());
       return;
     }
 
