@@ -17,111 +17,91 @@ async function getRawBody(req) {
   });
 }
 
+// ✅ SHARED DUPLICATED LOGIC
+async function handleAddManga(payload, title, url = null) {
+  try {
+    const whitelist = await loadWhitelist();
+    
+    // Unified check: string/object format
+    const exists = whitelist.some(item => 
+      (typeof item === 'string' ? item : item.title?.toLowerCase() || item.url)
+        ?.toLowerCase() === title.toLowerCase() ||
+      item?.url === url
+    );
+    
+    if (exists) {
+      await editInteractionResponse(payload.token, `⚠️ **"${title}"** sudah ada!`);
+      return;
+    }
+    
+    // Unified push: auto-convert string → object
+    const entry = url ? { title, url } : title;
+    whitelist.push(entry);
+    await saveWhitelist(whitelist);
+    
+    await editInteractionResponse(
+      payload.token, 
+      `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`
+    );
+  } catch (err) {
+    await editInteractionResponse(payload.token, `❌ ${err.message}`);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const sig = req.headers["x-signature-ed25519"];
   const ts = req.headers["x-signature-timestamp"];
   const raw = await getRawBody(req);
-  const body = raw.toString();
-
+  
   const isValid = await verifyKey(
-    body,
+    raw.toString(),
     sig,
     ts,
     process.env.DISCORD_PUBLIC_KEY,
   );
   if (!isValid) return res.status(401).end();
 
-  const payload = JSON.parse(body);
+  const payload = JSON.parse(raw.toString());
 
+  // Ping PONG!
   if (payload.type === 1) return res.json({ type: 1 });
 
   const { type, data: interactionData } = payload;
 
-  // ── Button & Select interactions ──
+  // ── MESSAGE COMPONENTS ──
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
 
-    // ← BARU: Select menu — add manga
+    // Select menu: title|||url
     if (custom_id === "select_add") {
-      const value = interactionData.values[0]; // "title|||url"
-      const [title, url] = value.split("|||");
+      const [title, url] = interactionData.values[0].split("|||");
       res.json({ type: 5, data: { flags: 64 } });
-
-      waitUntil((async () => {
-        try {
-          const whitelist = await loadWhitelist();
-          if (whitelist.some(w => w.url === url || w.title.toLowerCase() === title.toLowerCase())) {
-            await editInteractionResponse(payload.token,
-              `⚠️ **"${title}"** sudah ada di whitelist!`
-            );
-            return;
-          }
-          whitelist.push({ title, url });
-          await saveWhitelist(whitelist);
-          await editInteractionResponse(payload.token,
-            `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`
-          );
-        } catch (err) {
-          await editInteractionResponse(payload.token, `❌ Error: ${err.message}`);
-        }
-      })());
-      return;
+      return waitUntil(handleAddManga(payload, title, url));
     }
 
-    // Pagination search
+    // Search pagination
     if (custom_id.startsWith("search:")) {
-      const parts = custom_id.split(":");
-      const keyword = parts[1];
-      const page = parseInt(parts[2]);
+      const [, keyword, page = '1'] = custom_id.split(":");
       res.json({ type: 6 });
-      waitUntil(handleSearchPage(payload, keyword, page, redis)); // ← tambah redis
-      return;
+      return waitUntil(handleSearchPage(payload, keyword, +page, redis));
     }
 
-    // Add manga via tombol (legacy)
+    // Legacy button: add:title
     if (custom_id.startsWith("add:")) {
       const title = custom_id.replace("add:", "");
       res.json({ type: 5, data: { flags: 64 } });
-
-      waitUntil(
-        (async () => {
-          try {
-            const whitelist = await loadWhitelist();
-            if (
-              whitelist.some((t) => t.toLowerCase() === title.toLowerCase())
-            ) {
-              await editInteractionResponse(
-                payload.token,
-                `⚠️ **"${title}"** sudah ada di whitelist!`,
-              );
-              return;
-            }
-            whitelist.push(title);
-            await saveWhitelist(whitelist);
-            await editInteractionResponse(
-              payload.token,
-              `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`,
-            );
-          } catch (err) {
-            await editInteractionResponse(
-              payload.token,
-              `❌ Error: ${err.message}`,
-            );
-          }
-        })(),
-      );
-      return;
+      return waitUntil(handleAddManga(payload, title));
     }
   }
 
-  // ── Slash commands ──
+  // ── SLASH COMMANDS ──
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
     const handle = commands[name];
-    if (handle) return handle(payload, options, res);
+    return handle?.(payload, options, res);
   }
 
-  return res.status(400).json({ error: "Unknown interaction" });
+  res.status(400).json({ error: "Unknown interaction" });
 }

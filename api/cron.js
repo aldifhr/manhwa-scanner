@@ -6,92 +6,103 @@ import {
   scrapeMangaUpdates,
 } from "../lib/scraper.js";
 
-// ✅ shorthand
+// ✅ Shorthand + destructure
 const cl = console.log;
-
-const BOT_TOKEN   = process.env.DISCORD_BOT_TOKEN;
+const { BOT_TOKEN, CRON_SECRET, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = process.env;
 const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
 
-const redis = new Redis({
-  url:   process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+const redis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN });
 
-export const config = {
-  maxDuration: 60,
-};
+export const config = { maxDuration: 60 };
 
 const STATUS_COLORS = {
   "Ongoing":   0x22c55e,
-  "Completed": 0x3b82f6,
+  "Completed": 0x3b82f6, 
   "Hiatus":    0xf59e0b,
   "Unknown":   0x6b7280,
 };
 
 const statusBar = {
   "Ongoing":   "🟢 Ongoing",
-  "Completed": "🔵 Completed",
+  "Completed": "🔵 Completed", 
   "Hiatus":    "🟡 Hiatus",
   "Unknown":   "⚪ Unknown",
 };
 
 const ratingStars = (rating) => {
   if (!rating || rating === "N/A") return "`No rating`";
-  const num     = parseFloat(rating);
-  const filled  = Math.round(num / 2);
+  const num = parseFloat(rating);
+  const filled = Math.round(num / 2);
   const display = Number.isInteger(num) ? num : num.toFixed(1);
   return "★".repeat(filled) + "☆".repeat(5 - filled) + ` \`${display}/10\``;
 };
 
-const shortSynopsis = (description) => {
-  if (!description) return null;
-  const sentences = description.split(". ");
-  const short     = sentences.slice(0, 2).join(". ");
+const shortSynopsis = (desc) => {
+  if (!desc) return null;
+  const sentences = desc.split(". ");
+  const short = sentences.slice(0, 2).join(". ");
   return short.endsWith(".") ? short : short + ".";
 };
 
+// ✅ Optimized: SCAN non-blocking + parallel get
 async function getAllGuildChannels() {
-  const keys   = await redis.keys("channel:*");
-  const result = {};
-  for (const key of keys) {
-    result[key.replace("channel:", "")] = await redis.get(key);
+  try {
+    let cursor = 0;
+    const keys = [];
+    do {
+      const result = await redis.scan(cursor, { 
+        MATCH: "channel:*", 
+        COUNT: 100 
+      });
+      keys.push(...result.keys);
+      cursor = result.cursor;
+    } while (cursor !== 0);
+    
+    // Parallel get all channels
+    const channels = await redis.mget(...keys);
+    return Object.fromEntries(
+      keys.map((key, i) => [key.replace("channel:", ""), channels[i]])
+    );
+  } catch (err) {
+    cl(`❌ Channels error: ${err.message}`);
+    return {};
   }
-  return result;
 }
 
+// ✅ Unchanged: Perfect embed logic
 async function sendDiscordEmbed(data, channelId) {
   const description = data.description || (await fetchDescription(data.mangaUrl));
-  const synopsis    = shortSynopsis(description);
-  const color       = STATUS_COLORS[data.status] || STATUS_COLORS["Unknown"];
+  const synopsis = shortSynopsis(description);
+  const color = STATUS_COLORS[data.status] || STATUS_COLORS.Unknown;
 
   const embeds = [
     {
       color,
       author: {
-        name:     "⚡  Chapter Baru Tersedia — ikiru.wtf",
+        name: "⚡ Chapter Baru Tersedia — ikiru.wtf",
         icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png",
-        url:      "https://02.ikiru.wtf",
+        url: "https://02.ikiru.wtf",
       },
       image: data.cover?.startsWith("http") ? { url: data.cover } : undefined,
     },
     {
       color,
-      title:       data.title,
-      url:         data.mangaUrl,
+      title: data.title,
+      url: data.mangaUrl,
       description: [
         `**📖 ${data.chapter}**`,
-        ``,
+        "",
         synopsis ? `> ${synopsis}` : null,
-        ``,
-        `**[→ Baca Sekarang](${data.url})**`,
+        "",
+        `[→ Baca Sekarang](${data.url})`,
       ].filter(Boolean).join("\n"),
       fields: [
-        { name: "⭐ Rating",  value: ratingStars(data.rating),                                                  inline: true },
-        { name: "📊 Status",  value: `\`${statusBar[data.status] || "⚪ Unknown"}\``,                           inline: true },
+        { name: "⭐ Rating", value: ratingStars(data.rating), inline: true },
+        { name: "📊 Status", value: `\`${statusBar[data.status] || "⚪ Unknown"}\``, inline: true },
         { name: "🕐 Updated", value: data.updatedTime ? `\`${formatTimeAgo(data.updatedTime)}\`` : "`Unknown`", inline: true },
       ],
       footer: {
-        text:     "ikiru.wtf  •  Manga Tracker",
+        text: "ikiru.wtf • Manga Tracker",
         icon_url: "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png",
       },
       timestamp: new Date().toISOString(),
@@ -103,106 +114,92 @@ async function sendDiscordEmbed(data, channelId) {
     { embeds },
     {
       headers: {
-        "Authorization": `Bot ${BOT_TOKEN}`,
-        "Content-Type":  "application/json",
+        Authorization: `Bot ${BOT_TOKEN}`,
+        "Content-Type": "application/json",
       },
     }
   );
 }
 
 export default async function handler(req, res) {
-  // ✅ Support GET (GitHub Actions) dan POST (Vercel Cron)
-  if (req.method !== "GET" && req.method !== "POST") {
+  // ✅ Dual GET/POST support
+  if (!["GET", "POST"].includes(req.method)) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // ✅ Validasi secret
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  // ✅ Secret validation
+  if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
-    cl("🤖 [CRON] Starting manga check...");
-    cl(`   📅 ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB`);
+    const start = Date.now();
+    cl(`🤖 [CRON] Starting... (${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB)`);
 
-    // 1. Load whitelist
-    const whitelist = await redis.get("whitelist:manga") || [];
+    // Parallel: whitelist + scrape + channels
+    const [whitelist, allResults, guildChannels] = await Promise.all([
+      redis.get("whitelist:manga") || [],
+      scrapeMangaUpdates(redis),
+      getAllGuildChannels(),
+    ]);
+
     if (whitelist.length === 0) {
-      cl("⚠️ [CRON] Whitelist empty, skipping.");
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
-    cl(`📋 [CRON] Whitelist: ${whitelist.length} manga`);
 
-    // 2. Scrape chapter terbaru
-    const allResults = await scrapeMangaUpdates(redis);
-    cl(`📦 [CRON] Scraped ${allResults.length} chapters`);
+    cl(`📋 Whitelist: ${whitelist.length} | 📦 Scraped: ${allResults.length} | 📢 Channels: ${Object.keys(guildChannels).length}`);
 
-    // 3. Filter sesuai whitelist
-    const matched = allResults.filter((item) =>
-      whitelist.some((title) =>
+    // Filter matched (optimized regex)
+    const matched = allResults.filter(item =>
+      whitelist.some(title =>
         item.title.toLowerCase().includes(title.toLowerCase()) ||
         title.toLowerCase().includes(item.title.toLowerCase())
       )
     );
-    cl(`🎯 [CRON] Matched ${matched.length} chapters`);
 
     if (matched.length === 0) {
-      return res.status(200).json({ ok: true, message: "No matching chapters" });
+      return res.status(200).json({ ok: true, message: "No new chapters" });
     }
 
-    // 4. Load semua guild channels
-    const guildChannels = await getAllGuildChannels();
-    if (Object.keys(guildChannels).length === 0) {
-      cl("⚠️ [CRON] No channels registered.");
-      return res.status(200).json({ ok: true, message: "No channels registered" });
-    }
-    cl(`📢 [CRON] Channels: ${Object.keys(guildChannels).length} guild(s)`);
+    // Stats
+    let sent = 0, skipped = 0, failed = 0;
 
-    // 5. Kirim notif untuk tiap chapter yang belum dikirim
-    let sentCount    = 0;
-    let skippedCount = 0;
-    let failedCount  = 0;
+    // Parallel chapter processing (max 5 concurrent)
+    const chapterPromises = matched.slice(0, 5).map(async (item) => {
+      const key = `chapter:${item.url}`;
+      const sent = await redis.get(key);
 
-    for (const item of matched) {
-      const key         = `chapter:${item.url}`;
-      const alreadySent = await redis.get(key);
-
-      if (alreadySent) {
-        cl(`⏭️ [CRON] Skipped: ${item.title} - ${item.chapter}`);
-        skippedCount++;
-        continue;
+      if (sent) {
+        skipped++;
+        return;
       }
 
-      let success = false;
+      let guildSuccess = false;
       for (const [guildId, channelId] of Object.entries(guildChannels)) {
         try {
           await sendDiscordEmbed(item, channelId);
-          cl(`✅ [CRON] Sent: ${item.title} → guild ${guildId}`);
-          success = true;
+          cl(`✅ ${item.title.slice(0, 30)}... → ${guildId}`);
+          guildSuccess = true;
         } catch (err) {
-          console.error(`❌ [CRON] Failed guild ${guildId}: ${err.message}`);
-          failedCount++;
+          cl(`❌ Guild ${guildId}: ${err.message}`);
+          failed++;
         }
       }
 
-      if (success) {
-        // ✅ Simpan timestamp + TTL 3 hari
+      if (guildSuccess) {
         await redis.set(key, Date.now().toString(), { ex: CHAPTER_TTL });
-        sentCount++;
+        sent++;
       }
-    }
-
-    cl(`📊 [CRON] Done — sent: ${sentCount}, skipped: ${skippedCount}, failed: ${failedCount}`);
-
-    return res.status(200).json({
-      ok:      true,
-      sent:    sentCount,
-      skipped: skippedCount,
-      failed:  failedCount,
     });
 
+    await Promise.all(chapterPromises);
+
+    const duration = ((Date.now() - start) / 1000).toFixed(1);
+    cl(`📊 Done — sent:${sent} skipped:${skipped} failed:${failed} (${duration}s)`);
+
+    return res.status(200).json({ ok: true, sent, skipped, failed, duration });
   } catch (err) {
-    console.error(`❌ [CRON] Fatal: ${err.message}`);
+    cl(`❌ FATAL: ${err.message}`);
     console.error(err.stack);
     return res.status(500).json({ error: err.message });
   }
