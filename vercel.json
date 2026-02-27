@@ -3,7 +3,7 @@
     "api/cron.js": {
       "maxDuration": 30
     },
-    "api/discord.js": {
+    "api/interactive.js": {
       "maxDuration": 10
     }
   }
