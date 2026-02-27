@@ -1,12 +1,14 @@
 import { Redis } from "@upstash/redis";
 import * as dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
 
+// 🔹 Upstash Redis client
 const redis = new Redis({
-  url:   process.env.UPSTASH_REDIS_REST_URL,
+  url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+// 🔹 List manga
 const mangaList = [
   "Hello? Veterinarian!",
   "Woojin Si Detektif Jenius",
@@ -65,29 +67,53 @@ const mangaList = [
   "The Crown Prince That Sells Medicine",
 ];
 
-async function bulkAdd() {
-  const existing = await redis.get("whitelist:manga");
-  let whitelist = [];
-
-  if (Array.isArray(existing)) whitelist = existing;
-  else if (typeof existing === "string") whitelist = JSON.parse(existing);
-
-  let added   = 0;
-  let skipped = 0;
-
-  for (const title of mangaList) {
-    if (whitelist.some((t) => t.toLowerCase() === title.toLowerCase())) {
-      console.log(`⏭️  Skip: ${title}`);
-      skipped++;
-    } else {
-      whitelist.push(title);
-      console.log(`✅ Added: ${title}`);
-      added++;
-    }
-  }
-
-  await redis.set("whitelist:manga", JSON.stringify(whitelist));
-  console.log(`\n🎉 Done! Added: ${added} | Skipped: ${skipped} | Total: ${whitelist.length}`);
+// 🔹 Utility: buat slug URL aman
+function makeSlug(title) {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // hapus karakter non-alphanumeric
+    .replace(/\s+/g, "-");    // ganti spasi jadi "-"
 }
 
-bulkAdd().catch(console.error);
+async function bulkAdd() {
+  try {
+    // 🔹 Ambil data lama dari Redis
+    const existing = await redis.get("whitelist:manga");
+    let whitelist = [];
+
+    if (existing) {
+      try {
+        whitelist = typeof existing === "string" ? JSON.parse(existing) : existing;
+      } catch {
+        whitelist = [];
+      }
+    }
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const title of mangaList) {
+      const url = `https://02.ikiru.wtf/manga/${makeSlug(title)}/`;
+
+      // cek duplikat berdasarkan title
+      if (whitelist.some((t) => t.title && t.title.toLowerCase() === title.toLowerCase())) {
+        console.log(`⏭️  Skip: ${title}`);
+        skipped++;
+      } else {
+        whitelist.push({ title, url });
+        console.log(`✅ Added: ${title}`);
+        added++;
+      }
+    }
+
+    // 🔹 Simpan kembali ke Redis
+    await redis.set("whitelist:manga", JSON.stringify(whitelist));
+
+    console.log(`\n🎉 Done! Added: ${added} | Skipped: ${skipped} | Total: ${whitelist.length}`);
+  } catch (err) {
+    console.error("❌ bulkAdd error:", err);
+  }
+}
+
+bulkAdd();
