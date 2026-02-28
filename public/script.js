@@ -7,7 +7,7 @@ let trendChart = null;
 
 // ===== CHART.JS INTEGRATION =====
 // FIX #2 & #3: Terima data langsung, tidak fetch ulang
-async function renderTrendChart(data) {
+async function renderSuccessChart(data) {
   const canvas = $("trendChart");
   if (!canvas) return;
 
@@ -21,19 +21,19 @@ async function renderTrendChart(data) {
   trendChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: data.times || [],
+      labels: data.labels || [],
       datasets: [
         {
-          label: 'Sent 🔔',
+          label: 'Sent ✅',
           data: data.sent || [],
           backgroundColor: '#10B981',
           borderRadius: 4,
           borderSkipped: false
         },
         {
-          label: 'Skipped ⏭️',
-          data: data.skipped || [],
-          backgroundColor: '#F59E0B',
+          label: 'Failed ❌',
+          data: data.failed || [],
+          backgroundColor: '#EF4444',
           borderRadius: 4,
           borderSkipped: false
         }
@@ -53,7 +53,7 @@ async function renderTrendChart(data) {
           grid: { color: 'rgba(0,0,0,0.05)' }
         },
         x: {
-          title: { display: true, text: '5 menit interval' },
+          title: { display: true, text: 'Hari' },
           grid: { display: false }
         }
       },
@@ -64,7 +64,7 @@ async function renderTrendChart(data) {
         },
         title: {
           display: true,
-          text: 'ikiru Bot: Notif Trends 2 Jam Terakhir',
+          text: 'ikiru Bot: Success vs Failed (7 Hari Terakhir)',
           padding: { bottom: 20 }
         }
       },
@@ -115,7 +115,7 @@ function submitSecret() {
   const val = $("secretInput").value.trim();
   if (!val) return;
   secret = val;
-  sessionStorage.setItem("ikiru_secret", val);
+  localStorage.setItem("ikiru_secret", val);
   $("modalOverlay").classList.remove("show");
   loadAll();
 }
@@ -131,7 +131,7 @@ async function apiFetch(path) {
   });
   if (r.status === 401) {
     secret = "";
-    sessionStorage.removeItem("ikiru_secret");
+    localStorage.removeItem("ikiru_secret");
     $("modalOverlay").classList.add("show");
     throw new Error("Unauthorized");
   }
@@ -422,7 +422,7 @@ async function loadAll() {
       apiFetch("/api/logs"),
       apiFetch("/api/uptime"),
       apiFetch("/api/top"),
-      fetch(`${API_BASE}/api/trend?secret=${secret}`, { cache: "no-store" }), // FIX #1
+      fetch(`${API_BASE}/api/chart`, { cache: "no-store", headers: { Authorization: `Bearer ${secret}` } }),
     ]);
 
   // STATS + UPTIME
@@ -431,11 +431,11 @@ async function loadAll() {
     uptimeR.status === "fulfilled" ? uptimeR.value : null,
   );
 
-  // FIX #2 & #3: Parse JSON dari Response, lalu kirim data ke renderTrendChart
+  // Parse JSON dari Response, kirim data ke renderSuccessChart
   if (trendR.status === "fulfilled" && trendR.value.ok) {
     try {
       const trendData = await trendR.value.json(); // FIX #3: parse JSON di sini
-      renderTrendChart(trendData);                  // FIX #2: tidak fetch ulang
+      renderSuccessChart(trendData);                  
     } catch (e) {
       console.error("Chart parse error:", e);
     }
