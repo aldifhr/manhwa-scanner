@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="./styles.css" />
     <script src="./script.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
       rel="stylesheet"
@@ -56,6 +57,10 @@
       <!-- STATS - 6 CARDS DENGAN UPTIME -->
       <div class="section-label">cron terakhir</div>
       <div class="stats-grid">
+        <div class="section-label">📊 Trend 24 Jam Terakhir</div>
+<div class="chart-container">
+  anvas id="trendChart"></canvas>
+</div>
         <div class="stat-card">
           <div class="stat-label">Sent</div>
           <div class="stat-value green" id="statSent">—</div>
