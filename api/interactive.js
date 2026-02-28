@@ -40,6 +40,7 @@ async function handleAddManga(payload, title, url = null) {
     const entry = url ? { title, url } : title;
     whitelist.push(entry);
     await saveWhitelist(whitelist);
+
     await editInteractionResponse(
       payload.token,
       `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`,
