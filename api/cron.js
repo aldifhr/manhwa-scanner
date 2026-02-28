@@ -164,7 +164,14 @@ export default async function handler(req, res) {
       getAllGuildChannels(),
     ]);
 
-    const whitelist = rawWhitelist ? JSON.parse(rawWhitelist) : [];
+    const rawParsed = Array.isArray(rawWhitelist)
+      ? rawWhitelist
+      : rawWhitelist
+      ? JSON.parse(rawWhitelist)
+      : [];
+    const whitelist = rawParsed.map((w) =>
+      typeof w === "string" ? { title: w, url: null } : w,
+    );
 
     if (whitelist.length === 0) {
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
@@ -183,8 +190,10 @@ export default async function handler(req, res) {
     }
 
     // ===== FILTER MATCHED =====
+    const whitelistTitles = whitelist.map((w) => w.title);
+
     const matched = allResults.filter((item) =>
-      whitelist.some(
+      whitelistTitles.some(
         (title) =>
           item.title.toLowerCase().includes(title.toLowerCase()) ||
           title.toLowerCase().includes(item.title.toLowerCase()),
