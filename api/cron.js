@@ -76,10 +76,7 @@ async function getAllGuildChannels() {
     const channels = await redis.mget(...keys);
 
     return Object.fromEntries(
-      keys.map((key, i) => [
-        key.replace("channel:", ""),
-        channels[i],
-      ])
+      keys.map((key, i) => [key.replace("channel:", ""), channels[i]]),
     );
   } catch (err) {
     cl(`❌ Channels error: ${err.message}`);
@@ -90,14 +87,11 @@ async function getAllGuildChannels() {
 // ===== VALIDATE CHANNEL =====
 async function validateChannel(channelId, guildId) {
   try {
-    await axios.get(
-      `https://discord.com/api/v10/channels/${channelId}`,
-      {
-        headers: {
-          Authorization: `Bot ${BOT_TOKEN}`,
-        },
-      }
-    );
+    await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
+      headers: {
+        Authorization: `Bot ${BOT_TOKEN}`,
+      },
+    });
     return true;
   } catch (err) {
     cl(`🗑️ Removing invalid guild ${guildId}`);
@@ -123,9 +117,7 @@ async function sendDiscordEmbed(data, channelId) {
           "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png",
         url: "https://02.ikiru.wtf",
       },
-      image: data.cover?.startsWith("http")
-        ? { url: data.cover }
-        : undefined,
+      image: data.cover?.startsWith("http") ? { url: data.cover } : undefined,
     },
     {
       color,
@@ -176,7 +168,7 @@ async function sendDiscordEmbed(data, channelId) {
         Authorization: `Bot ${BOT_TOKEN}`,
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 }
 
@@ -195,59 +187,41 @@ export default async function handler(req, res) {
     cl("🤖 [CRON] Starting...");
 
     // ===== PARALLEL FETCH =====
-    const [rawWhitelist, allResults, guildChannels] =
-      await Promise.all([
-        redis.get("whitelist:manga"),
-        scrapeMangaUpdates(redis),
-        getAllGuildChannels(),
-      ]);
+    const [rawWhitelist, allResults, guildChannels] = await Promise.all([
+      redis.get("whitelist:manga"),
+      scrapeMangaUpdates(redis),
+      getAllGuildChannels(),
+    ]);
 
-    const whitelist = rawWhitelist
-      ? JSON.parse(rawWhitelist)
-      : [];
+    const whitelist = rawWhitelist ? JSON.parse(rawWhitelist) : [];
 
     if (whitelist.length === 0) {
-      return res
-        .status(200)
-        .json({ ok: true, message: "Whitelist empty" });
+      return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
 
     // ===== VALIDATE GUILDS (ONLY ONCE) =====
     const validGuilds = {};
 
-    for (const [guildId, channelId] of Object.entries(
-      guildChannels
-    )) {
-      const valid = await validateChannel(
-        channelId,
-        guildId
-      );
+    for (const [guildId, channelId] of Object.entries(guildChannels)) {
+      const valid = await validateChannel(channelId, guildId);
       if (valid) validGuilds[guildId] = channelId;
     }
 
     if (Object.keys(validGuilds).length === 0) {
-      return res
-        .status(200)
-        .json({ ok: true, message: "No active guilds" });
+      return res.status(200).json({ ok: true, message: "No active guilds" });
     }
 
     // ===== FILTER MATCHED =====
     const matched = allResults.filter((item) =>
       whitelist.some(
         (title) =>
-          item.title
-            .toLowerCase()
-            .includes(title.toLowerCase()) ||
-          title
-            .toLowerCase()
-            .includes(item.title.toLowerCase())
-      )
+          item.title.toLowerCase().includes(title.toLowerCase()) ||
+          title.toLowerCase().includes(item.title.toLowerCase()),
+      ),
     );
 
     if (matched.length === 0) {
-      return res
-        .status(200)
-        .json({ ok: true, message: "No new chapters" });
+      return res.status(200).json({ ok: true, message: "No new chapters" });
     }
 
     // ===== STATS =====
@@ -266,11 +240,17 @@ export default async function handler(req, res) {
 
       let guildSuccess = false;
 
-      for (const [guildId, channelId] of Object.entries(
-        validGuilds
-      )) {
+      for (const [guildId, channelId] of Object.entries(validGuilds)) {
         try {
           await sendDiscordEmbed(item, channelId);
+          await redis.lpush(
+            "cron:logs",
+            JSON.stringify({
+              time: new Date().toISOString(),
+              message: `${item.title} — ${item.chapter}`,
+              tag: "sent",
+            }),
+          );
           cl(`✅ ${item.title} → ${guildId}`);
           guildSuccess = true;
         } catch (err) {
@@ -280,22 +260,15 @@ export default async function handler(req, res) {
       }
 
       if (guildSuccess) {
-        await redis.set(
-          key,
-          Date.now().toString(),
-          { ex: CHAPTER_TTL }
-        );
+        await redis.set(key, Date.now().toString(), { ex: CHAPTER_TTL });
         sentCount++;
       }
     }
 
-    const duration = (
-      (Date.now() - start) /
-      1000
-    ).toFixed(1);
+    const duration = ((Date.now() - start) / 1000).toFixed(1);
 
     cl(
-      `📊 Done — sent:${sentCount} skipped:${skipped} failed:${failed} (${duration}s)`
+      `📊 Done — sent:${sentCount} skipped:${skipped} failed:${failed} (${duration}s)`,
     );
 
     return res.status(200).json({
@@ -313,3 +286,17 @@ export default async function handler(req, res) {
     });
   }
 }
+
+await redis.set(
+  "cron:last_run",
+  JSON.stringify({
+    sent: sentCount,
+    skipped,
+    failed,
+    duration,
+    timestamp: new Date().toISOString(),
+  }),
+);
+
+// Trim log supaya tidak membengkak (max 200 entries)
+await redis.ltrim("cron:logs", 0, 199);
