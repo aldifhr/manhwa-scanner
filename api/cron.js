@@ -215,7 +215,6 @@ export default async function handler(req, res) {
         try {
           await sendDiscordEmbed(item, channelId);
 
-          // ✅ Log per chapter yang berhasil dikirim
           await redis.lpush(
             "cron:logs",
             JSON.stringify({
@@ -230,7 +229,6 @@ export default async function handler(req, res) {
         } catch (err) {
           cl(`❌ ${guildId}: ${err.message}`);
 
-          // ✅ Log error per guild
           await redis.lpush(
             "cron:logs",
             JSON.stringify({
@@ -246,6 +244,19 @@ export default async function handler(req, res) {
 
       if (guildSuccess) {
         await redis.set(key, Date.now().toString(), { ex: CHAPTER_TTL });
+
+        // ✅ FIX: dipindah ke dalam loop, dalam scope `item`
+        await redis.lpush(
+          "recent:chapters",
+          JSON.stringify({
+            title: item.title,
+            chapter: item.chapter,
+            url: item.url,
+            cover: item.cover ?? null,
+            sentAt: new Date().toISOString(),
+          }),
+        );
+
         sentCount++;
       }
     }
@@ -256,7 +267,6 @@ export default async function handler(req, res) {
       `📊 Done — sent:${sentCount} skipped:${skipped} failed:${failed} (${duration}s)`,
     );
 
-    // ✅ Simpan stats run terakhir — HARUS di dalam handler, sebelum return
     await redis.set(
       "cron:last_run",
       JSON.stringify({
@@ -268,21 +278,10 @@ export default async function handler(req, res) {
       }),
     );
 
-    await redis.lpush(
-      "recent:chapters",
-      JSON.stringify({
-        title: item.title,
-        chapter: item.chapter,
-        url: item.url,
-        cover: item.cover ?? null,
-        sentAt: new Date().toISOString(),
-      }),
-    );
-
     // ✅ Trim log max 200 entries
     await redis.ltrim("cron:logs", 0, 199);
     await redis.ltrim("recent:chapters", 0, 19);
-    
+
     return res.status(200).json({
       ok: true,
       sent: sentCount,
