@@ -21,14 +21,19 @@ async function handleAddManga(payload, title, url = null) {
   try {
     const whitelist = await loadWhitelist();
 
-    const exists = whitelist.some(item =>
-      (typeof item === 'string' ? item : item.title?.toLowerCase() || item.url)
-        ?.toLowerCase() === title.toLowerCase() ||
-      item?.url === url
+    const exists = whitelist.some(
+      (item) =>
+        (typeof item === "string"
+          ? item
+          : item.title?.toLowerCase() || item.url
+        )?.toLowerCase() === title.toLowerCase() || item?.url === url,
     );
 
     if (exists) {
-      await editInteractionResponse(payload.token, `⚠️ **"${title}"** sudah ada!`);
+      await editInteractionResponse(
+        payload.token,
+        `⚠️ **"${title}"** sudah ada!`,
+      );
       return;
     }
 
@@ -38,7 +43,7 @@ async function handleAddManga(payload, title, url = null) {
 
     await editInteractionResponse(
       payload.token,
-      `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`
+      `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`,
     );
   } catch (err) {
     await editInteractionResponse(payload.token, `❌ ${err.message}`);
@@ -49,14 +54,14 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const sig = req.headers["x-signature-ed25519"];
-  const ts  = req.headers["x-signature-timestamp"];
+  const ts = req.headers["x-signature-timestamp"];
   const raw = await getRawBody(req);
 
   const isValid = await verifyKey(
     raw.toString(),
     sig,
     ts,
-    process.env.DISCORD_PUBLIC_KEY
+    process.env.DISCORD_PUBLIC_KEY,
   );
   if (!isValid) return res.status(401).end();
 
@@ -75,7 +80,7 @@ export default async function handler(req, res) {
     }
 
     if (custom_id.startsWith("search:")) {
-      const [, keyword, page = '1'] = custom_id.split(":");
+      const [, keyword, page = "1"] = custom_id.split(":");
       res.json({ type: 6 });
       return waitUntil(handleSearchPage(payload, keyword, +page, redis));
     }
@@ -88,22 +93,25 @@ export default async function handler(req, res) {
 
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1]) || 1;
-      res.json({ type: 6 }); // ← sudah handle di sini, jangan kirim lagi di handleList
-      return waitUntil(
-        commands["list"](payload, [{ value: page }], { json: () => {} }, true) // ← flag isComponent = true
-      );
+      res.json({ type: 6 });
+      return waitUntil(commands["list"](payload, [{ value: page }], true)); // ✅
     }
 
     if (custom_id === "clear_all") {
       res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil((async () => {
-        try {
-          await saveWhitelist([]);
-          await editInteractionResponse(payload.token, "🗑️ Whitelist dibersihkan!");
-        } catch (err) {
-          await editInteractionResponse(payload.token, `❌ ${err.message}`);
-        }
-      })());
+      return waitUntil(
+        (async () => {
+          try {
+            await saveWhitelist([]);
+            await editInteractionResponse(
+              payload.token,
+              "🗑️ Whitelist dibersihkan!",
+            );
+          } catch (err) {
+            await editInteractionResponse(payload.token, `❌ ${err.message}`);
+          }
+        })(),
+      );
     }
   }
 
