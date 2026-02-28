@@ -86,11 +86,12 @@ export default async function handler(req, res) {
       return waitUntil(handleAddManga(payload, title));
     }
 
-    // ✅ type 6 = deferred update, edit pesan yang sama bukan buat pesan baru
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1]) || 1;
-      res.json({ type: 6 });
-      return waitUntil(commands["list"](payload, [{ value: page }], { json: () => {} }));
+      res.json({ type: 6 }); // ← sudah handle di sini, jangan kirim lagi di handleList
+      return waitUntil(
+        commands["list"](payload, [{ value: page }], { json: () => {} }, true) // ← flag isComponent = true
+      );
     }
 
     if (custom_id === "clear_all") {
