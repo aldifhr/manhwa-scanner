@@ -63,7 +63,13 @@ async function validateChannel(channelId, guildId) {
     });
     return true;
   } catch (err) {
-    cl(`🗑️ Removing invalid guild ${guildId} — status: ${err.response?.status} — ${JSON.stringify(err.response?.data)}`);
+    const status = err.response?.status;
+    // Jangan hapus guild kalau 401 (token salah) atau 5xx (server error)
+    if (!status || status === 401 || status >= 500) {
+      cl(`⚠️ Skipping guild ${guildId} — status: ${status}`);
+      return false;
+    }
+    cl(`🗑️ Removing invalid guild ${guildId} — status: ${status} — ${JSON.stringify(err.response?.data)}`);
     await deleteGuildChannel(guildId);
     return false;
   }
