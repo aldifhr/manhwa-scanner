@@ -59,13 +59,11 @@ const shortSynopsis = (desc) => {
 async function validateChannel(channelId, guildId) {
   try {
     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
-      headers: {
-        Authorization: `Bot ${BOT_TOKEN}`,
-      },
+      headers: { Authorization: `Bot ${BOT_TOKEN}` },
     });
     return true;
   } catch (err) {
-    cl(`🗑️ Removing invalid guild ${guildId}`);
+    cl(`🗑️ Removing invalid guild ${guildId} — status: ${err.response?.status} — ${JSON.stringify(err.response?.data)}`);
     await deleteGuildChannel(guildId);
     return false;
   }
