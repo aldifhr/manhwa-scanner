@@ -8,7 +8,7 @@ let trendChart = null; // CHART STATE
 // ===== CHART.JS INTEGRATION =====
 async function loadTrendChart() {
   try {
-    const res = await fetch(`${API_BASE}/api/trend?secret=${process.env.CRON_SECRET}`, {
+    const res = await fetch(`${API_BASE}/api/trend?secret=${secret}`, {
       cache: "no-store"
     });
     if (!res.ok) throw new Error("Trend data failed");
