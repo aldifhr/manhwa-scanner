@@ -1,4 +1,4 @@
-const API_BASE = "";
+const API_BASE = "https://ikiru-bots.vercel.app";
 const POLL_MS = 30_000;
 const $ = (id) => document.getElementById(id);
 let secret = sessionStorage.getItem("ikiru_secret") || "";
@@ -8,7 +8,7 @@ let trendChart = null; // CHART STATE
 // ===== CHART.JS INTEGRATION =====
 async function loadTrendChart() {
   try {
-    const res = await fetch(`${API_BASE}/api/trend?secret=${secret}`, {
+    const res = await fetch(`${API_BASE}/api/trend?secret=${process.env.CRON_SECRET}`, {
       cache: "no-store"
     });
     if (!res.ok) throw new Error("Trend data failed");
