@@ -62,8 +62,13 @@
       text-transform:uppercase; color:var(--muted); margin-bottom:10px;
     }
 
-    /* ── Stats ── */
-    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:28px; }
+    /* ── Stats ── 6 COLS */
+    .stats-grid { 
+      display:grid; 
+      grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); 
+      gap:10px; 
+      margin-bottom:28px; 
+    }
     @media(max-width:580px){ .stats-grid{ grid-template-columns:repeat(2,1fr); } }
     .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 16px; }
     .stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
@@ -195,12 +200,16 @@
 <main>
   <div class="alert" id="alertBox" style="display:none"></div>
 
+  <!-- STATS - 6 CARDS DENGAN UPTIME -->
   <div class="section-label">cron terakhir</div>
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-value green" id="statSent">—</div></div>
     <div class="stat-card"><div class="stat-label">Skipped</div><div class="stat-value amber" id="statSkipped">—</div></div>
     <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value red" id="statFailed">—</div></div>
     <div class="stat-card"><div class="stat-label">Duration</div><div class="stat-value" id="statDuration">—</div></div>
+    <!-- UPTIME BARU -->
+    <div class="stat-card"><div class="stat-label">Uptime 24h</div><div class="stat-value" id="statUptime24h">—</div></div>
+    <div class="stat-card"><div class="stat-label">Uptime 7d</div><div class="stat-value" id="statUptime7d">—</div></div>
   </div>
 
   <div class="two-col">
@@ -224,6 +233,16 @@
         <ul class="guild-list" id="guildList"><li class="empty">memuat...</li></ul>
       </div>
     </div>
+  </div>
+
+  <!-- TOP MANHWA BARU -->
+  <div class="section-label">🏆 top manhwa 7 hari</div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Paling sering dikirim bot</span>
+      <span class="badge" id="topCount">0</span>
+    </div>
+    <ul class="manga-list" id="topManhwaList"><li class="empty">memuat...</li></ul>
   </div>
 
   <div class="section-label">recent manhwa terkirim</div>
@@ -252,6 +271,34 @@
   const $ = id => document.getElementById(id);
   let secret = sessionStorage.getItem("ikiru_secret") || "";
   let pollTimer = null;
+
+  // ===== UPTIME & TOP HELPERS =====
+  function calculateUptime(logs, hours) {
+    if (!logs?.length) return null;
+    const now = Date.now();
+    const cutoff = now - (hours * 60 * 60 * 1000);
+    
+    const recent = logs.filter(l => new Date(l.time) > cutoff);
+    if (!recent.length) return null;
+    
+    const success = recent.filter(l => l.tag === 'sent').length;
+    return Math.round((success / recent.length) * 100);
+  }
+
+  function getTopManhwa(logs) {
+    const counter = {};
+    logs
+      ?.filter(l => l.tag === 'sent' && l.message?.includes('Chapter'))
+      .forEach(l => {
+        const title = l.message.split(' — ')[0]?.trim() || l.message.split('Chapter')[0]?.trim();
+        if (title) counter[title] = (counter[title] || 0) + 1;
+      });
+    
+    return Object.entries(counter)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([title, count]) => ({ title, count }));
+  }
 
   function checkAuth() {
     if (!secret) { $("modalOverlay").classList.add("show"); return false; }
@@ -286,7 +333,7 @@
   const fmt = d => new Intl.DateTimeFormat("id-ID",{ hour:"2-digit",minute:"2-digit",second:"2-digit" }).format(d);
   function timeAgo(iso) {
     const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-    if (s < 60)   return `${s}d lalu`;
+    if (s < 60)   return `${s} det lalu`;
     if (s < 3600) return `${Math.floor(s/60)}m lalu`;
     if (s < 86400)return `${Math.floor(s/3600)}j lalu`;
     return `${Math.floor(s/86400)}h lalu`;
@@ -311,23 +358,62 @@
     ).join("");
   }
 
-  function showAlert(msg) { const el=$("alertBox"); el.style.display="block"; el.textContent=msg; }
+  function showAlert(msg) { 
+    const el=$("alertBox"); 
+    el.style.display="block"; 
+    el.textContent=msg; 
+    setTimeout(() => el.style.display="none", 8000);
+  }
   function clearAlert() { $("alertBox").style.display="none"; }
   function renderErr(ul, msg) { ul.innerHTML=`<li class="empty" style="color:var(--red)">${msg}</li>`; }
 
-  // ── Stats ──
-  function renderStats(data) {
+  // ── STATS EXTENDED (dengan UPTIME) ──
+  function renderStatsExtended(statusData, uptimeData) {
     const dot = $("statusDot");
-    if (!data) {
-      ["statSent","statSkipped","statFailed","statDuration"].forEach(id=>$(id).textContent="—");
+    if (!statusData) {
+      ["statSent","statSkipped","statFailed","statDuration","statUptime24h","statUptime7d"].forEach(id=>$(id).textContent="—");
       dot.className = "logo-dot offline";
       return;
     }
-    $("statSent").textContent     = data.sent     ?? "—";
-    $("statSkipped").textContent  = data.skipped  ?? "—";
-    $("statFailed").textContent   = data.failed   ?? "—";
-    $("statDuration").textContent = data.duration ? `${data.duration}s` : "—";
-    dot.className = "logo-dot" + (data.failed > 0 ? " offline" : "");
+    
+    $("statSent").textContent     = statusData.sent ?? "—";
+    $("statSkipped").textContent  = statusData.skipped ?? "—";
+    $("statFailed").textContent   = statusData.failed ?? "—";
+    $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "—";
+    
+    // UPTIME
+    $("statUptime24h").textContent = uptimeData?.uptime24h ?? "—";
+    $("statUptime24h").className = `stat-value ${
+      uptimeData?.uptime24h >= 95 ? 'green' : 
+      uptimeData?.uptime24h >= 80 ? 'amber' : 'red'
+    }`;
+    
+    $("statUptime7d").textContent = uptimeData?.uptime7d ?? "—";
+    $("statUptime7d").className = `stat-value ${
+      uptimeData?.uptime7d >= 95 ? 'green' : 
+      uptimeData?.uptime7d >= 80 ? 'amber' : 'red'
+    }`;
+    
+    dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
+  }
+
+  // ── TOP MANHWA ──
+  function renderTopManhwa(data) {
+    const list = $("topManhwaList");
+    const top = data?.top ?? [];
+    $("topCount").textContent = top.length;
+    
+    if (!top.length) {
+      list.innerHTML = '<li class="empty">Belum ada chapter terkirim</li>';
+      return;
+    }
+    
+    list.innerHTML = top.map((item, i) =>
+      `<li class="manga-item">
+        <span class="manga-index">${String(i+1).padStart(2,"0")}</span>
+        <span>${esc(item.title)} <span style="color:var(--muted);font-size:11px">(${item.count}x)</span></span>
+      </li>`
+    ).join("");
   }
 
   // ── Whitelist ──
@@ -399,7 +485,7 @@
     ).join("");
   }
 
-  // ── Main load ──
+  // ── MAIN LOAD (DENGAN UPTIME & TOP) ──
   async function loadAll() {
     if (!checkAuth()) return;
     clearAlert();
@@ -408,35 +494,48 @@
     btn.disabled = true;
     btn.textContent = "memuat...";
 
+    // Skeleton semua
     skeleton($("mangaList"));
     skeleton($("guildList"), 3);
     skeletonRecent($("recentList"), 4);
     skeleton($("logList"), 5);
+    skeleton($("topManhwaList"));
 
-    const [statusR, whitelistR, guildsR, recentR, logsR] = await Promise.allSettled([
+    const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR] = await Promise.allSettled([
       apiFetch("/api/status"),
       apiFetch("/api/whitelist"),
       apiFetch("/api/guilds"),
       apiFetch("/api/recent"),
       apiFetch("/api/logs"),
+      apiFetch("/api/uptime"),  // BARU
+      apiFetch("/api/top"),     // BARU
     ]);
 
-    renderStats(statusR.status === "fulfilled" ? statusR.value : null);
+    // STATS + UPTIME
+    renderStatsExtended(
+      statusR.status === "fulfilled" ? statusR.value : null,
+      uptimeR.status === "fulfilled" ? uptimeR.value : null
+    );
 
+    // TOP MANHWA
+    if (topR.status === "fulfilled") renderTopManhwa(topR.value);
+    else renderErr($("topManhwaList"), "Gagal muat top manhwa");
+
+    // Lainnya sama
     if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
-    else renderErr($("mangaList"), "Gagal memuat whitelist");
+    else renderErr($("mangaList"), "Gagal muat whitelist");
 
     if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
-    else renderErr($("guildList"), "Gagal memuat guilds");
+    else renderErr($("guildList"), "Gagal muat guilds");
 
     if (recentR.status === "fulfilled") renderRecent(recentR.value);
-    else renderErr($("recentList"), "Gagal memuat recent chapters");
+    else renderErr($("recentList"), "Gagal muat recent chapters");
 
     if (logsR.status === "fulfilled") renderLogs(logsR.value);
-    else renderErr($("logList"), "Gagal memuat logs");
+    else renderErr($("logList"), "Gagal muat logs");
 
-    const anyFailed = [statusR,whitelistR,guildsR,recentR,logsR].some(r=>r.status==="rejected");
-    if (anyFailed && secret) showAlert("Beberapa data gagal dimuat. Cek koneksi atau CRON_SECRET.");
+    const anyFailed = [statusR,whitelistR,guildsR,recentR,logsR,uptimeR,topR].some(r=>r.status==="rejected");
+    if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
     $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
     btn.disabled = false;
