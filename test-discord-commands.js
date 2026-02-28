@@ -30,7 +30,7 @@ const commands = [
     name:        "remove",
     description: "Remove manga from whitelist (by title or number)",
     options: [{
-      name:        "title",
+      name:        "query",
       description: "Manga title or number from /list",
       type:        3,
       required:    true,
@@ -112,7 +112,7 @@ async function registerCommands() {
     console.log("📝 Registering Discord slash commands...\n");
 
     const response = await fetch(
-      `https://discord.com/api/v10/applications/${APP_ID}/commands`,
+      `https://discord.com/api/v10/applications/${process.env.DISCORD_APPLICATION_ID}/commands`,
       {
         method:  "PUT",
         headers: {
