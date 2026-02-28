@@ -6,13 +6,17 @@ export default async function handler(req, res) {
 
   res.setHeader("Cache-Control", "no-store");
 
-  // Ambil 20 chapter terbaru dari list recent:chapters
   const raw = await redis.lrange("recent:chapters", 0, 19);
 
-  const items = raw.map((entry) => {
-    try { return typeof entry === "string" ? JSON.parse(entry) : entry; }
-    catch { return null; }
-  }).filter(Boolean);
+  const items = raw
+    .map((entry) => {
+      try {
+        return typeof entry === "string" ? JSON.parse(entry) : entry;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 
   res.json({ items });
 }

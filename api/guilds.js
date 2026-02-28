@@ -1,9 +1,9 @@
-import getAllGuildChannels from ""
+import { getAllGuildChannels } from "../lib/redis.js"; // ✅ import path dilengkapi
+
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`)
     return res.status(401).json({ error: "Unauthorized" });
 
-  // ✅ Tambah ini
   res.setHeader("Cache-Control", "no-store");
 
   const channelMap = await getAllGuildChannels();
