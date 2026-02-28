@@ -6,7 +6,7 @@
     "api/interactive.js": {
       "maxDuration": 10
     },
-    "api/trend.js": { 
+    "api/chart.js": { 
       "maxDuration": 10 
     }
   }

@@ -1,3 +1,5 @@
+import { redis } from "../lib/redis.js";
+
 export default async function handler(req, res) {
   const token = req.headers.authorization?.replace('Bearer ', '') || req.query.secret;
   if (!token || token !== process.env.CRON_SECRET) {
