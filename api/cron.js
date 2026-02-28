@@ -56,6 +56,7 @@ const shortSynopsis = (desc) => {
 };
 
 // ===== VALIDATE CHANNEL =====
+// FIX #2: Bedakan jenis error — jangan hapus guild kalau error 401 (bot token salah)
 async function validateChannel(channelId, guildId) {
   try {
     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
@@ -65,8 +66,20 @@ async function validateChannel(channelId, guildId) {
     });
     return true;
   } catch (err) {
-    cl(`🗑️ Removing invalid guild ${guildId}`);
-    await deleteGuildChannel(guildId);
+    const status = err.response?.status;
+
+    if (status === 404 || status === 403) {
+      // Channel tidak ada atau bot tidak punya akses → hapus guild
+      cl(`🗑️ Removing invalid guild ${guildId} (HTTP ${status})`);
+      await deleteGuildChannel(guildId);
+    } else if (status === 401) {
+      // Bot token salah → jangan hapus guild, ini masalah konfigurasi
+      cl(`⚠️ Bot token invalid, skipping guild ${guildId} (HTTP 401)`);
+    } else {
+      // Network error atau error lain → jangan hapus guild
+      cl(`⚠️ Could not validate guild ${guildId}: ${err.message}`);
+    }
+
     return false;
   }
 }
@@ -177,14 +190,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
 
-    // ===== VALIDATE GUILDS (ONLY ONCE) =====
+    // ===== VALIDATE GUILDS =====
+    // FIX #1: Hanya tambah ke validGuilds kalau benar-benar valid
     const validGuilds = {};
 
     for (const [guildId, channelId] of Object.entries(guildChannels)) {
       const valid = await validateChannel(channelId, guildId);
-      // ✅ If 401 (token issue), validateChannel returns false but doesn't delete
-      // Still add to validGuilds so we attempt to send — Discord will reject if truly invalid
-      if (valid || channelId) validGuilds[guildId] = channelId;
+      if (valid) validGuilds[guildId] = channelId; // FIX #1: hapus `|| channelId`
     }
 
     if (Object.keys(validGuilds).length === 0) {
@@ -213,33 +225,31 @@ export default async function handler(req, res) {
 
     for (const item of matched.slice(0, 5)) {
       const key = `chapter:${item.url}`;
-      const alreadySent = await redis.get(key);
 
-      if (alreadySent) {
+      // FIX #4: Pakai SET NX untuk hindari race condition kalau 2 cron jalan paralel
+      const claimed = await redis.set(key, Date.now().toString(), {
+        ex: CHAPTER_TTL,
+        nx: true, // only set if not exists
+      });
+
+      if (!claimed) {
+        cl(`⏭️ Skipped (already claimed): ${item.title}`);
         skipped++;
         continue;
       }
 
       let guildSuccess = false;
+      let guildFailCount = 0;
 
       for (const [guildId, channelId] of Object.entries(validGuilds)) {
         try {
           await sendDiscordEmbed(item, channelId);
-
-          await redis.lpush(
-            "cron:logs",
-            JSON.stringify({
-              time: new Date().toISOString(),
-              message: `${item.title} — ${item.chapter}`,
-              tag: "sent",
-            }),
-          );
-
           cl(`✅ ${item.title} → ${guildId}`);
           guildSuccess = true;
         } catch (err) {
           cl(`❌ ${guildId}: ${err.message}`);
 
+          // FIX #5: Log failed per guild tetap di sini (per guild memang wajar)
           await redis.lpush(
             "cron:logs",
             JSON.stringify({
@@ -249,14 +259,23 @@ export default async function handler(req, res) {
             }),
           );
 
-          failed++;
+          guildFailCount++;
         }
       }
 
-      if (guildSuccess) {
-        await redis.set(key, Date.now().toString(), { ex: CHAPTER_TTL });
+      failed += guildFailCount;
 
-        // ✅ FIX: dipindah ke dalam loop, dalam scope `item`
+      if (guildSuccess) {
+        // FIX #5: Log "sent" cukup sekali per item, bukan per guild
+        await redis.lpush(
+          "cron:logs",
+          JSON.stringify({
+            time: new Date().toISOString(),
+            message: `${item.title} — ${item.chapter}`,
+            tag: "sent",
+          }),
+        );
+
         await redis.lpush(
           "recent:chapters",
           JSON.stringify({
@@ -269,6 +288,10 @@ export default async function handler(req, res) {
         );
 
         sentCount++;
+      } else {
+        // Semua guild gagal → lepas klaim supaya bisa dicoba lagi di cron berikutnya
+        await redis.del(key);
+        cl(`⚠️ All guilds failed for ${item.title}, releasing claim`);
       }
     }
 
@@ -289,7 +312,7 @@ export default async function handler(req, res) {
       }),
     );
 
-    // ✅ Trim log max 200 entries
+    // Trim log max 200 entries
     await redis.ltrim("cron:logs", 0, 199);
     await redis.ltrim("recent:chapters", 0, 19);
 
@@ -304,6 +327,7 @@ export default async function handler(req, res) {
       }),
       { ex: 7200 },
     );
+
     return res.status(200).json({
       ok: true,
       sent: sentCount,

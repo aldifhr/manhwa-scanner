@@ -17,61 +17,61 @@ async function renderTrendChart(data) {
     trendChart = null;
   }
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   trendChart = new Chart(ctx, {
-    type: 'bar',
+    type: "bar",
     data: {
       labels: data.times || [],
       datasets: [
         {
-          label: 'Sent 🔔',
+          label: "Sent 🔔",
           data: data.sent || [],
-          backgroundColor: '#10B981',
+          backgroundColor: "#10B981",
           borderRadius: 4,
-          borderSkipped: false
+          borderSkipped: false,
         },
         {
-          label: 'Skipped ⏭️',
+          label: "Skipped ⏭️",
           data: data.skipped || [],
-          backgroundColor: '#F59E0B',
+          backgroundColor: "#F59E0B",
           borderRadius: 4,
-          borderSkipped: false
-        }
-      ]
+          borderSkipped: false,
+        },
+      ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: {
         intersect: false,
-        mode: 'index'
+        mode: "index",
       },
       scales: {
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Jumlah' },
-          grid: { color: 'rgba(0,0,0,0.05)' }
+          title: { display: true, text: "Jumlah" },
+          grid: { color: "rgba(0,0,0,0.05)" },
         },
         x: {
-          title: { display: true, text: '5 menit interval' },
-          grid: { display: false }
-        }
+          title: { display: true, text: "5 menit interval" },
+          grid: { display: false },
+        },
       },
       plugins: {
         legend: {
-          position: 'top',
-          labels: { padding: 20 }
+          position: "top",
+          labels: { padding: 20 },
         },
         title: {
           display: true,
-          text: 'ikiru Bot: Notif Trends 2 Jam Terakhir',
-          padding: { bottom: 20 }
-        }
+          text: "ikiru Bot: Notif Trends 2 Jam Terakhir",
+          padding: { bottom: 20 },
+        },
       },
       animation: {
-        duration: 800
-      }
-    }
+        duration: 800,
+      },
+    },
   });
 }
 
@@ -140,8 +140,14 @@ async function apiFetch(path) {
 }
 
 // ===== UI HELPERS =====
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const fmt = (d) => new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(d);
+const esc = (s) =>
+  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const fmt = (d) =>
+  new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(d);
 function timeAgo(iso) {
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
   if (s < 60) return `${s} det lalu`;
@@ -151,22 +157,26 @@ function timeAgo(iso) {
 }
 
 function skeleton(ul, n = 4) {
-  ul.innerHTML = Array.from({ length: n }, (_, i) =>
-    `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
+  ul.innerHTML = Array.from(
+    { length: n },
+    (_, i) =>
+      `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
       <div class="skel" style="width:${55 + (i % 3) * 20}%"></div>
-    </li>`
+    </li>`,
   ).join("");
 }
 
 function skeletonRecent(ul, n = 4) {
-  ul.innerHTML = Array.from({ length: n }, () =>
-    `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
+  ul.innerHTML = Array.from(
+    { length: n },
+    () =>
+      `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
       <div style="width:44px;height:60px;border-radius:3px;background:var(--border)"></div>
       <div>
         <div class="skel" style="width:70%;margin-bottom:6px"></div>
         <div class="skel" style="width:40%"></div>
       </div>
-    </li>`
+    </li>`,
   ).join("");
 }
 
@@ -189,8 +199,14 @@ function renderErr(ul, msg) {
 function renderStatsExtended(statusData, uptimeData) {
   const dot = $("statusDot");
   if (!statusData) {
-    ["statSent", "statSkipped", "statFailed", "statDuration", "statUptime24h", "statUptime7d"]
-      .forEach((id) => ($(id).textContent = "—"));
+    [
+      "statSent",
+      "statSkipped",
+      "statFailed",
+      "statDuration",
+      "statUptime24h",
+      "statUptime7d",
+    ].forEach((id) => ($(id).textContent = "—"));
     dot.className = "logo-dot offline";
     return;
   }
@@ -198,16 +214,26 @@ function renderStatsExtended(statusData, uptimeData) {
   $("statSent").textContent = statusData.sent ?? "—";
   $("statSkipped").textContent = statusData.skipped ?? "—";
   $("statFailed").textContent = statusData.failed ?? "—";
-  $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "—";
+  $("statDuration").textContent = statusData.duration
+    ? `${statusData.duration}s`
+    : "—";
 
   $("statUptime24h").textContent = uptimeData?.uptime24h ?? "—";
   $("statUptime24h").className = `stat-value ${
-    uptimeData?.uptime24h >= 95 ? "green" : uptimeData?.uptime24h >= 80 ? "amber" : "red"
+    uptimeData?.uptime24h >= 95
+      ? "green"
+      : uptimeData?.uptime24h >= 80
+        ? "amber"
+        : "red"
   }`;
 
   $("statUptime7d").textContent = uptimeData?.uptime7d ?? "—";
   $("statUptime7d").className = `stat-value ${
-    uptimeData?.uptime7d >= 95 ? "green" : uptimeData?.uptime7d >= 80 ? "amber" : "red"
+    uptimeData?.uptime7d >= 95
+      ? "green"
+      : uptimeData?.uptime7d >= 80
+        ? "amber"
+        : "red"
   }`;
 
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
@@ -224,11 +250,12 @@ function renderTopManhwa(data) {
   }
 
   list.innerHTML = top
-    .map((item, i) =>
-      `<li class="manga-item">
+    .map(
+      (item, i) =>
+        `<li class="manga-item">
         <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
         <span>${esc(item.title)} <span style="color:var(--muted);font-size:11px">(${item.count}x)</span></span>
-      </li>`
+      </li>`,
     )
     .join("");
 }
@@ -242,11 +269,12 @@ function renderWhitelist(data) {
     return;
   }
   list.innerHTML = items
-    .map((name, i) =>
-      `<li class="manga-item">
+    .map(
+      (name, i) =>
+        `<li class="manga-item">
         <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
         <span>${esc(name)}</span>
-      </li>`
+      </li>`,
     )
     .join("");
 }
@@ -260,14 +288,15 @@ function renderGuilds(data) {
     return;
   }
   list.innerHTML = guilds
-    .map((g) =>
-      `<li class="guild-item">
+    .map(
+      (g) =>
+        `<li class="guild-item">
         <div class="guild-info">
           <div class="guild-id">${esc(g.guildId)}</div>
           <div class="guild-channel">#${esc(g.channelId)}</div>
         </div>
         <span class="status-pill ${g.valid ? "active" : "invalid"}">${g.valid ? "aktif" : "invalid"}</span>
-      </li>`
+      </li>`,
     )
     .join("");
 }
@@ -308,12 +337,13 @@ function renderLogs(data) {
     return;
   }
   list.innerHTML = logs
-    .map((l) =>
-      `<li class="log-item">
+    .map(
+      (l) =>
+        `<li class="log-item">
         <span class="log-time">${fmt(new Date(l.time))}</span>
         <span>${esc(l.message)}</span>
         <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
-      </li>`
+      </li>`,
     )
     .join("");
 }
@@ -345,7 +375,10 @@ async function loadAll() {
       apiFetch("/api/logs"),
       apiFetch("/api/uptime"),
       apiFetch("/api/top"),
-      fetch(`${API_BASE}/api/trend?secret=${secret}`, { cache: "no-store" }), // FIX #1
+      fetch(`${API_BASE}/api/trend`, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${secret}` },
+      }),
     ]);
 
   // STATS + UPTIME
@@ -358,7 +391,7 @@ async function loadAll() {
   if (trendR.status === "fulfilled" && trendR.value.ok) {
     try {
       const trendData = await trendR.value.json(); // FIX #3: parse JSON di sini
-      renderTrendChart(trendData);                  // FIX #2: tidak fetch ulang
+      renderTrendChart(trendData); // FIX #2: tidak fetch ulang
     } catch (e) {
       console.error("Chart parse error:", e);
     }
@@ -379,8 +412,16 @@ async function loadAll() {
   if (logsR.status === "fulfilled") renderLogs(logsR.value);
   else renderErr($("logList"), "Gagal muat logs");
 
-  const anyFailed = [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR]
-    .some((r) => r.status === "rejected");
+  const anyFailed = [
+    statusR,
+    whitelistR,
+    guildsR,
+    recentR,
+    logsR,
+    uptimeR,
+    topR,
+    trendR,
+  ].some((r) => r.status === "rejected");
   if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
   $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
@@ -395,7 +436,7 @@ function startPoll() {
 }
 
 // Window focus → refresh
-window.addEventListener('focus', () => {
+window.addEventListener("focus", () => {
   if (secret) loadAll();
 });
 
