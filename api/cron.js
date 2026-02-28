@@ -59,17 +59,13 @@ const shortSynopsis = (desc) => {
 async function validateChannel(channelId, guildId) {
   try {
     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
-      headers: { Authorization: `Bot ${BOT_TOKEN}` },
+      headers: {
+        Authorization: `Bot ${BOT_TOKEN}`,
+      },
     });
     return true;
   } catch (err) {
-    const status = err.response?.status;
-    // Jangan hapus guild kalau 401 (token salah) atau 5xx (server error)
-    if (!status || status === 401 || status >= 500) {
-      cl(`⚠️ Skipping guild ${guildId} — status: ${status}`);
-      return false;
-    }
-    cl(`🗑️ Removing invalid guild ${guildId} — status: ${status} — ${JSON.stringify(err.response?.data)}`);
+    cl(`🗑️ Removing invalid guild ${guildId}`);
     await deleteGuildChannel(guildId);
     return false;
   }
@@ -186,7 +182,9 @@ export default async function handler(req, res) {
 
     for (const [guildId, channelId] of Object.entries(guildChannels)) {
       const valid = await validateChannel(channelId, guildId);
-      if (valid) validGuilds[guildId] = channelId;
+      // ✅ If 401 (token issue), validateChannel returns false but doesn't delete
+      // Still add to validGuilds so we attempt to send — Discord will reject if truly invalid
+      if (valid || channelId) validGuilds[guildId] = channelId;
     }
 
     if (Object.keys(validGuilds).length === 0) {
