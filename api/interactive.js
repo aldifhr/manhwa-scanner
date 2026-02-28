@@ -95,14 +95,15 @@ export default async function handler(req, res) {
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1]) || 1;
       res.json({ type: 6 });
-      return waitUntil(commands["list"](payload, [{ value: page }], true)); // ✅
+      return waitUntil(commands["list"](payload, [{ value: page }]));
     }
   }
 
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
     const handle = commands[name];
-    return handle?.(payload, options, res);
+    res.json({ type: 5, data: { flags: 64 } });
+    return waitUntil(handle?.(payload, options));
   }
 
   res.status(400).json({ error: "Unknown interaction" });
