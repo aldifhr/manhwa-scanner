@@ -72,6 +72,7 @@ export default async function handler(req, res) {
 
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
+    console.log("component custom_id:", custom_id); // ← tambah ini
 
     if (custom_id === "select_add") {
       const [title, url] = interactionData.values[0].split("|||");
