@@ -75,8 +75,20 @@ export default async function handler(req, res) {
     console.log("component custom_id:", custom_id); // ← tambah ini
 
     if (custom_id === "select_add") {
-      const [title, url] = interactionData.values[0].split("|||");
-      res.json({ type: 5, data: { flags: 64 } }); // flags: 64 = ephemeral
+      const [keyword, idx] = interactionData.values[0].split("|||");
+      const cached = await redis.get(`search:results:${keyword}`);
+      if (!cached) {
+        return res.json({
+          type: 4,
+          data: {
+            content: "⚠️ Session expired, coba `/search` lagi.",
+            flags: 64,
+          },
+        });
+      }
+      const results = JSON.parse(cached);
+      const { title, url } = results[parseInt(idx)];
+      res.json({ type: 5, data: { flags: 64 } });
       return waitUntil(handleAddManga(payload, title, url));
     }
 
