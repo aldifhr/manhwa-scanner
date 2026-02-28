@@ -108,6 +108,10 @@ export default async function handler(req, res) {
       return handle?.(payload, options, res);
     }
 
+    if (name === "search" || name === "remove") {
+      return handle?.(payload, options, res, redis);
+    }
+
     // semua command lain
     res.json({ type: 5, data: { flags: 64 } });
     return waitUntil(handle?.(payload, options));
