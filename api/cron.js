@@ -63,8 +63,8 @@ async function getAllGuildChannels() {
 
     do {
       const result = await redis.scan(cursor, {
-        MATCH: "channel:*",
-        COUNT: 100,
+        match: "channel:*", // fix: lowercase
+        count: 100,
       });
 
       keys.push(...result.keys);
@@ -243,18 +243,26 @@ export default async function handler(req, res) {
       for (const [guildId, channelId] of Object.entries(validGuilds)) {
         try {
           await sendDiscordEmbed(item, channelId);
-          await redis.lpush(
-            "cron:logs",
-            JSON.stringify({
-              time: new Date().toISOString(),
-              message: `${item.title} — ${item.chapter}`,
-              tag: "sent",
-            }),
-          );
+
+          // ✅ Log per chapter yang berhasil dikirim
+          await redis.lpush("cron:logs", JSON.stringify({
+            time:    new Date().toISOString(),
+            message: `${item.title} — ${item.chapter}`,
+            tag:     "sent",
+          }));
+
           cl(`✅ ${item.title} → ${guildId}`);
           guildSuccess = true;
         } catch (err) {
           cl(`❌ ${guildId}: ${err.message}`);
+
+          // ✅ Log error per guild
+          await redis.lpush("cron:logs", JSON.stringify({
+            time:    new Date().toISOString(),
+            message: `Gagal kirim ke guild ${guildId}: ${err.message}`,
+            tag:     "failed",
+          }));
+
           failed++;
         }
       }
@@ -271,6 +279,18 @@ export default async function handler(req, res) {
       `📊 Done — sent:${sentCount} skipped:${skipped} failed:${failed} (${duration}s)`,
     );
 
+    // ✅ Simpan stats run terakhir — HARUS di dalam handler, sebelum return
+    await redis.set("cron:last_run", JSON.stringify({
+      sent:      sentCount,
+      skipped,
+      failed,
+      duration,
+      timestamp: new Date().toISOString(),
+    }));
+
+    // ✅ Trim log max 200 entries
+    await redis.ltrim("cron:logs", 0, 199);
+
     return res.status(200).json({
       ok: true,
       sent: sentCount,
@@ -286,21 +306,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
-await redis.set("cron:last_run", JSON.stringify({
-  sent:      sentCount,
-  skipped,
-  failed,
-  duration,
-  timestamp: new Date().toISOString(),
-}));
-
-// Trim log supaya tidak membengkak (max 200)
-await redis.ltrim("cron:logs", 0, 199);
-
-// ===== TAMBAHKAN INI di dalam loop chapter, setelah sendDiscordEmbed berhasil =====
-await redis.lpush("cron:logs", JSON.stringify({
-  time:    new Date().toISOString(),
-  message: `${item.title} — ${item.chapter}`,
-  tag:     "sent",
-}));
