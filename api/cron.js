@@ -216,11 +216,14 @@ export default async function handler(req, res) {
           await sendDiscordEmbed(item, channelId);
 
           // ✅ Log per chapter yang berhasil dikirim
-          await redis.lpush("cron:logs", JSON.stringify({
-            time:    new Date().toISOString(),
-            message: `${item.title} — ${item.chapter}`,
-            tag:     "sent",
-          }));
+          await redis.lpush(
+            "cron:logs",
+            JSON.stringify({
+              time: new Date().toISOString(),
+              message: `${item.title} — ${item.chapter}`,
+              tag: "sent",
+            }),
+          );
 
           cl(`✅ ${item.title} → ${guildId}`);
           guildSuccess = true;
@@ -228,11 +231,14 @@ export default async function handler(req, res) {
           cl(`❌ ${guildId}: ${err.message}`);
 
           // ✅ Log error per guild
-          await redis.lpush("cron:logs", JSON.stringify({
-            time:    new Date().toISOString(),
-            message: `Gagal kirim ke guild ${guildId}: ${err.message}`,
-            tag:     "failed",
-          }));
+          await redis.lpush(
+            "cron:logs",
+            JSON.stringify({
+              time: new Date().toISOString(),
+              message: `Gagal kirim ke guild ${guildId}: ${err.message}`,
+              tag: "failed",
+            }),
+          );
 
           failed++;
         }
@@ -251,17 +257,32 @@ export default async function handler(req, res) {
     );
 
     // ✅ Simpan stats run terakhir — HARUS di dalam handler, sebelum return
-    await redis.set("cron:last_run", JSON.stringify({
-      sent:      sentCount,
-      skipped,
-      failed,
-      duration,
-      timestamp: new Date().toISOString(),
-    }));
+    await redis.set(
+      "cron:last_run",
+      JSON.stringify({
+        sent: sentCount,
+        skipped,
+        failed,
+        duration,
+        timestamp: new Date().toISOString(),
+      }),
+    );
+
+    await redis.lpush(
+      "recent:chapters",
+      JSON.stringify({
+        title: item.title,
+        chapter: item.chapter,
+        url: item.url,
+        cover: item.cover ?? null,
+        sentAt: new Date().toISOString(),
+      }),
+    );
 
     // ✅ Trim log max 200 entries
     await redis.ltrim("cron:logs", 0, 199);
-
+    await redis.ltrim("recent:chapters", 0, 19);
+    
     return res.status(200).json({
       ok: true,
       sent: sentCount,
