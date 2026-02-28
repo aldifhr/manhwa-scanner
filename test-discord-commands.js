@@ -105,6 +105,16 @@ const commands = [
       ],
     }],
   },
+  {
+  name: "add",
+  description: "Tambah manga ke whitelist",
+  options: [{
+    name: "title",
+    description: "Manga title to add",
+    type: 3,
+    required: true,
+  }],
+},
 ];
 
 async function registerCommands() {

@@ -103,7 +103,15 @@ export default async function handler(req, res) {
     const { name, options } = interactionData;
     const handle = commands[name];
 
-    const commandsWithRes = ["search", "remove", "setchannel", "recent", "info", "list" ];
+    const commandsWithRes = [
+      "search",
+      "remove",
+      "setchannel",
+      "recent",
+      "info",
+      "list",
+      "add",
+    ];
 
     if (commandsWithRes.includes(name)) {
       return handle?.(payload, options, res, redis);
