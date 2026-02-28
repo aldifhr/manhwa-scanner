@@ -102,6 +102,13 @@ export default async function handler(req, res) {
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
     const handle = commands[name];
+
+    // command yang butuh res sendiri
+    if (name === "search") {
+      return handle?.(payload, options, res);
+    }
+
+    // semua command lain
     res.json({ type: 5, data: { flags: 64 } });
     return waitUntil(handle?.(payload, options));
   }
