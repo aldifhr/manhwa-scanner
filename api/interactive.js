@@ -40,7 +40,6 @@ async function handleAddManga(payload, title, url = null) {
     const entry = url ? { title, url } : title;
     whitelist.push(entry);
     await saveWhitelist(whitelist);
-
     await editInteractionResponse(
       payload.token,
       `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`,
@@ -76,7 +75,7 @@ export default async function handler(req, res) {
 
     if (custom_id === "select_add") {
       const [title, url] = interactionData.values[0].split("|||");
-      res.json({ type: 5, data: { flags: 64 } });
+      res.json({ type: 5, data: { flags: 64 } }); // flags: 64 = ephemeral
       return waitUntil(handleAddManga(payload, title, url));
     }
 
