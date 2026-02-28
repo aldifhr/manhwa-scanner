@@ -1032,6 +1032,20 @@
         loadAll();
         startPoll();
       } else $("modalOverlay").classList.add("show");
+
+      function applyTheme(dark) {
+        document.body.classList.toggle("dark", dark);
+        $("btnTheme").textContent = dark ? "🌙" : "☀️";
+      }
+
+      function toggleTheme() {
+        const isDark = !document.body.classList.contains("dark");
+        localStorage.setItem("ikiru_theme", isDark ? "dark" : "light");
+        applyTheme(isDark);
+      }
+
+      // Init theme saat load
+      applyTheme(localStorage.getItem("ikiru_theme") === "dark");
     </script>
   </body>
 </html>
