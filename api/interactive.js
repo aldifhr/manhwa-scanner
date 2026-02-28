@@ -8,7 +8,6 @@ import { redis } from "../lib/redis.js";
 
 export const config = { api: { bodyParser: false } };
 
-// Ambil raw body
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -18,13 +17,11 @@ async function getRawBody(req) {
   });
 }
 
-// Shared logic untuk menambah manga
 async function handleAddManga(payload, title, url = null) {
   try {
     const whitelist = await loadWhitelist();
 
-    // Cek duplikat
-    const exists = whitelist.some(item => 
+    const exists = whitelist.some(item =>
       (typeof item === 'string' ? item : item.title?.toLowerCase() || item.url)
         ?.toLowerCase() === title.toLowerCase() ||
       item?.url === url
@@ -48,7 +45,6 @@ async function handleAddManga(payload, title, url = null) {
   }
 }
 
-// Handler utama
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
@@ -67,42 +63,36 @@ export default async function handler(req, res) {
   const payload = JSON.parse(raw.toString());
   const { type, data: interactionData } = payload;
 
-  // Ping
   if (type === 1) return res.json({ type: 1 });
 
-  // MESSAGE COMPONENTS
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
 
-    // Select menu add
     if (custom_id === "select_add") {
       const [title, url] = interactionData.values[0].split("|||");
       res.json({ type: 5, data: { flags: 64 } });
       return waitUntil(handleAddManga(payload, title, url));
     }
 
-    // Search pagination
     if (custom_id.startsWith("search:")) {
       const [, keyword, page = '1'] = custom_id.split(":");
       res.json({ type: 6 });
       return waitUntil(handleSearchPage(payload, keyword, +page, redis));
     }
 
-    // Legacy button add
     if (custom_id.startsWith("add:")) {
       const title = custom_id.replace("add:", "");
       res.json({ type: 5, data: { flags: 64 } });
       return waitUntil(handleAddManga(payload, title));
     }
 
-    // **List pagination Next/Prev**
+    // ✅ type 6 = deferred update, edit pesan yang sama bukan buat pesan baru
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1]) || 1;
-      res.json({ type: 5, data: { flags: 64 } });
+      res.json({ type: 6 });
       return waitUntil(commands["list"](payload, [{ value: page }], { json: () => {} }));
     }
 
-    // Clear all whitelist
     if (custom_id === "clear_all") {
       res.json({ type: 5, data: { flags: 64 } });
       return waitUntil((async () => {
@@ -116,7 +106,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // SLASH COMMANDS
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
     const handle = commands[name];
