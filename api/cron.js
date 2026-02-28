@@ -10,14 +10,14 @@ import { deleteGuildChannel, getAllGuildChannels } from "../lib/redis.js";
 // ===== ENV =====
 const cl = console.log;
 const {
-  BOT_TOKEN,
+  DISCORD_BOT_TOKEN,
   CRON_SECRET,
   UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN,
 } = process.env;
 
 const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
-
+  
 const redis = new Redis({
   url: UPSTASH_REDIS_REST_URL,
   token: UPSTASH_REDIS_REST_TOKEN,
@@ -60,7 +60,7 @@ async function validateChannel(channelId, guildId) {
   try {
     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
       headers: {
-        Authorization: `Bot ${BOT_TOKEN}`,
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
       },
     });
     return true;
@@ -136,7 +136,7 @@ async function sendDiscordEmbed(data, channelId) {
     { embeds },
     {
       headers: {
-        Authorization: `Bot ${BOT_TOKEN}`,
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
         "Content-Type": "application/json",
       },
     },
