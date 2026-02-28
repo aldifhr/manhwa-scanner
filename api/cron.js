@@ -5,7 +5,7 @@ import {
   fetchDescription,
   scrapeMangaUpdates,
 } from "../lib/scraper.js";
-import { deleteGuildChannel } from "../lib/redis.js";
+import { deleteGuildChannel, getAllGuildChannels } from "../lib/redis.js";
 
 // ===== ENV =====
 const cl = console.log;
@@ -54,35 +54,6 @@ const shortSynopsis = (desc) => {
   const short = sentences.slice(0, 2).join(". ");
   return short.endsWith(".") ? short : short + ".";
 };
-
-// ===== GET ALL CHANNELS =====
-async function getAllGuildChannels() {
-  try {
-    let cursor = 0;
-    const keys = [];
-
-    do {
-      const result = await redis.scan(cursor, {
-        match: "channel:*", // fix: lowercase
-        count: 100,
-      });
-
-      keys.push(...result.keys);
-      cursor = result.cursor;
-    } while (cursor !== 0);
-
-    if (keys.length === 0) return {};
-
-    const channels = await redis.mget(...keys);
-
-    return Object.fromEntries(
-      keys.map((key, i) => [key.replace("channel:", ""), channels[i]]),
-    );
-  } catch (err) {
-    cl(`❌ Channels error: ${err.message}`);
-    return {};
-  }
-}
 
 // ===== VALIDATE CHANNEL =====
 async function validateChannel(channelId, guildId) {
