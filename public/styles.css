@@ -538,3 +538,134 @@ main {
   background: var(--bg-card-dark);
   border-color: var(--border-dark);
 }
+
+/* ── Whitelist Form ── */
+.whitelist-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.whitelist-form input {
+  flex: 1;
+  min-width: 120px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.whitelist-form input:focus {
+  border-color: var(--text);
+}
+
+.btn-add {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 7px 14px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.btn-add:hover {
+  opacity: 0.8;
+}
+
+.btn-add:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Manga item dengan delete button ── */
+.manga-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.manga-item:last-child {
+  border-bottom: none;
+}
+
+.manga-item:hover {
+  background: var(--bg);
+}
+
+.manga-item:hover .btn-delete {
+  opacity: 1;
+}
+
+.manga-item-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manga-item-url {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.btn-delete {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-delete:hover {
+  background: var(--red-bg);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Scrollable manga list */
+.manga-list {
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.manga-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.manga-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.manga-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+}
