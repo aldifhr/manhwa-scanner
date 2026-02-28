@@ -86,7 +86,7 @@ export default async function handler(req, res) {
           },
         });
       }
-      const results = JSON.parse(cached);
+      const results = typeof cached === "string" ? JSON.parse(cached) : cached;
       const { title, url } = results[parseInt(idx)];
       res.json({ type: 5, data: { flags: 64 } });
       return waitUntil(handleAddManga(payload, title, url));
