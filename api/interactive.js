@@ -96,23 +96,6 @@ export default async function handler(req, res) {
       res.json({ type: 6 });
       return waitUntil(commands["list"](payload, [{ value: page }], true)); // ✅
     }
-
-    if (custom_id === "clear_all") {
-      res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil(
-        (async () => {
-          try {
-            await saveWhitelist([]);
-            await editInteractionResponse(
-              payload.token,
-              "🗑️ Whitelist dibersihkan!",
-            );
-          } catch (err) {
-            await editInteractionResponse(payload.token, `❌ ${err.message}`);
-          }
-        })(),
-      );
-    }
   }
 
   if (type === InteractionType.APPLICATION_COMMAND) {
