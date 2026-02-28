@@ -287,16 +287,20 @@ export default async function handler(req, res) {
   }
 }
 
-await redis.set(
-  "cron:last_run",
-  JSON.stringify({
-    sent: sentCount,
-    skipped,
-    failed,
-    duration,
-    timestamp: new Date().toISOString(),
-  }),
-);
+await redis.set("cron:last_run", JSON.stringify({
+  sent:      sentCount,
+  skipped,
+  failed,
+  duration,
+  timestamp: new Date().toISOString(),
+}));
 
-// Trim log supaya tidak membengkak (max 200 entries)
+// Trim log supaya tidak membengkak (max 200)
 await redis.ltrim("cron:logs", 0, 199);
+
+// ===== TAMBAHKAN INI di dalam loop chapter, setelah sendDiscordEmbed berhasil =====
+await redis.lpush("cron:logs", JSON.stringify({
+  time:    new Date().toISOString(),
+  message: `${item.title} — ${item.chapter}`,
+  tag:     "sent",
+}));

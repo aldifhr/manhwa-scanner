@@ -6,7 +6,7 @@
   <title>ikiru · Bot Monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -16,7 +16,6 @@
       --border:   #e8e6e0;
       --text:     #1a1916;
       --muted:    #8c8982;
-      --accent:   #1a1916;
       --green:    #2d6a4f;
       --green-bg: #d8f3dc;
       --red:      #9b2226;
@@ -35,14 +34,14 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding: 0 0 60px;
+      padding-bottom: 60px;
     }
 
     /* ── Header ── */
     header {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 18px 32px;
+      padding: 16px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -55,31 +54,22 @@
       align-items: center;
       gap: 10px;
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       letter-spacing: -0.02em;
     }
     .logo-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
       background: var(--green);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: .5; transform: scale(.8); }
+      animation: pulse 2.5s infinite;
     }
     .logo-dot.offline { background: var(--red); animation: none; }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.4; transform:scale(.75); }
     }
-    .last-updated {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-    }
+    .header-right { display:flex; align-items:center; gap:14px; }
+    .last-updated { font-family:var(--mono); font-size:11px; color:var(--muted); }
     .btn-refresh {
       font-family: var(--mono);
       font-size: 11px;
@@ -90,87 +80,55 @@
       border-radius: var(--radius);
       cursor: pointer;
       transition: all .15s;
-      letter-spacing: .03em;
     }
-    .btn-refresh:hover { background: var(--text); color: var(--bg); border-color: var(--text); }
-    .btn-refresh.loading { opacity: .5; pointer-events: none; }
+    .btn-refresh:hover { background:var(--text); color:var(--bg); border-color:var(--text); }
+    .btn-refresh:disabled { opacity:.4; pointer-events:none; }
 
     /* ── Layout ── */
-    main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
-
+    main { max-width: 960px; margin: 0 auto; padding: 28px 20px; }
     .section-label {
       font-family: var(--mono);
       font-size: 10px;
       letter-spacing: .1em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
-    /* ── Stat Cards ── */
+    /* ── Stat grid ── */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 32px;
+      grid-template-columns: repeat(4,1fr);
+      gap: 10px;
+      margin-bottom: 28px;
     }
-    @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-
+    @media(max-width:580px){ .stats-grid{ grid-template-columns:repeat(2,1fr); } }
     .stat-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      transition: box-shadow .2s;
+      padding: 18px 16px;
     }
-    .stat-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-    .stat-label {
-      font-size: 11px;
-      font-family: var(--mono);
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .06em;
-    }
-    .stat-value {
-      font-size: 28px;
-      font-weight: 600;
-      letter-spacing: -0.04em;
-      line-height: 1;
-    }
-    .stat-value.green { color: var(--green); }
-    .stat-value.red   { color: var(--red); }
-    .stat-value.amber { color: var(--amber); }
+    .stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+    .stat-value { font-size:26px; font-weight:600; letter-spacing:-0.04em; line-height:1; }
+    .stat-value.green { color:var(--green); }
+    .stat-value.red   { color:var(--red); }
+    .stat-value.amber { color:var(--amber); }
 
-    /* ── Two-col layout ── */
-    .two-col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 24px;
-    }
-    @media (max-width: 680px) { .two-col { grid-template-columns: 1fr; } }
+    /* ── Two col ── */
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px; }
+    @media(max-width:640px){ .two-col{ grid-template-columns:1fr; } }
 
     /* ── Card ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
     .card-header {
-      padding: 14px 18px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .card-title {
-      font-size: 13px;
-      font-weight: 500;
-    }
+    .card-title { font-size:13px; font-weight:500; }
     .badge {
       font-family: var(--mono);
       font-size: 10px;
@@ -180,138 +138,142 @@
       border: 1px solid var(--border);
       color: var(--muted);
     }
-    .card-body { padding: 0; }
 
-    /* ── Whitelist list ── */
-    .manga-list { list-style: none; }
+    /* ── Manga list ── */
+    .manga-list { list-style:none; }
     .manga-item {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 11px 18px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       font-size: 13px;
-      transition: background .1s;
     }
-    .manga-item:last-child { border-bottom: none; }
-    .manga-item:hover { background: var(--bg); }
-    .manga-index {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      min-width: 18px;
-    }
-    .manga-name { flex: 1; }
+    .manga-item:last-child { border-bottom:none; }
+    .manga-item:hover { background:var(--bg); }
+    .manga-index { font-family:var(--mono); font-size:10px; color:var(--muted); min-width:18px; }
 
     /* ── Guild list ── */
-    .guild-list { list-style: none; }
+    .guild-list { list-style:none; }
     .guild-item {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 11px 18px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
-      transition: background .1s;
     }
-    .guild-item:last-child { border-bottom: none; }
-    .guild-item:hover { background: var(--bg); }
-    .guild-info { flex: 1; min-width: 0; }
-    .guild-id {
-      font-family: var(--mono);
-      font-size: 12px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .guild-channel {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-    .status-pill {
-      font-family: var(--mono);
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 99px;
-      flex-shrink: 0;
-    }
-    .status-pill.active { background: var(--green-bg); color: var(--green); }
-    .status-pill.invalid { background: var(--red-bg); color: var(--red); }
+    .guild-item:last-child { border-bottom:none; }
+    .guild-item:hover { background:var(--bg); }
+    .guild-info { flex:1; min-width:0; }
+    .guild-id { font-family:var(--mono); font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .guild-channel { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:2px; }
+    .status-pill { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:99px; flex-shrink:0; }
+    .status-pill.active  { background:var(--green-bg); color:var(--green); }
+    .status-pill.invalid { background:var(--red-bg); color:var(--red); }
 
     /* ── Log ── */
-    .log-card { margin-bottom: 0; }
-    .log-list { list-style: none; }
+    .log-list { list-style:none; }
     .log-item {
       display: grid;
-      grid-template-columns: 80px 1fr auto;
+      grid-template-columns: 72px 1fr auto;
       gap: 12px;
       align-items: start;
-      padding: 11px 18px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       font-size: 12px;
-      transition: background .1s;
     }
-    .log-item:last-child { border-bottom: none; }
-    .log-item:hover { background: var(--bg); }
-    .log-time {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      padding-top: 1px;
-    }
-    .log-msg { line-height: 1.5; }
-    .log-tag {
-      font-family: var(--mono);
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 99px;
-      flex-shrink: 0;
-    }
-    .log-tag.sent    { background: var(--green-bg); color: var(--green); }
-    .log-tag.skipped { background: var(--amber-bg); color: var(--amber); }
-    .log-tag.failed  { background: var(--red-bg); color: var(--red); }
-    .log-tag.info    { background: var(--blue-bg); color: var(--blue); }
+    .log-item:last-child { border-bottom:none; }
+    .log-item:hover { background:var(--bg); }
+    .log-time { font-family:var(--mono); font-size:10px; color:var(--muted); padding-top:1px; }
+    .log-tag { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:99px; flex-shrink:0; align-self:start; }
+    .log-tag.sent    { background:var(--green-bg); color:var(--green); }
+    .log-tag.skipped { background:var(--amber-bg); color:var(--amber); }
+    .log-tag.failed  { background:var(--red-bg); color:var(--red); }
+    .log-tag.info    { background:var(--blue-bg); color:var(--blue); }
 
-    /* ── Empty / loading states ── */
-    .empty {
-      padding: 32px 18px;
-      text-align: center;
-      font-size: 12px;
-      color: var(--muted);
-      font-family: var(--mono);
-    }
-    .skeleton-line {
-      height: 12px;
-      background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
+    /* ── Empty / skeleton ── */
+    .empty { padding:28px 16px; text-align:center; font-size:12px; color:var(--muted); font-family:var(--mono); }
+    .skel {
+      height: 11px;
+      background: linear-gradient(90deg,var(--border) 25%,var(--bg) 50%,var(--border) 75%);
       background-size: 200% 100%;
-      border-radius: 4px;
+      border-radius: 3px;
       animation: shimmer 1.2s infinite;
     }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-    /* ── Config banner ── */
-    .config-banner {
+    /* ── Alert ── */
+    .alert {
       background: var(--amber-bg);
-      border: 1px solid #f6d860;
+      border: 1px solid #f0d080;
       border-radius: var(--radius);
-      padding: 12px 18px;
+      padding: 10px 16px;
       font-size: 12px;
       color: var(--amber);
       font-family: var(--mono);
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+    }
+    .alert code { background:rgba(0,0,0,.08); padding:1px 5px; border-radius:3px; }
+
+    /* ── Secret modal ── */
+    .modal-overlay {
       display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.3);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
     }
-    .config-banner.show { display: block; }
-    .config-banner code {
-      background: rgba(0,0,0,.08);
-      padding: 1px 5px;
-      border-radius: 3px;
+    .modal-overlay.show { display:flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px;
+      width: 360px;
+      max-width: 90vw;
     }
+    .modal h2 { font-size:15px; font-weight:600; margin-bottom:6px; }
+    .modal p  { font-size:12px; color:var(--muted); margin-bottom:16px; font-family:var(--mono); }
+    .modal input {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .modal input:focus { border-color: var(--text); }
+    .btn-primary {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 9px;
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      letter-spacing: .03em;
+    }
+    .btn-primary:hover { opacity:.85; }
   </style>
 </head>
 <body>
+
+<!-- Secret modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Bot Monitor</h2>
+    <p>Masukkan CRON_SECRET untuk akses dashboard</p>
+    <input type="password" id="secretInput" placeholder="CRON_SECRET..." autocomplete="off" />
+    <button class="btn-primary" onclick="submitSecret()">Masuk →</button>
+  </div>
+</div>
 
 <header>
   <div class="logo">
@@ -325,21 +287,16 @@
 </header>
 
 <main>
-  <!-- Config warning -->
-  <div class="config-banner" id="configBanner">
-    ⚠ Set <code>API_BASE</code> di baris pertama script untuk mengarahkan ke API kamu.
-  </div>
+  <div class="alert" id="alertBox" style="display:none"></div>
 
-  <!-- Stats -->
   <div class="section-label">cron terakhir</div>
-  <div class="stats-grid" id="statsGrid">
+  <div class="stats-grid">
     <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-value green" id="statSent">—</div></div>
     <div class="stat-card"><div class="stat-label">Skipped</div><div class="stat-value amber" id="statSkipped">—</div></div>
     <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value red" id="statFailed">—</div></div>
     <div class="stat-card"><div class="stat-label">Duration</div><div class="stat-value" id="statDuration">—</div></div>
   </div>
 
-  <!-- Whitelist + Guilds -->
   <div class="two-col">
     <div>
       <div class="section-label">whitelist manga</div>
@@ -348,11 +305,7 @@
           <span class="card-title">Manga terpantau</span>
           <span class="badge" id="whitelistCount">0</span>
         </div>
-        <div class="card-body">
-          <ul class="manga-list" id="mangaList">
-            <li class="empty">memuat...</li>
-          </ul>
-        </div>
+        <ul class="manga-list" id="mangaList"><li class="empty">memuat...</li></ul>
       </div>
     </div>
     <div>
@@ -362,230 +315,195 @@
           <span class="card-title">Server aktif</span>
           <span class="badge" id="guildCount">0</span>
         </div>
-        <div class="card-body">
-          <ul class="guild-list" id="guildList">
-            <li class="empty">memuat...</li>
-          </ul>
-        </div>
+        <ul class="guild-list" id="guildList"><li class="empty">memuat...</li></ul>
       </div>
     </div>
   </div>
 
-  <!-- Activity log -->
   <div class="section-label">log aktivitas</div>
-  <div class="card log-card">
+  <div class="card">
     <div class="card-header">
       <span class="card-title">Riwayat cron</span>
       <span class="badge" id="logCount">0 entries</span>
     </div>
-    <div class="card-body">
-      <ul class="log-list" id="logList">
-        <li class="empty">memuat...</li>
-      </ul>
-    </div>
+    <ul class="log-list" id="logList"><li class="empty">memuat...</li></ul>
   </div>
 </main>
 
 <script>
-  // ════════════════════════════════════════════
-  // CONFIG — ganti sesuai URL deployment kamu
-  // ════════════════════════════════════════════
-  const API_BASE = "https://ikiru-bots.vercel.app"; // contoh: "https://your-app.vercel.app"
+  // ─── CONFIG ──────────────────────────────────────────────
+  // Karena index.html di-serve dari domain yang sama dengan API,
+  // API_BASE tidak perlu diisi (pakai relative URL)
+  const API_BASE = "";
+  const POLL_MS  = 30_000;
+  // ─────────────────────────────────────────────────────────
 
-  // Endpoint yang perlu kamu buat di backend:
-  //   GET /api/status      → { sent, skipped, failed, duration, timestamp }
-  //   GET /api/whitelist   → { items: string[] }
-  //   GET /api/guilds      → { guilds: { guildId, channelId, valid }[] }
-  //   GET /api/logs        → { logs: { time, message, tag }[] }
-  // ════════════════════════════════════════════
-
-  const $ = (id) => document.getElementById(id);
-  const POLL_INTERVAL = 30_000; // auto-refresh tiap 30 detik
+  const $  = id => document.getElementById(id);
+  let secret = sessionStorage.getItem("ikiru_secret") || "";
   let pollTimer = null;
 
-  // ── Helpers ──────────────────────────────────
-  function fmt(date) {
-    return new Intl.DateTimeFormat("id-ID", {
-      hour: "2-digit", minute: "2-digit", second: "2-digit"
-    }).format(date);
+  // ── Secret / auth ─────────────────────────────────────────
+  function checkAuth() {
+    if (!secret) { $("modalOverlay").classList.add("show"); return false; }
+    return true;
   }
-
-  function timeAgo(isoString) {
-    const diff = Date.now() - new Date(isoString).getTime();
-    const s = Math.floor(diff / 1000);
-    if (s < 60)  return `${s}d lalu`;
-    if (s < 3600) return `${Math.floor(s/60)}m lalu`;
-    return `${Math.floor(s/3600)}j lalu`;
+  function submitSecret() {
+    const val = $("secretInput").value.trim();
+    if (!val) return;
+    secret = val;
+    sessionStorage.setItem("ikiru_secret", val);
+    $("modalOverlay").classList.remove("show");
+    loadAll();
   }
+  $("secretInput").addEventListener("keydown", e => { if (e.key === "Enter") submitSecret(); });
 
+  // ── Fetch helper ──────────────────────────────────────────
   async function apiFetch(path) {
-    if (!API_BASE) throw new Error("API_BASE belum diset");
     const r = await fetch(`${API_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${window.__CRON_SECRET || ""}` }
+      headers: { Authorization: `Bearer ${secret}` }
     });
+    if (r.status === 401) {
+      secret = "";
+      sessionStorage.removeItem("ikiru_secret");
+      $("modalOverlay").classList.add("show");
+      throw new Error("Unauthorized");
+    }
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   }
 
-  // ── Skeleton loading ─────────────────────────
-  function skeletonItems(ul, n = 4) {
-    ul.innerHTML = Array.from({ length: n }, (_, i) =>
-      `<li style="padding:12px 18px;border-bottom:1px solid var(--border)">
-        <div class="skeleton-line" style="width:${60 + (i % 3)*15}%;height:11px"></div>
+  // ── Helpers ───────────────────────────────────────────────
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const fmt = d => new Intl.DateTimeFormat("id-ID",{ hour:"2-digit",minute:"2-digit",second:"2-digit" }).format(d);
+
+  function skeleton(ul, n = 4) {
+    ul.innerHTML = Array.from({length:n},(_,i)=>
+      `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
+        <div class="skel" style="width:${55+(i%3)*20}%"></div>
       </li>`
     ).join("");
   }
 
-  // ── Render: Stats ─────────────────────────────
-  function renderStats(data) {
-    const statusDot = $("statusDot");
+  function showAlert(msg) {
+    const el = $("alertBox");
+    el.style.display = "block";
+    el.textContent = msg;
+  }
+  function clearAlert() { $("alertBox").style.display = "none"; }
 
+  // ── Render: Stats ─────────────────────────────────────────
+  function renderStats(data) {
+    const dot = $("statusDot");
     if (!data) {
-      ["statSent","statSkipped","statFailed","statDuration"].forEach(id => $(id).textContent = "—");
-      statusDot.className = "logo-dot offline";
+      ["statSent","statSkipped","statFailed","statDuration"].forEach(id=>$(id).textContent="—");
+      dot.className = "logo-dot offline";
       return;
     }
-
-    $("statSent").textContent     = data.sent     ?? "—";
-    $("statSkipped").textContent  = data.skipped  ?? "—";
-    $("statFailed").textContent   = data.failed   ?? "—";
-    $("statDuration").textContent = data.duration ? `${data.duration}s` : "—";
-
-    statusDot.className = "logo-dot" + (data.failed > 0 ? " offline" : "");
+    $("statSent").textContent     = data.sent      ?? "—";
+    $("statSkipped").textContent  = data.skipped   ?? "—";
+    $("statFailed").textContent   = data.failed    ?? "—";
+    $("statDuration").textContent = data.duration  ? `${data.duration}s` : "—";
+    dot.className = "logo-dot" + (data.failed > 0 ? " offline" : "");
   }
 
-  // ── Render: Whitelist ─────────────────────────
+  // ── Render: Whitelist ─────────────────────────────────────
   function renderWhitelist(data) {
-    const list = $("mangaList");
+    const list  = $("mangaList");
     const items = data?.items ?? [];
     $("whitelistCount").textContent = items.length;
-
-    if (!items.length) {
-      list.innerHTML = `<li class="empty">Whitelist kosong</li>`;
-      return;
-    }
-    list.innerHTML = items.map((name, i) =>
+    if (!items.length) { list.innerHTML=`<li class="empty">Whitelist kosong</li>`; return; }
+    list.innerHTML = items.map((name,i)=>
       `<li class="manga-item">
         <span class="manga-index">${String(i+1).padStart(2,"0")}</span>
-        <span class="manga-name">${escHtml(name)}</span>
+        <span>${esc(name)}</span>
       </li>`
     ).join("");
   }
 
-  // ── Render: Guilds ────────────────────────────
+  // ── Render: Guilds ────────────────────────────────────────
   function renderGuilds(data) {
-    const list = $("guildList");
+    const list   = $("guildList");
     const guilds = data?.guilds ?? [];
     $("guildCount").textContent = guilds.length;
-
-    if (!guilds.length) {
-      list.innerHTML = `<li class="empty">Belum ada guild terdaftar</li>`;
-      return;
-    }
-    list.innerHTML = guilds.map(g =>
+    if (!guilds.length) { list.innerHTML=`<li class="empty">Belum ada guild</li>`; return; }
+    list.innerHTML = guilds.map(g=>
       `<li class="guild-item">
         <div class="guild-info">
-          <div class="guild-id">${escHtml(g.guildId)}</div>
-          <div class="guild-channel">#${escHtml(g.channelId)}</div>
+          <div class="guild-id">${esc(g.guildId)}</div>
+          <div class="guild-channel">#${esc(g.channelId)}</div>
         </div>
-        <span class="status-pill ${g.valid ? "active" : "invalid"}">${g.valid ? "aktif" : "invalid"}</span>
+        <span class="status-pill ${g.valid?"active":"invalid"}">${g.valid?"aktif":"invalid"}</span>
       </li>`
     ).join("");
   }
 
-  // ── Render: Logs ──────────────────────────────
+  // ── Render: Logs ──────────────────────────────────────────
   function renderLogs(data) {
     const list = $("logList");
     const logs = data?.logs ?? [];
     $("logCount").textContent = `${logs.length} entries`;
-
-    if (!logs.length) {
-      list.innerHTML = `<li class="empty">Belum ada log</li>`;
-      return;
-    }
-    list.innerHTML = logs.map(l =>
+    if (!logs.length) { list.innerHTML=`<li class="empty">Belum ada log</li>`; return; }
+    list.innerHTML = logs.map(l=>
       `<li class="log-item">
         <span class="log-time">${fmt(new Date(l.time))}</span>
-        <span class="log-msg">${escHtml(l.message)}</span>
-        <span class="log-tag ${l.tag}">${l.tag}</span>
+        <span>${esc(l.message)}</span>
+        <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
       </li>`
     ).join("");
   }
 
-  // ── Error state ───────────────────────────────
-  function renderError(ul, msg) {
+  function renderErr(ul, msg) {
     ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`;
   }
 
-  // ── Main load ─────────────────────────────────
+  // ── Main load ─────────────────────────────────────────────
   async function loadAll() {
+    if (!checkAuth()) return;
+    clearAlert();
+
     const btn = $("btnRefresh");
-    btn.classList.add("loading");
-    btn.textContent = "↻ memuat";
+    btn.disabled = true;
+    btn.textContent = "memuat...";
 
-    // Check config
-    if (!API_BASE) {
-      $("configBanner").classList.add("show");
-      // Dev: render mock data so layout is visible
-      renderStats({ sent: 3, skipped: 1, failed: 0, duration: "4.2" });
-      renderWhitelist({ items: ["Solo Leveling", "Lookism", "Omniscient Reader"] });
-      renderGuilds({ guilds: [
-        { guildId: "123456789012345678", channelId: "987654321098765432", valid: true },
-        { guildId: "111222333444555666", channelId: "666555444333222111", valid: false },
-      ]});
-      renderLogs({ logs: [
-        { time: new Date().toISOString(), message: "Solo Leveling ch.200 → Guild A", tag: "sent" },
-        { time: new Date(Date.now()-60000).toISOString(), message: "Lookism sudah dikirim sebelumnya", tag: "skipped" },
-        { time: new Date(Date.now()-120000).toISOString(), message: "Cron dimulai", tag: "info" },
-      ]});
-      btn.classList.remove("loading");
-      btn.textContent = "↻ refresh";
-      return;
-    }
+    skeleton($("mangaList"));
+    skeleton($("guildList"), 3);
+    skeleton($("logList"),   5);
 
-    // Skeleton while loading
-    skeletonItems($("mangaList"));
-    skeletonItems($("guildList"), 3);
-    skeletonItems($("logList"), 5);
-
-    const results = await Promise.allSettled([
+    const [statusR, whitelistR, guildsR, logsR] = await Promise.allSettled([
       apiFetch("/api/status"),
       apiFetch("/api/whitelist"),
       apiFetch("/api/guilds"),
       apiFetch("/api/logs"),
     ]);
 
-    const [statusRes, whitelistRes, guildsRes, logsRes] = results;
+    renderStats(statusR.status === "fulfilled" ? statusR.value : null);
 
-    renderStats(statusRes.status === "fulfilled" ? statusRes.value : null);
-    if (whitelistRes.status === "fulfilled") renderWhitelist(whitelistRes.value);
-    else renderError($("mangaList"), "Gagal memuat whitelist");
-    if (guildsRes.status === "fulfilled") renderGuilds(guildsRes.value);
-    else renderError($("guildList"), "Gagal memuat guilds");
-    if (logsRes.status === "fulfilled") renderLogs(logsRes.value);
-    else renderError($("logList"), "Gagal memuat logs");
+    if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
+    else renderErr($("mangaList"), "Gagal memuat whitelist");
+
+    if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
+    else renderErr($("guildList"), "Gagal memuat guilds");
+
+    if (logsR.status === "fulfilled") renderLogs(logsR.value);
+    else renderErr($("logList"), "Gagal memuat logs");
+
+    const anyFailed = [statusR,whitelistR,guildsR,logsR].some(r=>r.status==="rejected");
+    if (anyFailed && secret) showAlert("Beberapa data gagal dimuat. Cek koneksi atau CRON_SECRET.");
 
     $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
-    btn.classList.remove("loading");
+    btn.disabled = false;
     btn.textContent = "↻ refresh";
   }
 
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
-
-  // ── Auto-poll ─────────────────────────────────
+  // ── Poll ──────────────────────────────────────────────────
   function startPoll() {
     clearInterval(pollTimer);
-    pollTimer = setInterval(loadAll, POLL_INTERVAL);
+    pollTimer = setInterval(loadAll, POLL_MS);
   }
 
-  // ── Init ──────────────────────────────────────
-  loadAll();
-  startPoll();
+  // ── Init ──────────────────────────────────────────────────
+  if (secret) { loadAll(); startPoll(); }
+  else $("modalOverlay").classList.add("show");
 </script>
-
 </body>
 </html>
