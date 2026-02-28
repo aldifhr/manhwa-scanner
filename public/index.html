@@ -360,7 +360,8 @@
   // ── Fetch helper ──────────────────────────────────────────
   async function apiFetch(path) {
     const r = await fetch(`${API_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${secret}` }
+      headers: { Authorization: `Bearer ${secret}` },
+      cache: "no-store", // ✅ tambah ini
     });
     if (r.status === 401) {
       secret = "";
