@@ -2,7 +2,7 @@ name: Manga Cron Job
 
 on:
   schedule:
-    - cron: "*/5 * * * *"  # setiap 5 menit (UTC)
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,15 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show trigger time
-        run: echo "Cron triggered at $(date -u)"
+      - name: Show UTC Time
+        run: echo "Triggered at $(date -u)"
 
-      - name: Call API Cron Endpoint
+      - name: Call Cron API
         run: |
-          echo "Calling endpoint..."
-          curl -X GET "${{ secrets.APP_URL }}/api/cron" \
+          echo "Calling API..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            --fail \
-            --show-error \
-            --location
-          echo "Request success!"
+            "${{ secrets.APP_URL }}/api/cron")
+
+          echo "$RESPONSE"
+
+          STATUS=$(echo "$RESPONSE" | grep HTTP_STATUS | cut -d":" -f2)
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Cron failed with status $STATUS"
+            exit 1
+          fi
+
+          echo "✅ Cron success!"
