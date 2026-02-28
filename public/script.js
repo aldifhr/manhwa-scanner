@@ -1,19 +1,97 @@
 const API_BASE = "";
 const POLL_MS = 30_000;
-
 const $ = (id) => document.getElementById(id);
 let secret = sessionStorage.getItem("ikiru_secret") || "";
 let pollTimer = null;
+let trendChart = null; // CHART STATE
 
-// ===== UPTIME & TOP HELPERS =====
+// ===== CHART.JS INTEGRATION =====
+async function loadTrendChart() {
+  try {
+    const res = await fetch(`${API_BASE}/api/trend?secret=${secret}`, {
+      cache: "no-store"
+    });
+    if (!res.ok) throw new Error("Trend data failed");
+    const data = await res.json();
+    
+    const canvas = $("trendChart");
+    if (!canvas) return;
+    
+    // Destroy existing chart
+    if (trendChart) {
+      trendChart.destroy();
+      trendChart = null;
+    }
+    
+    // Create new chart
+    const ctx = canvas.getContext('2d');
+    trendChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.times || [],
+        datasets: [
+          {
+            label: 'Sent 🔔',
+            data: data.sent || [],
+            backgroundColor: '#10B981',
+            borderRadius: 4,
+            borderSkipped: false
+          },
+          {
+            label: 'Skipped ⏭️', 
+            data: data.skipped || [],
+            backgroundColor: '#F59E0B',
+            borderRadius: 4,
+            borderSkipped: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Jumlah' },
+            grid: { color: 'rgba(0,0,0,0.05)' }
+          },
+          x: {
+            title: { display: true, text: '5 menit interval' },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { 
+            position: 'top',
+            labels: { padding: 20 }
+          },
+          title: {
+            display: true,
+            text: 'ikiru Bot: Notif Trends 2 Jam Terakhir',
+            padding: { bottom: 20 }
+          }
+        },
+        animation: {
+          duration: 800
+        }
+      }
+    });
+  } catch (e) {
+    console.error('Chart load error:', e);
+  }
+}
+
+// ===== UPTIME & TOP HELPERS (EXISTING) =====
 function calculateUptime(logs, hours) {
   if (!logs?.length) return null;
   const now = Date.now();
   const cutoff = now - hours * 60 * 60 * 1000;
-
   const recent = logs.filter((l) => new Date(l.time) > cutoff);
   if (!recent.length) return null;
-
   const success = recent.filter((l) => l.tag === "sent").length;
   return Math.round((success / recent.length) * 100);
 }
@@ -28,13 +106,13 @@ function getTopManhwa(logs) {
         l.message.split("Chapter")[0]?.trim();
       if (title) counter[title] = (counter[title] || 0) + 1;
     });
-
   return Object.entries(counter)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
     .map(([title, count]) => ({ title, count }));
 }
 
+// ===== AUTH & API (EXISTING + CHART READY) =====
 function checkAuth() {
   if (!secret) {
     $("modalOverlay").classList.add("show");
@@ -42,6 +120,7 @@ function checkAuth() {
   }
   return true;
 }
+
 function submitSecret() {
   const val = $("secretInput").value.trim();
   if (!val) return;
@@ -50,6 +129,7 @@ function submitSecret() {
   $("modalOverlay").classList.remove("show");
   loadAll();
 }
+
 $("secretInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") submitSecret();
 });
@@ -69,14 +149,9 @@ async function apiFetch(path) {
   return r.json();
 }
 
-const esc = (s) =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const fmt = (d) =>
-  new Intl.DateTimeFormat("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(d);
+// ===== UI HELPERS (EXISTING) =====
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const fmt = (d) => new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(d);
 function timeAgo(iso) {
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
   if (s < 60) return `${s} det lalu`;
@@ -86,25 +161,22 @@ function timeAgo(iso) {
 }
 
 function skeleton(ul, n = 4) {
-  ul.innerHTML = Array.from(
-    { length: n },
-    (_, i) =>
-      `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
-        <div class="skel" style="width:${55 + (i % 3) * 20}%"></div>
-      </li>`,
+  ul.innerHTML = Array.from({ length: n }, (_, i) =>
+    `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
+      <div class="skel" style="width:${55 + (i % 3) * 20}%"></div>
+    </li>`
   ).join("");
 }
+
 function skeletonRecent(ul, n = 4) {
-  ul.innerHTML = Array.from(
-    { length: n },
-    () =>
-      `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
-        <div style="width:44px;height:60px;border-radius:3px;background:var(--border)"></div>
-        <div>
-          <div class="skel" style="width:70%;margin-bottom:6px"></div>
-          <div class="skel" style="width:40%"></div>
-        </div>
-      </li>`,
+  ul.innerHTML = Array.from({ length: n }, () =>
+    `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="width:44px;height:60px;border-radius:3px;background:var(--border)"></div>
+      <div>
+        <div class="skel" style="width:70%;margin-bottom:6px"></div>
+        <div class="skel" style="width:40%"></div>
+      </div>
+    </li>`
   ).join("");
 }
 
@@ -114,25 +186,21 @@ function showAlert(msg) {
   el.textContent = msg;
   setTimeout(() => (el.style.display = "none"), 8000);
 }
+
 function clearAlert() {
   $("alertBox").style.display = "none";
 }
+
 function renderErr(ul, msg) {
   ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`;
 }
 
-// ── STATS EXTENDED (dengan UPTIME) ──
+// ===== RENDER FUNCTIONS (EXISTING - UNCHANGED) =====
 function renderStatsExtended(statusData, uptimeData) {
   const dot = $("statusDot");
   if (!statusData) {
-    [
-      "statSent",
-      "statSkipped",
-      "statFailed",
-      "statDuration",
-      "statUptime24h",
-      "statUptime7d",
-    ].forEach((id) => ($(id).textContent = "—"));
+    ["statSent", "statSkipped", "statFailed", "statDuration", "statUptime24h", "statUptime7d"]
+      .forEach((id) => ($(id).textContent = "—"));
     dot.className = "logo-dot offline";
     return;
   }
@@ -140,33 +208,21 @@ function renderStatsExtended(statusData, uptimeData) {
   $("statSent").textContent = statusData.sent ?? "—";
   $("statSkipped").textContent = statusData.skipped ?? "—";
   $("statFailed").textContent = statusData.failed ?? "—";
-  $("statDuration").textContent = statusData.duration
-    ? `${statusData.duration}s`
-    : "—";
+  $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "—";
 
-  // UPTIME
   $("statUptime24h").textContent = uptimeData?.uptime24h ?? "—";
   $("statUptime24h").className = `stat-value ${
-    uptimeData?.uptime24h >= 95
-      ? "green"
-      : uptimeData?.uptime24h >= 80
-        ? "amber"
-        : "red"
+    uptimeData?.uptime24h >= 95 ? "green" : uptimeData?.uptime24h >= 80 ? "amber" : "red"
   }`;
 
   $("statUptime7d").textContent = uptimeData?.uptime7d ?? "—";
   $("statUptime7d").className = `stat-value ${
-    uptimeData?.uptime7d >= 95
-      ? "green"
-      : uptimeData?.uptime7d >= 80
-        ? "amber"
-        : "red"
+    uptimeData?.uptime7d >= 95 ? "green" : uptimeData?.uptime7d >= 80 ? "amber" : "red"
   }`;
 
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
 }
 
-// ── TOP MANHWA ──
 function renderTopManhwa(data) {
   const list = $("topManhwaList");
   const top = data?.top ?? [];
@@ -178,17 +234,15 @@ function renderTopManhwa(data) {
   }
 
   list.innerHTML = top
-    .map(
-      (item, i) =>
-        `<li class="manga-item">
+    .map((item, i) =>
+      `<li class="manga-item">
         <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
         <span>${esc(item.title)} <span style="color:var(--muted);font-size:11px">(${item.count}x)</span></span>
-      </li>`,
+      </li>`
     )
     .join("");
 }
 
-// ── Whitelist ──
 function renderWhitelist(data) {
   const list = $("mangaList");
   const items = data?.items ?? [];
@@ -198,17 +252,15 @@ function renderWhitelist(data) {
     return;
   }
   list.innerHTML = items
-    .map(
-      (name, i) =>
-        `<li class="manga-item">
+    .map((name, i) =>
+      `<li class="manga-item">
         <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
         <span>${esc(name)}</span>
-      </li>`,
+      </li>`
     )
     .join("");
 }
 
-// ── Guilds ──
 function renderGuilds(data) {
   const list = $("guildList");
   const guilds = data?.guilds ?? [];
@@ -218,20 +270,18 @@ function renderGuilds(data) {
     return;
   }
   list.innerHTML = guilds
-    .map(
-      (g) =>
-        `<li class="guild-item">
+    .map((g) =>
+      `<li class="guild-item">
         <div class="guild-info">
           <div class="guild-id">${esc(g.guildId)}</div>
           <div class="guild-channel">#${esc(g.channelId)}</div>
         </div>
         <span class="status-pill ${g.valid ? "active" : "invalid"}">${g.valid ? "aktif" : "invalid"}</span>
-      </li>`,
+      </li>`
     )
     .join("");
 }
 
-// ── Recent manhwa ──
 function renderRecent(data) {
   const list = $("recentList");
   const items = data?.items ?? [];
@@ -259,7 +309,6 @@ function renderRecent(data) {
     .join("");
 }
 
-// ── Logs ──
 function renderLogs(data) {
   const list = $("logList");
   const logs = data?.logs ?? [];
@@ -269,18 +318,17 @@ function renderLogs(data) {
     return;
   }
   list.innerHTML = logs
-    .map(
-      (l) =>
-        `<li class="log-item">
+    .map((l) =>
+      `<li class="log-item">
         <span class="log-time">${fmt(new Date(l.time))}</span>
         <span>${esc(l.message)}</span>
         <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
-      </li>`,
+      </li>`
     )
     .join("");
 }
 
-// ── MAIN LOAD (DENGAN UPTIME & TOP) ──
+// ===== SUPERCHARGED LOAD ALL (CHART + PARALLEL) =====
 async function loadAll() {
   if (!checkAuth()) return;
   clearAlert();
@@ -289,22 +337,24 @@ async function loadAll() {
   btn.disabled = true;
   btn.textContent = "memuat...";
 
-  // Skeleton semua
+  // Skeleton loading
   skeleton($("mangaList"));
   skeleton($("guildList"), 3);
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 5);
   skeleton($("topManhwaList"));
 
-  const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR] =
+  // 🔥 PARALLEL + CHART LOADING
+  const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR] =
     await Promise.allSettled([
       apiFetch("/api/status"),
       apiFetch("/api/whitelist"),
       apiFetch("/api/guilds"),
       apiFetch("/api/recent"),
       apiFetch("/api/logs"),
-      apiFetch("/api/uptime"), // BARU
-      apiFetch("/api/top"), // BARU
+      apiFetch("/api/uptime"),
+      apiFetch("/api/top"),
+      fetch(`${API_BASE}/api/trend?secret=${secret}`), // CHART DATA
     ]);
 
   // STATS + UPTIME
@@ -313,11 +363,15 @@ async function loadAll() {
     uptimeR.status === "fulfilled" ? uptimeR.value : null,
   );
 
-  // TOP MANHWA
+  // 🔥 CHART RENDER
+  if (trendR.status === "fulfilled") {
+    loadTrendChart();
+  }
+
+  // EXISTING RENDERS (unchanged)
   if (topR.status === "fulfilled") renderTopManhwa(topR.value);
   else renderErr($("topManhwaList"), "Gagal muat top manhwa");
 
-  // Lainnya sama
   if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
   else renderErr($("mangaList"), "Gagal muat whitelist");
 
@@ -330,15 +384,8 @@ async function loadAll() {
   if (logsR.status === "fulfilled") renderLogs(logsR.value);
   else renderErr($("logList"), "Gagal muat logs");
 
-  const anyFailed = [
-    statusR,
-    whitelistR,
-    guildsR,
-    recentR,
-    logsR,
-    uptimeR,
-    topR,
-  ].some((r) => r.status === "rejected");
+  const anyFailed = [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR]
+    .some((r) => r.status === "rejected");
   if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
   $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
@@ -346,16 +393,18 @@ async function loadAll() {
   btn.textContent = "↻ refresh";
 }
 
+// ===== AUTO-REFRESH 30s (OPTIMIZED) =====
 function startPoll() {
   clearInterval(pollTimer);
   pollTimer = setInterval(loadAll, POLL_MS);
 }
 
-if (secret) {
-  loadAll();
-  startPoll();
-} else $("modalOverlay").classList.add("show");
+// Window focus → refresh
+window.addEventListener('focus', () => {
+  if (secret) loadAll();
+});
 
+// ===== THEME (EXISTING) =====
 function applyTheme(dark) {
   document.body.classList.toggle("dark", dark);
   $("btnTheme").textContent = dark ? "🌙" : "☀️";
@@ -367,5 +416,12 @@ function toggleTheme() {
   applyTheme(isDark);
 }
 
-// Init theme saat load
+// ===== INIT =====
+if (secret) {
+  loadAll();
+  startPoll();
+} else {
+  $("modalOverlay").classList.add("show");
+}
+
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");

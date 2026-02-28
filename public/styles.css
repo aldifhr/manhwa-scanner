@@ -524,3 +524,17 @@ main {
 .btn-primary:hover {
   opacity: 0.85;
 }
+
+.chart-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  height: 350px;
+}
+
+.dark .chart-container {
+  background: var(--bg-card-dark);
+  border-color: var(--border-dark);
+}
