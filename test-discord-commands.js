@@ -2,10 +2,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const APP_ID    = process.env.DISCORD_APPLICATION_ID;
-
-if (!BOT_TOKEN || !APP_ID) {
+if (!process.env.DISCORD_BOT_TOKEN || !process.env.DISCORD_APPLICATION_ID) {
   console.error("❌ Please set DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID in .env");
   process.exit(1);
 }
@@ -119,7 +116,7 @@ async function registerCommands() {
       {
         method:  "PUT",
         headers: {
-          "Authorization": `Bot ${BOT_TOKEN}`,
+          "Authorization": `Bot ${process.env.DISCORD_BOT_TOKEN}`,
           "Content-Type":  "application/json",
         },
         body: JSON.stringify(commands),
