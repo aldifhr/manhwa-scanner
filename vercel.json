@@ -5,6 +5,9 @@
     },
     "api/interactive.js": {
       "maxDuration": 10
+    },
+    "api/trend.js": { 
+      "maxDuration": 10 
     }
   }
 }

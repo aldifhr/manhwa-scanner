@@ -17,7 +17,7 @@ const {
 } = process.env;
 
 const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
-  
+
 const redis = new Redis({
   url: UPSTASH_REDIS_REST_URL,
   token: UPSTASH_REDIS_REST_TOKEN,
@@ -167,8 +167,8 @@ export default async function handler(req, res) {
     const rawParsed = Array.isArray(rawWhitelist)
       ? rawWhitelist
       : rawWhitelist
-      ? JSON.parse(rawWhitelist)
-      : [];
+        ? JSON.parse(rawWhitelist)
+        : [];
     const whitelist = rawParsed.map((w) =>
       typeof w === "string" ? { title: w, url: null } : w,
     );
@@ -293,6 +293,17 @@ export default async function handler(req, res) {
     await redis.ltrim("cron:logs", 0, 199);
     await redis.ltrim("recent:chapters", 0, 19);
 
+    const minuteSlot = Math.floor(Date.now() / (5 * 60 * 1000));
+    await redis.set(
+      `cron:trend:${minuteSlot}`,
+      JSON.stringify({
+        sent: sentCount,
+        skipped,
+        failed,
+        duration: parseFloat(duration),
+      }),
+      { ex: 7200 },
+    );
     return res.status(200).json({
       ok: true,
       sent: sentCount,
