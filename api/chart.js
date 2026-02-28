@@ -1,56 +1,62 @@
 import { redis } from "../lib/redis.js";
 
 export default async function handler(req, res) {
-  const token = req.headers.authorization?.replace('Bearer ', '') || req.query.secret;
-  if (!token || token !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  // FIX: pakai process.env.CRON_SECRET
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const now = Math.floor(Date.now() / (5 * 60 * 1000));
+    // Ambil semua logs (max 200 entry)
+    const raw = await redis.lrange("cron:logs", 0, 199);
 
-    // Buat semua key sekaligus
-    const slots = Array.from({ length: 24 }, (_, i) => now - (23 - i));
-    const keys = slots.map((slot) => `cron:trend:${slot}`);
+    // Buat struktur 7 hari terakhir
+    const days = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const label = d.toLocaleDateString("id-ID", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      });
+      days[label] = { sent: 0, failed: 0 };
+    }
 
-    // ✅ 1x request ke Redis, ambil semua sekaligus
-    const results = await redis.mget(...keys);
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-    const times = [];
-    const sent = [];
-    const skipped = [];
-    const duration = [];
+    for (const entry of raw) {
+      try {
+        const data = typeof entry === "string" ? JSON.parse(entry) : entry;
+        const time = new Date(data.time);
 
-    slots.forEach((slot, i) => {
-      const slotTime = new Date(slot * 5 * 60 * 1000);
-      times.push(slotTime.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit'
-      }));
+        if (time < cutoff) continue;
+        if (!["sent", "failed"].includes(data.tag)) continue;
 
-      const data = results[i] ?? { sent: 0, skipped: 0, duration: 0 };
-      sent.push(data.sent || 0);
-      skipped.push(data.skipped || 0);
-      duration.push(data.duration || 0);
-    });
+        const label = time.toLocaleDateString("id-ID", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        });
 
-    const totalDuration = duration.reduce((a, b) => a + b, 0);
+        if (!days[label]) continue;
+        days[label][data.tag]++;
+      } catch {
+        continue;
+      }
+    }
 
-    res.status(200).json({
-      times,
-      sent,
-      skipped,
-      duration,
-      totalSent: sent.reduce((a, b) => a + b, 0),
-      avgDuration: Math.round((totalDuration / 24) * 10) / 10
-    });
+    const labels = Object.keys(days);
+    const sent = labels.map((l) => days[l].sent);
+    const failed = labels.map((l) => days[l].failed);
 
+    return res.status(200).json({ labels, sent, failed });
   } catch (error) {
-    console.error('Trend API error:', error);
-    res.status(500).json({ error: 'Internal error', times: [], sent: [], skipped: [] });
+    console.error("Chart API error:", error);
+    return res.status(500).json({ error: "Internal error", labels: [], sent: [], failed: [] });
   }
 }
