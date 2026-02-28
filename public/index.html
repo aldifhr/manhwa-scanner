@@ -11,44 +11,40 @@
       rel="stylesheet"
     />
     <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
       :root {
-        --bg:       #f7f6f3;
-        --surface:  #ffffff;
-        --border:   #e8e6e0;
-        --text:     #1a1916;
-        --muted:    #8c8982;
-        --green:    #2d6a4f;
+        --bg: #f7f6f3;
+        --surface: #ffffff;
+        --border: #e8e6e0;
+        --text: #1a1916;
+        --muted: #8c8982;
+        --green: #2d6a4f;
         --green-bg: #d8f3dc;
-        --red:      #9b2226;
-        --red-bg:   #fde8e8;
-        --amber:    #7d4e13;
+        --red: #9b2226;
+        --red-bg: #fde8e8;
+        --amber: #7d4e13;
         --amber-bg: #fef3cd;
-        --blue:     #1d4e89;
-        --blue-bg:  #dbeafe;
-        --radius:   6px;
-        --mono:     'DM Mono', monospace;
-        --sans:     'DM Sans', sans-serif;
+        --blue: #1d4e89;
+        --blue-bg: #dbeafe;
+        --radius: 6px;
+        --mono: "DM Mono", monospace;
+        --sans: "DM Sans", sans-serif;
       }
 
-      body.dark {
-        --bg:       #111110;
-        --surface:  #1a1916;
-        --border:   #2e2c28;
-        --text:     #f0ede6;
-        --muted:    #6b6860;
-        --green:    #4ade80;
-        --green-bg: #14532d;
-        --red:      #f87171;
-        --red-bg:   #450a0a;
-        --amber:    #fbbf24;
-        --amber-bg: #451a03;
-        --blue:     #60a5fa;
-        --blue-bg:  #1e3a5f;
+      body {
+        font-family: var(--sans);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        padding-bottom: 60px;
       }
-
-      body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:60px; transition: background .2s, color .2s; }
 
       /* ── Header ── */
       header {
@@ -58,90 +54,278 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        position: sticky; top: 0; z-index: 10;
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
-      .logo { display:flex; align-items:center; gap:10px; font-weight:600; font-size:14px; letter-spacing:-0.02em; }
-      .logo-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse 2.5s infinite; }
-      .logo-dot.offline { background:var(--red); animation:none; }
-      @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
-      .header-right { display:flex; align-items:center; gap:10px; }
-      .last-updated { font-family:var(--mono); font-size:11px; color:var(--muted); }
-
-      .btn-refresh, .btn-theme {
-        font-family: var(--mono); font-size:11px; color:var(--muted);
-        background: none; border: 1px solid var(--border);
-        border-radius: var(--radius); cursor: pointer; transition: all .15s;
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        letter-spacing: -0.02em;
       }
-      .btn-refresh { padding:5px 12px; }
-      .btn-theme   { padding:5px 9px; font-size:13px; line-height:1; }
-      .btn-refresh:hover, .btn-theme:hover { background:var(--text); color:var(--bg); border-color:var(--text); }
-      .btn-refresh:disabled { opacity:.4; pointer-events:none; }
+      .logo-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+        animation: pulse 2.5s infinite;
+      }
+      .logo-dot.offline {
+        background: var(--red);
+        animation: none;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(0.75);
+        }
+      }
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .last-updated {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .btn-refresh {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        background: none;
+        border: 1px solid var(--border);
+        padding: 5px 12px;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .btn-refresh:hover {
+        background: var(--text);
+        color: var(--bg);
+        border-color: var(--text);
+      }
+      .btn-refresh:disabled {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      .btn-theme {
+        font-size: 14px;
+        background: none;
+        border: 1px solid var(--border);
+        padding: 5px 10px;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: all 0.15s;
+        line-height: 1;
+      }
+      .btn-theme:hover {
+        background: var(--text);
+      }
 
+      body.dark {
+        --bg: #111110;
+        --surface: #1a1916;
+        --border: #2e2c28;
+        --text: #f0ede6;
+        --muted: #6b6860;
+        --green: #4ade80;
+        --green-bg: #14532d;
+        --red: #f87171;
+        --red-bg: #450a0a;
+        --amber: #fbbf24;
+        --amber-bg: #451a03;
+        --blue: #60a5fa;
+        --blue-bg: #1e3a5f;
+      }
       /* ── Layout ── */
-      main { max-width:960px; margin:0 auto; padding:28px 20px; }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 28px 20px;
+      }
       .section-label {
-        font-family:var(--mono); font-size:10px; letter-spacing:.1em;
-        text-transform:uppercase; color:var(--muted); margin-bottom:10px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 10px;
       }
 
-      /* ── Stats ── */
+      /* ── Stats ── 6 COLS */
       .stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 10px;
         margin-bottom: 28px;
       }
-      @media(max-width:580px){ .stats-grid{ grid-template-columns:repeat(2,1fr); } }
-      .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 16px; }
-      .stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
-      .stat-value { font-size:26px; font-weight:600; letter-spacing:-0.04em; line-height:1; }
-      .stat-value.green { color:var(--green); }
-      .stat-value.red   { color:var(--red); }
-      .stat-value.amber { color:var(--amber); }
+      @media (max-width: 580px) {
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 16px;
+      }
+      .stat-label {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+      }
+      .stat-value {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        line-height: 1;
+      }
+      .stat-value.green {
+        color: var(--green);
+      }
+      .stat-value.red {
+        color: var(--red);
+      }
+      .stat-value.amber {
+        color: var(--amber);
+      }
 
       /* ── Two col ── */
-      .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px; }
-      @media(max-width:640px){ .two-col{ grid-template-columns:1fr; } }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 640px) {
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+      }
 
       /* ── Card ── */
-      .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:20px; }
-      .card-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-      .card-title { font-size:13px; font-weight:500; }
-      .badge { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:99px; background:var(--bg); border:1px solid var(--border); color:var(--muted); }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+      .card-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .card-title {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
 
       /* ── Manga list ── */
-      .manga-list { list-style:none; }
-      .manga-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; }
-      .manga-item:last-child { border-bottom:none; }
-      .manga-item:hover { background:var(--bg); }
-      .manga-index { font-family:var(--mono); font-size:10px; color:var(--muted); min-width:18px; }
-
-      /* ── Top manhwa bar ── */
-      .top-item { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; }
-      .top-item:last-child { border-bottom:none; }
-      .top-item:hover { background:var(--bg); }
-      .top-bar-wrap { flex:1; min-width:0; }
-      .top-bar-label { display:flex; justify-content:space-between; margin-bottom:5px; }
-      .top-bar-title { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:75%; }
-      .top-bar-count { font-family:var(--mono); font-size:11px; color:var(--muted); }
-      .top-bar-track { height:4px; background:var(--border); border-radius:99px; overflow:hidden; }
-      .top-bar-fill  { height:100%; background:var(--green); border-radius:99px; transition:width .4s ease; }
+      .manga-list {
+        list-style: none;
+      }
+      .manga-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .manga-item:last-child {
+        border-bottom: none;
+      }
+      .manga-item:hover {
+        background: var(--bg);
+      }
+      .manga-index {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        min-width: 18px;
+      }
 
       /* ── Guild list ── */
-      .guild-list { list-style:none; }
-      .guild-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); }
-      .guild-item:last-child { border-bottom:none; }
-      .guild-item:hover { background:var(--bg); }
-      .guild-info { flex:1; min-width:0; }
-      .guild-id { font-family:var(--mono); font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
-      .guild-id:hover { text-decoration:underline; }
-      .guild-channel { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:2px; }
-      .status-pill { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:99px; flex-shrink:0; }
-      .status-pill.active  { background:var(--green-bg); color:var(--green); }
-      .status-pill.invalid { background:var(--red-bg); color:var(--red); }
+      .guild-list {
+        list-style: none;
+      }
+      .guild-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .guild-item:last-child {
+        border-bottom: none;
+      }
+      .guild-item:hover {
+        background: var(--bg);
+      }
+      .guild-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .guild-id {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .guild-channel {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .status-pill {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        flex-shrink: 0;
+      }
+      .status-pill.active {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .status-pill.invalid {
+        background: var(--red-bg);
+        color: var(--red);
+      }
 
       /* ── Recent manhwa ── */
-      .recent-list { list-style:none; }
+      .recent-list {
+        list-style: none;
+      }
       .recent-item {
         display: grid;
         grid-template-columns: 44px 1fr auto;
@@ -151,103 +335,221 @@
         border-bottom: 1px solid var(--border);
         text-decoration: none;
         color: inherit;
-        transition: background .1s;
+        transition: background 0.1s;
       }
-      .recent-item:last-child { border-bottom:none; }
-      .recent-item:hover { background:var(--bg); }
-      .recent-cover { width:44px; height:60px; border-radius:3px; object-fit:cover; background:var(--border); flex-shrink:0; }
-      .recent-cover-placeholder { width:44px; height:60px; border-radius:3px; background:var(--border); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-      .recent-info { min-width:0; }
-      .recent-title { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
-      .recent-chapter { font-family:var(--mono); font-size:11px; color:var(--muted); }
-      .recent-time { font-family:var(--mono); font-size:10px; color:var(--muted); white-space:nowrap; }
-
-      /* ── Log filter bar ── */
-      .log-filter-bar {
-        padding: 10px 16px;
-        border-bottom: 1px solid var(--border);
+      .recent-item:last-child {
+        border-bottom: none;
+      }
+      .recent-item:hover {
+        background: var(--bg);
+      }
+      .recent-cover {
+        width: 44px;
+        height: 60px;
+        border-radius: 3px;
+        object-fit: cover;
+        background: var(--border);
+        flex-shrink: 0;
+      }
+      .recent-cover-placeholder {
+        width: 44px;
+        height: 60px;
+        border-radius: 3px;
+        background: var(--border);
         display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
         align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
       }
-      .log-search {
-        flex: 1; min-width: 140px;
-        font-family: var(--mono); font-size: 12px;
-        padding: 5px 10px;
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background: var(--bg); color: var(--text);
-        outline: none; transition: border-color .15s;
+      .recent-info {
+        min-width: 0;
       }
-      .log-search:focus { border-color: var(--text); }
-      .filter-tags { display:flex; gap:6px; flex-wrap:wrap; }
-      .filter-btn {
-        font-family: var(--mono); font-size: 10px;
-        padding: 3px 10px; border-radius: 99px;
-        border: 1px solid var(--border);
-        background: none; color: var(--muted);
-        cursor: pointer; transition: all .15s;
+      .recent-title {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 3px;
       }
-      .filter-btn:hover { border-color:var(--text); color:var(--text); }
-      .filter-btn.active { background:var(--text); color:var(--bg); border-color:var(--text); }
+      .recent-chapter {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .recent-time {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
 
       /* ── Log ── */
-      .log-list { list-style:none; }
-      .log-item { display:grid; grid-template-columns:72px 1fr auto; gap:12px; align-items:start; padding:10px 16px; border-bottom:1px solid var(--border); font-size:12px; }
-      .log-item:last-child { border-bottom:none; }
-      .log-item:hover { background:var(--bg); }
-      .log-time { font-family:var(--mono); font-size:10px; color:var(--muted); padding-top:1px; }
-      .log-tag { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:99px; flex-shrink:0; align-self:start; }
-      .log-tag.sent    { background:var(--green-bg); color:var(--green); }
-      .log-tag.skipped { background:var(--amber-bg); color:var(--amber); }
-      .log-tag.failed  { background:var(--red-bg); color:var(--red); }
-      .log-tag.info    { background:var(--blue-bg); color:var(--blue); }
+      .log-list {
+        list-style: none;
+      }
+      .log-item {
+        display: grid;
+        grid-template-columns: 72px 1fr auto;
+        gap: 12px;
+        align-items: start;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .log-item:last-child {
+        border-bottom: none;
+      }
+      .log-item:hover {
+        background: var(--bg);
+      }
+      .log-time {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        padding-top: 1px;
+      }
+      .log-tag {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        flex-shrink: 0;
+        align-self: start;
+      }
+      .log-tag.sent {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .log-tag.skipped {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .log-tag.failed {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .log-tag.info {
+        background: var(--blue-bg);
+        color: var(--blue);
+      }
 
       /* ── Empty / skeleton ── */
-      .empty { padding:28px 16px; text-align:center; font-size:12px; color:var(--muted); font-family:var(--mono); }
-      .skel { height:11px; background:linear-gradient(90deg,var(--border) 25%,var(--bg) 50%,var(--border) 75%); background-size:200% 100%; border-radius:3px; animation:shimmer 1.2s infinite; }
-      @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+      .empty {
+        padding: 28px 16px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      .skel {
+        height: 11px;
+        background: linear-gradient(
+          90deg,
+          var(--border) 25%,
+          var(--bg) 50%,
+          var(--border) 75%
+        );
+        background-size: 200% 100%;
+        border-radius: 3px;
+        animation: shimmer 1.2s infinite;
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
 
       /* ── Alert ── */
-      .alert { background:var(--amber-bg); border:1px solid #f0d080; border-radius:var(--radius); padding:10px 16px; font-size:12px; color:var(--amber); font-family:var(--mono); margin-bottom:20px; }
-
-      /* ── Toast ── */
-      .toast {
-        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-        background: var(--text); color: var(--bg);
-        font-family: var(--mono); font-size: 12px;
-        padding: 8px 18px; border-radius: 99px;
-        opacity: 0; transition: all .25s; z-index: 200; white-space: nowrap;
+      .alert {
+        background: var(--amber-bg);
+        border: 1px solid #f0d080;
+        border-radius: var(--radius);
+        padding: 10px 16px;
+        font-size: 12px;
+        color: var(--amber);
+        font-family: var(--mono);
+        margin-bottom: 20px;
       }
-      .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
       /* ── Modal ── */
-      .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:100; align-items:center; justify-content:center; }
-      .modal-overlay.show { display:flex; }
-      .modal { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:28px; width:360px; max-width:90vw; }
-      .modal h2 { font-size:15px; font-weight:600; margin-bottom:6px; }
-      .modal p  { font-size:12px; color:var(--muted); margin-bottom:16px; font-family:var(--mono); }
-      .modal-error { font-family:var(--mono); font-size:11px; color:var(--red); margin-bottom:8px; min-height:16px; }
-      .modal input { width:100%; font-family:var(--mono); font-size:13px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text); outline:none; margin-bottom:8px; }
-      .modal input:focus { border-color:var(--text); }
-      .modal input.error { border-color:var(--red); }
-      .btn-primary { width:100%; font-family:var(--mono); font-size:12px; padding:9px; background:var(--text); color:var(--bg); border:none; border-radius:var(--radius); cursor:pointer; }
-      .btn-primary:hover { opacity:.85; }
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 28px;
+        width: 360px;
+        max-width: 90vw;
+      }
+      .modal h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .modal p {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 16px;
+        font-family: var(--mono);
+      }
+      .modal input {
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg);
+        color: var(--text);
+        outline: none;
+        margin-bottom: 12px;
+      }
+      .modal input:focus {
+        border-color: var(--text);
+      }
+      .btn-primary {
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 9px;
+        background: var(--text);
+        color: var(--bg);
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+      }
+      .btn-primary:hover {
+        opacity: 0.85;
+      }
     </style>
   </head>
   <body>
-
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-
-    <!-- Modal Auth -->
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal">
         <h2>Bot Monitor</h2>
         <p>Masukkan CRON_SECRET untuk akses dashboard</p>
-        <div class="modal-error" id="modalError"></div>
-        <input type="password" id="secretInput" placeholder="CRON_SECRET..." autocomplete="off" />
+        <input
+          type="password"
+          id="secretInput"
+          placeholder="CRON_SECRET..."
+          autocomplete="off"
+        />
         <button class="btn-primary" onclick="submitSecret()">Masuk →</button>
       </div>
     </div>
@@ -259,23 +561,51 @@
       </div>
       <div class="header-right">
         <span class="last-updated" id="lastUpdated">—</span>
-        <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" aria-label="Toggle dark mode">☀️</button>
-        <button class="btn-refresh" id="btnRefresh" onclick="loadAll()">↻ refresh</button>
+        <button
+          class="btn-theme"
+          id="btnTheme"
+          onclick="toggleTheme()"
+          aria-label="Toggle dark mode"
+        >
+          ☀️
+        </button>
+        <button class="btn-refresh" id="btnRefresh" onclick="loadAll()">
+          ↻ refresh
+        </button>
       </div>
     </header>
 
     <main>
-      <div class="alert" id="alertBox" style="display:none"></div>
+      <div class="alert" id="alertBox" style="display: none"></div>
 
-      <!-- STATS -->
+      <!-- STATS - 6 CARDS DENGAN UPTIME -->
       <div class="section-label">cron terakhir</div>
       <div class="stats-grid">
-        <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-value green" id="statSent">—</div></div>
-        <div class="stat-card"><div class="stat-label">Skipped</div><div class="stat-value amber" id="statSkipped">—</div></div>
-        <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value red" id="statFailed">—</div></div>
-        <div class="stat-card"><div class="stat-label">Duration</div><div class="stat-value" id="statDuration">—</div></div>
-        <div class="stat-card"><div class="stat-label">Uptime 24h</div><div class="stat-value" id="statUptime24h">—</div></div>
-        <div class="stat-card"><div class="stat-label">Uptime 7d</div><div class="stat-value" id="statUptime7d">—</div></div>
+        <div class="stat-card">
+          <div class="stat-label">Sent</div>
+          <div class="stat-value green" id="statSent">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Skipped</div>
+          <div class="stat-value amber" id="statSkipped">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Failed</div>
+          <div class="stat-value red" id="statFailed">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Duration</div>
+          <div class="stat-value" id="statDuration">—</div>
+        </div>
+        <!-- UPTIME BARU -->
+        <div class="stat-card">
+          <div class="stat-label">Uptime 24h</div>
+          <div class="stat-value" id="statUptime24h">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Uptime 7d</div>
+          <div class="stat-value" id="statUptime7d">—</div>
+        </div>
       </div>
 
       <div class="two-col">
@@ -286,7 +616,9 @@
               <span class="card-title">Manga terpantau</span>
               <span class="badge" id="whitelistCount">0</span>
             </div>
-            <ul class="manga-list" id="mangaList"><li class="empty">memuat...</li></ul>
+            <ul class="manga-list" id="mangaList">
+              <li class="empty">memuat...</li>
+            </ul>
           </div>
         </div>
         <div>
@@ -296,96 +628,89 @@
               <span class="card-title">Server aktif</span>
               <span class="badge" id="guildCount">0</span>
             </div>
-            <ul class="guild-list" id="guildList"><li class="empty">memuat...</li></ul>
+            <ul class="guild-list" id="guildList">
+              <li class="empty">memuat...</li>
+            </ul>
           </div>
         </div>
       </div>
 
-      <!-- TOP MANHWA -->
+      <!-- TOP MANHWA BARU -->
       <div class="section-label">🏆 top manhwa 7 hari</div>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Paling sering dikirim bot</span>
           <span class="badge" id="topCount">0</span>
         </div>
-        <ul class="manga-list" id="topManhwaList"><li class="empty">memuat...</li></ul>
+        <ul class="manga-list" id="topManhwaList">
+          <li class="empty">memuat...</li>
+        </ul>
       </div>
 
-      <!-- RECENT -->
       <div class="section-label">recent manhwa terkirim</div>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Chapter terbaru yang dikirim bot</span>
           <span class="badge" id="recentCount">0</span>
         </div>
-        <ul class="recent-list" id="recentList"><li class="empty">memuat...</li></ul>
+        <ul class="recent-list" id="recentList">
+          <li class="empty">memuat...</li>
+        </ul>
       </div>
 
-      <!-- LOG -->
       <div class="section-label">log aktivitas</div>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Riwayat cron</span>
           <span class="badge" id="logCount">0 entries</span>
         </div>
-        <!-- Filter bar -->
-        <div class="log-filter-bar">
-          <input
-            class="log-search"
-            id="logSearch"
-            type="text"
-            placeholder="Cari log..."
-            oninput="filterLogs()"
-            autocomplete="off"
-          />
-          <div class="filter-tags">
-            <button class="filter-btn active" data-tag="all"     onclick="setTagFilter(this)">Semua</button>
-            <button class="filter-btn"        data-tag="sent"    onclick="setTagFilter(this)">Sent</button>
-            <button class="filter-btn"        data-tag="skipped" onclick="setTagFilter(this)">Skipped</button>
-            <button class="filter-btn"        data-tag="failed"  onclick="setTagFilter(this)">Failed</button>
-          </div>
-        </div>
-        <ul class="log-list" id="logList"><li class="empty">memuat...</li></ul>
+        <ul class="log-list" id="logList">
+          <li class="empty">memuat...</li>
+        </ul>
       </div>
     </main>
 
     <script>
-      const API_BASE = process.env.BASE_URL || ""
-      const POLL_MS  = 30_000;
+      const API_BASE = "";
+      const POLL_MS = 30_000;
 
-      const $ = id => document.getElementById(id);
-      let secret     = sessionStorage.getItem("ikiru_secret") || "";
-      let pollTimer  = null;
-      let allLogs    = [];
-      let activeTag  = "all";
+      const $ = (id) => document.getElementById(id);
+      let secret = sessionStorage.getItem("ikiru_secret") || "";
+      let pollTimer = null;
 
-      // ── THEME ──
-      function applyTheme(dark) {
-        document.body.classList.toggle("dark", dark);
-        $("btnTheme").textContent = dark ? "🌙" : "☀️";
-      }
-      function toggleTheme() {
-        const isDark = !document.body.classList.contains("dark");
-        localStorage.setItem("ikiru_theme", isDark ? "dark" : "light");
-        applyTheme(isDark);
-      }
-      applyTheme(localStorage.getItem("ikiru_theme") === "dark");
+      // ===== UPTIME & TOP HELPERS =====
+      function calculateUptime(logs, hours) {
+        if (!logs?.length) return null;
+        const now = Date.now();
+        const cutoff = now - hours * 60 * 60 * 1000;
 
-      // ── TOAST ──
-      let toastTimer = null;
-      function showToast(msg) {
-        const el = $("toast");
-        el.textContent = msg;
-        el.classList.add("show");
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => el.classList.remove("show"), 2000);
+        const recent = logs.filter((l) => new Date(l.time) > cutoff);
+        if (!recent.length) return null;
+
+        const success = recent.filter((l) => l.tag === "sent").length;
+        return Math.round((success / recent.length) * 100);
       }
 
-      // ── AUTH ──
+      function getTopManhwa(logs) {
+        const counter = {};
+        logs
+          ?.filter((l) => l.tag === "sent" && l.message?.includes("Chapter"))
+          .forEach((l) => {
+            const title =
+              l.message.split(" — ")[0]?.trim() ||
+              l.message.split("Chapter")[0]?.trim();
+            if (title) counter[title] = (counter[title] || 0) + 1;
+          });
+
+        return Object.entries(counter)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([title, count]) => ({ title, count }));
+      }
+
       function checkAuth() {
         if (!secret) {
           $("modalOverlay").classList.add("show");
-          setTimeout(() => $("secretInput").focus(), 50);
           return false;
         }
         return true;
@@ -393,17 +718,15 @@
       function submitSecret() {
         const val = $("secretInput").value.trim();
         if (!val) return;
-        $("modalError").textContent = "";
-        $("secretInput").classList.remove("error");
         secret = val;
         sessionStorage.setItem("ikiru_secret", val);
         $("modalOverlay").classList.remove("show");
         loadAll();
-        startPoll();
       }
-      $("secretInput").addEventListener("keydown", e => { if (e.key === "Enter") submitSecret(); });
+      $("secretInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitSecret();
+      });
 
-      // ── API FETCH ──
       async function apiFetch(path) {
         const r = await fetch(`${API_BASE}${path}`, {
           cache: "no-store",
@@ -412,122 +735,117 @@
         if (r.status === 401) {
           secret = "";
           sessionStorage.removeItem("ikiru_secret");
-          $("secretInput").value = "";
-          $("secretInput").classList.add("error");
-          $("modalError").textContent = "CRON_SECRET salah atau expired.";
           $("modalOverlay").classList.add("show");
-          setTimeout(() => $("secretInput").focus(), 50);
           throw new Error("Unauthorized");
         }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       }
 
-      // ── UTILS ──
-      const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      const fmt = d => new Intl.DateTimeFormat("id-ID",{ hour:"2-digit",minute:"2-digit",second:"2-digit" }).format(d);
+      const esc = (s) =>
+        String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      const fmt = (d) =>
+        new Intl.DateTimeFormat("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }).format(d);
       function timeAgo(iso) {
         const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-        if (s < 60)    return `${s} det lalu`;
-        if (s < 3600)  return `${Math.floor(s/60)}m lalu`;
-        if (s < 86400) return `${Math.floor(s/3600)}j lalu`;
-        return `${Math.floor(s/86400)}h lalu`;
+        if (s < 60) return `${s} det lalu`;
+        if (s < 3600) return `${Math.floor(s / 60)}m lalu`;
+        if (s < 86400) return `${Math.floor(s / 3600)}j lalu`;
+        return `${Math.floor(s / 86400)}h lalu`;
       }
 
-      // ── UPTIME HELPER ──
-      function calculateUptime(logs, hours) {
-        if (!logs?.length) return null;
-        const cutoff = Date.now() - hours * 3600 * 1000;
-        const recent = logs.filter(l => new Date(l.time) > cutoff);
-        if (!recent.length) return null;
-        const relevant = recent.filter(l => l.tag === "sent" || l.tag === "failed");
-        if (!relevant.length) return null;
-        const success = relevant.filter(l => l.tag === "sent").length;
-        return Math.round((success / relevant.length) * 100);
-      }
-
-      // ── TOP MANHWA HELPER ──
-      function getTopManhwa(logs) {
-        const counter = {};
-        const seen = new Set();
-        logs?.filter(l => l.tag === "sent" && l.message?.includes("—"))
-          .forEach(l => {
-            const key = l.message.trim();
-            if (seen.has(key)) return;
-            seen.add(key);
-            const title = l.message.split(" — ")[0]?.trim();
-            if (title) counter[title] = (counter[title] || 0) + 1;
-          });
-        return Object.entries(counter)
-          .sort(([,a],[,b]) => b - a)
-          .slice(0, 5)
-          .map(([title, count]) => ({ title, count }));
-      }
-
-      // ── SKELETONS ──
       function skeleton(ul, n = 4) {
-        ul.innerHTML = Array.from({ length:n },(_,i) =>
-          `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
-            <div class="skel" style="width:${55+(i%3)*20}%"></div>
-          </li>`
+        ul.innerHTML = Array.from(
+          { length: n },
+          (_, i) =>
+            `<li style="padding:11px 16px;border-bottom:1px solid var(--border)">
+        <div class="skel" style="width:${55 + (i % 3) * 20}%"></div>
+      </li>`,
         ).join("");
       }
       function skeletonRecent(ul, n = 4) {
-        ul.innerHTML = Array.from({ length:n }, () =>
-          `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
-            <div style="width:44px;height:60px;border-radius:3px;background:var(--border)"></div>
-            <div>
-              <div class="skel" style="width:70%;margin-bottom:6px"></div>
-              <div class="skel" style="width:40%"></div>
-            </div>
-          </li>`
+        ul.innerHTML = Array.from(
+          { length: n },
+          () =>
+            `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
+        <div style="width:44px;height:60px;border-radius:3px;background:var(--border)"></div>
+        <div>
+          <div class="skel" style="width:70%;margin-bottom:6px"></div>
+          <div class="skel" style="width:40%"></div>
+        </div>
+      </li>`,
         ).join("");
       }
 
-      // ── ALERT ──
       function showAlert(msg) {
         const el = $("alertBox");
         el.style.display = "block";
         el.textContent = msg;
-        setTimeout(() => el.style.display = "none", 8000);
+        setTimeout(() => (el.style.display = "none"), 8000);
       }
-      function clearAlert() { $("alertBox").style.display = "none"; }
-      function renderErr(ul, msg) { ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`; }
+      function clearAlert() {
+        $("alertBox").style.display = "none";
+      }
+      function renderErr(ul, msg) {
+        ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`;
+      }
 
-      // ── RENDER STATS ──
-      function renderStatsExtended(statusData, logsData) {
+      // ── STATS EXTENDED (dengan UPTIME) ──
+      function renderStatsExtended(statusData, uptimeData) {
         const dot = $("statusDot");
         if (!statusData) {
-          ["statSent","statSkipped","statFailed","statDuration","statUptime24h","statUptime7d"]
-            .forEach(id => $(id).textContent = "—");
+          [
+            "statSent",
+            "statSkipped",
+            "statFailed",
+            "statDuration",
+            "statUptime24h",
+            "statUptime7d",
+          ].forEach((id) => ($(id).textContent = "—"));
           dot.className = "logo-dot offline";
           return;
         }
 
-        $("statSent").textContent     = statusData.sent     ?? "—";
-        $("statSkipped").textContent  = statusData.skipped  ?? "—";
-        $("statFailed").textContent   = statusData.failed   ?? "—";
-        $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "—";
+        $("statSent").textContent = statusData.sent ?? "—";
+        $("statSkipped").textContent = statusData.skipped ?? "—";
+        $("statFailed").textContent = statusData.failed ?? "—";
+        $("statDuration").textContent = statusData.duration
+          ? `${statusData.duration}s`
+          : "—";
 
-        const logs = logsData?.logs ?? [];
-        const u24  = calculateUptime(logs, 24);
-        const u7d  = calculateUptime(logs, 168);
+        // UPTIME
+        $("statUptime24h").textContent = uptimeData?.uptime24h ?? "—";
+        $("statUptime24h").className = `stat-value ${
+          uptimeData?.uptime24h >= 95
+            ? "green"
+            : uptimeData?.uptime24h >= 80
+              ? "amber"
+              : "red"
+        }`;
 
-        const uptimeClass = v => v == null ? "" : v >= 95 ? "green" : v >= 80 ? "amber" : "red";
-
-        $("statUptime24h").textContent = u24 != null ? `${u24}%` : "—";
-        $("statUptime24h").className   = `stat-value ${uptimeClass(u24)}`;
-
-        $("statUptime7d").textContent  = u7d != null ? `${u7d}%` : "—";
-        $("statUptime7d").className    = `stat-value ${uptimeClass(u7d)}`;
+        $("statUptime7d").textContent = uptimeData?.uptime7d ?? "—";
+        $("statUptime7d").className = `stat-value ${
+          uptimeData?.uptime7d >= 95
+            ? "green"
+            : uptimeData?.uptime7d >= 80
+              ? "amber"
+              : "red"
+        }`;
 
         dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
       }
 
-      // ── RENDER TOP MANHWA (dengan progress bar) ──
-      function renderTopManhwa(logs) {
+      // ── TOP MANHWA ──
+      function renderTopManhwa(data) {
         const list = $("topManhwaList");
-        const top  = getTopManhwa(logs);
+        const top = data?.top ?? [];
         $("topCount").textContent = top.length;
 
         if (!top.length) {
@@ -535,123 +853,110 @@
           return;
         }
 
-        const max = top[0].count;
-        list.innerHTML = top.map((item, i) =>
-          `<li class="top-item">
-            <span class="manga-index">${String(i+1).padStart(2,"0")}</span>
-            <div class="top-bar-wrap">
-              <div class="top-bar-label">
-                <span class="top-bar-title" title="${esc(item.title)}">${esc(item.title)}</span>
-                <span class="top-bar-count">${item.count}x</span>
-              </div>
-              <div class="top-bar-track">
-                <div class="top-bar-fill" style="width:${Math.round((item.count/max)*100)}%"></div>
-              </div>
-            </div>
-          </li>`
-        ).join("");
+        list.innerHTML = top
+          .map(
+            (item, i) =>
+              `<li class="manga-item">
+        <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
+        <span>${esc(item.title)} <span style="color:var(--muted);font-size:11px">(${item.count}x)</span></span>
+      </li>`,
+          )
+          .join("");
       }
 
-      // ── RENDER WHITELIST ──
+      // ── Whitelist ──
       function renderWhitelist(data) {
-        const list  = $("mangaList");
+        const list = $("mangaList");
         const items = data?.items ?? [];
         $("whitelistCount").textContent = items.length;
-        if (!items.length) { list.innerHTML = `<li class="empty">Whitelist kosong</li>`; return; }
-        list.innerHTML = items.map((name, i) =>
-          `<li class="manga-item">
-            <span class="manga-index">${String(i+1).padStart(2,"0")}</span>
-            <span>${esc(name)}</span>
-          </li>`
-        ).join("");
+        if (!items.length) {
+          list.innerHTML = `<li class="empty">Whitelist kosong</li>`;
+          return;
+        }
+        list.innerHTML = items
+          .map(
+            (name, i) =>
+              `<li class="manga-item">
+        <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
+        <span>${esc(name)}</span>
+      </li>`,
+          )
+          .join("");
       }
 
-      // ── RENDER GUILDS (dengan copy guildId) ──
+      // ── Guilds ──
       function renderGuilds(data) {
-        const list   = $("guildList");
+        const list = $("guildList");
         const guilds = data?.guilds ?? [];
         $("guildCount").textContent = guilds.length;
-        if (!guilds.length) { list.innerHTML = `<li class="empty">Belum ada guild</li>`; return; }
-        list.innerHTML = guilds.map(g =>
-          `<li class="guild-item">
-            <div class="guild-info">
-              <div class="guild-id" onclick="copyText('${esc(g.guildId)}')" title="Klik untuk copy">${esc(g.guildId)}</div>
-              <div class="guild-channel">#${esc(g.channelId)}</div>
-            </div>
-            <span class="status-pill ${g.valid?"active":"invalid"}">${g.valid?"aktif":"invalid"}</span>
-          </li>`
-        ).join("");
+        if (!guilds.length) {
+          list.innerHTML = `<li class="empty">Belum ada guild</li>`;
+          return;
+        }
+        list.innerHTML = guilds
+          .map(
+            (g) =>
+              `<li class="guild-item">
+        <div class="guild-info">
+          <div class="guild-id">${esc(g.guildId)}</div>
+          <div class="guild-channel">#${esc(g.channelId)}</div>
+        </div>
+        <span class="status-pill ${g.valid ? "active" : "invalid"}">${g.valid ? "aktif" : "invalid"}</span>
+      </li>`,
+          )
+          .join("");
       }
 
-      function copyText(text) {
-        navigator.clipboard.writeText(text).then(() => showToast(`Copied: ${text}`));
-      }
-
-      // ── RENDER RECENT ──
+      // ── Recent manhwa ──
       function renderRecent(data) {
-        const list  = $("recentList");
+        const list = $("recentList");
         const items = data?.items ?? [];
         $("recentCount").textContent = items.length;
-        if (!items.length) { list.innerHTML = `<li class="empty">Belum ada chapter terkirim</li>`; return; }
-        list.innerHTML = items.map(item => {
-          const cover = item.cover
-            ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-               <div class="recent-cover-placeholder" style="display:none">📖</div>`
-            : `<div class="recent-cover-placeholder">📖</div>`;
-          return `<a class="recent-item" href="${item.url ? esc(item.url) : "#"}" target="_blank" rel="noopener">
-            ${cover}
-            <div class="recent-info">
-              <div class="recent-title" title="${esc(item.title)}">${esc(item.title)}</div>
-              <div class="recent-chapter">${esc(item.chapter)}</div>
-            </div>
-            <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "—"}</span>
-          </a>`;
-        }).join("");
+        if (!items.length) {
+          list.innerHTML = `<li class="empty">Belum ada chapter terkirim</li>`;
+          return;
+        }
+        list.innerHTML = items
+          .map((item) => {
+            const cover = item.cover
+              ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` +
+                `<div class="recent-cover-placeholder" style="display:none">📖</div>`
+              : `<div class="recent-cover-placeholder">📖</div>`;
+            const link = item.url ? esc(item.url) : "#";
+            return `<a class="recent-item" href="${link}" target="_blank" rel="noopener">
+        ${cover}
+        <div class="recent-info">
+          <div class="recent-title">${esc(item.title)}</div>
+          <div class="recent-chapter">${esc(item.chapter)}</div>
+        </div>
+        <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "—"}</span>
+      </a>`;
+          })
+          .join("");
       }
 
-      // ── RENDER LOGS (dengan filter) ──
+      // ── Logs ──
       function renderLogs(data) {
-        allLogs = data?.logs ?? [];
-        $("logCount").textContent = `${allLogs.length} entries`;
-        if (!allLogs.length) {
-          $("logList").innerHTML = `<li class="empty">Belum ada log</li>`;
+        const list = $("logList");
+        const logs = data?.logs ?? [];
+        $("logCount").textContent = `${logs.length} entries`;
+        if (!logs.length) {
+          list.innerHTML = `<li class="empty">Belum ada log</li>`;
           return;
         }
-        filterLogs();
+        list.innerHTML = logs
+          .map(
+            (l) =>
+              `<li class="log-item">
+        <span class="log-time">${fmt(new Date(l.time))}</span>
+        <span>${esc(l.message)}</span>
+        <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
+      </li>`,
+          )
+          .join("");
       }
 
-      function filterLogs() {
-        const keyword  = $("logSearch")?.value?.toLowerCase() ?? "";
-        const filtered = allLogs.filter(l => {
-          const matchTag     = activeTag === "all" || l.tag === activeTag;
-          const matchKeyword = !keyword || l.message?.toLowerCase().includes(keyword);
-          return matchTag && matchKeyword;
-        });
-
-        $("logCount").textContent = `${filtered.length} entries`;
-
-        if (!filtered.length) {
-          $("logList").innerHTML = `<li class="empty">Tidak ada log yang cocok</li>`;
-          return;
-        }
-
-        $("logList").innerHTML = filtered.map(l =>
-          `<li class="log-item">
-            <span class="log-time">${fmt(new Date(l.time))}</span>
-            <span>${esc(l.message)}</span>
-            <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
-          </li>`
-        ).join("");
-      }
-
-      function setTagFilter(btn) {
-        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        activeTag = btn.dataset.tag;
-        filterLogs();
-      }
-
-      // ── MAIN LOAD ──
+      // ── MAIN LOAD (DENGAN UPTIME & TOP) ──
       async function loadAll() {
         if (!checkAuth()) return;
         clearAlert();
@@ -660,31 +965,37 @@
         btn.disabled = true;
         btn.textContent = "memuat...";
 
+        // Skeleton semua
         skeleton($("mangaList"));
         skeleton($("guildList"), 3);
         skeletonRecent($("recentList"), 4);
         skeleton($("logList"), 5);
         skeleton($("topManhwaList"));
 
-        const [statusR, whitelistR, guildsR, recentR, logsR] = await Promise.allSettled([
-          apiFetch("/api/status"),
-          apiFetch("/api/whitelist"),
-          apiFetch("/api/guilds"),
-          apiFetch("/api/recent"),
-          apiFetch("/api/logs"),
-        ]);
+        const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR] =
+          await Promise.allSettled([
+            apiFetch("/api/status"),
+            apiFetch("/api/whitelist"),
+            apiFetch("/api/guilds"),
+            apiFetch("/api/recent"),
+            apiFetch("/api/logs"),
+            apiFetch("/api/uptime"), // BARU
+            apiFetch("/api/top"), // BARU
+          ]);
 
-        // Stats + uptime (computed dari logs)
+        // STATS + UPTIME
         renderStatsExtended(
           statusR.status === "fulfilled" ? statusR.value : null,
-          logsR.status  === "fulfilled" ? logsR.value  : null,
+          uptimeR.status === "fulfilled" ? uptimeR.value : null,
         );
 
-        // Top manhwa (computed dari logs)
-        if (logsR.status === "fulfilled") renderTopManhwa(logsR.value.logs ?? []);
+        // TOP MANHWA
+        if (topR.status === "fulfilled") renderTopManhwa(topR.value);
         else renderErr($("topManhwaList"), "Gagal muat top manhwa");
 
-        if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
+        // Lainnya sama
+        if (whitelistR.status === "fulfilled")
+          renderWhitelist(whitelistR.value);
         else renderErr($("mangaList"), "Gagal muat whitelist");
 
         if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
@@ -696,18 +1007,31 @@
         if (logsR.status === "fulfilled") renderLogs(logsR.value);
         else renderErr($("logList"), "Gagal muat logs");
 
-        const anyFailed = [statusR,whitelistR,guildsR,recentR,logsR].some(r => r.status === "rejected");
-        if (anyFailed && secret) showAlert("Beberapa data gagal dimuat. Cek koneksi atau CRON_SECRET.");
+        const anyFailed = [
+          statusR,
+          whitelistR,
+          guildsR,
+          recentR,
+          logsR,
+          uptimeR,
+          topR,
+        ].some((r) => r.status === "rejected");
+        if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
         $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
         btn.disabled = false;
         btn.textContent = "↻ refresh";
       }
 
-      function startPoll() { clearInterval(pollTimer); pollTimer = setInterval(loadAll, POLL_MS); }
+      function startPoll() {
+        clearInterval(pollTimer);
+        pollTimer = setInterval(loadAll, POLL_MS);
+      }
 
-      if (secret) { loadAll(); startPoll(); }
-      else $("modalOverlay").classList.add("show");
+      if (secret) {
+        loadAll();
+        startPoll();
+      } else $("modalOverlay").classList.add("show");
     </script>
   </body>
 </html>
