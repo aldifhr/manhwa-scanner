@@ -3,89 +3,79 @@ const POLL_MS = 30_000;
 const $ = (id) => document.getElementById(id);
 let secret = sessionStorage.getItem("ikiru_secret") || "";
 let pollTimer = null;
-let trendChart = null; // CHART STATE
+let trendChart = null;
 
 // ===== CHART.JS INTEGRATION =====
-async function loadTrendChart() {
-  try {
-    const res = await fetch(`${API_BASE}/api/trend?secret=${secret}`, {
-      cache: "no-store"
-    });
-    if (!res.ok) throw new Error("Trend data failed");
-    const data = await res.json();
-    
-    const canvas = $("trendChart");
-    if (!canvas) return;
-    
-    // Destroy existing chart
-    if (trendChart) {
-      trendChart.destroy();
-      trendChart = null;
-    }
-    
-    // Create new chart
-    const ctx = canvas.getContext('2d');
-    trendChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.times || [],
-        datasets: [
-          {
-            label: 'Sent 🔔',
-            data: data.sent || [],
-            backgroundColor: '#10B981',
-            borderRadius: 4,
-            borderSkipped: false
-          },
-          {
-            label: 'Skipped ⏭️', 
-            data: data.skipped || [],
-            backgroundColor: '#F59E0B',
-            borderRadius: 4,
-            borderSkipped: false
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          intersect: false,
-          mode: 'index'
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: { display: true, text: 'Jumlah' },
-            grid: { color: 'rgba(0,0,0,0.05)' }
-          },
-          x: {
-            title: { display: true, text: '5 menit interval' },
-            grid: { display: false }
-          }
-        },
-        plugins: {
-          legend: { 
-            position: 'top',
-            labels: { padding: 20 }
-          },
-          title: {
-            display: true,
-            text: 'ikiru Bot: Notif Trends 2 Jam Terakhir',
-            padding: { bottom: 20 }
-          }
-        },
-        animation: {
-          duration: 800
-        }
-      }
-    });
-  } catch (e) {
-    console.error('Chart load error:', e);
+// FIX #2 & #3: Terima data langsung, tidak fetch ulang
+async function renderTrendChart(data) {
+  const canvas = $("trendChart");
+  if (!canvas) return;
+
+  // Destroy existing chart
+  if (trendChart) {
+    trendChart.destroy();
+    trendChart = null;
   }
+
+  const ctx = canvas.getContext('2d');
+  trendChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.times || [],
+      datasets: [
+        {
+          label: 'Sent 🔔',
+          data: data.sent || [],
+          backgroundColor: '#10B981',
+          borderRadius: 4,
+          borderSkipped: false
+        },
+        {
+          label: 'Skipped ⏭️',
+          data: data.skipped || [],
+          backgroundColor: '#F59E0B',
+          borderRadius: 4,
+          borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Jumlah' },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        },
+        x: {
+          title: { display: true, text: '5 menit interval' },
+          grid: { display: false }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { padding: 20 }
+        },
+        title: {
+          display: true,
+          text: 'ikiru Bot: Notif Trends 2 Jam Terakhir',
+          padding: { bottom: 20 }
+        }
+      },
+      animation: {
+        duration: 800
+      }
+    }
+  });
 }
 
-// ===== UPTIME & TOP HELPERS (EXISTING) =====
+// ===== UPTIME & TOP HELPERS =====
 function calculateUptime(logs, hours) {
   if (!logs?.length) return null;
   const now = Date.now();
@@ -112,7 +102,7 @@ function getTopManhwa(logs) {
     .map(([title, count]) => ({ title, count }));
 }
 
-// ===== AUTH & API (EXISTING + CHART READY) =====
+// ===== AUTH & API =====
 function checkAuth() {
   if (!secret) {
     $("modalOverlay").classList.add("show");
@@ -149,7 +139,7 @@ async function apiFetch(path) {
   return r.json();
 }
 
-// ===== UI HELPERS (EXISTING) =====
+// ===== UI HELPERS =====
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const fmt = (d) => new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(d);
 function timeAgo(iso) {
@@ -195,7 +185,7 @@ function renderErr(ul, msg) {
   ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`;
 }
 
-// ===== RENDER FUNCTIONS (EXISTING - UNCHANGED) =====
+// ===== RENDER FUNCTIONS =====
 function renderStatsExtended(statusData, uptimeData) {
   const dot = $("statusDot");
   if (!statusData) {
@@ -328,7 +318,7 @@ function renderLogs(data) {
     .join("");
 }
 
-// ===== SUPERCHARGED LOAD ALL (CHART + PARALLEL) =====
+// ===== LOAD ALL =====
 async function loadAll() {
   if (!checkAuth()) return;
   clearAlert();
@@ -344,7 +334,8 @@ async function loadAll() {
   skeleton($("logList"), 5);
   skeleton($("topManhwaList"));
 
-  // 🔥 PARALLEL + CHART LOADING
+  // FIX #1: Gunakan `secret` (bukan process.env.CRON_SECRET) untuk trend
+  // FIX #3: Simpan Response object, parse JSON setelah allSettled
   const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR] =
     await Promise.allSettled([
       apiFetch("/api/status"),
@@ -354,7 +345,7 @@ async function loadAll() {
       apiFetch("/api/logs"),
       apiFetch("/api/uptime"),
       apiFetch("/api/top"),
-      fetch(`${API_BASE}/api/trend?secret=${secret}`), // CHART DATA
+      fetch(`${API_BASE}/api/trend?secret=${secret}`, { cache: "no-store" }), // FIX #1
     ]);
 
   // STATS + UPTIME
@@ -363,12 +354,16 @@ async function loadAll() {
     uptimeR.status === "fulfilled" ? uptimeR.value : null,
   );
 
-  // 🔥 CHART RENDER
-  if (trendR.status === "fulfilled") {
-    loadTrendChart();
+  // FIX #2 & #3: Parse JSON dari Response, lalu kirim data ke renderTrendChart
+  if (trendR.status === "fulfilled" && trendR.value.ok) {
+    try {
+      const trendData = await trendR.value.json(); // FIX #3: parse JSON di sini
+      renderTrendChart(trendData);                  // FIX #2: tidak fetch ulang
+    } catch (e) {
+      console.error("Chart parse error:", e);
+    }
   }
 
-  // EXISTING RENDERS (unchanged)
   if (topR.status === "fulfilled") renderTopManhwa(topR.value);
   else renderErr($("topManhwaList"), "Gagal muat top manhwa");
 
@@ -393,7 +388,7 @@ async function loadAll() {
   btn.textContent = "↻ refresh";
 }
 
-// ===== AUTO-REFRESH 30s (OPTIMIZED) =====
+// ===== AUTO-REFRESH 30s =====
 function startPoll() {
   clearInterval(pollTimer);
   pollTimer = setInterval(loadAll, POLL_MS);
@@ -404,7 +399,7 @@ window.addEventListener('focus', () => {
   if (secret) loadAll();
 });
 
-// ===== THEME (EXISTING) =====
+// ===== THEME =====
 function applyTheme(dark) {
   document.body.classList.toggle("dark", dark);
   $("btnTheme").textContent = dark ? "🌙" : "☀️";
