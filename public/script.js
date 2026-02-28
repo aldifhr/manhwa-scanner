@@ -357,16 +357,14 @@ async function loadAll() {
   btn.disabled = true;
   btn.textContent = "memuat...";
 
-  // Skeleton loading
   skeleton($("mangaList"));
   skeleton($("guildList"), 3);
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 5);
   skeleton($("topManhwaList"));
 
-  // FIX #1: Gunakan `secret` (bukan process.env.CRON_SECRET) untuk trend
-  // FIX #3: Simpan Response object, parse JSON setelah allSettled
-  const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR] =
+  // ✅ Data utama dulu — tidak include trend
+  const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR] =
     await Promise.allSettled([
       apiFetch("/api/status"),
       apiFetch("/api/whitelist"),
@@ -375,58 +373,36 @@ async function loadAll() {
       apiFetch("/api/logs"),
       apiFetch("/api/uptime"),
       apiFetch("/api/top"),
-      fetch(`${API_BASE}/api/trend`, {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${secret}` },
-      }),
     ]);
 
-  // STATS + UPTIME
+  // ✅ Render semua data utama langsung
   renderStatsExtended(
     statusR.status === "fulfilled" ? statusR.value : null,
     uptimeR.status === "fulfilled" ? uptimeR.value : null,
   );
-
-  // FIX #2 & #3: Parse JSON dari Response, lalu kirim data ke renderTrendChart
-  if (trendR.status === "fulfilled" && trendR.value.ok) {
-    try {
-      const trendData = await trendR.value.json(); // FIX #3: parse JSON di sini
-      renderTrendChart(trendData); // FIX #2: tidak fetch ulang
-    } catch (e) {
-      console.error("Chart parse error:", e);
-    }
-  }
-
   if (topR.status === "fulfilled") renderTopManhwa(topR.value);
   else renderErr($("topManhwaList"), "Gagal muat top manhwa");
-
   if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
   else renderErr($("mangaList"), "Gagal muat whitelist");
-
   if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
   else renderErr($("guildList"), "Gagal muat guilds");
-
   if (recentR.status === "fulfilled") renderRecent(recentR.value);
   else renderErr($("recentList"), "Gagal muat recent chapters");
-
   if (logsR.status === "fulfilled") renderLogs(logsR.value);
   else renderErr($("logList"), "Gagal muat logs");
-
-  const anyFailed = [
-    statusR,
-    whitelistR,
-    guildsR,
-    recentR,
-    logsR,
-    uptimeR,
-    topR,
-    trendR,
-  ].some((r) => r.status === "rejected");
-  if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
   $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
   btn.disabled = false;
   btn.textContent = "↻ refresh";
+
+  // ✅ Trend fetch terpisah — tidak blokir UI
+  fetch(`${API_BASE}/api/trend`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${secret}` },
+  })
+    .then((r) => r.json())
+    .then((data) => renderTrendChart(data))
+    .catch((e) => console.error("Chart load error:", e));
 }
 
 // ===== AUTO-REFRESH 30s =====
