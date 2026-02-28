@@ -29,13 +29,7 @@
       --sans:     'DM Sans', sans-serif;
     }
 
-    body {
-      font-family: var(--sans);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding-bottom: 60px;
-    }
+    body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:60px; }
 
     /* ── Header ── */
     header {
@@ -45,70 +39,33 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      position: sticky; top: 0; z-index: 10;
     }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      font-size: 14px;
-      letter-spacing: -0.02em;
-    }
-    .logo-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      animation: pulse 2.5s infinite;
-    }
-    .logo-dot.offline { background: var(--red); animation: none; }
-    @keyframes pulse {
-      0%,100% { opacity:1; transform:scale(1); }
-      50%      { opacity:.4; transform:scale(.75); }
-    }
+    .logo { display:flex; align-items:center; gap:10px; font-weight:600; font-size:14px; letter-spacing:-0.02em; }
+    .logo-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse 2.5s infinite; }
+    .logo-dot.offline { background:var(--red); animation:none; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
     .header-right { display:flex; align-items:center; gap:14px; }
     .last-updated { font-family:var(--mono); font-size:11px; color:var(--muted); }
     .btn-refresh {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      background: none;
-      border: 1px solid var(--border);
-      padding: 5px 12px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: all .15s;
+      font-family:var(--mono); font-size:11px; color:var(--muted);
+      background:none; border:1px solid var(--border); padding:5px 12px;
+      border-radius:var(--radius); cursor:pointer; transition:all .15s;
     }
     .btn-refresh:hover { background:var(--text); color:var(--bg); border-color:var(--text); }
     .btn-refresh:disabled { opacity:.4; pointer-events:none; }
 
     /* ── Layout ── */
-    main { max-width: 960px; margin: 0 auto; padding: 28px 20px; }
+    main { max-width:960px; margin:0 auto; padding:28px 20px; }
     .section-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
+      font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--muted); margin-bottom:10px;
     }
 
-    /* ── Stat grid ── */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4,1fr);
-      gap: 10px;
-      margin-bottom: 28px;
-    }
+    /* ── Stats ── */
+    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:28px; }
     @media(max-width:580px){ .stats-grid{ grid-template-columns:repeat(2,1fr); } }
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 16px;
-    }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 16px; }
     .stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
     .stat-value { font-size:26px; font-weight:600; letter-spacing:-0.04em; line-height:1; }
     .stat-value.green { color:var(--green); }
@@ -120,48 +77,21 @@
     @media(max-width:640px){ .two-col{ grid-template-columns:1fr; } }
 
     /* ── Card ── */
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-    .card-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:20px; }
+    .card-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
     .card-title { font-size:13px; font-weight:500; }
-    .badge {
-      font-family: var(--mono);
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 99px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--muted);
-    }
+    .badge { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:99px; background:var(--bg); border:1px solid var(--border); color:var(--muted); }
 
     /* ── Manga list ── */
     .manga-list { list-style:none; }
-    .manga-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
-    }
+    .manga-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; }
     .manga-item:last-child { border-bottom:none; }
     .manga-item:hover { background:var(--bg); }
     .manga-index { font-family:var(--mono); font-size:10px; color:var(--muted); min-width:18px; }
 
     /* ── Guild list ── */
     .guild-list { list-style:none; }
-    .guild-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
-    }
+    .guild-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); }
     .guild-item:last-child { border-bottom:none; }
     .guild-item:hover { background:var(--bg); }
     .guild-info { flex:1; min-width:0; }
@@ -171,17 +101,46 @@
     .status-pill.active  { background:var(--green-bg); color:var(--green); }
     .status-pill.invalid { background:var(--red-bg); color:var(--red); }
 
-    /* ── Log ── */
-    .log-list { list-style:none; }
-    .log-item {
+    /* ── Recent manhwa ── */
+    .recent-list { list-style:none; }
+    .recent-item {
       display: grid;
-      grid-template-columns: 72px 1fr auto;
+      grid-template-columns: 44px 1fr auto;
       gap: 12px;
-      align-items: start;
+      align-items: center;
       padding: 10px 16px;
       border-bottom: 1px solid var(--border);
-      font-size: 12px;
+      text-decoration: none;
+      color: inherit;
+      transition: background .1s;
     }
+    .recent-item:last-child { border-bottom:none; }
+    .recent-item:hover { background:var(--bg); }
+    .recent-cover {
+      width: 44px; height: 60px;
+      border-radius: 3px;
+      object-fit: cover;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+    .recent-cover-placeholder {
+      width: 44px; height: 60px;
+      border-radius: 3px;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .recent-info { min-width:0; }
+    .recent-title { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
+    .recent-chapter { font-family:var(--mono); font-size:11px; color:var(--muted); }
+    .recent-time { font-family:var(--mono); font-size:10px; color:var(--muted); white-space:nowrap; }
+
+    /* ── Log ── */
+    .log-list { list-style:none; }
+    .log-item { display:grid; grid-template-columns:72px 1fr auto; gap:12px; align-items:start; padding:10px 16px; border-bottom:1px solid var(--border); font-size:12px; }
     .log-item:last-child { border-bottom:none; }
     .log-item:hover { background:var(--bg); }
     .log-time { font-family:var(--mono); font-size:10px; color:var(--muted); padding-top:1px; }
@@ -193,79 +152,26 @@
 
     /* ── Empty / skeleton ── */
     .empty { padding:28px 16px; text-align:center; font-size:12px; color:var(--muted); font-family:var(--mono); }
-    .skel {
-      height: 11px;
-      background: linear-gradient(90deg,var(--border) 25%,var(--bg) 50%,var(--border) 75%);
-      background-size: 200% 100%;
-      border-radius: 3px;
-      animation: shimmer 1.2s infinite;
-    }
+    .skel { height:11px; background:linear-gradient(90deg,var(--border) 25%,var(--bg) 50%,var(--border) 75%); background-size:200% 100%; border-radius:3px; animation:shimmer 1.2s infinite; }
     @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
     /* ── Alert ── */
-    .alert {
-      background: var(--amber-bg);
-      border: 1px solid #f0d080;
-      border-radius: var(--radius);
-      padding: 10px 16px;
-      font-size: 12px;
-      color: var(--amber);
-      font-family: var(--mono);
-      margin-bottom: 20px;
-    }
-    .alert code { background:rgba(0,0,0,.08); padding:1px 5px; border-radius:3px; }
+    .alert { background:var(--amber-bg); border:1px solid #f0d080; border-radius:var(--radius); padding:10px 16px; font-size:12px; color:var(--amber); font-family:var(--mono); margin-bottom:20px; }
 
-    /* ── Secret modal ── */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.3);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-    }
+    /* ── Modal ── */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:100; align-items:center; justify-content:center; }
     .modal-overlay.show { display:flex; }
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 28px;
-      width: 360px;
-      max-width: 90vw;
-    }
+    .modal { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:28px; width:360px; max-width:90vw; }
     .modal h2 { font-size:15px; font-weight:600; margin-bottom:6px; }
     .modal p  { font-size:12px; color:var(--muted); margin-bottom:16px; font-family:var(--mono); }
-    .modal input {
-      width: 100%;
-      font-family: var(--mono);
-      font-size: 13px;
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--bg);
-      color: var(--text);
-      outline: none;
-      margin-bottom: 12px;
-    }
-    .modal input:focus { border-color: var(--text); }
-    .btn-primary {
-      width: 100%;
-      font-family: var(--mono);
-      font-size: 12px;
-      padding: 9px;
-      background: var(--text);
-      color: var(--bg);
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      letter-spacing: .03em;
-    }
+    .modal input { width:100%; font-family:var(--mono); font-size:13px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text); outline:none; margin-bottom:12px; }
+    .modal input:focus { border-color:var(--text); }
+    .btn-primary { width:100%; font-family:var(--mono); font-size:12px; padding:9px; background:var(--text); color:var(--bg); border:none; border-radius:var(--radius); cursor:pointer; }
     .btn-primary:hover { opacity:.85; }
   </style>
 </head>
 <body>
 
-<!-- Secret modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h2>Bot Monitor</h2>
@@ -320,6 +226,15 @@
     </div>
   </div>
 
+  <div class="section-label">recent manhwa terkirim</div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Chapter terbaru yang dikirim bot</span>
+      <span class="badge" id="recentCount">0</span>
+    </div>
+    <ul class="recent-list" id="recentList"><li class="empty">memuat...</li></ul>
+  </div>
+
   <div class="section-label">log aktivitas</div>
   <div class="card">
     <div class="card-header">
@@ -331,18 +246,13 @@
 </main>
 
 <script>
-  // ─── CONFIG ──────────────────────────────────────────────
-  // Karena index.html di-serve dari domain yang sama dengan API,
-  // API_BASE tidak perlu diisi (pakai relative URL)
   const API_BASE = "";
   const POLL_MS  = 30_000;
-  // ─────────────────────────────────────────────────────────
 
-  const $  = id => document.getElementById(id);
+  const $ = id => document.getElementById(id);
   let secret = sessionStorage.getItem("ikiru_secret") || "";
   let pollTimer = null;
 
-  // ── Secret / auth ─────────────────────────────────────────
   function checkAuth() {
     if (!secret) { $("modalOverlay").classList.add("show"); return false; }
     return true;
@@ -357,11 +267,10 @@
   }
   $("secretInput").addEventListener("keydown", e => { if (e.key === "Enter") submitSecret(); });
 
-  // ── Fetch helper ──────────────────────────────────────────
   async function apiFetch(path) {
     const r = await fetch(`${API_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${secret}` },
-      cache: "no-store", // ✅ tambah ini
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${secret}` }
     });
     if (r.status === 401) {
       secret = "";
@@ -373,9 +282,15 @@
     return r.json();
   }
 
-  // ── Helpers ───────────────────────────────────────────────
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const fmt = d => new Intl.DateTimeFormat("id-ID",{ hour:"2-digit",minute:"2-digit",second:"2-digit" }).format(d);
+  function timeAgo(iso) {
+    const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (s < 60)   return `${s}d lalu`;
+    if (s < 3600) return `${Math.floor(s/60)}m lalu`;
+    if (s < 86400)return `${Math.floor(s/3600)}j lalu`;
+    return `${Math.floor(s/86400)}h lalu`;
+  }
 
   function skeleton(ul, n = 4) {
     ul.innerHTML = Array.from({length:n},(_,i)=>
@@ -384,15 +299,23 @@
       </li>`
     ).join("");
   }
-
-  function showAlert(msg) {
-    const el = $("alertBox");
-    el.style.display = "block";
-    el.textContent = msg;
+  function skeletonRecent(ul, n = 4) {
+    ul.innerHTML = Array.from({length:n},()=>
+      `<li style="display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border)">
+        <div style="width:44px;height:60px;border-radius:3px;background:var(--border)"></div>
+        <div>
+          <div class="skel" style="width:70%;margin-bottom:6px"></div>
+          <div class="skel" style="width:40%"></div>
+        </div>
+      </li>`
+    ).join("");
   }
-  function clearAlert() { $("alertBox").style.display = "none"; }
 
-  // ── Render: Stats ─────────────────────────────────────────
+  function showAlert(msg) { const el=$("alertBox"); el.style.display="block"; el.textContent=msg; }
+  function clearAlert() { $("alertBox").style.display="none"; }
+  function renderErr(ul, msg) { ul.innerHTML=`<li class="empty" style="color:var(--red)">${msg}</li>`; }
+
+  // ── Stats ──
   function renderStats(data) {
     const dot = $("statusDot");
     if (!data) {
@@ -400,16 +323,16 @@
       dot.className = "logo-dot offline";
       return;
     }
-    $("statSent").textContent     = data.sent      ?? "—";
-    $("statSkipped").textContent  = data.skipped   ?? "—";
-    $("statFailed").textContent   = data.failed    ?? "—";
-    $("statDuration").textContent = data.duration  ? `${data.duration}s` : "—";
+    $("statSent").textContent     = data.sent     ?? "—";
+    $("statSkipped").textContent  = data.skipped  ?? "—";
+    $("statFailed").textContent   = data.failed   ?? "—";
+    $("statDuration").textContent = data.duration ? `${data.duration}s` : "—";
     dot.className = "logo-dot" + (data.failed > 0 ? " offline" : "");
   }
 
-  // ── Render: Whitelist ─────────────────────────────────────
+  // ── Whitelist ──
   function renderWhitelist(data) {
-    const list  = $("mangaList");
+    const list = $("mangaList");
     const items = data?.items ?? [];
     $("whitelistCount").textContent = items.length;
     if (!items.length) { list.innerHTML=`<li class="empty">Whitelist kosong</li>`; return; }
@@ -421,9 +344,9 @@
     ).join("");
   }
 
-  // ── Render: Guilds ────────────────────────────────────────
+  // ── Guilds ──
   function renderGuilds(data) {
-    const list   = $("guildList");
+    const list = $("guildList");
     const guilds = data?.guilds ?? [];
     $("guildCount").textContent = guilds.length;
     if (!guilds.length) { list.innerHTML=`<li class="empty">Belum ada guild</li>`; return; }
@@ -438,7 +361,30 @@
     ).join("");
   }
 
-  // ── Render: Logs ──────────────────────────────────────────
+  // ── Recent manhwa ──
+  function renderRecent(data) {
+    const list = $("recentList");
+    const items = data?.items ?? [];
+    $("recentCount").textContent = items.length;
+    if (!items.length) { list.innerHTML=`<li class="empty">Belum ada chapter terkirim</li>`; return; }
+    list.innerHTML = items.map(item => {
+      const cover = item.cover
+        ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          + `<div class="recent-cover-placeholder" style="display:none">📖</div>`
+        : `<div class="recent-cover-placeholder">📖</div>`;
+      const link = item.url ? esc(item.url) : "#";
+      return `<a class="recent-item" href="${link}" target="_blank" rel="noopener">
+        ${cover}
+        <div class="recent-info">
+          <div class="recent-title">${esc(item.title)}</div>
+          <div class="recent-chapter">${esc(item.chapter)}</div>
+        </div>
+        <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "—"}</span>
+      </a>`;
+    }).join("");
+  }
+
+  // ── Logs ──
   function renderLogs(data) {
     const list = $("logList");
     const logs = data?.logs ?? [];
@@ -453,11 +399,7 @@
     ).join("");
   }
 
-  function renderErr(ul, msg) {
-    ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`;
-  }
-
-  // ── Main load ─────────────────────────────────────────────
+  // ── Main load ──
   async function loadAll() {
     if (!checkAuth()) return;
     clearAlert();
@@ -468,12 +410,14 @@
 
     skeleton($("mangaList"));
     skeleton($("guildList"), 3);
-    skeleton($("logList"),   5);
+    skeletonRecent($("recentList"), 4);
+    skeleton($("logList"), 5);
 
-    const [statusR, whitelistR, guildsR, logsR] = await Promise.allSettled([
+    const [statusR, whitelistR, guildsR, recentR, logsR] = await Promise.allSettled([
       apiFetch("/api/status"),
       apiFetch("/api/whitelist"),
       apiFetch("/api/guilds"),
+      apiFetch("/api/recent"),
       apiFetch("/api/logs"),
     ]);
 
@@ -485,10 +429,13 @@
     if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
     else renderErr($("guildList"), "Gagal memuat guilds");
 
+    if (recentR.status === "fulfilled") renderRecent(recentR.value);
+    else renderErr($("recentList"), "Gagal memuat recent chapters");
+
     if (logsR.status === "fulfilled") renderLogs(logsR.value);
     else renderErr($("logList"), "Gagal memuat logs");
 
-    const anyFailed = [statusR,whitelistR,guildsR,logsR].some(r=>r.status==="rejected");
+    const anyFailed = [statusR,whitelistR,guildsR,recentR,logsR].some(r=>r.status==="rejected");
     if (anyFailed && secret) showAlert("Beberapa data gagal dimuat. Cek koneksi atau CRON_SECRET.");
 
     $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
@@ -496,13 +443,8 @@
     btn.textContent = "↻ refresh";
   }
 
-  // ── Poll ──────────────────────────────────────────────────
-  function startPoll() {
-    clearInterval(pollTimer);
-    pollTimer = setInterval(loadAll, POLL_MS);
-  }
+  function startPoll() { clearInterval(pollTimer); pollTimer = setInterval(loadAll, POLL_MS); }
 
-  // ── Init ──────────────────────────────────────────────────
   if (secret) { loadAll(); startPoll(); }
   else $("modalOverlay").classList.add("show");
 </script>
