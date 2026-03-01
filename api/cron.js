@@ -239,21 +239,21 @@ export default async function handler(req, res) {
       return getNum(a) - getNum(b); // kecil → besar
     });
     cl(`🔍 DEBUG MATCHED (${matched.length}):`);
-matched.forEach((item, i) => {
-  const key = `chapter:${normalizeUrl(item.url)}`;
-  cl(`${i+1}. ${item.title}`);
-  cl(`   📖 ${item.chapter}`);
-  cl(`   🔗 ${item.url}`);
-  cl(`   🗝️  ${key}`);
-});
+    matched.forEach((item, i) => {
+      const key = `chapter:${normalizeUrl(item.url)}`;
+      cl(`${i + 1}. ${item.title}`);
+      cl(`   📖 ${item.chapter}`);
+      cl(`   🔗 ${item.url}`);
+      cl(`   🗝️  ${key}`);
+    });
     let sent = 0;
     let skipped = 0;
     let failed = 0;
 
     for (const item of matched) {
       const key = `chapter:${normalizeUrl(item.url)}`;
-      const exists = await redis.exists(key);  // ⭐ TAMBAH
-  cl(`⏰ CHECK ${key}: ${exists ? 'SKIP (exists)' : 'SEND (new)'} `);
+      const exists = await redis.exists(key); // ⭐ TAMBAH
+      cl(`⏰ CHECK ${key}: ${exists ? "SKIP (exists)" : "SEND (new)"} `);
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
         nx: true,
@@ -306,8 +306,10 @@ matched.forEach((item, i) => {
     }
 
     // CAP LISTS ONCE (NO DOUBLE TRIM)
-    await redis.ltrim("recent:chapters", 0, 49);
-    await redis.ltrim("cron:logs", 0, 199);
+    await redis.ltrim("recent:chapters", 0, 99);
+    await redis.expire("recent:chapters", 60*60*24*14);
+    await redis.ltrim("cron:logs", 0, 499);
+    await redis.expire("cron:logs", 60*60*24*30); 
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
 
