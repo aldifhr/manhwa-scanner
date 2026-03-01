@@ -182,7 +182,7 @@ export default async function handler(req, res) {
     // ===== PARALLEL FETCH =====
     const [rawWhitelist, allResults, guildChannels] = await Promise.all([
       redis.get("whitelist:manga"),
-      scrapeMangaUpdates(redis),
+      scrapeMangaUpdates(),
       getAllGuildChannels(),
     ]);
 
@@ -192,7 +192,6 @@ export default async function handler(req, res) {
         ? JSON.parse(rawWhitelist)
         : [];
 
-    // Normalize whitelist — support string lama & object baru { title, url }
     const whitelist = rawParsed.map((w) =>
       typeof w === "string" ? { title: w, url: null } : w,
     );
@@ -203,9 +202,6 @@ export default async function handler(req, res) {
 
     cl(`📋 Whitelist count: ${whitelist.length}`);
     cl(`📦 Scraped count: ${allResults.length}`);
-    if (allResults.length > 0) {
-      cl(`📦 Scraped sample: ${allResults.slice(0, 3).map((r) => r.title).join(" | ")}`);
-    }
 
     // ===== VALIDATE GUILDS =====
     const validGuilds = {};
@@ -222,12 +218,9 @@ export default async function handler(req, res) {
     // ===== FILTER MATCHED — primary: URL, fallback: title =====
     const matched = allResults.filter((item) => {
       return whitelist.some((w) => {
-        // Primary: cocokkan via mangaUrl
         if (w.url && item.mangaUrl) {
           return normalizeUrl(item.mangaUrl) === normalizeUrl(w.url);
         }
-
-        // Fallback: cocokkan via title (entry lama tanpa url)
         if (w.title) {
           const itemNorm = normalizeTitle(item.title);
           const wNorm = normalizeTitle(w.title);
@@ -237,26 +230,31 @@ export default async function handler(req, res) {
             wNorm.includes(itemNorm)
           );
         }
-
         return false;
       });
     });
 
     cl(`✅ Matched: ${matched.length} — ${matched.map((m) => m.title).join(" | ")}`);
 
+    // ===== DEBUG: cek status Redis NX per item =====
+    for (const item of matched) {
+      const key = `chapter:${item.url}`;
+      const existing = await redis.get(key);
+      cl(`  📌 ${item.title} | ${existing ? "⏭️ SUDAH DIKLAIM (skip)" : "🆕 BARU"}`);
+    }
+
     if (matched.length === 0) {
       return res.status(200).json({ ok: true, message: "No new chapters" });
     }
 
-    // ===== PROCESS & SEND =====
+    // ===== PROCESS & SEND — semua matched, tidak ada batas slice =====
     let sentCount = 0;
     let skipped = 0;
     let failed = 0;
 
-    for (const item of matched.slice(0, 5)) {
+    for (const item of matched) {
       const key = `chapter:${item.url}`;
 
-      // SET NX — hindari race condition kalau 2 cron jalan paralel
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
         nx: true,
@@ -317,7 +315,6 @@ export default async function handler(req, res) {
 
         sentCount++;
       } else {
-        // Semua guild gagal → lepas klaim supaya bisa dicoba lagi
         await redis.del(key);
         cl(`⚠️ All guilds failed for ${item.title}, releasing claim`);
       }
@@ -338,7 +335,6 @@ export default async function handler(req, res) {
       }),
     );
 
-    // Trim log max 200 entries
     await redis.ltrim("cron:logs", 0, 199);
     await redis.ltrim("recent:chapters", 0, 19);
 
