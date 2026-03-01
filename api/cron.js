@@ -238,14 +238,22 @@ export default async function handler(req, res) {
 
       return getNum(a) - getNum(b); // kecil → besar
     });
-
+    cl(`🔍 DEBUG MATCHED (${matched.length}):`);
+matched.forEach((item, i) => {
+  const key = `chapter:${normalizeUrl(item.url)}`;
+  cl(`${i+1}. ${item.title}`);
+  cl(`   📖 ${item.chapter}`);
+  cl(`   🔗 ${item.url}`);
+  cl(`   🗝️  ${key}`);
+});
     let sent = 0;
     let skipped = 0;
     let failed = 0;
 
     for (const item of matched) {
       const key = `chapter:${normalizeUrl(item.url)}`;
-
+      const exists = await redis.exists(key);  // ⭐ TAMBAH
+  cl(`⏰ CHECK ${key}: ${exists ? 'SKIP (exists)' : 'SEND (new)'} `);
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
         nx: true,
