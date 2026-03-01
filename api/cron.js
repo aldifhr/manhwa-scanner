@@ -225,17 +225,26 @@ export default async function handler(req, res) {
         return false;
       }),
     );
-
     if (!matched.length) {
       return res.status(200).json({ ok: true, message: "No new chapters" });
     }
+
+    // 🔥 SORT DI SINI
+    matched.sort((a, b) => {
+      const getNum = (c) => {
+        const match = c.chapter.match(/\d+(\.\d+)?/);
+        return match ? parseFloat(match[0]) : 0;
+      };
+
+      return getNum(a) - getNum(b); // kecil → besar
+    });
 
     let sent = 0;
     let skipped = 0;
     let failed = 0;
 
     for (const item of matched) {
-      const key = `chapter:${item.url}`;
+      const key = `chapter:${normalizeUrl(item.url)}`;
 
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
