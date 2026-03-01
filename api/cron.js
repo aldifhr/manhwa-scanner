@@ -55,8 +55,20 @@ const shortSynopsis = (desc) => {
   return short.endsWith(".") ? short : short + ".";
 };
 
+// ===== NORMALIZE HELPERS =====
+function normalizeTitle(str) {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeUrl(u) {
+  return u?.replace(/\/+$/, "").toLowerCase().trim();
+}
+
 // ===== VALIDATE CHANNEL =====
-// FIX #2: Bedakan jenis error — jangan hapus guild kalau error 401 (bot token salah)
 async function validateChannel(channelId, guildId) {
   try {
     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
@@ -69,14 +81,11 @@ async function validateChannel(channelId, guildId) {
     const status = err.response?.status;
 
     if (status === 404 || status === 403) {
-      // Channel tidak ada atau bot tidak punya akses → hapus guild
       cl(`🗑️ Removing invalid guild ${guildId} (HTTP ${status})`);
       await deleteGuildChannel(guildId);
     } else if (status === 401) {
-      // Bot token salah → jangan hapus guild, ini masalah konfigurasi
       cl(`⚠️ Bot token invalid, skipping guild ${guildId} (HTTP 401)`);
     } else {
-      // Network error atau error lain → jangan hapus guild
       cl(`⚠️ Could not validate guild ${guildId}: ${err.message}`);
     }
 
@@ -182,6 +191,8 @@ export default async function handler(req, res) {
       : rawWhitelist
         ? JSON.parse(rawWhitelist)
         : [];
+
+    // Normalize whitelist — support string lama & object baru { title, url }
     const whitelist = rawParsed.map((w) =>
       typeof w === "string" ? { title: w, url: null } : w,
     );
@@ -190,35 +201,54 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
 
+    cl(`📋 Whitelist count: ${whitelist.length}`);
+    cl(`📦 Scraped count: ${allResults.length}`);
+    if (allResults.length > 0) {
+      cl(`📦 Scraped sample: ${allResults.slice(0, 3).map((r) => r.title).join(" | ")}`);
+    }
+
     // ===== VALIDATE GUILDS =====
-    // FIX #1: Hanya tambah ke validGuilds kalau benar-benar valid
     const validGuilds = {};
 
     for (const [guildId, channelId] of Object.entries(guildChannels)) {
       const valid = await validateChannel(channelId, guildId);
-      if (valid) validGuilds[guildId] = channelId; // FIX #1: hapus `|| channelId`
+      if (valid) validGuilds[guildId] = channelId;
     }
 
     if (Object.keys(validGuilds).length === 0) {
       return res.status(200).json({ ok: true, message: "No active guilds" });
     }
 
-    // ===== FILTER MATCHED =====
-    const whitelistTitles = whitelist.map((w) => w.title);
+    // ===== FILTER MATCHED — primary: URL, fallback: title =====
+    const matched = allResults.filter((item) => {
+      return whitelist.some((w) => {
+        // Primary: cocokkan via mangaUrl
+        if (w.url && item.mangaUrl) {
+          return normalizeUrl(item.mangaUrl) === normalizeUrl(w.url);
+        }
 
-    const matched = allResults.filter((item) =>
-      whitelistTitles.some(
-        (title) =>
-          item.title.toLowerCase().includes(title.toLowerCase()) ||
-          title.toLowerCase().includes(item.title.toLowerCase()),
-      ),
-    );
+        // Fallback: cocokkan via title (entry lama tanpa url)
+        if (w.title) {
+          const itemNorm = normalizeTitle(item.title);
+          const wNorm = normalizeTitle(w.title);
+          return (
+            itemNorm === wNorm ||
+            itemNorm.includes(wNorm) ||
+            wNorm.includes(itemNorm)
+          );
+        }
+
+        return false;
+      });
+    });
+
+    cl(`✅ Matched: ${matched.length} — ${matched.map((m) => m.title).join(" | ")}`);
 
     if (matched.length === 0) {
       return res.status(200).json({ ok: true, message: "No new chapters" });
     }
 
-    // ===== STATS =====
+    // ===== PROCESS & SEND =====
     let sentCount = 0;
     let skipped = 0;
     let failed = 0;
@@ -226,10 +256,10 @@ export default async function handler(req, res) {
     for (const item of matched.slice(0, 5)) {
       const key = `chapter:${item.url}`;
 
-      // FIX #4: Pakai SET NX untuk hindari race condition kalau 2 cron jalan paralel
+      // SET NX — hindari race condition kalau 2 cron jalan paralel
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
-        nx: true, // only set if not exists
+        nx: true,
       });
 
       if (!claimed) {
@@ -249,7 +279,6 @@ export default async function handler(req, res) {
         } catch (err) {
           cl(`❌ ${guildId}: ${err.message}`);
 
-          // FIX #5: Log failed per guild tetap di sini (per guild memang wajar)
           await redis.lpush(
             "cron:logs",
             JSON.stringify({
@@ -266,7 +295,6 @@ export default async function handler(req, res) {
       failed += guildFailCount;
 
       if (guildSuccess) {
-        // FIX #5: Log "sent" cukup sekali per item, bukan per guild
         await redis.lpush(
           "cron:logs",
           JSON.stringify({
@@ -289,7 +317,7 @@ export default async function handler(req, res) {
 
         sentCount++;
       } else {
-        // Semua guild gagal → lepas klaim supaya bisa dicoba lagi di cron berikutnya
+        // Semua guild gagal → lepas klaim supaya bisa dicoba lagi
         await redis.del(key);
         cl(`⚠️ All guilds failed for ${item.title}, releasing claim`);
       }
@@ -297,9 +325,7 @@ export default async function handler(req, res) {
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
 
-    cl(
-      `📊 Done — sent:${sentCount} skipped:${skipped} failed:${failed} (${duration}s)`,
-    );
+    cl(`📊 Done — sent:${sentCount} skipped:${skipped} failed:${failed} (${duration}s)`);
 
     await redis.set(
       "cron:last_run",

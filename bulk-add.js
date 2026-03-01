@@ -8,7 +8,9 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// 🔹 List manga
+// 🔹 List manga — tulis semirip mungkin dengan judul di website
+// Tapi sekarang dengan normalizeTitle di notify.js, perbedaan tanda baca
+// seperti apostrof, titik dua, kurung sudah ditoleransi secara otomatis
 const mangaList = [
   "Hello? Veterinarian!",
   "Woojin Si Detektif Jenius",
@@ -67,15 +69,6 @@ const mangaList = [
   "The Crown Prince That Sells Medicine",
 ];
 
-// 🔹 Utility: buat slug URL aman
-function makeSlug(title) {
-  return title
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "") // hapus karakter non-alphanumeric
-    .replace(/\s+/g, "-");    // ganti spasi jadi "-"
-}
-
 async function bulkAdd() {
   try {
     // 🔹 Ambil data lama dari Redis
@@ -85,23 +78,33 @@ async function bulkAdd() {
     if (existing) {
       try {
         whitelist = typeof existing === "string" ? JSON.parse(existing) : existing;
+        if (!Array.isArray(whitelist)) whitelist = [];
       } catch {
         whitelist = [];
       }
     }
 
+    // Migrate string entries ke format { title, url }
+    whitelist = whitelist.map((item) =>
+      typeof item === "string" ? { title: item, url: null } : item,
+    );
+
     let added = 0;
     let skipped = 0;
 
     for (const title of mangaList) {
-      const url = `https://02.ikiru.wtf/manga/${makeSlug(title)}/`;
+      // Cek duplikat case-insensitive
+      const isDuplicate = whitelist.some(
+        (t) => t.title && t.title.toLowerCase() === title.toLowerCase(),
+      );
 
-      // cek duplikat berdasarkan title
-      if (whitelist.some((t) => t.title && t.title.toLowerCase() === title.toLowerCase())) {
+      if (isDuplicate) {
         console.log(`⏭️  Skip: ${title}`);
         skipped++;
       } else {
-        whitelist.push({ title, url });
+        // Simpan title apa adanya, tanpa generate URL palsu
+        // URL tidak dipakai untuk matching di notify.js
+        whitelist.push({ title, url: null });
         console.log(`✅ Added: ${title}`);
         added++;
       }
@@ -111,6 +114,12 @@ async function bulkAdd() {
     await redis.set("whitelist:manga", JSON.stringify(whitelist));
 
     console.log(`\n🎉 Done! Added: ${added} | Skipped: ${skipped} | Total: ${whitelist.length}`);
+
+    // 🔹 Preview sample data tersimpan
+    console.log("\n📋 Sample whitelist (5 terakhir):");
+    whitelist.slice(-5).forEach((item) => {
+      console.log(`  - ${item.title}`);
+    });
   } catch (err) {
     console.error("❌ bulkAdd error:", err);
   }
