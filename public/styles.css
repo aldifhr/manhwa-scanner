@@ -65,15 +65,8 @@ header {
   animation: none;
 }
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.75);
-  }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
 }
 .header-right {
   display: flex;
@@ -115,9 +108,7 @@ header {
   transition: all 0.15s;
   line-height: 1;
 }
-.btn-theme:hover {
-  background: var(--text);
-}
+.btn-theme:hover { background: var(--text); }
 
 body.dark {
   --bg: #111110;
@@ -134,6 +125,7 @@ body.dark {
   --blue: #60a5fa;
   --blue-bg: #1e3a5f;
 }
+
 /* ── Layout ── */
 main {
   max-width: 960px;
@@ -149,7 +141,7 @@ main {
   margin-bottom: 10px;
 }
 
-/* ── Stats ── 6 COLS */
+/* ── Stats ── */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -157,9 +149,7 @@ main {
   margin-bottom: 28px;
 }
 @media (max-width: 580px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .stat-card {
   background: var(--surface);
@@ -181,15 +171,9 @@ main {
   letter-spacing: -0.04em;
   line-height: 1;
 }
-.stat-value.green {
-  color: var(--green);
-}
-.stat-value.red {
-  color: var(--red);
-}
-.stat-value.amber {
-  color: var(--amber);
-}
+.stat-value.green { color: var(--green); }
+.stat-value.red   { color: var(--red); }
+.stat-value.amber { color: var(--amber); }
 
 /* ── Two col ── */
 .two-col {
@@ -199,9 +183,7 @@ main {
   margin-bottom: 20px;
 }
 @media (max-width: 640px) {
-  .two-col {
-    grid-template-columns: 1fr;
-  }
+  .two-col { grid-template-columns: 1fr; }
 }
 
 /* ── Card ── */
@@ -213,15 +195,16 @@ main {
   margin-bottom: 20px;
 }
 .card-header {
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 .card-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
+  color: var(--muted);
 }
 .badge {
   font-family: var(--mono);
@@ -233,55 +216,105 @@ main {
   color: var(--muted);
 }
 
-/* ── Manga list ── */
-.manga-list {
+/* ── Scrollable lists — shared ── */
+.manga-list,
+.guild-list,
+.log-list,
+.recent-list {
   list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.manga-list::-webkit-scrollbar,
+.guild-list::-webkit-scrollbar,
+.log-list::-webkit-scrollbar,
+.recent-list::-webkit-scrollbar {
+  width: 3px;
+}
+.manga-list::-webkit-scrollbar-track,
+.guild-list::-webkit-scrollbar-track,
+.log-list::-webkit-scrollbar-track,
+.recent-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.manga-list::-webkit-scrollbar-thumb,
+.guild-list::-webkit-scrollbar-thumb,
+.log-list::-webkit-scrollbar-thumb,
+.recent-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+}
+
+/* ── Manga list ── */
 .manga-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 7px 16px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 12px;
+  transition: background 0.1s;
 }
-.manga-item:last-child {
-  border-bottom: none;
-}
-.manga-item:hover {
-  background: var(--bg);
-}
+.manga-item:last-child { border-bottom: none; }
+.manga-item:hover { background: var(--bg); }
+.manga-item:hover .btn-delete { opacity: 1; }
+
 .manga-index {
   font-family: var(--mono);
   font-size: 10px;
   color: var(--muted);
   min-width: 18px;
+  flex-shrink: 0;
+}
+.manga-item-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* URL badge — hidden by default, tooltip via title attr */
+.manga-item-url {
+  display: none;
+}
+
+.btn-delete {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btn-delete:hover {
+  background: var(--red-bg);
+  border-color: var(--red);
+  color: var(--red);
 }
 
 /* ── Guild list ── */
-.guild-list {
-  list-style: none;
-}
 .guild-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
 }
-.guild-item:last-child {
-  border-bottom: none;
-}
-.guild-item:hover {
-  background: var(--bg);
-}
-.guild-info {
-  flex: 1;
-  min-width: 0;
-}
+.guild-item:last-child { border-bottom: none; }
+.guild-item:hover { background: var(--bg); }
+.guild-info { flex: 1; min-width: 0; }
 .guild-id {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -291,7 +324,7 @@ main {
   font-family: var(--mono);
   font-size: 10px;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 1px;
 }
 .status-pill {
   font-family: var(--mono);
@@ -300,69 +333,54 @@ main {
   border-radius: 99px;
   flex-shrink: 0;
 }
-.status-pill.active {
-  background: var(--green-bg);
-  color: var(--green);
-}
-.status-pill.invalid {
-  background: var(--red-bg);
-  color: var(--red);
-}
+.status-pill.active  { background: var(--green-bg); color: var(--green); }
+.status-pill.invalid { background: var(--red-bg);   color: var(--red); }
 
-/* ── Recent manhwa ── */
-.recent-list {
-  list-style: none;
-}
+/* ── Recent list ── */
 .recent-item {
   display: grid;
-  grid-template-columns: 44px 1fr auto;
-  gap: 12px;
+  grid-template-columns: 36px 1fr auto;
+  gap: 10px;
   align-items: center;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
   text-decoration: none;
   color: inherit;
   transition: background 0.1s;
 }
-.recent-item:last-child {
-  border-bottom: none;
-}
-.recent-item:hover {
-  background: var(--bg);
-}
+.recent-item:last-child { border-bottom: none; }
+.recent-item:hover { background: var(--bg); }
 .recent-cover {
-  width: 44px;
-  height: 60px;
+  width: 36px;
+  height: 50px;
   border-radius: 3px;
   object-fit: cover;
   background: var(--border);
   flex-shrink: 0;
 }
 .recent-cover-placeholder {
-  width: 44px;
-  height: 60px;
+  width: 36px;
+  height: 50px;
   border-radius: 3px;
   background: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 14px;
   flex-shrink: 0;
 }
-.recent-info {
-  min-width: 0;
-}
+.recent-info { min-width: 0; }
 .recent-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 .recent-chapter {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
 }
 .recent-time {
@@ -372,25 +390,19 @@ main {
   white-space: nowrap;
 }
 
-/* ── Log ── */
-.log-list {
-  list-style: none;
-}
+/* ── Log list ── */
 .log-item {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
-  gap: 12px;
+  grid-template-columns: 64px 1fr auto;
+  gap: 10px;
   align-items: start;
-  padding: 10px 16px;
+  padding: 7px 16px;
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  font-size: 11px;
+  transition: background 0.1s;
 }
-.log-item:last-child {
-  border-bottom: none;
-}
-.log-item:hover {
-  background: var(--bg);
-}
+.log-item:last-child { border-bottom: none; }
+.log-item:hover { background: var(--bg); }
 .log-time {
   font-family: var(--mono);
   font-size: 10px;
@@ -400,55 +412,93 @@ main {
 .log-tag {
   font-family: var(--mono);
   font-size: 10px;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 99px;
   flex-shrink: 0;
   align-self: start;
 }
-.log-tag.sent {
-  background: var(--green-bg);
-  color: var(--green);
+.log-tag.sent    { background: var(--green-bg); color: var(--green); }
+.log-tag.skipped { background: var(--amber-bg); color: var(--amber); }
+.log-tag.failed  { background: var(--red-bg);   color: var(--red); }
+.log-tag.info    { background: var(--blue-bg);  color: var(--blue); }
+
+/* ── Top manhwa ── */
+.top-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
 }
-.log-tag.skipped {
-  background: var(--amber-bg);
-  color: var(--amber);
+.top-item:last-child { border-bottom: none; }
+.top-item:hover { background: var(--bg); }
+.top-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  flex-shrink: 0;
 }
-.log-tag.failed {
-  background: var(--red-bg);
-  color: var(--red);
+
+/* ── Whitelist form ── */
+.whitelist-form {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
-.log-tag.info {
-  background: var(--blue-bg);
-  color: var(--blue);
+.whitelist-form input {
+  flex: 1;
+  min-width: 100px;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
 }
+.whitelist-form input:focus { border-color: var(--text); }
+.btn-add {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 6px 12px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.btn-add:hover    { opacity: 0.8; }
+.btn-add:disabled { opacity: 0.4; pointer-events: none; }
 
 /* ── Empty / skeleton ── */
 .empty {
-  padding: 28px 16px;
+  padding: 24px 16px;
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
   font-family: var(--mono);
 }
 .skel {
-  height: 11px;
-  background: linear-gradient(
-    90deg,
-    var(--border) 25%,
-    var(--bg) 50%,
-    var(--border) 75%
-  );
+  height: 10px;
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
   background-size: 200% 100%;
   border-radius: 3px;
   animation: shimmer 1.2s infinite;
 }
 @keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* ── Alert ── */
@@ -456,8 +506,8 @@ main {
   background: var(--amber-bg);
   border: 1px solid #f0d080;
   border-radius: var(--radius);
-  padding: 10px 16px;
-  font-size: 12px;
+  padding: 9px 16px;
+  font-size: 11px;
   color: var(--amber);
   font-family: var(--mono);
   margin-bottom: 20px;
@@ -468,14 +518,12 @@ main {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0,0,0,0.3);
   z-index: 100;
   align-items: center;
   justify-content: center;
 }
-.modal-overlay.show {
-  display: flex;
-}
+.modal-overlay.show { display: flex; }
 .modal {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -507,9 +555,7 @@ main {
   outline: none;
   margin-bottom: 12px;
 }
-.modal input:focus {
-  border-color: var(--text);
-}
+.modal input:focus { border-color: var(--text); }
 .btn-primary {
   width: 100%;
   font-family: var(--mono);
@@ -521,151 +567,14 @@ main {
   border-radius: var(--radius);
   cursor: pointer;
 }
-.btn-primary:hover {
-  opacity: 0.85;
-}
+.btn-primary:hover { opacity: 0.85; }
 
+/* ── Chart ── */
 .chart-container {
-  background: var(--bg-card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 20px;
   margin-bottom: 24px;
-  height: 350px;
-}
-
-.dark .chart-container {
-  background: var(--bg-card-dark);
-  border-color: var(--border-dark);
-}
-
-/* ── Whitelist Form ── */
-.whitelist-form {
-  display: flex;
-  gap: 8px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-
-.whitelist-form input {
-  flex: 1;
-  min-width: 120px;
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.whitelist-form input:focus {
-  border-color: var(--text);
-}
-
-.btn-add {
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 7px 14px;
-  background: var(--text);
-  color: var(--bg);
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: opacity 0.15s;
-}
-
-.btn-add:hover {
-  opacity: 0.8;
-}
-
-.btn-add:disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* ── Manga item dengan delete button ── */
-.manga-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.manga-item:last-child {
-  border-bottom: none;
-}
-
-.manga-item:hover {
-  background: var(--bg);
-}
-
-.manga-item:hover .btn-delete {
-  opacity: 1;
-}
-
-.manga-item-title {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.manga-item-url {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-
-.btn-delete {
-  font-family: var(--mono);
-  font-size: 10px;
-  padding: 2px 8px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  color: var(--muted);
-  cursor: pointer;
-  opacity: 0;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-
-.btn-delete:hover {
-  background: var(--red-bg);
-  border-color: var(--red);
-  color: var(--red);
-}
-
-/* Scrollable manga list */
-.manga-list {
-  list-style: none;
-  max-height: 320px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.manga-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.manga-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.manga-list::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 99px;
+  height: 280px;
 }
