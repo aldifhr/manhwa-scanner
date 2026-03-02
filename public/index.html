@@ -94,8 +94,6 @@
               <span class="card-title">Manga terpantau</span>
               <span class="badge" id="whitelistCount">0</span>
             </div>
-
-            <!-- Form tambah manga -->
             <div class="whitelist-form">
               <input
                 type="text"
@@ -113,7 +111,6 @@
               />
               <button class="btn-add" id="btnAddManga" onclick="addManga()">+ Tambah</button>
             </div>
-
             <ul class="manga-list" id="mangaList">
               <li class="empty">memuat...</li>
             </ul>
@@ -131,6 +128,28 @@
             </ul>
           </div>
         </div>
+      </div>
+
+      <!-- SNAPSHOT SECTION -->
+      <div class="section-label" style="margin-top:24px">📸 snapshot whitelist</div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Backup & Restore</span>
+          <span class="badge" id="snapshotCount">0</span>
+        </div>
+        <div class="whitelist-form">
+          <input
+            type="text"
+            id="inputSnapshotLabel"
+            placeholder="Label snapshot (opsional)..."
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') saveSnapshot()"
+          />
+          <button class="btn-add" id="btnSaveSnapshot" onclick="saveSnapshot()">📸 Save</button>
+        </div>
+        <ul class="manga-list" id="snapshotList">
+          <li class="empty">Belum ada snapshot</li>
+        </ul>
       </div>
 
       <div class="section-label">🏆 top manhwa 7 hari</div>

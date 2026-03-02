@@ -486,3 +486,118 @@ if (secret) {
 } else $("modalOverlay").classList.add("show");
 
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");
+
+// ===== SNAPSHOT =====
+function renderSnapshots(snapshots) {
+  const list = $("snapshotList");
+  $("snapshotCount").textContent = snapshots.length;
+  if (!snapshots.length) {
+    list.innerHTML = `<li class="empty">Belum ada snapshot</li>`;
+    return;
+  }
+  list.innerHTML = snapshots.map((s) => `
+    <li class="manga-item">
+      <span class="manga-index">📸</span>
+      <span class="manga-item-title">
+        ${esc(s.label || "Snapshot")}
+        <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga · ${timeAgo(s.savedAt)}</small>
+      </span>
+      <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px" 
+        onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')">↩ restore</button>
+      <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">✕</button>
+    </li>
+  `).join("");
+}
+
+async function loadSnapshots() {
+  try {
+    const data = await apiFetch("/api/snapshot");
+    renderSnapshots(data.snapshots ?? []);
+  } catch (e) {
+    renderErr($("snapshotList"), "Gagal muat snapshot");
+  }
+}
+
+async function saveSnapshot() {
+  const labelInput = $("inputSnapshotLabel");
+  const btn = $("btnSaveSnapshot");
+  const label = labelInput.value.trim();
+
+  btn.disabled = true;
+  btn.textContent = "...";
+
+  try {
+    const r = await fetch(`${API_BASE}/api/snapshot`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ label: label || null }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showAlert(data.error || "Gagal save snapshot");
+      return;
+    }
+    labelInput.value = "";
+    showAlert(`✅ Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`);
+    loadSnapshots();
+  } catch (e) {
+    showAlert("Gagal: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "📸 Save";
+  }
+}
+
+async function restoreSnapshot(id, label) {
+  if (!confirm(`Restore snapshot "${label}"?\n\nWhitelist aktif akan diganti. Whitelist saat ini akan di-backup otomatis.`)) return;
+
+  try {
+    const r = await fetch(`${API_BASE}/api/snapshot`, {
+      method: "PUT",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showAlert(data.error || "Gagal restore");
+      return;
+    }
+    showAlert(`✅ ${data.message}`);
+    loadSnapshots();
+    // Reload whitelist juga
+    apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
+  } catch (e) {
+    showAlert("Gagal: " + e.message);
+  }
+}
+
+async function deleteSnapshot(id) {
+  if (!confirm("Hapus snapshot ini?")) return;
+  try {
+    const r = await fetch(`${API_BASE}/api/snapshot`, {
+      method: "DELETE",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showAlert(data.error || "Gagal hapus snapshot");
+      return;
+    }
+    loadSnapshots();
+  } catch (e) {
+    showAlert("Gagal: " + e.message);
+  }
+}
