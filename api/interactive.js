@@ -106,8 +106,13 @@ export default async function handler(req, res) {
 
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1]) || 1;
+
+      // Kirim deferred dulu
       res.json({ type: 6 });
-      return waitUntil(commands["list"](payload, [{ value: page }]));
+
+      // Langsung await tanpa waitUntil
+      await commands["list"](payload, [{ value: page }]);
+      return;
     }
   }
 
