@@ -107,12 +107,53 @@ export default async function handler(req, res) {
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1]) || 1;
 
-      // Kirim deferred dulu
-      res.json({ type: 6 });
+      // Ambil data dulu sebelum respond ke Discord
+      const whitelist = await loadWhitelist();
+      const pageSize = 15;
+      const totalPage = Math.ceil(whitelist.length / pageSize);
+      const safePage = Math.min(Math.max(1, page), totalPage || 1);
+      const start = (safePage - 1) * pageSize;
+      const slice = whitelist.slice(start, start + pageSize);
 
-      // Langsung await tanpa waitUntil
-      await commands["list"](payload, [{ value: page }]);
-      return;
+      const content =
+        `📋 **Whitelist** (${whitelist.length} manga)\n` +
+        `*Page ${safePage}/${totalPage}*\n\n` +
+        slice.map((item, i) => `${start + i + 1}. ${item.title}`).join("\n");
+
+      const components = [
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 1,
+              label: "◀ Prev",
+              custom_id: `list:${safePage - 1}`,
+              disabled: safePage <= 1,
+            },
+            {
+              type: 2,
+              style: 2,
+              label: `Page ${safePage}`,
+              custom_id: "noop",
+              disabled: true,
+            },
+            {
+              type: 2,
+              style: 1,
+              label: "Next ▶",
+              custom_id: `list:${safePage + 1}`,
+              disabled: safePage >= totalPage,
+            },
+          ],
+        },
+      ];
+
+      // ✅ Langsung respond dengan data, tidak perlu deferred
+      return res.json({
+        type: 7, // update message langsung
+        data: { content, components, flags: 64 },
+      });
     }
   }
 
