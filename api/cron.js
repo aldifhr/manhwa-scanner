@@ -95,7 +95,6 @@ async function validateChannel(channelId, guildId) {
 }
 
 // ===== SEND EMBED =====
-
 async function sendDiscordEmbed(data, channelId) {
   const description =
     data.description || (await fetchDescription(data.mangaUrl));
@@ -112,10 +111,6 @@ async function sendDiscordEmbed(data, channelId) {
           "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png",
         url: "https://02.ikiru.wtf",
       },
-      image: data.cover?.startsWith("http") ? { url: data.cover } : undefined,
-    },
-    {
-      color,
       title: data.title,
       url: data.mangaUrl,
       description: [
@@ -127,28 +122,13 @@ async function sendDiscordEmbed(data, channelId) {
       ]
         .filter(Boolean)
         .join("\n"),
+      image: data.cover?.startsWith("http") ? { url: data.cover } : undefined,
       fields: [
-        {
-          name: "⭐ Rating",
-          value: ratingStars(data.rating),
-          inline: true,
-        },
-        {
-          name: "📊 Status",
-          value: `\`${statusBar[data.status] || "⚪ Unknown"}\``,
-          inline: true,
-        },
-        {
-          name: "🕐 Updated",
-          value: data.updatedTime
-            ? `\`${formatTimeAgo(data.updatedTime)}\``
-            : "`Unknown`",
-          inline: true,
-        },
+        { name: "⭐ Rating", value: ratingStars(data.rating), inline: true },
+        { name: "📊 Status", value: `\`${statusBar[data.status] || "⚪ Unknown"}\``, inline: true },
+        { name: "🕐 Updated", value: data.updatedTime ? `\`${formatTimeAgo(data.updatedTime)}\`` : "`Unknown`", inline: true },
       ],
-      footer: {
-        text: "ikiru.wtf • Manga Tracker",
-      },
+      footer: { text: "ikiru.wtf • Manga Tracker" },
       timestamp: new Date().toISOString(),
     },
   ];
@@ -268,6 +248,7 @@ export default async function handler(req, res) {
 
       for (const channelId of Object.values(validGuilds)) {
         try {
+          console.log("🖼️ Cover URL:", item.cover);
           await sendDiscordEmbed(item, channelId);
           success = true;
         } catch (err) {
