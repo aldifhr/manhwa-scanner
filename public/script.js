@@ -4,6 +4,7 @@ const $ = (id) => document.getElementById(id);
 let secret = localStorage.getItem("ikiru_secret") || "";
 let pollTimer = null;
 let trendChart = null;
+let isProcessing = false;
 
 // ===== CHART =====
 async function renderSuccessChart(data) {
@@ -126,21 +127,17 @@ const fmt = (d) =>
   }).format(d);
 function timeAgo(iso) {
   if (!iso) return "—";
-
   const seconds = Math.floor((Date.now() - new Date(iso)) / 1000);
-
   const intervals = [
     { label: "h", seconds: 86400 },
     { label: "j", seconds: 3600 },
     { label: "m", seconds: 60 },
     { label: "dtk", seconds: 1 },
   ];
-
   for (const i of intervals) {
     const value = Math.floor(seconds / i.seconds);
     if (value >= 1) return `${value}${i.label} lalu`;
   }
-
   return "baru saja";
 }
 
@@ -221,7 +218,6 @@ function renderWhitelist(data) {
     .map((item, i) => {
       const title = typeof item === "string" ? item : item.title;
       const url = typeof item === "object" ? item.url : null;
-      // URL disembunyikan, hanya muncul sebagai tooltip di title attribute
       return `<li class="manga-item" title="${url ? esc(url) : ""}">
       <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
       <span class="manga-item-title">${esc(title)}</span>
@@ -268,9 +264,7 @@ function renderGuilds(data) {
         <div class="guild-id">${esc(g.guildId)}</div>
         <div class="guild-channel">#${esc(g.channelId)}</div>
       </div>
-      <span class="status-pill ${g.channelId ? "active" : "invalid"}">
-  ${g.channelId ? "aktif" : "invalid"}
-</span
+      <span class="status-pill ${g.channelId ? "active" : "invalid"}">${g.channelId ? "aktif" : "invalid"}</span>
     </li>`,
     )
     .join("");
@@ -334,6 +328,7 @@ async function addManga() {
     return;
   }
 
+  isProcessing = true;
   btn.disabled = true;
   btn.textContent = "...";
 
@@ -358,6 +353,7 @@ async function addManga() {
   } catch (e) {
     showAlert("Gagal: " + e.message);
   } finally {
+    isProcessing = false;
     btn.disabled = false;
     btn.textContent = "+ Tambah";
   }
@@ -365,6 +361,7 @@ async function addManga() {
 
 async function deleteManga(title) {
   if (!confirm(`Hapus "${title}"?`)) return;
+  isProcessing = true;
   try {
     const r = await fetch(`${API_BASE}/api/whitelist`, {
       method: "DELETE",
@@ -383,6 +380,8 @@ async function deleteManga(title) {
     renderWhitelist(data);
   } catch (e) {
     showAlert("Gagal: " + e.message);
+  } finally {
+    isProcessing = false;
   }
 }
 
@@ -466,8 +465,9 @@ function startPoll() {
   clearInterval(pollTimer);
   pollTimer = setInterval(loadAll, POLL_MS);
 }
+
 window.addEventListener("focus", () => {
-  if (secret) loadAll();
+  if (secret && !isProcessing) loadAll();
 });
 
 // ===== THEME =====
@@ -506,7 +506,7 @@ function renderSnapshots(snapshots) {
         ${esc(s.label || "Snapshot")}
         <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga · ${timeAgo(s.savedAt)}</small>
       </span>
-      <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px" 
+      <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px"
         onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')">↩ restore</button>
       <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">✕</button>
     </li>
@@ -529,6 +529,7 @@ async function saveSnapshot() {
   const btn = $("btnSaveSnapshot");
   const label = labelInput.value.trim();
 
+  isProcessing = true;
   btn.disabled = true;
   btn.textContent = "...";
 
@@ -555,6 +556,7 @@ async function saveSnapshot() {
   } catch (e) {
     showAlert("Gagal: " + e.message);
   } finally {
+    isProcessing = false;
     btn.disabled = false;
     btn.textContent = "📸 Save";
   }
@@ -568,6 +570,7 @@ async function restoreSnapshot(id, label) {
   )
     return;
 
+  isProcessing = true;
   try {
     const r = await fetch(`${API_BASE}/api/snapshot`, {
       method: "PUT",
@@ -585,17 +588,17 @@ async function restoreSnapshot(id, label) {
     }
     showAlert(`✅ ${data.message}`);
     loadSnapshots();
-    // Reload whitelist juga
-    apiFetch("/api/whitelist")
-      .then(renderWhitelist)
-      .catch(() => {});
+    apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
   } catch (e) {
     showAlert("Gagal: " + e.message);
+  } finally {
+    isProcessing = false;
   }
 }
 
 async function deleteSnapshot(id) {
   if (!confirm("Hapus snapshot ini?")) return;
+  isProcessing = true;
   try {
     const r = await fetch(`${API_BASE}/api/snapshot`, {
       method: "DELETE",
@@ -614,5 +617,7 @@ async function deleteSnapshot(id) {
     loadSnapshots();
   } catch (e) {
     showAlert("Gagal: " + e.message);
+  } finally {
+    isProcessing = false;
   }
 }
