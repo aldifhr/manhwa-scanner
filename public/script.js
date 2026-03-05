@@ -6,6 +6,10 @@ let pollTimer = null;
 let trendChart = null;
 let isProcessing = false;
 
+// ===== WHITELIST STATE =====
+let whitelistItems = [];
+let whitelistSortOrder = "default"; // default | az | za
+
 // ===== CHART =====
 async function renderSuccessChart(data) {
   const canvas = $("trendChart");
@@ -176,6 +180,14 @@ function renderErr(ul, msg) {
   ul.innerHTML = `<li class="empty" style="color:var(--red)">${msg}</li>`;
 }
 
+// highlight query dalam teks
+function highlight(text, query) {
+  if (!query) return esc(text);
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${escaped})`, "gi");
+  return esc(text).replace(re, `<mark style="background:var(--amber-bg);color:var(--amber);border-radius:2px;padding:0 1px">$1</mark>`);
+}
+
 // ===== RENDER =====
 function renderStatsExtended(statusData, uptimeData) {
   const dot = $("statusDot");
@@ -206,26 +218,76 @@ function renderStatsExtended(statusData, uptimeData) {
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
 }
 
-function renderWhitelist(data) {
+// ===== WHITELIST RENDER + FILTER =====
+function applyWhitelistFilter() {
+  const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
   const list = $("mangaList");
-  const items = data?.items ?? [];
-  $("whitelistCount").textContent = items.length;
-  if (!items.length) {
-    list.innerHTML = `<li class="empty">Whitelist kosong — tambah manga di atas</li>`;
+
+  let items = [...whitelistItems];
+
+  // sort
+  if (whitelistSortOrder === "az") {
+    items.sort((a, b) => {
+      const ta = (typeof a === "string" ? a : a.title).toLowerCase();
+      const tb = (typeof b === "string" ? b : b.title).toLowerCase();
+      return ta.localeCompare(tb);
+    });
+  } else if (whitelistSortOrder === "za") {
+    items.sort((a, b) => {
+      const ta = (typeof a === "string" ? a : a.title).toLowerCase();
+      const tb = (typeof b === "string" ? b : b.title).toLowerCase();
+      return tb.localeCompare(ta);
+    });
+  }
+
+  // filter
+  const filtered = query
+    ? items.filter((item) => {
+        const title = (typeof item === "string" ? item : item.title).toLowerCase();
+        return title.includes(query);
+      })
+    : items;
+
+  // update badge
+  $("whitelistCount").textContent = whitelistItems.length;
+
+  if (!filtered.length) {
+    list.innerHTML = query
+      ? `<li class="empty">Tidak ada hasil untuk "<strong>${esc(query)}</strong>"</li>`
+      : `<li class="empty">Whitelist kosong — tambah manga di atas</li>`;
     return;
   }
-  list.innerHTML = items
+
+  list.innerHTML = filtered
     .map((item, i) => {
       const title = typeof item === "string" ? item : item.title;
       const url = typeof item === "object" ? item.url : null;
+      // pakai index asli dari whitelistItems untuk nomor urut
+      const realIndex = whitelistItems.indexOf(item);
+      const displayIndex = whitelistSortOrder === "default" ? realIndex : i;
       return `<li class="manga-item" title="${url ? esc(url) : ""}">
-      <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(title)}</span>
-      ${url ? `<span class="manga-item-has-url" title="${esc(url)}">🔗</span>` : ""}
-      <button class="btn-delete" onclick="deleteManga('${esc(title)}')">✕</button>
-    </li>`;
+        <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
+        <span class="manga-item-title">${highlight(title, query)}</span>
+        ${url ? `<span class="manga-item-has-url" title="${esc(url)}">🔗</span>` : ""}
+        <button class="btn-delete" onclick="deleteManga('${esc(title)}')">✕</button>
+      </li>`;
     })
     .join("");
+}
+
+function renderWhitelist(data) {
+  whitelistItems = data?.items ?? [];
+  applyWhitelistFilter();
+}
+
+function setSortOrder(order) {
+  whitelistSortOrder = order;
+  // update tombol aktif
+  ["default", "az", "za"].forEach((o) => {
+    const btn = $(`sortBtn_${o}`);
+    if (btn) btn.classList.toggle("active", o === order);
+  });
+  applyWhitelistFilter();
 }
 
 function renderTopManhwa(data) {
@@ -492,7 +554,7 @@ async function loadAll() {
   btn.textContent = "↻ refresh";
 }
 
-// ===== SNAPSHOT RELOAD (ringan, hanya refresh snapshot) =====
+// ===== SNAPSHOT RELOAD =====
 async function reloadSnapshots() {
   try {
     const data = await apiFetch("/api/snapshot");

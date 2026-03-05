@@ -94,6 +94,21 @@
               <span class="card-title">Manga terpantau</span>
               <span class="badge" id="whitelistCount">0</span>
             </div>
+            <!-- toolbar: search + sort -->
+            <div class="whitelist-toolbar">
+              <input
+                type="search"
+                id="inputWhitelistSearch"
+                placeholder="🔍 cari manga..."
+                autocomplete="off"
+                oninput="applyWhitelistFilter()"
+              />
+              <div class="sort-btns">
+                <button id="sortBtn_default" class="sort-btn active" onclick="setSortOrder('default')" title="Urutan default">↕</button>
+                <button id="sortBtn_az" class="sort-btn" onclick="setSortOrder('az')" title="A → Z">A↓</button>
+                <button id="sortBtn_za" class="sort-btn" onclick="setSortOrder('za')" title="Z → A">Z↑</button>
+              </div>
+            </div>
             <div class="whitelist-form">
               <input
                 type="text"
