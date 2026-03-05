@@ -268,7 +268,9 @@ function renderGuilds(data) {
         <div class="guild-id">${esc(g.guildId)}</div>
         <div class="guild-channel">#${esc(g.channelId)}</div>
       </div>
-      <span class="status-pill ${g.valid ? "active" : "invalid"}">${g.valid ? "aktif" : "invalid"}</span>
+      <span class="status-pill ${g.channelId ? "active" : "invalid"}">
+  ${g.channelId ? "aktif" : "invalid"}
+</span
     </li>`,
     )
     .join("");
@@ -495,7 +497,9 @@ function renderSnapshots(snapshots) {
     list.innerHTML = `<li class="empty">Belum ada snapshot</li>`;
     return;
   }
-  list.innerHTML = snapshots.map((s) => `
+  list.innerHTML = snapshots
+    .map(
+      (s) => `
     <li class="manga-item">
       <span class="manga-index">📸</span>
       <span class="manga-item-title">
@@ -506,7 +510,9 @@ function renderSnapshots(snapshots) {
         onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')">↩ restore</button>
       <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">✕</button>
     </li>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 async function loadSnapshots() {
@@ -542,7 +548,9 @@ async function saveSnapshot() {
       return;
     }
     labelInput.value = "";
-    showAlert(`✅ Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`);
+    showAlert(
+      `✅ Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
+    );
     loadSnapshots();
   } catch (e) {
     showAlert("Gagal: " + e.message);
@@ -553,7 +561,12 @@ async function saveSnapshot() {
 }
 
 async function restoreSnapshot(id, label) {
-  if (!confirm(`Restore snapshot "${label}"?\n\nWhitelist aktif akan diganti. Whitelist saat ini akan di-backup otomatis.`)) return;
+  if (
+    !confirm(
+      `Restore snapshot "${label}"?\n\nWhitelist aktif akan diganti. Whitelist saat ini akan di-backup otomatis.`,
+    )
+  )
+    return;
 
   try {
     const r = await fetch(`${API_BASE}/api/snapshot`, {
@@ -573,7 +586,9 @@ async function restoreSnapshot(id, label) {
     showAlert(`✅ ${data.message}`);
     loadSnapshots();
     // Reload whitelist juga
-    apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
+    apiFetch("/api/whitelist")
+      .then(renderWhitelist)
+      .catch(() => {});
   } catch (e) {
     showAlert("Gagal: " + e.message);
   }
