@@ -399,7 +399,7 @@ async function loadAll() {
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 5);
   skeleton($("topManhwaList"));
-
+  skeleton($("snapshotList"), 2);
   const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR] =
     await Promise.allSettled([
       apiFetch("/api/status"),
@@ -413,6 +413,7 @@ async function loadAll() {
         cache: "no-store",
         headers: { Authorization: `Bearer ${secret}` },
       }),
+      apiFetch("/api/snapshot"),
     ]);
 
   renderStatsExtended(
@@ -443,6 +444,9 @@ async function loadAll() {
   if (logsR.status === "fulfilled") renderLogs(logsR.value);
   else renderErr($("logList"), "Gagal muat logs");
 
+  if (snapshotR.status === "fulfilled") renderSnapshots(snapshotR.value.snapshots ?? []);
+  else renderErr($("snapshotList"), "Gagal muat snapshot");
+  
   const anyFailed = [
     statusR,
     whitelistR,
