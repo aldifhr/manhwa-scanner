@@ -154,10 +154,12 @@ export default async function handler(req, res) {
     }
 
     // Navigasi halaman search
+    // Pakai firstColon/lastColon agar keyword yang mengandung ":" (e.g. "re:zero") tidak terpotong
     if (custom_id.startsWith("search:")) {
-      const parts   = custom_id.split(":");
-      const keyword = parts[1];
-      const page    = parseInt(parts[2], 10) || 1;
+      const firstColon = custom_id.indexOf(":");
+      const lastColon  = custom_id.lastIndexOf(":");
+      const keyword    = custom_id.slice(firstColon + 1, lastColon);
+      const page       = parseInt(custom_id.slice(lastColon + 1), 10) || 1;
       res.json({ type: 6 });
       return waitUntil(handleSearchPage(payload, keyword, page, redis));
     }

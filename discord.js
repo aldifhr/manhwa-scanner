@@ -17,16 +17,6 @@ const commands = [
     description: "Cek chapter baru sekarang tanpa nunggu cron",
   },
   {
-    name:        "forcescrape",
-    description: "Force scrape 1 manga dan kirim notif (ignore cache)",
-    options: [{
-      name:        "title",
-      description: "Manga title to force scrape",
-      type:        3,
-      required:    true,
-    }],
-  },
-  {
     name:        "remove",
     description: "Remove manga from whitelist (by title or number)",
     options: [{

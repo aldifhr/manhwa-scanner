@@ -1,14 +1,18 @@
-import { redis } from "../lib/redis.js";
+import { redis }           from "../lib/redis.js";
+import { isCronAuthorized } from "../lib/auth.js";
 
 export default async function handler(req, res) {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`)
+  if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 
   res.setHeader("Cache-Control", "no-store");
 
-  const raw = await redis.get("cron:last_run");
-  if (!raw) return res.json(null);
-
-  const data = typeof raw === "string" ? JSON.parse(raw) : raw;
-  res.json(data);
+  try {
+    // Upstash auto-deserialize — tidak perlu JSON.parse manual
+    const data = await redis.get("cron:last_run");
+    return res.json(data ?? null);
+  } catch (err) {
+    console.error("[last-run] Error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
 }

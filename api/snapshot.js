@@ -1,40 +1,51 @@
-import { redis } from "../lib/redis.js";
+import { redis, loadWhitelist, saveWhitelist } from "../lib/redis.js";
+import { isCronAuthorized }                    from "../lib/auth.js";
 
-const WHITELIST_KEY = "whitelist:manga";
 const SNAPSHOT_LIST_KEY = "snapshots:list";
-const MAX_SNAPSHOTS = 10;
+const MAX_SNAPSHOTS     = 10;
 
-function auth(req) {
-  return req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+/**
+ * Ambil semua snapshot dari Redis.
+ * Upstash auto-deserialize — tidak perlu JSON.parse manual.
+ */
+async function getSnapshots() {
+  const raw = await redis.get(SNAPSHOT_LIST_KEY);
+  return Array.isArray(raw) ? raw : [];
 }
 
-async function getWhitelist() {
-  const raw = await redis.get(WHITELIST_KEY);
-  const parsed = Array.isArray(raw) ? raw : raw ? JSON.parse(raw) : [];
-  return parsed.map((w) => (typeof w === "string" ? { title: w, url: null } : w));
+/**
+ * Generate unique snapshot ID dengan timestamp + random suffix
+ * untuk menghindari collision kalau dua request masuk bersamaan.
+ */
+function generateId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
+
+// ─── HANDLER ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  if (!auth(req)) {
+  if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
-  }
+
+  res.setHeader("Cache-Control", "no-store");
 
   // GET — ambil semua snapshot
   if (req.method === "GET") {
     try {
-      const raw = await redis.get(SNAPSHOT_LIST_KEY);
-      const snapshots = raw ? (Array.isArray(raw) ? raw : JSON.parse(raw)) : [];
+      const snapshots = await getSnapshots();
       return res.status(200).json({ snapshots });
     } catch (err) {
-      console.error("Snapshot GET error:", err);
-      return res.status(500).json({ error: err.message });
+      console.error("[snapshot GET] Error:", err);
+      return res.status(500).json({ error: "Internal error" });
     }
   }
 
-  // POST — save snapshot baru
+  // POST — simpan snapshot baru dari whitelist aktif
   if (req.method === "POST") {
     try {
-      const whitelist = await getWhitelist();
+      const whitelist = await loadWhitelist();
 
       if (!whitelist.length) {
         return res.status(400).json({ error: "Whitelist kosong, tidak ada yang di-snapshot" });
@@ -43,29 +54,27 @@ export default async function handler(req, res) {
       const { label } = req.body ?? {};
 
       const snapshot = {
-        id: Date.now().toString(),
-        label: label?.trim() || null,
+        id:      generateId(),
+        label:   label?.trim() || null,
         savedAt: new Date().toISOString(),
-        count: whitelist.length,
-        data: whitelist,
+        count:   whitelist.length,
+        data:    whitelist,
       };
 
-      // Ambil list snapshot lama
-      const raw = await redis.get(SNAPSHOT_LIST_KEY);
-      const snapshots = raw ? (Array.isArray(raw) ? raw : JSON.parse(raw)) : [];
+      const snapshots = await getSnapshots();
+      const updated   = [snapshot, ...snapshots].slice(0, MAX_SNAPSHOTS);
 
-      // Prepend snapshot baru, cap MAX_SNAPSHOTS
-      const updated = [snapshot, ...snapshots].slice(0, MAX_SNAPSHOTS);
-      await redis.set(SNAPSHOT_LIST_KEY, JSON.stringify(updated));
+      // Upstash auto-serialize — tidak perlu JSON.stringify
+      await redis.set(SNAPSHOT_LIST_KEY, updated);
 
-      return res.status(200).json({ ok: true, snapshot });
+      return res.status(201).json({ ok: true, snapshot });
     } catch (err) {
-      console.error("Snapshot POST error:", err);
-      return res.status(500).json({ error: err.message });
+      console.error("[snapshot POST] Error:", err);
+      return res.status(500).json({ error: "Internal error" });
     }
   }
 
-  // PUT — restore snapshot by id
+  // PUT — restore whitelist dari snapshot by id
   if (req.method === "PUT") {
     try {
       const { id } = req.body ?? {};
@@ -74,62 +83,61 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "id snapshot wajib diisi" });
       }
 
-      const raw = await redis.get(SNAPSHOT_LIST_KEY);
-      const snapshots = raw ? (Array.isArray(raw) ? raw : JSON.parse(raw)) : [];
+      const snapshots = await getSnapshots();
+      const snapshot  = snapshots.find((s) => s.id === id);
 
-      const snapshot = snapshots.find((s) => s.id === id);
       if (!snapshot) {
         return res.status(404).json({ error: "Snapshot tidak ditemukan" });
       }
 
-      // Backup whitelist aktif sebelum restore
-      const current = await getWhitelist();
-      const backupSnapshot = {
-        id: Date.now().toString(),
-        label: `[auto-backup sebelum restore ${snapshot.label || snapshot.id}]`,
+      // Auto-backup whitelist aktif sebelum restore
+      const current = await loadWhitelist();
+      const backup  = {
+        id:      generateId(),
+        label:   `[auto-backup sebelum restore "${snapshot.label || snapshot.id}"]`,
         savedAt: new Date().toISOString(),
-        count: current.length,
-        data: current,
+        count:   current.length,
+        data:    current,
       };
-      const updatedSnapshots = [backupSnapshot, ...snapshots].slice(0, MAX_SNAPSHOTS);
-      await redis.set(SNAPSHOT_LIST_KEY, JSON.stringify(updatedSnapshots));
 
-      // Restore whitelist
-      await redis.set(WHITELIST_KEY, JSON.stringify(snapshot.data));
+      const updatedSnapshots = [backup, ...snapshots].slice(0, MAX_SNAPSHOTS);
+      await redis.set(SNAPSHOT_LIST_KEY, updatedSnapshots);
+
+      // Restore whitelist via saveWhitelist — tidak bypass dengan key hardcode
+      await saveWhitelist(snapshot.data);
 
       return res.status(200).json({
-        ok: true,
+        ok:       true,
         restored: snapshot.count,
-        message: `Whitelist berhasil direstore ke snapshot "${snapshot.label || snapshot.id}"`,
+        message:  `Whitelist berhasil direstore ke snapshot "${snapshot.label || snapshot.id}"`,
       });
     } catch (err) {
-      console.error("Snapshot PUT error:", err);
-      return res.status(500).json({ error: err.message });
+      console.error("[snapshot PUT] Error:", err);
+      return res.status(500).json({ error: "Internal error" });
     }
   }
 
   // DELETE — hapus snapshot by id
   if (req.method === "DELETE") {
     try {
-      const { id } = req.body ?? {};
+      const id = req.query?.id || req.body?.id;
 
       if (!id) {
         return res.status(400).json({ error: "id snapshot wajib diisi" });
       }
 
-      const raw = await redis.get(SNAPSHOT_LIST_KEY);
-      const snapshots = raw ? (Array.isArray(raw) ? raw : JSON.parse(raw)) : [];
+      const snapshots = await getSnapshots();
+      const filtered  = snapshots.filter((s) => s.id !== id);
 
-      const filtered = snapshots.filter((s) => s.id !== id);
       if (filtered.length === snapshots.length) {
         return res.status(404).json({ error: "Snapshot tidak ditemukan" });
       }
 
-      await redis.set(SNAPSHOT_LIST_KEY, JSON.stringify(filtered));
+      await redis.set(SNAPSHOT_LIST_KEY, filtered);
       return res.status(200).json({ ok: true });
     } catch (err) {
-      console.error("Snapshot DELETE error:", err);
-      return res.status(500).json({ error: err.message });
+      console.error("[snapshot DELETE] Error:", err);
+      return res.status(500).json({ error: "Internal error" });
     }
   }
 

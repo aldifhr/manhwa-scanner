@@ -1,17 +1,20 @@
-import { redis } from "../lib/redis.js";
+import { redis }           from "../lib/redis.js";
+import { isCronAuthorized } from "../lib/auth.js";
 
 export default async function handler(req, res) {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`)
+  if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 
   res.setHeader("Cache-Control", "no-store");
 
-  const raw = await redis.lrange("cron:logs", 0, 49);
+  try {
+    // Upstash auto-deserialize — tidak perlu JSON.parse manual
+    const raw  = await redis.lrange("cron:logs", 0, 49);
+    const logs = raw.filter(Boolean);
 
-  const logs = raw.map((entry) => {
-    try { return typeof entry === "string" ? JSON.parse(entry) : entry; }
-    catch { return { time: new Date().toISOString(), message: String(entry), tag: "info" }; }
-  });
-
-  res.json({ logs });
+    return res.json({ logs });
+  } catch (err) {
+    console.error("[logs] Error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
 }

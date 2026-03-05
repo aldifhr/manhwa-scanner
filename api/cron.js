@@ -1,60 +1,23 @@
-import { Redis } from "@upstash/redis";
-import axios from "axios";
-import {
-  formatTimeAgo,
-  fetchDescription,
-  scrapeMangaUpdates,
-} from "../lib/scraper.js";
-import { deleteGuildChannel, getAllGuildChannels } from "../lib/redis.js";
-
-const cl = console.log;
-
-const {
-  DISCORD_BOT_TOKEN,
-  CRON_SECRET,
-  UPSTASH_REDIS_REST_URL,
-  UPSTASH_REDIS_REST_TOKEN,
-} = process.env;
-
-const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
-
-const redis = new Redis({
-  url: UPSTASH_REDIS_REST_URL,
-  token: UPSTASH_REDIS_REST_TOKEN,
-});
+import { redis, loadWhitelist }          from "../lib/redis.js";
+import { isCronAuthorized }              from "../lib/auth.js";
+import { sendDiscordEmbed }              from "../lib/discord.js";
+import { deleteGuildChannel,
+         getAllGuildChannels }            from "../lib/redis.js";
+import { scrapeMangaUpdates }            from "../lib/scraper.js";
+import axios                             from "axios";
 
 export const config = { maxDuration: 60 };
 
-// ===== EMBED CONFIG =====
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS = {
-  Ongoing: 0x22c55e,
-  Completed: 0x3b82f6,
-  Hiatus: 0xf59e0b,
-  Unknown: 0x6b7280,
-};
+const CHAPTER_TTL    = 60 * 60 * 24 * 3; // 3 hari
+const DISCORD_TOKEN  = process.env.DISCORD_BOT_TOKEN;
+const DEBUG          = process.env.CRON_DEBUG === "true";
 
-const statusBar = {
-  Ongoing: "🟢 Ongoing",
-  Completed: "🔵 Completed",
-  Hiatus: "🟡 Hiatus",
-  Unknown: "⚪ Unknown",
-};
+const log  = (...args) => DEBUG && console.log("[cron]", ...args);
+const warn = (...args) => console.warn("[cron]", ...args);
 
-const ratingStars = (rating) => {
-  if (!rating || rating === "N/A") return "`No rating`";
-  const num = parseFloat(rating);
-  const filled = Math.round(num / 2);
-  const display = Number.isInteger(num) ? num : num.toFixed(1);
-  return "★".repeat(filled) + "☆".repeat(5 - filled) + ` \`${display}/10\``;
-};
-
-const shortSynopsis = (desc) => {
-  if (!desc) return null;
-  const sentences = desc.split(". ");
-  const short = sentences.slice(0, 2).join(". ");
-  return short.endsWith(".") ? short : short + ".";
-};
+// ─── UTILS ────────────────────────────────────────────────────────────────────
 
 function normalizeTitle(str) {
   return str
@@ -68,150 +31,70 @@ function normalizeUrl(u) {
   return u?.replace(/\/+$/, "").toLowerCase().trim();
 }
 
-// ===== VALIDATE CHANNEL =====
+// ─── VALIDATE CHANNEL ─────────────────────────────────────────────────────────
 
+/**
+ * Cek apakah bot masih punya akses ke channel.
+ * Auto-remove guild dari Redis kalau 403/404.
+ */
 async function validateChannel(channelId, guildId) {
   try {
     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
-      headers: {
-        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
-      },
+      headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
     });
     return true;
   } catch (err) {
     const status = err.response?.status;
-
     if (status === 404 || status === 403) {
-      cl(`🗑️ Removing invalid guild ${guildId}`);
+      warn(`Removing invalid guild ${guildId} (${status})`);
       await deleteGuildChannel(guildId);
     } else if (status === 401) {
-      cl(`⚠️ Bot token invalid`);
+      warn("Bot token invalid");
     } else {
-      cl(`⚠️ Validate error ${guildId}: ${err.message}`);
+      warn(`Validate error guild ${guildId}: ${err.message}`);
     }
-
     return false;
   }
 }
 
-// ===== SEND EMBED =====
-
-async function sendDiscordEmbed(data, channelId) {
-  const description =
-    data.description || (await fetchDescription(data.mangaUrl));
-
-  const synopsis = shortSynopsis(description);
-  const color = STATUS_COLORS[data.status] || STATUS_COLORS.Unknown;
-
-  const embeds = [
-    {
-      color,
-      author: {
-        name: "⚡ Chapter Baru Tersedia — ikiru.wtf",
-        icon_url:
-          "https://02.ikiru.wtf/wp-content/uploads/2025/06/logo-ikiru-264736-Qt7APF3i.png",
-        url: "https://02.ikiru.wtf",
-      },
-      image: data.cover?.startsWith("http") ? { url: data.cover } : undefined,
-    },
-    {
-      color,
-      title: data.title,
-      url: data.mangaUrl,
-      description: [
-        `**📖 ${data.chapter}**`,
-        "",
-        synopsis ? `> ${synopsis}` : null,
-        "",
-        `[→ Baca Sekarang](${data.url})`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      fields: [
-        {
-          name: "⭐ Rating",
-          value: ratingStars(data.rating),
-          inline: true,
-        },
-        {
-          name: "📊 Status",
-          value: `\`${statusBar[data.status] || "⚪ Unknown"}\``,
-          inline: true,
-        },
-        {
-          name: "🕐 Updated",
-          value: data.updatedTime
-            ? `\`${formatTimeAgo(data.updatedTime)}\``
-            : "`Unknown`",
-          inline: true,
-        },
-      ],
-      footer: {
-        text: "ikiru.wtf • Manga Tracker",
-      },
-      timestamp: new Date().toISOString(),
-    },
-  ];
-
-  await axios.post(
-    `https://discord.com/api/v10/channels/${channelId}/messages`,
-    { embeds },
-    {
-      headers: {
-        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-}
-
-// ===== MAIN HANDLER =====
+// ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  if (!["GET", "POST"].includes(req.method)) {
+  if (!["GET", "POST"].includes(req.method))
     return res.status(405).json({ error: "Method not allowed" });
-  }
 
-  if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+  if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
-  }
 
   try {
     const start = Date.now();
-    cl("🤖 [CRON] Starting...");
+    console.log("[cron] Starting...");
 
-    const [rawWhitelist, allResults, guildChannels] = await Promise.all([
-      redis.get("whitelist:manga"),
-      scrapeMangaUpdates(),
+    // ── Fetch data paralel ───────────────────────────────────────────────────
+    const [whitelist, allResults, guildChannels] = await Promise.all([
+      loadWhitelist(),
+      scrapeMangaUpdates(redis),
       getAllGuildChannels(),
     ]);
-
-    const rawParsed = rawWhitelist
-      ? Array.isArray(rawWhitelist)
-        ? rawWhitelist
-        : JSON.parse(rawWhitelist)
-      : [];
-
-    const whitelist = rawParsed.map((w) =>
-      typeof w === "string" ? { title: w, url: null } : w,
-    );
 
     if (!whitelist.length) {
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
 
-    const validGuilds = {};
-
-    for (const [guildId, channelId] of Object.entries(guildChannels)) {
-      if (await validateChannel(channelId, guildId)) {
-        validGuilds[guildId] = channelId;
-      }
-    }
+    // ── Validasi semua guild secara paralel ──────────────────────────────────
+    const validEntries = await Promise.all(
+      Object.entries(guildChannels).map(async ([guildId, channelId]) => {
+        const valid = await validateChannel(channelId, guildId);
+        return valid ? [guildId, channelId] : null;
+      }),
+    );
+    const validGuilds = Object.fromEntries(validEntries.filter(Boolean));
 
     if (!Object.keys(validGuilds).length) {
       return res.status(200).json({ ok: true, message: "No active guilds" });
     }
 
+    // ── Match chapter baru dengan whitelist ──────────────────────────────────
     const matched = allResults.filter((item) =>
       whitelist.some((w) => {
         if (w.url && item.mangaUrl) {
@@ -225,41 +108,36 @@ export default async function handler(req, res) {
         return false;
       }),
     );
+
     if (!matched.length) {
       return res.status(200).json({ ok: true, message: "No new chapters" });
     }
 
-    // 🔥 SORT DI SINI
+    // Sort chapter kecil → besar agar urutan notifikasi benar
     matched.sort((a, b) => {
       const getNum = (c) => {
-        const match = c.chapter.match(/\d+(\.\d+)?/);
-        return match ? parseFloat(match[0]) : 0;
+        const m = c.chapter?.match(/\d+(\.\d+)?/);
+        return m ? parseFloat(m[0]) : 0;
       };
+      return getNum(a) - getNum(b);
+    });
 
-      return getNum(a) - getNum(b); // kecil → besar
-    });
-    cl(`🔍 DEBUG MATCHED (${matched.length}):`);
-    matched.forEach((item, i) => {
-      const key = `chapter:${normalizeUrl(item.url)}`;
-      cl(`${i + 1}. ${item.title}`);
-      cl(`   📖 ${item.chapter}`);
-      cl(`   🔗 ${item.url}`);
-      cl(`   🗝️  ${key}`);
-    });
-    let sent = 0;
-    let skipped = 0;
-    let failed = 0;
+    log(`Matched ${matched.length} chapters`);
+
+    // ── Kirim notifikasi ─────────────────────────────────────────────────────
+    let sent = 0, skipped = 0, failed = 0;
 
     for (const item of matched) {
       const key = `chapter:${normalizeUrl(item.url)}`;
-      const exists = await redis.exists(key); // ⭐ TAMBAH
-      cl(`⏰ CHECK ${key}: ${exists ? "SKIP (exists)" : "SEND (new)"} `);
+
+      // nx: true — atomic claim, skip kalau sudah ada
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
         nx: true,
       });
 
       if (!claimed) {
+        log(`Skip (already sent): ${item.title} ${item.chapter}`);
         skipped++;
         continue;
       }
@@ -268,84 +146,76 @@ export default async function handler(req, res) {
 
       for (const channelId of Object.values(validGuilds)) {
         try {
-          await sendDiscordEmbed(item, channelId);
+          await sendDiscordEmbed(item, channelId, redis);
           success = true;
         } catch (err) {
           failed++;
+          warn(`Failed channel ${channelId}: ${err.message}`);
         }
       }
 
+      // Kalau semua guild gagal, lepas claim agar bisa dicoba lagi
       if (!success) {
         await redis.del(key);
+        warn(`All guilds failed for "${item.title}" — key released`);
         continue;
       }
 
       const nowIso = new Date().toISOString();
 
-      await redis.lpush(
-        "recent:chapters",
-        JSON.stringify({
-          title: item.title,
-          chapter: item.chapter,
-          url: item.url,
-          cover: item.cover ?? null,
-          sentAt: nowIso,
-        }),
-      );
+      // Upstash auto-serialize — tidak perlu JSON.stringify
+      await redis.lpush("recent:chapters", {
+        title:   item.title,
+        chapter: item.chapter,
+        url:     item.url,
+        cover:   item.cover ?? null,
+        sentAt:  nowIso,
+      });
 
-      await redis.lpush(
-        "cron:logs",
-        JSON.stringify({
-          time: nowIso,
-          message: `${item.title} — ${item.chapter}`,
-          tag: "sent",
-        }),
-      );
+      await redis.lpush("cron:logs", {
+        time:    nowIso,
+        message: `${item.title} — ${item.chapter}`,
+        title:   item.title,
+        chapter: item.chapter,
+        tag:     "sent",
+      });
 
       sent++;
     }
 
-    // CAP LISTS ONCE (NO DOUBLE TRIM)
-    await redis.ltrim("recent:chapters", 0, 99);
-    await redis.expire("recent:chapters", 60*60*24*14);
-    await redis.ltrim("cron:logs", 0, 499);
-    await redis.expire("cron:logs", 60*60*24*30); 
+    // ── Trim lists sekali di akhir ───────────────────────────────────────────
+    await Promise.all([
+      redis.ltrim("recent:chapters", 0, 99),
+      redis.expire("recent:chapters", 60 * 60 * 24 * 14),
+      redis.ltrim("cron:logs", 0, 499),
+      redis.expire("cron:logs", 60 * 60 * 24 * 30),
+    ]);
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
 
-    await redis.set(
-      "cron:last_run",
-      JSON.stringify({
+    // Simpan last_run dan trend — Upstash auto-serialize
+    const minuteSlot = Math.floor(Date.now() / (5 * 60 * 1000));
+
+    await Promise.all([
+      redis.set("cron:last_run", {
         sent,
         skipped,
         failed,
         duration,
         timestamp: new Date().toISOString(),
       }),
-    );
+      redis.set(
+        `cron:trend:${minuteSlot}`,
+        { sent, skipped, failed, duration: parseFloat(duration) },
+        { ex: 7200 },
+      ),
+    ]);
 
-    const minuteSlot = Math.floor(Date.now() / (5 * 60 * 1000));
+    console.log(`[cron] Done in ${duration}s — sent:${sent} skipped:${skipped} failed:${failed}`);
 
-    await redis.set(
-      `cron:trend:${minuteSlot}`,
-      JSON.stringify({
-        sent,
-        skipped,
-        failed,
-        duration: parseFloat(duration),
-      }),
-      { ex: 7200 },
-    );
-
-    return res.status(200).json({
-      ok: true,
-      sent,
-      skipped,
-      failed,
-      duration,
-    });
+    return res.status(200).json({ ok: true, sent, skipped, failed, duration });
   } catch (err) {
-    console.error("FATAL:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("[cron] FATAL:", err);
+    return res.status(500).json({ error: "Internal error" });
   }
 }
