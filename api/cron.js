@@ -12,9 +12,6 @@ export const config = { maxDuration: 60 };
 const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DEBUG = process.env.CRON_DEBUG === "true";
-if (DEBUG) {
-  log("Valid channels:", Object.entries(validGuilds).map(([g, c]) => `${g.slice(-4)}→${c.slice(-4)}`).join(", "));
-}
 const log = (...args) => DEBUG && console.log("[cron]", ...args);
 const warn = (...args) => console.warn("[cron]", ...args);
 
@@ -111,7 +108,6 @@ export default async function handler(req, res) {
     if (!whitelist.length) {
       return res.status(200).json({ ok: true, message: "Whitelist empty" });
     }
-
     // ── Validasi semua guild secara paralel ──────────────────────────────────
     const validEntries = await Promise.all(
       Object.entries(guildChannels).map(async ([guildId, channelId]) => {
@@ -124,10 +120,11 @@ export default async function handler(req, res) {
     log(
       `Active guilds: ${Object.keys(validGuilds).length}/${Object.keys(guildChannels).length}`,
     );
-
+    console.log(`[cron] Guilds found: ${Object.keys(guildChannels).length}`); //
     if (!Object.keys(validGuilds).length) {
       return res.status(200).json({ ok: true, message: "No active guilds" });
     }
+
 
     // // ── Validasi semua guild secara paralel ──────────────────────────────────
     // const validEntries = await Promise.all(
