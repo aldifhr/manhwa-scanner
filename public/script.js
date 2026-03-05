@@ -316,6 +316,31 @@ function renderLogs(data) {
     .join("");
 }
 
+function renderSnapshots(snapshots) {
+  const list = $("snapshotList");
+  $("snapshotCount").textContent = snapshots.length;
+  if (!snapshots.length) {
+    list.innerHTML = `<li class="empty">Belum ada snapshot</li>`;
+    return;
+  }
+  list.innerHTML = snapshots
+    .map(
+      (s) => `
+    <li class="manga-item">
+      <span class="manga-index">📸</span>
+      <span class="manga-item-title">
+        ${esc(s.label || "Snapshot")}
+        <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga · ${timeAgo(s.savedAt)}</small>
+      </span>
+      <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px"
+        onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')">↩ restore</button>
+      <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">✕</button>
+    </li>
+  `,
+    )
+    .join("");
+}
+
 // ===== WHITELIST ADD/DELETE =====
 async function addManga() {
   const titleInput = $("inputMangaTitle");
@@ -400,21 +425,31 @@ async function loadAll() {
   skeleton($("logList"), 5);
   skeleton($("topManhwaList"));
   skeleton($("snapshotList"), 2);
-  const [statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR] =
-    await Promise.allSettled([
-      apiFetch("/api/status"),
-      apiFetch("/api/whitelist"),
-      apiFetch("/api/guilds"),
-      apiFetch("/api/recent"),
-      apiFetch("/api/logs"),
-      apiFetch("/api/uptime"),
-      apiFetch("/api/top"),
-      fetch(`${API_BASE}/api/chart`, {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${secret}` },
-      }),
-      apiFetch("/api/snapshot"),
-    ]);
+
+  const [
+    statusR,
+    whitelistR,
+    guildsR,
+    recentR,
+    logsR,
+    uptimeR,
+    topR,
+    trendR,
+    snapshotR,
+  ] = await Promise.allSettled([
+    apiFetch("/api/status"),
+    apiFetch("/api/whitelist"),
+    apiFetch("/api/guilds"),
+    apiFetch("/api/recent"),
+    apiFetch("/api/logs"),
+    apiFetch("/api/uptime"),
+    apiFetch("/api/top"),
+    fetch(`${API_BASE}/api/chart`, {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${secret}` },
+    }),
+    apiFetch("/api/snapshot"),
+  ]);
 
   renderStatsExtended(
     statusR.status === "fulfilled" ? statusR.value : null,
@@ -446,22 +481,25 @@ async function loadAll() {
 
   if (snapshotR.status === "fulfilled") renderSnapshots(snapshotR.value.snapshots ?? []);
   else renderErr($("snapshotList"), "Gagal muat snapshot");
-  
+
   const anyFailed = [
-    statusR,
-    whitelistR,
-    guildsR,
-    recentR,
-    logsR,
-    uptimeR,
-    topR,
-    trendR,
+    statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR, snapshotR,
   ].some((r) => r.status === "rejected");
   if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
   $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
   btn.disabled = false;
   btn.textContent = "↻ refresh";
+}
+
+// ===== SNAPSHOT RELOAD (ringan, hanya refresh snapshot) =====
+async function reloadSnapshots() {
+  try {
+    const data = await apiFetch("/api/snapshot");
+    renderSnapshots(data.snapshots ?? []);
+  } catch (e) {
+    renderErr($("snapshotList"), "Gagal muat snapshot");
+  }
 }
 
 // ===== POLL + FOCUS =====
@@ -493,41 +531,7 @@ if (secret) {
 
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");
 
-// ===== SNAPSHOT =====
-function renderSnapshots(snapshots) {
-  const list = $("snapshotList");
-  $("snapshotCount").textContent = snapshots.length;
-  if (!snapshots.length) {
-    list.innerHTML = `<li class="empty">Belum ada snapshot</li>`;
-    return;
-  }
-  list.innerHTML = snapshots
-    .map(
-      (s) => `
-    <li class="manga-item">
-      <span class="manga-index">📸</span>
-      <span class="manga-item-title">
-        ${esc(s.label || "Snapshot")}
-        <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga · ${timeAgo(s.savedAt)}</small>
-      </span>
-      <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px"
-        onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')">↩ restore</button>
-      <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">✕</button>
-    </li>
-  `,
-    )
-    .join("");
-}
-
-async function loadSnapshots() {
-  try {
-    const data = await apiFetch("/api/snapshot");
-    renderSnapshots(data.snapshots ?? []);
-  } catch (e) {
-    renderErr($("snapshotList"), "Gagal muat snapshot");
-  }
-}
-
+// ===== SNAPSHOT ACTIONS =====
 async function saveSnapshot() {
   const labelInput = $("inputSnapshotLabel");
   const btn = $("btnSaveSnapshot");
@@ -556,7 +560,7 @@ async function saveSnapshot() {
     showAlert(
       `✅ Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
     );
-    loadSnapshots();
+    reloadSnapshots();
   } catch (e) {
     showAlert("Gagal: " + e.message);
   } finally {
@@ -591,7 +595,7 @@ async function restoreSnapshot(id, label) {
       return;
     }
     showAlert(`✅ ${data.message}`);
-    loadSnapshots();
+    reloadSnapshots();
     apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
   } catch (e) {
     showAlert("Gagal: " + e.message);
@@ -618,7 +622,7 @@ async function deleteSnapshot(id) {
       showAlert(data.error || "Gagal hapus snapshot");
       return;
     }
-    loadSnapshots();
+    reloadSnapshots();
   } catch (e) {
     showAlert("Gagal: " + e.message);
   } finally {
