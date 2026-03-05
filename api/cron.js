@@ -8,7 +8,6 @@ import axios from "axios";
 export const config = { maxDuration: 60 };
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-
 const CHAPTER_TTL = 60 * 60 * 24 * 3; // 3 hari
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DEBUG = process.env.CRON_DEBUG === "true";
@@ -16,7 +15,6 @@ const log = (...args) => DEBUG && console.log("[cron]", ...args);
 const warn = (...args) => console.warn("[cron]", ...args);
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
-
 function normalizeTitle(str) {
   return str
     .toLowerCase()
@@ -30,63 +28,29 @@ function normalizeUrl(u) {
 }
 
 // ─── VALIDATE CHANNEL ─────────────────────────────────────────────────────────
-
-/**
- * Cek apakah bot masih punya akses ke channel.
- * Auto-remove guild dari Redis kalau 403/404.
- */
-
 async function validateChannel(channelId, guildId) {
   try {
-    const resp = await axios.get(
-      `https://discord.com/api/v10/channels/${channelId}`,
-      {
-        headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
-      },
-    );
+    const resp = await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
+      headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
+    });
     const channel = resp.data;
-    log(
-      `✅ CONNECTED: #${channel.name} (${channelId}) in guild ${guildId.slice(-4)}`,
-    );
+    log(`✅ CONNECTED: #${channel.name} (${channelId.slice(-4)}) in guild ${guildId.slice(-4)}`);
     return true;
   } catch (err) {
     const status = err.response?.status;
     if (status === 404 || status === 403) {
-      warn(
-        `❌ DISCONNECTED: guild ${guildId.slice(-4)} channel ${channelId.slice(-4)} (${status}) — removed`,
-      );
+      warn(`❌ DISCONNECTED: guild ${guildId.slice(-4)} ch ${channelId.slice(-4)} (${status}) — removed`);
       await deleteGuildChannel(guildId);
     } else if (status === 401) {
-      warn("❌ Bot token invalid — all channels fail");
+      warn("❌ Bot token invalid — all fail");
     } else {
-      warn(`⚠️  Validate guild ${guildId.slice(-4)}: ${err.message}`);
+      warn(`⚠️ Validate ${guildId.slice(-4)}: ${err.message}`);
     }
     return false;
   }
 }
 
-// async function validateChannel(channelId, guildId) {
-//   try {
-//     await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
-//       headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
-//     });
-//     return true;
-//   } catch (err) {
-//     const status = err.response?.status;
-//     if (status === 404 || status === 403) {
-//       warn(`Removing invalid guild ${guildId} (${status})`);
-//       await deleteGuildChannel(guildId);
-//     } else if (status === 401) {
-//       warn("Bot token invalid");
-//     } else {
-//       warn(`Validate error guild ${guildId}: ${err.message}`);
-//     }
-//     return false;
-//   }
-// }
-
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
-
 export default async function handler(req, res) {
   if (!["GET", "POST"].includes(req.method))
     return res.status(405).json({ error: "Method not allowed" });
@@ -105,41 +69,44 @@ export default async function handler(req, res) {
       getAllGuildChannels(),
     ]);
 
-    if (!whitelist.length) {
-      return res.status(200).json({ ok: true, message: "Whitelist empty" });
-    }
-    // ── Validasi semua guild secara paralel ──────────────────────────────────
+    // ── VALIDASI GUILD SELAMANYA (atas whitelist) ────────────────────────────
+    console.log(`[cron] Whitelist:${whitelist.length} | Guilds found:${Object.keys(guildChannels || {}).length}`);
+    
     const validEntries = await Promise.all(
-      Object.entries(guildChannels).map(async ([guildId, channelId]) => {
+      Object.entries(guildChannels || {}).map(async ([guildId, channelId]) => {
         const valid = await validateChannel(channelId, guildId);
         return valid ? [guildId, channelId] : null;
-      }),
+      })
     );
 
     const validGuilds = Object.fromEntries(validEntries.filter(Boolean));
-    log(
-      `Active guilds: ${Object.keys(validGuilds).length}/${Object.keys(guildChannels).length}`,
-    );
-    console.log(`[cron] Guilds found: ${Object.keys(guildChannels).length}`); //
-    if (!Object.keys(validGuilds).length) {
-      return res.status(200).json({ ok: true, message: "No active guilds" });
+    console.log(`[cron] Guilds: ${Object.keys(guildChannels || {}).length} → Active: ${Object.keys(validGuilds).length}`);
+    
+    if (DEBUG && Object.keys(validGuilds).length) {
+      log("Valid:", Object.entries(validGuilds)
+        .map(([g, c]) => `${g.slice(-4)}→${c.slice(-4)}`)
+        .join(", "));
     }
 
+    if (!Object.keys(validGuilds).length) {
+      return res.status(200).json({ 
+        ok: true, 
+        guilds: 0, 
+        whitelist: whitelist.length,
+        message: "No active guilds" 
+      });
+    }
 
-    // // ── Validasi semua guild secara paralel ──────────────────────────────────
-    // const validEntries = await Promise.all(
-    //   Object.entries(guildChannels).map(async ([guildId, channelId]) => {
-    //     const valid = await validateChannel(channelId, guildId);
-    //     return valid ? [guildId, channelId] : null;
-    //   }),
-    // );
-    // const validGuilds = Object.fromEntries(validEntries.filter(Boolean));
+    // ── Check whitelist (setelah validasi) ───────────────────────────────────
+    if (!whitelist.length) {
+      return res.status(200).json({ 
+        ok: true, 
+        guilds: Object.keys(validGuilds).length,
+        message: "No whitelist" 
+      });
+    }
 
-    // if (!Object.keys(validGuilds).length) {
-    //   return res.status(200).json({ ok: true, message: "No active guilds" });
-    // }
-
-    // ── Match chapter baru dengan whitelist ──────────────────────────────────
+    // ── Match chapter baru ───────────────────────────────────────────────────
     const matched = allResults.filter((item) =>
       whitelist.some((w) => {
         if (w.url && item.mangaUrl) {
@@ -151,14 +118,19 @@ export default async function handler(req, res) {
           return a === b || a.includes(b) || b.includes(a);
         }
         return false;
-      }),
+      })
     );
 
     if (!matched.length) {
-      return res.status(200).json({ ok: true, message: "No new chapters" });
+      return res.status(200).json({ 
+        ok: true, 
+        guilds: Object.keys(validGuilds).length,
+        scraped: allResults.length,
+        message: "No new chapters" 
+      });
     }
 
-    // Sort chapter kecil → besar agar urutan notifikasi benar
+    // Sort chapter kecil → besar
     matched.sort((a, b) => {
       const getNum = (c) => {
         const m = c.chapter?.match(/\d+(\.\d+)?/);
@@ -170,21 +142,18 @@ export default async function handler(req, res) {
     log(`Matched ${matched.length} chapters`);
 
     // ── Kirim notifikasi ─────────────────────────────────────────────────────
-    let sent = 0,
-      skipped = 0,
-      failed = 0;
+    let sent = 0, skipped = 0, failed = 0;
 
     for (const item of matched) {
       const key = `chapter:${normalizeUrl(item.url)}`;
 
-      // nx: true — atomic claim, skip kalau sudah ada
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
         nx: true,
       });
 
       if (!claimed) {
-        log(`Skip (already sent): ${item.title} ${item.chapter}`);
+        log(`Skip (TTL): ${item.title} ${item.chapter}`);
         skipped++;
         continue;
       }
@@ -195,22 +164,20 @@ export default async function handler(req, res) {
         try {
           await sendDiscordEmbed(item, channelId, redis);
           success = true;
+          log(`✅ Sent to ${channelId.slice(-4)}: ${item.title}`);
         } catch (err) {
           failed++;
-          warn(`Failed channel ${channelId}: ${err.message}`);
+          warn(`Failed ${channelId.slice(-4)}: ${err.message}`);
         }
       }
 
-      // Kalau semua guild gagal, lepas claim agar bisa dicoba lagi
       if (!success) {
         await redis.del(key);
-        warn(`All guilds failed for "${item.title}" — key released`);
+        warn(`All guilds failed "${item.title}" — released`);
         continue;
       }
 
       const nowIso = new Date().toISOString();
-
-      // Upstash auto-serialize — tidak perlu JSON.stringify
       await redis.lpush("recent:chapters", {
         title: item.title,
         chapter: item.chapter,
@@ -230,7 +197,7 @@ export default async function handler(req, res) {
       sent++;
     }
 
-    // ── Trim lists sekali di akhir ───────────────────────────────────────────
+    // ── Cleanup lists ────────────────────────────────────────────────────────
     await Promise.all([
       redis.ltrim("recent:chapters", 0, 99),
       redis.expire("recent:chapters", 60 * 60 * 24 * 14),
@@ -239,30 +206,26 @@ export default async function handler(req, res) {
     ]);
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
-
-    // Simpan last_run dan trend — Upstash auto-serialize
     const minuteSlot = Math.floor(Date.now() / (5 * 60 * 1000));
 
     await Promise.all([
       redis.set("cron:last_run", {
-        sent,
-        skipped,
-        failed,
-        duration,
+        sent, skipped, failed, duration,
+        guilds: Object.keys(validGuilds).length,
         timestamp: new Date().toISOString(),
       }),
-      redis.set(
-        `cron:trend:${minuteSlot}`,
-        { sent, skipped, failed, duration: parseFloat(duration) },
-        { ex: 7200 },
-      ),
+      redis.set(`cron:trend:${minuteSlot}`, {
+        sent, skipped, failed, duration: parseFloat(duration)
+      }, { ex: 7200 }),
     ]);
 
-    console.log(
-      `[cron] Done in ${duration}s — sent:${sent} skipped:${skipped} failed:${failed}`,
-    );
+    console.log(`[cron] Done ${duration}s — sent:${sent} skipped:${skipped} failed:${failed} guilds:${Object.keys(validGuilds).length}`);
 
-    return res.status(200).json({ ok: true, sent, skipped, failed, duration });
+    return res.status(200).json({ 
+      ok: true, sent, skipped, failed, 
+      guilds: Object.keys(validGuilds).length,
+      duration 
+    });
   } catch (err) {
     console.error("[cron] FATAL:", err);
     return res.status(500).json({ error: "Internal error" });
