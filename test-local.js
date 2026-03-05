@@ -1,47 +1,46 @@
-import { searchIkiru } from "./lib/scraper.js";
+import axios from "axios";
+import { searchIkiru, scrapeMangaCover } from "./lib/scraper.js";
 
-// ─── Ganti / tambah judul di sini ─────────────────────────────────────────────
-const TEST_TITLES = [
-  "The Regressed Mercenary's Machinations",
-  "Myst, Might, Mayhem (Legend Of Heavenly Chaos Demon)",
-  "Solo Leveling",
-  "Nano Machine",
-];
+async function test() {
+  const keyword = "The Regressed Mercenary's Machinations";
 
-// ─── TEST ─────────────────────────────────────────────────────────────────────
-async function testMultipleTitles() {
-  let totalHit = 0;
-  let withImage = 0;
-  let withoutImage = 0;
+  console.log("\n===============================");
+  console.log("🔍 Searching:", keyword);
 
-  for (const title of TEST_TITLES) {
-    console.log(`\n${"=".repeat(55)}`);
-    console.log(`🔍 "${title}"`);
-    console.log("=".repeat(55));
+  const results = await searchIkiru(keyword);
 
-    const results = await searchIkiru(title);
-
-    if (!results.length) {
-      console.log("❌ Tidak ditemukan");
-      continue;
-    }
-
-    const r = results[0];
-    const hasImage = !!r.cover;
-    totalHit++;
-    hasImage ? withImage++ : withoutImage++;
-
-    console.log(`   Title  : ${r.title}`);
-    console.log(`   Gambar : ${hasImage ? "✅ ADA" : "❌ TIDAK ADA"}`);
-    console.log(`   Cover  : ${r.cover ?? "(null)"}`);  // ← selalu print, ada atau tidak
+  if (!results.length) {
+    console.log("❌ Tidak ditemukan");
+    return;
   }
 
-  console.log(`\n${"=".repeat(55)}`);
-  console.log("📊 SUMMARY");
-  console.log("=".repeat(55));
-  console.log(`Total ditemukan : ${totalHit}/${TEST_TITLES.length}`);
-  console.log(`✅ Ada gambar   : ${withImage}`);
-  console.log(`❌ Tanpa gambar : ${withoutImage}`);
+  const manga = results[0];
+
+  console.log("\n📖 BASIC DATA");
+  console.log("Title   :", manga.title);
+  console.log("URL     :", manga.url);
+  console.log("Search Cover :", manga.cover);
+
+  console.log("\n📄 Fetching detail cover...");
+  const realCover = await scrapeMangaCover(manga.url);
+
+  console.log("Detail Cover :", realCover);
+
+  if (!realCover) {
+    console.log("❌ Tidak dapat cover dari detail page");
+    return;
+  }
+
+  try {
+    const res = await axios.head(realCover, {
+      timeout: 8000,
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+
+    console.log("Cover Test:", res.status, res.headers["content-type"]);
+  } catch (err) {
+    console.log("Cover Test: ❌ ERROR", err.response?.status || err.message);
+  }
 }
 
-testMultipleTitles().catch(console.error);
+test();
