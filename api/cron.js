@@ -26,31 +26,46 @@ function normalizeUrl(u) {
   return u?.replace(/\/+$/, "").toLowerCase().trim();
 }
 
+function normalizeSource(source) {
+  const s = String(source || "").toLowerCase().trim();
+  if (s === "mirror" || s === "shinigami_mirror") return "shinigami_mirror";
+  if (s === "shinigami" || s === "project" || s === "shinigami_project") {
+    return "shinigami_project";
+  }
+  return "ikiru";
+}
+
 function getChapterNumber(chapterText) {
   const m = chapterText?.match(/\d+(\.\d+)?/);
   return m ? parseFloat(m[0]) : 0;
 }
 
 function createWhitelistMatcher(whitelist) {
-  const normalizedUrls = new Set();
-  const normalizedTitles = [];
-
-  for (const entry of whitelist) {
-    if (entry.url) normalizedUrls.add(normalizeUrl(entry.url));
-    if (entry.title) normalizedTitles.push(normalizeTitle(entry.title));
-  }
+  const prepared = whitelist.map((entry) => ({
+    hasUrl: Boolean(entry.url),
+    url: entry.url ? normalizeUrl(entry.url) : null,
+    title: entry.title ? normalizeTitle(entry.title) : null,
+    source: normalizeSource(entry.source),
+  }));
 
   return (item) => {
     const itemUrl = item.mangaUrl ? normalizeUrl(item.mangaUrl) : null;
-    if (itemUrl && normalizedUrls.has(itemUrl)) return true;
+    const itemTitle = item.title ? normalizeTitle(item.title) : null;
+    const itemSource = normalizeSource(item.source);
 
-    const itemTitle = normalizeTitle(item.title);
-    return normalizedTitles.some(
-      (title) =>
-        itemTitle === title ||
-        itemTitle.includes(title) ||
-        title.includes(itemTitle),
-    );
+    return prepared.some((entry) => {
+      if (entry.source && itemSource !== entry.source) return false;
+      // Jika whitelist punya URL, wajib match URL exact (hindari konflik title lintas source)
+      if (entry.hasUrl) return Boolean(itemUrl) && itemUrl === entry.url;
+
+      // Fallback title hanya untuk entry legacy tanpa URL
+      if (!entry.title || !itemTitle) return false;
+      return (
+        itemTitle === entry.title ||
+        itemTitle.includes(entry.title) ||
+        entry.title.includes(itemTitle)
+      );
+    });
   };
 }
 
@@ -204,6 +219,7 @@ export default async function handler(req, res) {
         chapter: item.chapter,
         url: item.url,
         cover: item.cover ?? null,
+        source: item.source ?? "ikiru",
         sentAt: nowIso,
       });
 

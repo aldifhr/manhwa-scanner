@@ -22,13 +22,25 @@ function normalizeUrl(url = "") {
   return String(url).replace(/\/+$/, "").toLowerCase().trim();
 }
 
+function normalizeSource(source = "") {
+  const s = String(source).toLowerCase().trim();
+  if (s === "mirror" || s === "shinigami_mirror") return "shinigami_mirror";
+  if (s === "shinigami" || s === "project" || s === "shinigami_project") {
+    return "shinigami_project";
+  }
+  return "ikiru";
+}
+
 function createWhitelistMatcher(entry) {
   const normalizedUrl = entry.url ? normalizeUrl(entry.url) : null;
   const normalizedTitle = entry.title ? normalizeTitle(entry.title) : null;
+  const normalizedSource = normalizeSource(entry.source);
 
   return (item) => {
     const itemUrl = item.mangaUrl ? normalizeUrl(item.mangaUrl) : null;
-    if (normalizedUrl && itemUrl === normalizedUrl) return true;
+    const itemSource = normalizeSource(item.source);
+    if (itemSource !== normalizedSource) return false;
+    if (normalizedUrl) return itemUrl === normalizedUrl;
 
     if (!normalizedTitle) return false;
     const itemTitle = normalizeTitle(item.title);
@@ -80,12 +92,13 @@ export default async function handler(req, res) {
   try {
     const title = req.body?.title?.trim() || "";
     const url = req.body?.url?.trim() || "";
+    const source = req.body?.source?.trim() || "ikiru";
 
     if (!title && !url) {
       return res.status(400).json({ error: "title atau url wajib diisi" });
     }
 
-    const entry = { title: title || null, url: url || null };
+    const entry = { title: title || null, url: url || null, source };
     const isMatched = createWhitelistMatcher(entry);
     const { items: allResults, cached } = await getCachedScrapeResults();
     const matches = allResults.filter(isMatched);

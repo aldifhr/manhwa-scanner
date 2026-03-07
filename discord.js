@@ -95,15 +95,28 @@ const commands = [
       ],
     }],
   },
-  {
+{
   name: "add",
-  description: "Tambah manga ke whitelist",
-  options: [{
-    name: "title",
-    description: "Manga title to add",
-    type: 3,
-    required: true,
-  }],
+  description: "Tambah manga ke whitelist berdasarkan source",
+  options: [
+    {
+      name: "source",
+      description: "Pilih source manga",
+      type: 3,
+      required: true,
+      choices: [
+        { name: "Ikiru", value: "ikiru" },
+        { name: "Shinigami Project", value: "shinigami_project" },
+        { name: "Shinigami Mirror", value: "shinigami_mirror" },
+      ],
+    },
+    {
+      name: "title",
+      description: "Manga title to add",
+      type: 3,
+      required: true,
+    },
+  ],
 },
 ];
 

@@ -36,7 +36,7 @@ async function handleAddManga(payload, title, url = null) {
       return;
     }
 
-    whitelist.push({ title, url: url ?? null });
+    whitelist.push({ title, url: url ?? null, source: "ikiru" });
     await saveWhitelist(whitelist);
 
     await editInteractionResponse(
@@ -63,7 +63,9 @@ async function buildListResponse(page = 1) {
     ? "📋 Whitelist kosong!"
     : `📋 **Whitelist** (${whitelist.length} manga)\n` +
       `*Page ${safePage}/${totalPage}*\n\n` +
-      slice.map((item, i) => `${start + i + 1}. ${item.title}`).join("\n");
+      slice
+        .map((item, i) => `${start + i + 1}. [${item.source ?? "ikiru"}] ${item.title}`)
+        .join("\n");
 
   const components = whitelist.length === 0 ? [] : [
     {
