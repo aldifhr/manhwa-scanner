@@ -17,14 +17,14 @@
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal">
         <h2>Bot Monitor</h2>
-        <p>Masukkan CRON_SECRET untuk akses dashboard</p>
+        <p>Masukkan password dashboard untuk akses monitor</p>
         <input
           type="password"
-          id="secretInput"
-          placeholder="CRON_SECRET..."
+          id="passwordInput"
+          placeholder="Password..."
           autocomplete="off"
         />
-        <button type="button" class="btn-primary" onclick="submitSecret()">Masuk</button>
+        <button type="button" class="btn-primary" onclick="submitPassword()">Masuk</button>
       </div>
     </div>
 
@@ -57,6 +57,9 @@
         </button>
         <button type="button" class="btn-refresh" id="btnRefresh" onclick="loadAll()">
           refresh
+        </button>
+        <button type="button" class="btn-refresh" id="btnLogout" onclick="logoutDashboard()">
+          logout
         </button>
       </div>
     </header>

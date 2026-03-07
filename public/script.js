@@ -1,5 +1,4 @@
 ﻿const API_BASE = "";
-const SECRET_STORAGE_KEY = "ikiru_secret";
 const DEFAULT_POLL_MS = 30_000;
 const elementCache = new Map();
 const $ = (id) => {
@@ -11,13 +10,7 @@ const TIME_FORMATTER = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
   second: "2-digit",
 });
-const legacySecret = localStorage.getItem(SECRET_STORAGE_KEY) || "";
-if (legacySecret && !sessionStorage.getItem(SECRET_STORAGE_KEY)) {
-  sessionStorage.setItem(SECRET_STORAGE_KEY, legacySecret);
-}
-localStorage.removeItem(SECRET_STORAGE_KEY);
-
-let secret = sessionStorage.getItem(SECRET_STORAGE_KEY) || "";
+let isAuthenticated = false;
 let pollTimer = null;
 let pollMs = Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS);
 if (![10_000, 30_000, 60_000].includes(pollMs)) pollMs = DEFAULT_POLL_MS;
@@ -41,35 +34,86 @@ function countSentLast24h(recentItems) {
 
 // ===== AUTH =====
 function checkAuth() {
-  if (!secret) {
+  if (!isAuthenticated) {
     $("modalOverlay").classList.add("show");
     return false;
   }
   return true;
 }
-function submitSecret() {
-  const val = $("secretInput").value.trim();
-  if (!val) return;
-  secret = val;
-  sessionStorage.setItem(SECRET_STORAGE_KEY, val);
-  $("modalOverlay").classList.remove("show");
-  loadAll();
-  startPoll();
+async function submitPassword() {
+  const input = $("passwordInput");
+  const password = input.value.trim();
+  if (!password) return;
+
+  try {
+    const r = await fetch(`${API_BASE}/api/login`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showAlert(data.error || "Login gagal");
+      return;
+    }
+
+    isAuthenticated = true;
+    input.value = "";
+    $("modalOverlay").classList.remove("show");
+    await loadAll();
+    startPoll();
+  } catch (e) {
+    showAlert("Login gagal: " + e.message);
+  }
 }
-$("secretInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") submitSecret();
+$("passwordInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") submitPassword();
 });
+
+async function logoutDashboard() {
+  try {
+    await fetch(`${API_BASE}/api/logout`, {
+      method: "POST",
+      cache: "no-store",
+    });
+  } catch (e) {
+    console.warn("Logout request failed:", e);
+  }
+
+  isAuthenticated = false;
+  $("modalOverlay").classList.add("show");
+  clearInterval(pollTimer);
+}
+
+async function bootstrapAuth() {
+  try {
+    const r = await fetch(`${API_BASE}/api/auth-status`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const data = await r.json();
+    isAuthenticated = Boolean(data?.authenticated);
+  } catch {
+    isAuthenticated = false;
+  }
+
+  if (isAuthenticated) {
+    $("modalOverlay").classList.remove("show");
+    loadAll();
+    startPoll();
+  } else {
+    $("modalOverlay").classList.add("show");
+  }
+}
 
 async function apiFetch(path, signal) {
   const r = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
-    headers: { Authorization: `Bearer ${secret}` },
     signal,
   });
   if (r.status === 401) {
-    secret = "";
-    sessionStorage.removeItem(SECRET_STORAGE_KEY);
-    localStorage.removeItem(SECRET_STORAGE_KEY);
+    isAuthenticated = false;
     $("modalOverlay").classList.add("show");
     throw new Error("Unauthorized");
   }
@@ -404,7 +448,6 @@ async function addManga() {
       method: "POST",
       cache: "no-store",
       headers: {
-        Authorization: `Bearer ${secret}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ title, url: url || null }),
@@ -434,7 +477,6 @@ async function deleteManga(title) {
       method: "DELETE",
       cache: "no-store",
       headers: {
-        Authorization: `Bearer ${secret}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ title }),
@@ -467,7 +509,6 @@ async function runCronNow() {
     const r = await fetch(`${API_BASE}/api/cron`, {
       method: "GET",
       cache: "no-store",
-      headers: { Authorization: `Bearer ${secret}` },
     });
     const data = await r.json();
     if (!r.ok) {
@@ -561,7 +602,7 @@ async function loadAll() {
     const anyFailed = [
       statusR, whitelistR, recentR, logsR, compareR,
     ].some((r) => r.status === "rejected" && r.reason?.name !== "AbortError");
-    if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
+    if (anyFailed && isAuthenticated) showAlert("Beberapa data gagal dimuat.");
 
     $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
   } finally {
@@ -603,7 +644,7 @@ function setPollInterval() {
 }
 
 window.addEventListener("focus", () => {
-  if (secret && !isProcessing) loadAll();
+  if (isAuthenticated && !isProcessing) loadAll();
 });
 
 // ===== THEME =====
@@ -618,13 +659,9 @@ function toggleTheme() {
 }
 
 // ===== INIT =====
-if (secret) {
-  loadAll();
-  startPoll();
-} else $("modalOverlay").classList.add("show");
-
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");
 updateAutoRefreshUI();
+bootstrapAuth();
 
 
 
