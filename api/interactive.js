@@ -4,6 +4,7 @@ import { loadWhitelist, saveWhitelist, redis } from "../lib/redis.js";
 import { editInteractionResponse }    from "../lib/discord.js";
 import commands                       from "../lib/commands/index.js";
 import handleSearchPage               from "../lib/commands/searchPage.js";
+import { logApiHit } from "../lib/requestLog.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -99,6 +100,8 @@ async function buildListResponse(page = 1) {
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  logApiHit("interactive", req);
+
   if (req.method !== "POST") return res.status(405).end();
 
   const sig = req.headers["x-signature-ed25519"];

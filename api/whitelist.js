@@ -1,7 +1,10 @@
 import { loadWhitelist, saveWhitelist } from "../lib/redis.js";
 import { isCronAuthorized }             from "../lib/auth.js";
+import { logApiHit } from "../lib/requestLog.js";
 
 export default async function handler(req, res) {
+  logApiHit("whitelist", req);
+
   if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 

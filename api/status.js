@@ -1,7 +1,10 @@
 import { redis }           from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
+import { logApiHit } from "../lib/requestLog.js";
 
 export default async function handler(req, res) {
+  logApiHit("status", req);
+
   if (req.method !== "GET")
     return res.status(405).json({ error: "Method not allowed" });
 

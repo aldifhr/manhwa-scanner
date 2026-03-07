@@ -1,5 +1,6 @@
 import { redis, loadWhitelist, saveWhitelist } from "../lib/redis.js";
 import { isCronAuthorized }                    from "../lib/auth.js";
+import { logApiHit } from "../lib/requestLog.js";
 
 const SNAPSHOT_LIST_KEY = "snapshots:list";
 const MAX_SNAPSHOTS     = 10;
@@ -26,6 +27,8 @@ function generateId() {
 // ─── HANDLER ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  logApiHit("snapshot", req);
+
   if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 

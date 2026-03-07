@@ -8,6 +8,7 @@ import {
   redis,
 } from "../lib/redis.js";
 import { scrapeMangaUpdates } from "../lib/scraper.js";
+import { logApiHit } from "../lib/requestLog.js";
 
 export const config = { maxDuration: 60 };
 
@@ -78,6 +79,8 @@ async function validateChannel(channelId, guildId) {
 }
 
 export default async function handler(req, res) {
+  logApiHit("cron", req);
+
   if (!["GET", "POST"].includes(req.method)) {
     return res.status(405).json({ error: "Method not allowed" });
   }

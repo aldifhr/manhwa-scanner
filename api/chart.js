@@ -1,5 +1,6 @@
 import { redis }           from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
+import { logApiHit } from "../lib/requestLog.js";
 
 const CHART_DAY_FORMATTER = new Intl.DateTimeFormat("id-ID", {
   weekday: "short",
@@ -8,6 +9,8 @@ const CHART_DAY_FORMATTER = new Intl.DateTimeFormat("id-ID", {
 });
 
 export default async function handler(req, res) {
+  logApiHit("chart", req);
+
   if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 
