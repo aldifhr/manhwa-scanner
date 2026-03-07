@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="./styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.js" defer></script>
     <script src="./script.js" defer></script>
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
@@ -105,40 +104,6 @@
         </div>
       </div>
 
-      <div class="section-label">matcher lab</div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Test Match (Whitelist vs Scraper)</span>
-        </div>
-        <div class="whitelist-form">
-          <input
-            type="text"
-            id="matchTestTitle"
-            placeholder="Title (opsional)"
-            autocomplete="off"
-            onkeydown="if(event.key==='Enter') runMatchTest()"
-          />
-          <input
-            type="text"
-            id="matchTestUrl"
-            placeholder="URL manga (opsional)"
-            autocomplete="off"
-            onkeydown="if(event.key==='Enter') runMatchTest()"
-          />
-          <button type="button" class="btn-add" id="btnMatchTest" onclick="runMatchTest()">
-            Test
-          </button>
-        </div>
-        <div class="match-test-result" id="matchTestResult">
-          Masukkan title/url, lalu klik <strong>Test</strong>.
-        </div>
-      </div>
-
-      <div class="section-label">Success vs Failed (7 Hari Terakhir)</div>
-      <div class="chart-container">
-        <canvas id="trendChart"></canvas>
-      </div>
-
       <div class="section-label">cron terakhir</div>
       <div class="stats-grid">
         <div class="stat-card">
@@ -223,38 +188,6 @@
             </ul>
           </div>
         </div>
-      </div>
-
-      <div class="section-label" style="margin-top:24px">snapshot whitelist</div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Backup & Restore</span>
-          <span class="badge" id="snapshotCount">0</span>
-        </div>
-        <div class="whitelist-form">
-          <input
-            type="text"
-            id="inputSnapshotLabel"
-            placeholder="Label snapshot (opsional)..."
-            autocomplete="off"
-            onkeydown="if(event.key==='Enter') saveSnapshot()"
-          />
-          <button type="button" class="btn-add" id="btnSaveSnapshot" onclick="saveSnapshot()">Save</button>
-        </div>
-        <ul class="manga-list" id="snapshotList">
-          <li class="empty">Belum ada snapshot</li>
-        </ul>
-      </div>
-
-      <div class="section-label">top manhwa 7 hari</div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Paling sering dikirim bot</span>
-          <span class="badge" id="topCount">0</span>
-        </div>
-        <ul class="manga-list" id="topManhwaList">
-          <li class="empty">memuat...</li>
-        </ul>
       </div>
 
       <div class="section-label">recent manhwa terkirim</div>

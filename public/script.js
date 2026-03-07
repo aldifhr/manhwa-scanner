@@ -22,7 +22,6 @@ let pollTimer = null;
 let pollMs = Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS);
 if (![10_000, 30_000, 60_000].includes(pollMs)) pollMs = DEFAULT_POLL_MS;
 let autoRefreshEnabled = localStorage.getItem("ikiru_auto_refresh") !== "off";
-let trendChart = null;
 let isProcessing = false;
 let loadAbortController = null;
 let latestLogs = [];
@@ -30,81 +29,6 @@ let latestLogs = [];
 // ===== WHITELIST STATE =====
 let whitelistItems = [];
 let whitelistSortOrder = "default"; // default | az | za
-
-// ===== CHART =====
-async function renderSuccessChart(data) {
-  const canvas = $("trendChart");
-  if (!canvas) return;
-  if (trendChart) {
-    trendChart.destroy();
-    trendChart = null;
-  }
-
-  const ctx = canvas.getContext("2d");
-  trendChart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: data.labels || [],
-      datasets: [
-        {
-          label: "Sent",
-          data: data.sent || [],
-          backgroundColor: "#10B981",
-          borderRadius: 4,
-          borderSkipped: false,
-        },
-        {
-          label: "Failed",
-          data: data.failed || [],
-          backgroundColor: "#EF4444",
-          borderRadius: 4,
-          borderSkipped: false,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { intersect: false, mode: "index" },
-      scales: {
-        y: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.05)" } },
-        x: { grid: { display: false } },
-      },
-      plugins: {
-        legend: { position: "top", labels: { padding: 16, boxWidth: 12 } },
-        title: { display: false },
-      },
-      animation: { duration: 600 },
-    },
-  });
-}
-
-// ===== UPTIME & TOP =====
-function calculateUptime(logs, hours) {
-  if (!logs?.length) return null;
-  const cutoff = Date.now() - hours * 3600000;
-  const recent = logs.filter((l) => new Date(l.time) > cutoff);
-  if (!recent.length) return null;
-  return Math.round(
-    (recent.filter((l) => l.tag === "sent").length / recent.length) * 100,
-  );
-}
-
-function getTopManhwa(logs) {
-  const counter = {};
-  logs
-    ?.filter((l) => l.tag === "sent" && l.message?.includes("Chapter"))
-    .forEach((l) => {
-      const title =
-        l.message.split(" - ")[0]?.trim() ||
-        l.message.split("Chapter")[0]?.trim();
-      if (title) counter[title] = (counter[title] || 0) + 1;
-    });
-  return Object.entries(counter)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([title, count]) => ({ title, count }));
-}
 
 function countSentLast24h(recentItems) {
   if (!Array.isArray(recentItems)) return 0;
@@ -376,26 +300,6 @@ function setSortOrder(order) {
   applyWhitelistFilter();
 }
 
-function renderTopManhwa(data) {
-  const list = $("topManhwaList");
-  const top = data?.top ?? [];
-  $("topCount").textContent = top.length;
-  if (!top.length) {
-    list.innerHTML = '<li class="empty">Belum ada chapter terkirim</li>';
-    return;
-  }
-  list.innerHTML = top
-    .map(
-      (item, i) =>
-        `<li class="manga-item">
-      <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}</span>
-      <span class="top-count">${item.count}</span>
-    </li>`,
-    )
-    .join("");
-}
-
 function renderGuilds(data) {
   const list = $("guildList");
   const guilds = data?.guilds ?? [];
@@ -529,31 +433,6 @@ function closeLogDrilldown() {
   $("logDrilldownOverlay").classList.remove("show");
 }
 
-function renderSnapshots(snapshots) {
-  const list = $("snapshotList");
-  $("snapshotCount").textContent = snapshots.length;
-  if (!snapshots.length) {
-    list.innerHTML = `<li class="empty">Belum ada snapshot</li>`;
-    return;
-  }
-  list.innerHTML = snapshots
-    .map(
-      (s) => `
-    <li class="manga-item">
-      <span class="manga-index">SNAP</span>
-      <span class="manga-item-title">
-        ${esc(s.label || "Snapshot")}
-        <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga - ${timeAgo(s.savedAt)}</small>
-      </span>
-      <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px"
-        onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')"> restore</button>
-      <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">x</button>
-    </li>
-  `,
-    )
-    .join("");
-}
-
 // ===== WHITELIST ADD/DELETE =====
 async function addManga() {
   const titleInput = $("inputMangaTitle");
@@ -671,60 +550,6 @@ async function runCronNow() {
   }
 }
 
-async function runMatchTest() {
-  if (!checkAuth() || isProcessing) return;
-
-  const title = $("matchTestTitle")?.value.trim() || "";
-  const url = $("matchTestUrl")?.value.trim() || "";
-  const btn = $("btnMatchTest");
-  const out = $("matchTestResult");
-
-  if (!title && !url) {
-    out.innerHTML = `<span style="color:var(--red)">Isi minimal title atau URL.</span>`;
-    return;
-  }
-
-  isProcessing = true;
-  btn.disabled = true;
-  btn.textContent = "testing...";
-  out.innerHTML = "Testing matcher...";
-
-  try {
-    const r = await fetch(`${API_BASE}/api/test-match`, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title, url }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      out.innerHTML = `<span style="color:var(--red)">${esc(data.error || "Request gagal")}</span>`;
-      return;
-    }
-
-    const sample = (data.sample || [])
-      .slice(0, 5)
-      .map((x) => `- ${esc(x.title)} - ${esc(x.chapter)}`)
-      .join("<br>");
-
-    out.innerHTML = `
-      <div><strong>Cache:</strong> ${data.cache?.hit ? "hit" : "miss"} (${data.cache?.ttlMs ?? 0} ms)</div>
-      <div><strong>Scraped:</strong> ${data.scraped} | <strong>Matched:</strong> ${data.matched}</div>
-      <div><strong>By URL:</strong> ${data.diagnostics?.byUrlCount ?? 0} | <strong>By Title:</strong> ${data.diagnostics?.byTitleCount ?? 0}</div>
-      <div style="margin-top:6px">${sample || "Tidak ada sample match."}</div>
-    `;
-  } catch (e) {
-    out.innerHTML = `<span style="color:var(--red)">Gagal: ${esc(e.message)}</span>`;
-  } finally {
-    isProcessing = false;
-    btn.disabled = false;
-    btn.textContent = "Test";
-  }
-}
-
 // ===== LOAD ALL =====
 async function loadAll() {
   if (!checkAuth()) return;
@@ -742,8 +567,6 @@ async function loadAll() {
   skeleton($("guildList"), 3);
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 5);
-  skeleton($("topManhwaList"));
-  skeleton($("snapshotList"), 2);
   skeleton($("compareList"), 3);
 
   try {
@@ -754,9 +577,6 @@ async function loadAll() {
       recentR,
       logsR,
       uptimeR,
-      topR,
-      trendR,
-      snapshotR,
       compareR,
     ] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
@@ -765,13 +585,6 @@ async function loadAll() {
       apiFetch("/api/recent", controller.signal),
       apiFetch("/api/logs", controller.signal),
       apiFetch("/api/uptime", controller.signal),
-      apiFetch("/api/top", controller.signal),
-      fetch(`${API_BASE}/api/chart`, {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${secret}` },
-        signal: controller.signal,
-      }),
-      apiFetch("/api/snapshot", controller.signal),
       apiFetch("/api/source-compare", controller.signal),
     ]);
 
@@ -792,17 +605,6 @@ async function loadAll() {
       false,
     );
 
-    if (trendR.status === "fulfilled" && trendR.value.ok) {
-      try {
-        renderSuccessChart(await trendR.value.json());
-      } catch (e) {
-        console.error("Chart error:", e);
-      }
-    }
-
-    if (topR.status === "fulfilled") renderTopManhwa(topR.value);
-    else renderErr($("topManhwaList"), "Gagal muat");
-
     if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
     else renderErr($("mangaList"), "Gagal muat whitelist");
 
@@ -815,14 +617,11 @@ async function loadAll() {
     if (logsR.status === "fulfilled") renderLogs(logsR.value);
     else renderErr($("logList"), "Gagal muat logs");
 
-    if (snapshotR.status === "fulfilled") renderSnapshots(snapshotR.value.snapshots ?? []);
-    else renderErr($("snapshotList"), "Gagal muat snapshot");
-
     if (compareR.status === "fulfilled") renderSourceCompare(compareR.value);
     else renderErr($("compareList"), "Gagal muat compare");
 
     const anyFailed = [
-      statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR, snapshotR, compareR,
+      statusR, whitelistR, guildsR, recentR, logsR, uptimeR, compareR,
     ].some((r) => r.status === "rejected" && r.reason?.name !== "AbortError");
     if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
@@ -831,16 +630,6 @@ async function loadAll() {
     if (loadAbortController === controller) loadAbortController = null;
     btn.disabled = false;
     btn.textContent = "refresh";
-  }
-}
-
-// ===== SNAPSHOT RELOAD =====
-async function reloadSnapshots() {
-  try {
-    const data = await apiFetch("/api/snapshot");
-    renderSnapshots(data.snapshots ?? []);
-  } catch (e) {
-    renderErr($("snapshotList"), "Gagal muat snapshot");
   }
 }
 
@@ -902,105 +691,6 @@ if (secret) {
 
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");
 updateAutoRefreshUI();
-
-// ===== SNAPSHOT ACTIONS =====
-async function saveSnapshot() {
-  const labelInput = $("inputSnapshotLabel");
-  const btn = $("btnSaveSnapshot");
-  const label = labelInput.value.trim();
-
-  isProcessing = true;
-  btn.disabled = true;
-  btn.textContent = "...";
-
-  try {
-    const r = await fetch(`${API_BASE}/api/snapshot`, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ label: label || null }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      showAlert(data.error || "Gagal save snapshot");
-      return;
-    }
-    labelInput.value = "";
-    showAlert(
-      `Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
-    );
-    reloadSnapshots();
-  } catch (e) {
-    showAlert("Gagal: " + e.message);
-  } finally {
-    isProcessing = false;
-    btn.disabled = false;
-    btn.textContent = "Save";
-  }
-}
-
-async function restoreSnapshot(id, label) {
-  if (
-    !confirm(
-      `Restore snapshot "${label}"?\n\nWhitelist aktif akan diganti. Whitelist saat ini akan di-backup otomatis.`,
-    )
-  )
-    return;
-
-  isProcessing = true;
-  try {
-    const r = await fetch(`${API_BASE}/api/snapshot`, {
-      method: "PUT",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      showAlert(data.error || "Gagal restore");
-      return;
-    }
-    showAlert(`${data.message}`);
-    reloadSnapshots();
-    apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
-  } catch (e) {
-    showAlert("Gagal: " + e.message);
-  } finally {
-    isProcessing = false;
-  }
-}
-
-async function deleteSnapshot(id) {
-  if (!confirm("Hapus snapshot ini?")) return;
-  isProcessing = true;
-  try {
-    const r = await fetch(`${API_BASE}/api/snapshot`, {
-      method: "DELETE",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      showAlert(data.error || "Gagal hapus snapshot");
-      return;
-    }
-    reloadSnapshots();
-  } catch (e) {
-    showAlert("Gagal: " + e.message);
-  } finally {
-    isProcessing = false;
-  }
-}
 
 
 
