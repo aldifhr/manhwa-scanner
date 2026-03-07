@@ -23,7 +23,10 @@ function normalizeTitle(str) {
 }
 
 function normalizeUrl(u) {
-  return u?.replace(/\/+$/, "").toLowerCase().trim();
+  const normalized = u?.replace(/\/+$/, "").toLowerCase().trim();
+  return normalized
+    ?.replace(/^https?:\/\/(?:www\.)?shngm\.id\b/, "https://a.shinigami.asia")
+    ?.replace(/^https?:\/\/(?:www\.)?shinigami\.asia\b/, "https://a.shinigami.asia");
 }
 
 function normalizeSource(source) {

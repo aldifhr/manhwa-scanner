@@ -3,7 +3,6 @@ import { waitUntil } from "@vercel/functions";
 import { loadWhitelist, saveWhitelist, redis } from "../lib/redis.js";
 import { editInteractionResponse } from "../lib/discord.js";
 import commands from "../lib/commands/index.js";
-import handleSearchPage from "../lib/commands/searchPage.js";
 import { logApiHit } from "../lib/requestLog.js";
 
 export const config = { api: { bodyParser: false } };
@@ -33,15 +32,24 @@ function sourceLabel(source = "") {
   return "Ikiru";
 }
 
+function normalizeUrl(url = "") {
+  const normalized = String(url).replace(/\/+$/, "").toLowerCase().trim();
+  return normalized
+    .replace(/^https?:\/\/(?:www\.)?shngm\.id\b/, "https://a.shinigami.asia")
+    .replace(/^https?:\/\/(?:www\.)?shinigami\.asia\b/, "https://a.shinigami.asia");
+}
+
 async function handleAddManga(payload, title, url = null, source = "ikiru") {
   try {
     const normalizedSource = normalizeSource(source);
+    const normalizedUrl = url ? normalizeUrl(url) : null;
     const whitelist = await loadWhitelist();
 
     const exists = whitelist.some(
       (item) =>
         normalizeSource(item.source) === normalizedSource &&
-        (item.title?.toLowerCase() === title.toLowerCase() || (url && item.url === url)),
+        (item.title?.toLowerCase() === title.toLowerCase() ||
+          (normalizedUrl && normalizeUrl(item.url || "") === normalizedUrl)),
     );
 
     if (exists) {
@@ -145,41 +153,6 @@ export default async function handler(req, res) {
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
 
-    if (custom_id === "select_add") {
-      const [rawSource, keyword, id] = String(interactionData.values?.[0] || "").split("|||");
-      const source = normalizeSource(rawSource);
-      const cached =
-        (await redis.get(`search:results:${source}:${keyword}`)) ||
-        (await redis.get(`search:results:${keyword}`));
-
-      if (!cached) {
-        return res.json({
-          type: 4,
-          data: { content: "Session expired. Run /search again.", flags: 64 },
-        });
-      }
-
-      const results = Array.isArray(cached) ? cached : [];
-      const item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
-
-      if (!item) {
-        return res.json({
-          type: 4,
-          data: { content: "Selected manga not found. Run /search again.", flags: 64 },
-        });
-      }
-
-      res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil(
-        handleAddManga(
-          payload,
-          item.title,
-          item.mangaUrl ?? item.url,
-          item.source ?? source,
-        ),
-      );
-    }
-
     if (custom_id === "select_add_src") {
       const [rawSource, keyword, id] = String(interactionData.values?.[0] || "").split("|||");
       const source = normalizeSource(rawSource);
@@ -211,15 +184,6 @@ export default async function handler(req, res) {
           item.source ?? source,
         ),
       );
-    }
-
-    if (custom_id.startsWith("search:")) {
-      const parts = custom_id.split(":");
-      const page = parseInt(parts.pop(), 10) || 1;
-      const source = normalizeSource(parts[1] || "all");
-      const keyword = decodeURIComponent(parts.slice(2).join(":"));
-      res.json({ type: 6 });
-      return waitUntil(handleSearchPage(payload, keyword, page, source, redis));
     }
 
     if (custom_id.startsWith("list:")) {
