@@ -46,20 +46,6 @@ const commands = [
     description: "Show bot status dan notification channel",
   },
   {
-    name:        "info",
-    description: "Search and get manga details dari ikiru.wtf",
-    options: [{
-      name:        "title",
-      description: "Manga title to search",
-      type:        3,
-      required:    true,
-    }],
-  },
-  {
-    name:        "recent",
-    description: "Show 5 latest chapters",
-  },
-  {
     name:        "setchannel",
     description: "Set notification channel untuk manga updates",
     options: [{
@@ -68,21 +54,6 @@ const commands = [
       type:         7,
       required:     true,
       channel_types: [0],
-    }],
-  },
-  {
-    name:        "popular",
-    description: "Show popular manga",
-    options: [{
-      name:        "period",
-      description: "Time period",
-      type:        3,
-      required:    false,
-      choices: [
-        { name: "Today",   value: "daily"   },
-        { name: "Weekly",  value: "weekly"  },
-        { name: "Monthly", value: "monthly" },
-      ],
     }],
   },
 {
