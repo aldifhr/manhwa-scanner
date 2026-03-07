@@ -105,6 +105,14 @@ function sourceName(source) {
   return "Ikiru";
 }
 
+function sourceBadgeClass(source) {
+  const s = String(source || "").toLowerCase().trim();
+  if (s === "shinigami_project" || s === "shinigami_mirror" || s === "shinigami") {
+    return "source-shinigami";
+  }
+  return "source-ikiru";
+}
+
 function skeleton(ul, n = 4) {
   ul.innerHTML = Array.from(
     { length: n },
@@ -262,10 +270,14 @@ function applyWhitelistFilter() {
     .map((entry, i) => {
       const { item, title, originalIndex } = entry;
       const url = typeof item === "object" ? item.url : null;
+      const source = typeof item === "object" ? item.source : "ikiru";
+      const sourceLabel = sourceName(source).toUpperCase();
+      const badgeClass = sourceBadgeClass(source);
       const displayIndex = whitelistSortOrder === "default" ? originalIndex : i;
       return `<li class="manga-item" title="${url ? esc(url) : ""}">
         <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
         <span class="manga-item-title">${highlight(title, query)}</span>
+        <span class="source-badge ${badgeClass}">${esc(sourceLabel)}</span>
         ${url ? `<span class="manga-item-has-url" title="${esc(url)}">link</span>` : ""}
         <button class="btn-delete" onclick="deleteManga('${esc(title)}')">x</button>
       </li>`;
