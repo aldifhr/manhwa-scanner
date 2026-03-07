@@ -3,6 +3,13 @@ import { redis } from "../lib/redis.js";
 import { scrapeMangaUpdates } from "../lib/scraper.js";
 import { logApiHit } from "../lib/requestLog.js";
 
+const SCRAPE_CACHE_TTL_MS = 60 * 1000;
+let scrapeCache = {
+  data: null,
+  expiresAt: 0,
+  inFlight: null,
+};
+
 function normalizeTitle(str = "") {
   return String(str)
     .toLowerCase()
@@ -33,6 +40,32 @@ function createWhitelistMatcher(entry) {
   };
 }
 
+async function getCachedScrapeResults() {
+  const now = Date.now();
+  if (Array.isArray(scrapeCache.data) && scrapeCache.expiresAt > now) {
+    return { items: scrapeCache.data, cached: true };
+  }
+
+  if (scrapeCache.inFlight) {
+    const items = await scrapeCache.inFlight;
+    return { items, cached: true };
+  }
+
+  scrapeCache.inFlight = (async () => {
+    const items = await scrapeMangaUpdates(redis);
+    scrapeCache.data = items;
+    scrapeCache.expiresAt = Date.now() + SCRAPE_CACHE_TTL_MS;
+    return items;
+  })();
+
+  try {
+    const items = await scrapeCache.inFlight;
+    return { items, cached: false };
+  } finally {
+    scrapeCache.inFlight = null;
+  }
+}
+
 export default async function handler(req, res) {
   logApiHit("test-match", req);
 
@@ -54,7 +87,7 @@ export default async function handler(req, res) {
 
     const entry = { title: title || null, url: url || null };
     const isMatched = createWhitelistMatcher(entry);
-    const allResults = await scrapeMangaUpdates(redis);
+    const { items: allResults, cached } = await getCachedScrapeResults();
     const matches = allResults.filter(isMatched);
 
     const normalizedInputUrl = url ? normalizeUrl(url) : null;
@@ -74,6 +107,10 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       input: entry,
+      cache: {
+        hit: cached,
+        ttlMs: SCRAPE_CACHE_TTL_MS,
+      },
       scraped: allResults.length,
       matched: matches.length,
       diagnostics: {
@@ -93,4 +130,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Internal error" });
   }
 }
-

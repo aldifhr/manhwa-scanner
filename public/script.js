@@ -1,5 +1,6 @@
 ﻿const API_BASE = "";
-const POLL_MS = 30_000;
+const SECRET_STORAGE_KEY = "ikiru_secret";
+const DEFAULT_POLL_MS = 30_000;
 const elementCache = new Map();
 const $ = (id) => {
   if (!elementCache.has(id)) elementCache.set(id, document.getElementById(id));
@@ -10,8 +11,17 @@ const TIME_FORMATTER = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
   second: "2-digit",
 });
-let secret = localStorage.getItem("ikiru_secret") || "";
+const legacySecret = localStorage.getItem(SECRET_STORAGE_KEY) || "";
+if (legacySecret && !sessionStorage.getItem(SECRET_STORAGE_KEY)) {
+  sessionStorage.setItem(SECRET_STORAGE_KEY, legacySecret);
+}
+localStorage.removeItem(SECRET_STORAGE_KEY);
+
+let secret = sessionStorage.getItem(SECRET_STORAGE_KEY) || "";
 let pollTimer = null;
+let pollMs = Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS);
+if (![10_000, 30_000, 60_000].includes(pollMs)) pollMs = DEFAULT_POLL_MS;
+let autoRefreshEnabled = localStorage.getItem("ikiru_auto_refresh") !== "off";
 let trendChart = null;
 let isProcessing = false;
 let loadAbortController = null;
@@ -118,9 +128,10 @@ function submitSecret() {
   const val = $("secretInput").value.trim();
   if (!val) return;
   secret = val;
-  localStorage.setItem("ikiru_secret", val);
+  sessionStorage.setItem(SECRET_STORAGE_KEY, val);
   $("modalOverlay").classList.remove("show");
   loadAll();
+  startPoll();
 }
 $("secretInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") submitSecret();
@@ -134,7 +145,8 @@ async function apiFetch(path, signal) {
   });
   if (r.status === 401) {
     secret = "";
-    localStorage.removeItem("ikiru_secret");
+    sessionStorage.removeItem(SECRET_STORAGE_KEY);
+    localStorage.removeItem(SECRET_STORAGE_KEY);
     $("modalOverlay").classList.add("show");
     throw new Error("Unauthorized");
   }
@@ -220,16 +232,16 @@ function renderStatsExtended(statusData, uptimeData) {
     dot.className = "logo-dot offline";
     return;
   }
-  $("statSent").textContent = statusData.sent ?? "";
-  $("statSkipped").textContent = statusData.skipped ?? "";
-  $("statFailed").textContent = statusData.failed ?? "";
+  $("statSent").textContent = statusData.sent ?? "-";
+  $("statSkipped").textContent = statusData.skipped ?? "-";
+  $("statFailed").textContent = statusData.failed ?? "-";
   $("statDuration").textContent = statusData.duration
     ? `${statusData.duration}s`
-    : "";
-  $("statUptime24h").textContent = uptimeData?.uptime24h ?? "";
+    : "-";
+  $("statUptime24h").textContent = uptimeData?.uptime24h ?? "-";
   $("statUptime24h").className =
     `stat-value ${uptimeData?.uptime24h >= 95 ? "green" : uptimeData?.uptime24h >= 80 ? "amber" : "red"}`;
-  $("statUptime7d").textContent = uptimeData?.uptime7d ?? "";
+  $("statUptime7d").textContent = uptimeData?.uptime7d ?? "-";
   $("statUptime7d").className =
     `stat-value ${uptimeData?.uptime7d >= 95 ? "green" : uptimeData?.uptime7d >= 80 ? "amber" : "red"}`;
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
@@ -256,11 +268,11 @@ function renderOverview(statusData, whitelistData, guildData, recentData) {
   healthEl.textContent = failed > 0 ? "DEGRADED" : "HEALTHY";
   healthEl.className = `stat-value ${failed > 0 ? "amber" : "green"}`;
 
-  lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "";
-  guildsEl.textContent = Array.isArray(guildData?.guilds) ? guildData.guilds.length : "";
+  lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
+  guildsEl.textContent = Array.isArray(guildData?.guilds) ? guildData.guilds.length : "-";
   whitelistEl.textContent = Array.isArray(whitelistData?.items)
     ? whitelistData.items.length
-    : "";
+    : "-";
   sent24hEl.textContent = countSentLast24h(recentData?.items);
 }
 
@@ -273,10 +285,10 @@ function renderLastCronResult(statusData, fromManual = false) {
   const durationEl = $("lastCronDuration");
 
   if (!statusData) {
-    sentEl.textContent = "sent: ";
-    skippedEl.textContent = "skipped: ";
-    failedEl.textContent = "failed: ";
-    durationEl.textContent = "duration: ";
+    sentEl.textContent = "sent: -";
+    skippedEl.textContent = "skipped: -";
+    failedEl.textContent = "failed: -";
+    durationEl.textContent = "duration: -";
     timeEl.textContent = "-";
     bar.className = "last-cron-bar";
     return;
@@ -285,7 +297,7 @@ function renderLastCronResult(statusData, fromManual = false) {
   const sent = Number(statusData.sent ?? 0);
   const skipped = Number(statusData.skipped ?? 0);
   const failed = Number(statusData.failed ?? 0);
-  const duration = statusData.duration ? `${statusData.duration}s` : "";
+  const duration = statusData.duration ? `${statusData.duration}s` : "-";
 
   sentEl.textContent = `sent: ${sent}`;
   skippedEl.textContent = `skipped: ${skipped}`;
@@ -654,6 +666,7 @@ async function runMatchTest() {
       .join("<br>");
 
     out.innerHTML = `
+      <div><strong>Cache:</strong> ${data.cache?.hit ? "hit" : "miss"} (${data.cache?.ttlMs ?? 0} ms)</div>
       <div><strong>Scraped:</strong> ${data.scraped} | <strong>Matched:</strong> ${data.matched}</div>
       <div><strong>By URL:</strong> ${data.diagnostics?.byUrlCount ?? 0} | <strong>By Title:</strong> ${data.diagnostics?.byTitleCount ?? 0}</div>
       <div style="margin-top:6px">${sample || "Tidak ada sample match."}</div>
@@ -783,7 +796,32 @@ async function reloadSnapshots() {
 // ===== POLL + FOCUS =====
 function startPoll() {
   clearInterval(pollTimer);
-  pollTimer = setInterval(loadAll, POLL_MS);
+  if (!autoRefreshEnabled) return;
+  pollTimer = setInterval(loadAll, pollMs);
+}
+
+function updateAutoRefreshUI() {
+  const btn = $("btnAutoRefresh");
+  const select = $("pollInterval");
+  if (select) select.value = String(pollMs);
+  if (btn) btn.textContent = autoRefreshEnabled ? "auto: on" : "auto: off";
+}
+
+function toggleAutoRefresh() {
+  autoRefreshEnabled = !autoRefreshEnabled;
+  localStorage.setItem("ikiru_auto_refresh", autoRefreshEnabled ? "on" : "off");
+  updateAutoRefreshUI();
+  startPoll();
+}
+
+function setPollInterval() {
+  const select = $("pollInterval");
+  if (!select) return;
+  const next = Number(select.value);
+  if (![10_000, 30_000, 60_000].includes(next)) return;
+  pollMs = next;
+  localStorage.setItem("ikiru_poll_ms", String(pollMs));
+  startPoll();
 }
 
 window.addEventListener("focus", () => {
@@ -812,6 +850,7 @@ if (secret) {
 } else $("modalOverlay").classList.add("show");
 
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");
+updateAutoRefreshUI();
 
 // ===== SNAPSHOT ACTIONS =====
 async function saveSnapshot() {
@@ -840,7 +879,7 @@ async function saveSnapshot() {
     }
     labelInput.value = "";
     showAlert(
-      ` Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
+      `Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
     );
     reloadSnapshots();
   } catch (e) {
@@ -876,7 +915,7 @@ async function restoreSnapshot(id, label) {
       showAlert(data.error || "Gagal restore");
       return;
     }
-    showAlert(` ${data.message}`);
+    showAlert(`${data.message}`);
     reloadSnapshots();
     apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
   } catch (e) {
@@ -911,4 +950,9 @@ async function deleteSnapshot(id) {
     isProcessing = false;
   }
 }
+
+
+
+
+
 

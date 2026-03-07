@@ -36,6 +36,14 @@
       </div>
       <div class="header-right">
         <span class="last-updated" id="lastUpdated">-</span>
+        <select id="pollInterval" class="poll-select" onchange="setPollInterval()">
+          <option value="10000">10s</option>
+          <option value="30000">30s</option>
+          <option value="60000">60s</option>
+        </select>
+        <button type="button" class="btn-refresh" id="btnAutoRefresh" onclick="toggleAutoRefresh()">
+          auto: on
+        </button>
         <button type="button" class="btn-run" id="btnRunCron" onclick="runCronNow()">
           jalankan cron
         </button>
