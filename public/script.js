@@ -1,4 +1,4 @@
-const API_BASE = "";
+﻿const API_BASE = "";
 const POLL_MS = 30_000;
 const elementCache = new Map();
 const $ = (id) => {
@@ -37,14 +37,14 @@ async function renderSuccessChart(data) {
       labels: data.labels || [],
       datasets: [
         {
-          label: "Sent ✅",
+          label: "Sent",
           data: data.sent || [],
           backgroundColor: "#10B981",
           borderRadius: 4,
           borderSkipped: false,
         },
         {
-          label: "Failed ❌",
+          label: "Failed",
           data: data.failed || [],
           backgroundColor: "#EF4444",
           borderRadius: 4,
@@ -86,7 +86,7 @@ function getTopManhwa(logs) {
     ?.filter((l) => l.tag === "sent" && l.message?.includes("Chapter"))
     .forEach((l) => {
       const title =
-        l.message.split(" — ")[0]?.trim() ||
+        l.message.split(" - ")[0]?.trim() ||
         l.message.split("Chapter")[0]?.trim();
       if (title) counter[title] = (counter[title] || 0) + 1;
     });
@@ -147,17 +147,17 @@ const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const fmt = (d) => TIME_FORMATTER.format(d);
 function timeAgo(iso) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const seconds = Math.floor((Date.now() - new Date(iso)) / 1000);
   const intervals = [
-    { label: "h", seconds: 86400 },
-    { label: "j", seconds: 3600 },
-    { label: "m", seconds: 60 },
-    { label: "dtk", seconds: 1 },
+    { label: "hari", seconds: 86400 },
+    { label: "jam", seconds: 3600 },
+    { label: "menit", seconds: 60 },
+    { label: "detik", seconds: 1 },
   ];
   for (const i of intervals) {
     const value = Math.floor(seconds / i.seconds);
-    if (value >= 1) return `${value}${i.label} lalu`;
+    if (value >= 1) return `${value} ${i.label} lalu`;
   }
   return "baru saja";
 }
@@ -216,20 +216,20 @@ function renderStatsExtended(statusData, uptimeData) {
       "statDuration",
       "statUptime24h",
       "statUptime7d",
-    ].forEach((id) => ($(id).textContent = "—"));
+    ].forEach((id) => ($(id).textContent = "-"));
     dot.className = "logo-dot offline";
     return;
   }
-  $("statSent").textContent = statusData.sent ?? "—";
-  $("statSkipped").textContent = statusData.skipped ?? "—";
-  $("statFailed").textContent = statusData.failed ?? "—";
+  $("statSent").textContent = statusData.sent ?? "";
+  $("statSkipped").textContent = statusData.skipped ?? "";
+  $("statFailed").textContent = statusData.failed ?? "";
   $("statDuration").textContent = statusData.duration
     ? `${statusData.duration}s`
-    : "—";
-  $("statUptime24h").textContent = uptimeData?.uptime24h ?? "—";
+    : "";
+  $("statUptime24h").textContent = uptimeData?.uptime24h ?? "";
   $("statUptime24h").className =
     `stat-value ${uptimeData?.uptime24h >= 95 ? "green" : uptimeData?.uptime24h >= 80 ? "amber" : "red"}`;
-  $("statUptime7d").textContent = uptimeData?.uptime7d ?? "—";
+  $("statUptime7d").textContent = uptimeData?.uptime7d ?? "";
   $("statUptime7d").className =
     `stat-value ${uptimeData?.uptime7d >= 95 ? "green" : uptimeData?.uptime7d >= 80 ? "amber" : "red"}`;
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
@@ -243,11 +243,11 @@ function renderOverview(statusData, whitelistData, guildData, recentData) {
   const sent24hEl = $("overviewSent24h");
 
   if (!statusData) {
-    healthEl.textContent = "—";
-    lastRunEl.textContent = "—";
-    guildsEl.textContent = "—";
-    whitelistEl.textContent = "—";
-    sent24hEl.textContent = "—";
+    healthEl.textContent = "-";
+    lastRunEl.textContent = "-";
+    guildsEl.textContent = "-";
+    whitelistEl.textContent = "-";
+    sent24hEl.textContent = "-";
     healthEl.className = "stat-value";
     return;
   }
@@ -256,11 +256,11 @@ function renderOverview(statusData, whitelistData, guildData, recentData) {
   healthEl.textContent = failed > 0 ? "DEGRADED" : "HEALTHY";
   healthEl.className = `stat-value ${failed > 0 ? "amber" : "green"}`;
 
-  lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "—";
-  guildsEl.textContent = Array.isArray(guildData?.guilds) ? guildData.guilds.length : "—";
+  lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "";
+  guildsEl.textContent = Array.isArray(guildData?.guilds) ? guildData.guilds.length : "";
   whitelistEl.textContent = Array.isArray(whitelistData?.items)
     ? whitelistData.items.length
-    : "—";
+    : "";
   sent24hEl.textContent = countSentLast24h(recentData?.items);
 }
 
@@ -273,11 +273,11 @@ function renderLastCronResult(statusData, fromManual = false) {
   const durationEl = $("lastCronDuration");
 
   if (!statusData) {
-    sentEl.textContent = "sent: —";
-    skippedEl.textContent = "skipped: —";
-    failedEl.textContent = "failed: —";
-    durationEl.textContent = "duration: —";
-    timeEl.textContent = "—";
+    sentEl.textContent = "sent: ";
+    skippedEl.textContent = "skipped: ";
+    failedEl.textContent = "failed: ";
+    durationEl.textContent = "duration: ";
+    timeEl.textContent = "-";
     bar.className = "last-cron-bar";
     return;
   }
@@ -285,16 +285,16 @@ function renderLastCronResult(statusData, fromManual = false) {
   const sent = Number(statusData.sent ?? 0);
   const skipped = Number(statusData.skipped ?? 0);
   const failed = Number(statusData.failed ?? 0);
-  const duration = statusData.duration ? `${statusData.duration}s` : "—";
+  const duration = statusData.duration ? `${statusData.duration}s` : "";
 
   sentEl.textContent = `sent: ${sent}`;
   skippedEl.textContent = `skipped: ${skipped}`;
   failedEl.textContent = `failed: ${failed}`;
   durationEl.textContent = `duration: ${duration}`;
 
-  const sourceText = fromManual ? "manual" : "auto";
+  const sourceText = fromManual ? "manual" : "otomatis";
   const timeText = statusData.timestamp ? timeAgo(statusData.timestamp) : "baru saja";
-  timeEl.textContent = `${sourceText} • ${timeText}`;
+  timeEl.textContent = `${sourceText} - ${timeText}`;
 
   bar.className = `last-cron-bar ${failed > 0 ? "warn" : "ok"}`;
 }
@@ -322,7 +322,7 @@ function applyWhitelistFilter() {
   if (!filtered.length) {
     list.innerHTML = query
       ? `<li class="empty">Tidak ada hasil untuk "<strong>${esc(query)}</strong>"</li>`
-      : `<li class="empty">Whitelist kosong — tambah manga di atas</li>`;
+      : `<li class="empty">Whitelist kosong - tambah manga di atas</li>`;
     return;
   }
 
@@ -334,8 +334,8 @@ function applyWhitelistFilter() {
       return `<li class="manga-item" title="${url ? esc(url) : ""}">
         <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
         <span class="manga-item-title">${highlight(title, query)}</span>
-        ${url ? `<span class="manga-item-has-url" title="${esc(url)}">🔗</span>` : ""}
-        <button class="btn-delete" onclick="deleteManga('${esc(title)}')">✕</button>
+        ${url ? `<span class="manga-item-has-url" title="${esc(url)}">link</span>` : ""}
+        <button class="btn-delete" onclick="deleteManga('${esc(title)}')">x</button>
       </li>`;
     })
     .join("");
@@ -370,7 +370,7 @@ function renderTopManhwa(data) {
         `<li class="manga-item">
       <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
       <span class="manga-item-title">${esc(item.title)}</span>
-      <span class="top-count">${item.count}×</span>
+      <span class="top-count">${item.count}</span>
     </li>`,
     )
     .join("");
@@ -410,15 +410,15 @@ function renderRecent(data) {
     .map((item) => {
       const cover = item.cover
         ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` +
-          `<div class="recent-cover-placeholder" style="display:none">📖</div>`
-        : `<div class="recent-cover-placeholder">📖</div>`;
+          `<div class="recent-cover-placeholder" style="display:none">img</div>`
+        : `<div class="recent-cover-placeholder">img</div>`;
       return `<a class="recent-item" href="${item.url ? esc(item.url) : "#"}" target="_blank" rel="noopener">
       ${cover}
       <div class="recent-info">
         <div class="recent-title">${esc(item.title)}</div>
         <div class="recent-chapter">${esc(item.chapter)}</div>
       </div>
-      <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "—"}</span>
+      <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "-"}</span>
     </a>`;
     })
     .join("");
@@ -483,14 +483,14 @@ function renderSnapshots(snapshots) {
     .map(
       (s) => `
     <li class="manga-item">
-      <span class="manga-index">📸</span>
+      <span class="manga-index">SNAP</span>
       <span class="manga-item-title">
         ${esc(s.label || "Snapshot")}
-        <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga · ${timeAgo(s.savedAt)}</small>
+        <small style="opacity:.5;font-size:.75em;margin-left:6px">${s.count} manga - ${timeAgo(s.savedAt)}</small>
       </span>
       <button class="btn-delete" style="background:var(--green,#22c55e);color:#fff;margin-right:4px"
-        onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')">↩ restore</button>
-      <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">✕</button>
+        onclick="restoreSnapshot('${s.id}', '${esc(s.label || s.id)}')"> restore</button>
+      <button class="btn-delete" onclick="deleteSnapshot('${s.id}')">x</button>
     </li>
   `,
     )
@@ -650,7 +650,7 @@ async function runMatchTest() {
 
     const sample = (data.sample || [])
       .slice(0, 5)
-      .map((x) => `• ${esc(x.title)} — ${esc(x.chapter)}`)
+      .map((x) => `- ${esc(x.title)} - ${esc(x.chapter)}`)
       .join("<br>");
 
     out.innerHTML = `
@@ -762,11 +762,11 @@ async function loadAll() {
     ].some((r) => r.status === "rejected" && r.reason?.name !== "AbortError");
     if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
-    $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
+    $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
   } finally {
     if (loadAbortController === controller) loadAbortController = null;
     btn.disabled = false;
-    btn.textContent = "↻ refresh";
+    btn.textContent = "refresh";
   }
 }
 
@@ -797,7 +797,7 @@ window.addEventListener("keydown", (e) => {
 // ===== THEME =====
 function applyTheme(dark) {
   document.body.classList.toggle("dark", dark);
-  $("btnTheme").textContent = dark ? "🌙" : "☀️";
+  $("btnTheme").textContent = dark ? "dark" : "light";
 }
 function toggleTheme() {
   const isDark = !document.body.classList.contains("dark");
@@ -840,7 +840,7 @@ async function saveSnapshot() {
     }
     labelInput.value = "";
     showAlert(
-      `✅ Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
+      ` Snapshot "${data.snapshot.label || data.snapshot.id}" tersimpan! (${data.snapshot.count} manga)`,
     );
     reloadSnapshots();
   } catch (e) {
@@ -848,7 +848,7 @@ async function saveSnapshot() {
   } finally {
     isProcessing = false;
     btn.disabled = false;
-    btn.textContent = "📸 Save";
+    btn.textContent = "Save";
   }
 }
 
@@ -876,7 +876,7 @@ async function restoreSnapshot(id, label) {
       showAlert(data.error || "Gagal restore");
       return;
     }
-    showAlert(`✅ ${data.message}`);
+    showAlert(` ${data.message}`);
     reloadSnapshots();
     apiFetch("/api/whitelist").then(renderWhitelist).catch(() => {});
   } catch (e) {
@@ -911,3 +911,4 @@ async function deleteSnapshot(id) {
     isProcessing = false;
   }
 }
+
