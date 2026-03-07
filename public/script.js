@@ -389,8 +389,8 @@ function renderGuilds(data) {
       (g) =>
         `<li class="guild-item">
       <div class="guild-info">
-        <div class="guild-id">${esc(g.guildId)}</div>
-        <div class="guild-channel">#${esc(g.channelId)}</div>
+        <div class="guild-id">${esc(g.guildName || g.guildId)}</div>
+        <div class="guild-channel">#${esc(g.channelName || g.channelId)}</div>
       </div>
       <span class="status-pill ${g.channelId ? "active" : "invalid"}">${g.channelId ? "aktif" : "invalid"}</span>
     </li>`,
