@@ -5,7 +5,16 @@ import {
   validateDashboardPassword,
 } from "../lib/auth.js";
 
-function readPassword(req) {
+async function readRawBody(req) {
+  if (!req || !req.readable) return "";
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function readPassword(req) {
   const body = req.body;
   if (typeof body === "string") {
     try {
@@ -20,7 +29,14 @@ function readPassword(req) {
     return String(body.password ?? "");
   }
 
-  return "";
+  const raw = await readRawBody(req);
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    return String(parsed?.password ?? "");
+  } catch {
+    return "";
+  }
 }
 
 export default async function handler(req, res) {
@@ -32,7 +48,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "DASHBOARD_PASSWORD belum diset di server" });
   }
 
-  const password = readPassword(req).trim();
+  const password = (await readPassword(req)).trim();
   if (!validateDashboardPassword(password)) {
     return res.status(401).json({ error: "Password salah" });
   }
