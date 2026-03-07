@@ -1,14 +1,12 @@
-import { verifyKey, InteractionType } from "discord-interactions";
-import { waitUntil }                  from "@vercel/functions";
+﻿import { verifyKey, InteractionType } from "discord-interactions";
+import { waitUntil } from "@vercel/functions";
 import { loadWhitelist, saveWhitelist, redis } from "../lib/redis.js";
-import { editInteractionResponse }    from "../lib/discord.js";
-import commands                       from "../lib/commands/index.js";
-import handleSearchPage               from "../lib/commands/searchPage.js";
+import { editInteractionResponse } from "../lib/discord.js";
+import commands from "../lib/commands/index.js";
+import handleSearchPage from "../lib/commands/searchPage.js";
 import { logApiHit } from "../lib/requestLog.js";
 
 export const config = { api: { bodyParser: false } };
-
-// ─── RAW BODY ─────────────────────────────────────────────────────────────────
 
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -19,87 +17,107 @@ async function getRawBody(req) {
   });
 }
 
-// ─── ADD MANGA (single source of truth) ──────────────────────────────────────
+function normalizeSource(source = "") {
+  const s = String(source).toLowerCase().trim();
+  if (s === "mirror" || s === "shinigami_mirror") return "shinigami_mirror";
+  if (s === "shinigami" || s === "project" || s === "shinigami_project") {
+    return "shinigami_project";
+  }
+  return "ikiru";
+}
 
-async function handleAddManga(payload, title, url = null) {
+function sourceLabel(source = "") {
+  const s = normalizeSource(source);
+  if (s === "shinigami_project") return "Shinigami (Project)";
+  if (s === "shinigami_mirror") return "Shinigami (Mirror)";
+  return "Ikiru";
+}
+
+async function handleAddManga(payload, title, url = null, source = "ikiru") {
   try {
+    const normalizedSource = normalizeSource(source);
     const whitelist = await loadWhitelist();
 
     const exists = whitelist.some(
       (item) =>
-        item.title?.toLowerCase() === title.toLowerCase() ||
-        (url && item.url === url),
+        normalizeSource(item.source) === normalizedSource &&
+        (item.title?.toLowerCase() === title.toLowerCase() || (url && item.url === url)),
     );
 
     if (exists) {
-      await editInteractionResponse(payload, `⚠️ **"${title}"** sudah ada!`);
+      await editInteractionResponse(
+        payload,
+        `**${title}** already exists in **${sourceLabel(normalizedSource)}**.`,
+      );
       return;
     }
 
-    whitelist.push({ title, url: url ?? null, source: "ikiru" });
+    whitelist.push({ title, url: url ?? null, source: normalizedSource });
     await saveWhitelist(whitelist);
 
     await editInteractionResponse(
       payload,
-      `✅ **"${title}"** ditambahkan!\n📋 Total: **${whitelist.length}** manga`,
+      `Added **${title}** from **${sourceLabel(normalizedSource)}**.\nTotal: **${whitelist.length}**`,
     );
   } catch (err) {
     console.error("[handleAddManga] Error:", err);
-    await editInteractionResponse(payload, `❌ Error: ${err.message}`);
+    await editInteractionResponse(payload, `Error: ${err.message}`);
   }
 }
 
-// ─── LIST BUILDER (single source of truth) ───────────────────────────────────
-
 async function buildListResponse(page = 1) {
   const whitelist = await loadWhitelist();
-  const pageSize  = 10;
+  const pageSize = 10;
   const totalPage = Math.ceil(whitelist.length / pageSize) || 1;
-  const safePage  = Math.min(Math.max(1, page), totalPage);
-  const start     = (safePage - 1) * pageSize;
-  const slice     = whitelist.slice(start, start + pageSize);
+  const safePage = Math.min(Math.max(1, page), totalPage);
+  const start = (safePage - 1) * pageSize;
+  const slice = whitelist.slice(start, start + pageSize);
 
-  const content = whitelist.length === 0
-    ? "📋 Whitelist kosong!"
-    : `📋 **Whitelist** (${whitelist.length} manga)\n` +
-      `*Page ${safePage}/${totalPage}*\n\n` +
-      slice
-        .map((item, i) => `${start + i + 1}. [${item.source ?? "ikiru"}] ${item.title}`)
-        .join("\n");
+  const content =
+    whitelist.length === 0
+      ? "Whitelist empty."
+      : `Whitelist (${whitelist.length})\nPage ${safePage}/${totalPage}\n\n` +
+        slice
+          .map(
+            (item, i) =>
+              `${start + i + 1}. [${sourceLabel(item.source)}] ${item.title}`,
+          )
+          .join("\n");
 
-  const components = whitelist.length === 0 ? [] : [
-    {
-      type: 1,
-      components: [
-        {
-          type:      2,
-          style:     1,
-          label:     "◀ Prev",
-          custom_id: `list:${safePage - 1}`,
-          disabled:  safePage <= 1,
-        },
-        {
-          type:      2,
-          style:     2,
-          label:     `Page ${safePage}`,
-          custom_id: "noop",
-          disabled:  true,
-        },
-        {
-          type:      2,
-          style:     1,
-          label:     "Next ▶",
-          custom_id: `list:${safePage + 1}`,
-          disabled:  safePage >= totalPage,
-        },
-      ],
-    },
-  ];
+  const components =
+    whitelist.length === 0
+      ? []
+      : [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: 1,
+                label: "Prev",
+                custom_id: `list:${safePage - 1}`,
+                disabled: safePage <= 1,
+              },
+              {
+                type: 2,
+                style: 2,
+                label: `Page ${safePage}`,
+                custom_id: "noop",
+                disabled: true,
+              },
+              {
+                type: 2,
+                style: 1,
+                label: "Next",
+                custom_id: `list:${safePage + 1}`,
+                disabled: safePage >= totalPage,
+              },
+            ],
+          },
+        ];
 
   return { content, components };
 }
-
-// ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   logApiHit("interactive", req);
@@ -107,7 +125,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const sig = req.headers["x-signature-ed25519"];
-  const ts  = req.headers["x-signature-timestamp"];
+  const ts = req.headers["x-signature-timestamp"];
   const raw = await getRawBody(req);
   const rawString = raw.toString();
 
@@ -122,62 +140,88 @@ export default async function handler(req, res) {
   const payload = JSON.parse(rawString);
   const { type, data: interactionData } = payload;
 
-  // ── PING ──────────────────────────────────────────────────────────────────
   if (type === 1) return res.json({ type: 1 });
 
-  // ── MESSAGE COMPONENT ─────────────────────────────────────────────────────
   if (type === InteractionType.MESSAGE_COMPONENT) {
     const { custom_id } = interactionData;
-    console.log("[router] component custom_id:", custom_id);
 
-    // Tambah manga dari hasil search dropdown
     if (custom_id === "select_add") {
-      const [keyword, slugOrUrl] = interactionData.values[0].split("|||");
+      const [rawSource, keyword, id] = String(interactionData.values?.[0] || "").split("|||");
+      const source = normalizeSource(rawSource);
+      const cached =
+        (await redis.get(`search:results:${source}:${keyword}`)) ||
+        (await redis.get(`search:results:${keyword}`));
 
-      const cached = await redis.get(`search:results:${keyword}`);
       if (!cached) {
         return res.json({
           type: 4,
-          data: { content: "⚠️ Session expired, coba `/search` lagi.", flags: 64 },
+          data: { content: "Session expired. Run /search again.", flags: 64 },
         });
       }
 
-      // Upstash auto-deserialize — tidak perlu JSON.parse
       const results = Array.isArray(cached) ? cached : [];
-      const item = results.find(
-        (r) => (r.slug ?? r.mangaUrl ?? r.url) === slugOrUrl,
-      );
+      const item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
 
       if (!item) {
         return res.json({
           type: 4,
-          data: { content: "⚠️ Manga tidak ditemukan, coba `/search` lagi.", flags: 64 },
+          data: { content: "Selected manga not found. Run /search again.", flags: 64 },
         });
       }
 
       res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil(handleAddManga(payload, item.title, item.mangaUrl ?? item.url));
+      return waitUntil(
+        handleAddManga(
+          payload,
+          item.title,
+          item.mangaUrl ?? item.url,
+          item.source ?? source,
+        ),
+      );
     }
 
-    // Navigasi halaman search
-    // Pakai firstColon/lastColon agar keyword yang mengandung ":" (e.g. "re:zero") tidak terpotong
-    if (custom_id.startsWith("search:")) {
-      const firstColon = custom_id.indexOf(":");
-      const lastColon  = custom_id.lastIndexOf(":");
-      const keyword    = custom_id.slice(firstColon + 1, lastColon);
-      const page       = parseInt(custom_id.slice(lastColon + 1), 10) || 1;
-      res.json({ type: 6 });
-      return waitUntil(handleSearchPage(payload, keyword, page, redis));
-    }
+    if (custom_id === "select_add_src") {
+      const [rawSource, keyword, id] = String(interactionData.values?.[0] || "").split("|||");
+      const source = normalizeSource(rawSource);
+      const cached = await redis.get(`add:results:${source}:${keyword}`);
 
-    // Tambah manga langsung dari button add
-    if (custom_id.startsWith("add:")) {
-      const title = custom_id.replace("add:", "");
+      if (!cached) {
+        return res.json({
+          type: 4,
+          data: { content: "Session expired. Run /add again.", flags: 64 },
+        });
+      }
+
+      const results = Array.isArray(cached) ? cached : [];
+      const item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
+
+      if (!item) {
+        return res.json({
+          type: 4,
+          data: { content: "Selected manga not found. Run /add again.", flags: 64 },
+        });
+      }
+
       res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil(handleAddManga(payload, title));
+      return waitUntil(
+        handleAddManga(
+          payload,
+          item.title,
+          item.mangaUrl ?? item.url,
+          item.source ?? source,
+        ),
+      );
     }
 
-    // Navigasi halaman list — update message in-place (type 7)
+    if (custom_id.startsWith("search:")) {
+      const parts = custom_id.split(":");
+      const page = parseInt(parts.pop(), 10) || 1;
+      const source = normalizeSource(parts[1] || "all");
+      const keyword = decodeURIComponent(parts.slice(2).join(":"));
+      res.json({ type: 6 });
+      return waitUntil(handleSearchPage(payload, keyword, page, source, redis));
+    }
+
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1], 10) || 1;
       const { content, components } = await buildListResponse(page);
@@ -187,26 +231,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Unknown component" });
   }
 
-  // ── APPLICATION COMMAND ───────────────────────────────────────────────────
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
     const handle = commands[name];
 
     if (!handle) {
-      console.warn(`[router] Unknown command: ${name}`);
       return res.status(400).json({ error: "Unknown command" });
     }
 
-    // /list — sync, pakai buildListResponse langsung
     if (name === "list") {
       const page = parseInt(options?.[0]?.value, 10) || 1;
       const { content, components } = await buildListResponse(page);
       return res.json({ type: 4, data: { content, components, flags: 64 } });
     }
 
-    // Semua command lain selalu dapat res dan redis
-    // ping  → langsung res.json() di dalam handler
-    // yang lain → defer sendiri di dalam handler masing-masing
     return handle(payload, options, res, redis);
   }
 

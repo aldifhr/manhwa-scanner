@@ -39,13 +39,27 @@ const commands = [
   },
   {
     name:        "search",
-    description: "Cari manga di Ikiru berdasarkan keyword",
-    options: [{
-      name:        "keyword",
-      description: "Keyword pencarian",
-      type:        3,
-      required:    true,
-    }],
+    description: "Cari manga berdasarkan source",
+    options: [
+      {
+        name:        "keyword",
+        description: "Keyword pencarian",
+        type:        3,
+        required:    true,
+      },
+      {
+        name:        "source",
+        description: "Sumber pencarian",
+        type:        3,
+        required:    false,
+        choices: [
+          { name: "All Sources", value: "all" },
+          { name: "Ikiru", value: "ikiru" },
+          { name: "Shinigami Project", value: "shinigami_project" },
+          { name: "Shinigami Mirror", value: "shinigami_mirror" },
+        ],
+      },
+    ],
   },
   {
     name:        "clear",
