@@ -174,6 +174,14 @@ function timeAgo(iso) {
   return "baru saja";
 }
 
+function sourceName(source) {
+  const s = String(source || "").toLowerCase().trim();
+  if (s === "shinigami_project" || s === "shinigami_mirror" || s === "shinigami") {
+    return "Shinigami";
+  }
+  return "Ikiru";
+}
+
 function skeleton(ul, n = 4) {
   ul.innerHTML = Array.from(
     { length: n },
@@ -428,10 +436,47 @@ function renderRecent(data) {
       ${cover}
       <div class="recent-info">
         <div class="recent-title">${esc(item.title)}</div>
-        <div class="recent-chapter">${esc(item.chapter)}</div>
+        <div class="recent-chapter">${esc(item.chapter)}${item.source ? ` - ${esc(sourceName(item.source))}` : ""}</div>
       </div>
       <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "-"}</span>
     </a>`;
+    })
+    .join("");
+}
+
+function renderSourceCompare(data) {
+  const summary = data?.summary ?? {};
+  const sourceCounts = data?.sourceCounts ?? {};
+  const items = data?.comparisons ?? [];
+  const list = $("compareList");
+
+  $("compareCount").textContent = summary.totalCompared ?? 0;
+  $("compareIkiruWins").textContent = summary.ikiruWins ?? 0;
+  $("compareShinigamiWins").textContent = summary.shinigamiWins ?? 0;
+  $("compareTies").textContent = summary.ties ?? 0;
+  $("sourceCountIkiru").textContent = sourceCounts.ikiru ?? 0;
+  $("sourceCountShinigami").textContent =
+    (sourceCounts.shinigami_project ?? 0) + (sourceCounts.shinigami_mirror ?? 0);
+
+  if (!items.length) {
+    list.innerHTML = '<li class="empty">Belum ada data compare judul/chapter yang sama.</li>';
+    return;
+  }
+
+  list.innerHTML = items
+    .map((item, i) => {
+      const winnerText =
+        item.winner === "ikiru"
+          ? "Ikiru lebih cepat"
+          : item.winner === "shinigami"
+            ? "Shinigami lebih cepat"
+            : "Tie";
+      const delta = Number(item.deltaMinutes ?? 0);
+      return `<li class="manga-item">
+      <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)} - ${esc(item.chapter)}
+      <small style="display:block;opacity:.6;font-size:.75em">${esc(winnerText)} (${delta} menit)</small></span>
+    </li>`;
     })
     .join("");
 }
@@ -699,6 +744,7 @@ async function loadAll() {
   skeleton($("logList"), 5);
   skeleton($("topManhwaList"));
   skeleton($("snapshotList"), 2);
+  skeleton($("compareList"), 3);
 
   try {
     const [
@@ -711,6 +757,7 @@ async function loadAll() {
       topR,
       trendR,
       snapshotR,
+      compareR,
     ] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/whitelist", controller.signal),
@@ -725,6 +772,7 @@ async function loadAll() {
         signal: controller.signal,
       }),
       apiFetch("/api/snapshot", controller.signal),
+      apiFetch("/api/source-compare", controller.signal),
     ]);
 
     if (loadAbortController !== controller) return;
@@ -770,8 +818,11 @@ async function loadAll() {
     if (snapshotR.status === "fulfilled") renderSnapshots(snapshotR.value.snapshots ?? []);
     else renderErr($("snapshotList"), "Gagal muat snapshot");
 
+    if (compareR.status === "fulfilled") renderSourceCompare(compareR.value);
+    else renderErr($("compareList"), "Gagal muat compare");
+
     const anyFailed = [
-      statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR, snapshotR,
+      statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR, snapshotR, compareR,
     ].some((r) => r.status === "rejected" && r.reason?.name !== "AbortError");
     if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 

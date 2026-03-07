@@ -223,6 +223,7 @@ export default async function handler(req, res) {
         url: item.url,
         cover: item.cover ?? null,
         source: item.source ?? "ikiru",
+        updatedTime: item.updatedTime ?? null,
         sentAt: nowIso,
       });
 
