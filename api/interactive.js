@@ -154,9 +154,31 @@ export default async function handler(req, res) {
     const { custom_id } = interactionData;
 
     if (custom_id === "select_add_src") {
-      const [rawSource, keyword, id] = String(interactionData.values?.[0] || "").split("|||");
-      const source = normalizeSource(rawSource);
-      const cached = await redis.get(`add:results:${source}:${keyword}`);
+      const rawValue = String(interactionData.values?.[0] || "");
+      const parts = rawValue.split("|||");
+
+      let cached = null;
+      let item = null;
+      let selectedSource = "ikiru";
+
+      if (parts.length === 2) {
+        const [sessionId, idxRaw] = parts;
+        const sessionSource = normalizeSource(sessionId.split(":")[0] || "ikiru");
+        cached = await redis.get(`add:results:${sessionId}`);
+        const idx = Number.parseInt(idxRaw, 10);
+        const results = Array.isArray(cached) ? cached : [];
+        if (Number.isInteger(idx) && idx >= 0 && idx < results.length) {
+          item = results[idx];
+        }
+        selectedSource = normalizeSource(item?.source || sessionSource);
+      } else {
+        const [rawSource, keyword, id] = parts;
+        const legacySource = normalizeSource(rawSource);
+        cached = await redis.get(`add:results:${legacySource}:${keyword}`);
+        const results = Array.isArray(cached) ? cached : [];
+        item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
+        selectedSource = normalizeSource(item?.source || legacySource);
+      }
 
       if (!cached) {
         return res.json({
@@ -164,9 +186,6 @@ export default async function handler(req, res) {
           data: { content: "Session expired. Run /add again.", flags: 64 },
         });
       }
-
-      const results = Array.isArray(cached) ? cached : [];
-      const item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
 
       if (!item) {
         return res.json({
@@ -181,7 +200,7 @@ export default async function handler(req, res) {
           payload,
           item.title,
           item.mangaUrl ?? item.url,
-          item.source ?? source,
+          selectedSource,
         ),
       );
     }

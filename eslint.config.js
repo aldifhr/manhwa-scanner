@@ -28,6 +28,7 @@ export default [
     rules: {
       "no-console": "off",
       "no-unused-vars": "off",
+      "no-useless-assignment": "off",
       "no-undef": "off",
       eqeqeq: "error",
     },
