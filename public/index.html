@@ -60,7 +60,10 @@
       <div class="last-cron-bar" id="lastCronBar">
         <div class="last-cron-head">
           <span class="last-cron-title">Last Cron Result</span>
-          <span class="last-cron-time" id="lastCronTime">—</span>
+          <div class="last-cron-actions">
+            <span class="last-cron-time" id="lastCronTime">—</span>
+            <button type="button" class="btn-mini" onclick="openLogDrilldown()">View Logs</button>
+          </div>
         </div>
         <div class="last-cron-metrics">
           <span id="lastCronSent">sent: —</span>
@@ -91,6 +94,35 @@
         <div class="stat-card">
           <div class="stat-label">Sent 24h</div>
           <div class="stat-value" id="overviewSent24h">—</div>
+        </div>
+      </div>
+
+      <div class="section-label">matcher lab</div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Test Match (Whitelist vs Scraper)</span>
+        </div>
+        <div class="whitelist-form">
+          <input
+            type="text"
+            id="matchTestTitle"
+            placeholder="Title (opsional)"
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') runMatchTest()"
+          />
+          <input
+            type="text"
+            id="matchTestUrl"
+            placeholder="URL manga (opsional)"
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') runMatchTest()"
+          />
+          <button type="button" class="btn-add" id="btnMatchTest" onclick="runMatchTest()">
+            Test
+          </button>
+        </div>
+        <div class="match-test-result" id="matchTestResult">
+          Masukkan title/url, lalu klik <strong>Test</strong>.
         </div>
       </div>
 
@@ -241,5 +273,18 @@
         </ul>
       </div>
     </main>
+
+    <div class="modal-overlay" id="logDrilldownOverlay">
+      <div class="modal modal-wide">
+        <div class="log-drilldown-head">
+          <h2>Log Drilldown</h2>
+          <button type="button" class="btn-mini" onclick="closeLogDrilldown()">Close</button>
+        </div>
+        <p>20 log terbaru dari backend cron.</p>
+        <ul class="log-list" id="logDrilldownList">
+          <li class="empty">Belum ada data</li>
+        </ul>
+      </div>
+    </div>
   </body>
 </html>

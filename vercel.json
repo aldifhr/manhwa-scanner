@@ -6,6 +6,9 @@
     "api/interactive.js": {
       "maxDuration": 10
     },
+    "api/test-match.js": {
+      "maxDuration": 30
+    },
     "api/chart.js": { 
       "maxDuration": 10 
     }

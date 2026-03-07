@@ -15,6 +15,7 @@ let pollTimer = null;
 let trendChart = null;
 let isProcessing = false;
 let loadAbortController = null;
+let latestLogs = [];
 
 // ===== WHITELIST STATE =====
 let whitelistItems = [];
@@ -426,6 +427,7 @@ function renderRecent(data) {
 function renderLogs(data) {
   const list = $("logList");
   const logs = data?.logs ?? [];
+  latestLogs = logs;
   $("logCount").textContent = `${logs.length} entries`;
   if (!logs.length) {
     list.innerHTML = `<li class="empty">Belum ada log</li>`;
@@ -441,6 +443,33 @@ function renderLogs(data) {
     </li>`,
     )
     .join("");
+}
+
+function openLogDrilldown() {
+  const overlay = $("logDrilldownOverlay");
+  const list = $("logDrilldownList");
+  const logs = (latestLogs || []).slice(0, 20);
+
+  if (!logs.length) {
+    list.innerHTML = `<li class="empty">Belum ada log</li>`;
+  } else {
+    list.innerHTML = logs
+      .map(
+        (l) => `
+      <li class="log-item">
+        <span class="log-time">${fmt(new Date(l.time))}</span>
+        <span>${esc(l.message)}</span>
+        <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
+      </li>`,
+      )
+      .join("");
+  }
+
+  overlay.classList.add("show");
+}
+
+function closeLogDrilldown() {
+  $("logDrilldownOverlay").classList.remove("show");
 }
 
 function renderSnapshots(snapshots) {
@@ -585,6 +614,59 @@ async function runCronNow() {
   }
 }
 
+async function runMatchTest() {
+  if (!checkAuth() || isProcessing) return;
+
+  const title = $("matchTestTitle")?.value.trim() || "";
+  const url = $("matchTestUrl")?.value.trim() || "";
+  const btn = $("btnMatchTest");
+  const out = $("matchTestResult");
+
+  if (!title && !url) {
+    out.innerHTML = `<span style="color:var(--red)">Isi minimal title atau URL.</span>`;
+    return;
+  }
+
+  isProcessing = true;
+  btn.disabled = true;
+  btn.textContent = "testing...";
+  out.innerHTML = "Testing matcher...";
+
+  try {
+    const r = await fetch(`${API_BASE}/api/test-match`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title, url }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      out.innerHTML = `<span style="color:var(--red)">${esc(data.error || "Request gagal")}</span>`;
+      return;
+    }
+
+    const sample = (data.sample || [])
+      .slice(0, 5)
+      .map((x) => `• ${esc(x.title)} — ${esc(x.chapter)}`)
+      .join("<br>");
+
+    out.innerHTML = `
+      <div><strong>Scraped:</strong> ${data.scraped} | <strong>Matched:</strong> ${data.matched}</div>
+      <div><strong>By URL:</strong> ${data.diagnostics?.byUrlCount ?? 0} | <strong>By Title:</strong> ${data.diagnostics?.byTitleCount ?? 0}</div>
+      <div style="margin-top:6px">${sample || "Tidak ada sample match."}</div>
+    `;
+  } catch (e) {
+    out.innerHTML = `<span style="color:var(--red)">Gagal: ${esc(e.message)}</span>`;
+  } finally {
+    isProcessing = false;
+    btn.disabled = false;
+    btn.textContent = "Test";
+  }
+}
+
 // ===== LOAD ALL =====
 async function loadAll() {
   if (!checkAuth()) return;
@@ -706,6 +788,10 @@ function startPoll() {
 
 window.addEventListener("focus", () => {
   if (secret && !isProcessing) loadAll();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeLogDrilldown();
 });
 
 // ===== THEME =====
