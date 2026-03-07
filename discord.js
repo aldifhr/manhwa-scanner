@@ -58,7 +58,7 @@ const commands = [
   },
 {
   name: "add",
-  description: "Tambah manga ke whitelist berdasarkan source",
+  description: "Tambah manga ke whitelist",
   options: [
     {
       name: "source",
@@ -67,8 +67,7 @@ const commands = [
       required: true,
       choices: [
         { name: "Ikiru", value: "ikiru" },
-        { name: "Shinigami Project", value: "shinigami_project" },
-        { name: "Shinigami Mirror", value: "shinigami_mirror" },
+        { name: "Shinigami", value: "shinigami_project" },
       ],
     },
     {
