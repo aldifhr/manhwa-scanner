@@ -246,23 +246,15 @@ export default async function handler(req, res) {
     ]);
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
-    const minuteSlot = Math.floor(Date.now() / (5 * 60 * 1000));
 
-    await Promise.all([
-      redis.set("cron:last_run", {
-        sent,
-        skipped,
-        failed,
-        duration,
-        guilds: activeGuildCount,
-        timestamp: new Date().toISOString(),
-      }),
-      redis.set(
-        `cron:trend:${minuteSlot}`,
-        { sent, skipped, failed, duration: parseFloat(duration) },
-        { ex: 7200 },
-      ),
-    ]);
+    await redis.set("cron:last_run", {
+      sent,
+      skipped,
+      failed,
+      duration,
+      guilds: activeGuildCount,
+      timestamp: new Date().toISOString(),
+    });
 
     console.log(
       `[cron] Done ${duration}s - sent:${sent} skipped:${skipped} failed:${failed} guilds:${activeGuildCount}`,

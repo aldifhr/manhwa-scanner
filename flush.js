@@ -116,11 +116,28 @@ async function flushChannels() {
   log.success(`Total deleted: ${keys.length} keys`);
 }
 
+async function flushTrend() {
+  log.title("🗑️  FLUSH CRON TREND KEYS");
+  const keys = await redis.keys("cron:trend:*");
+
+  if (keys.length === 0) {
+    log.warn("Tidak ada cron:trend key di Redis.");
+    return;
+  }
+
+  for (const key of keys) {
+    await redis.del(key);
+    log.item(`Deleted: ${key}`);
+  }
+  log.success(`Total deleted: ${keys.length} keys`);
+}
+
 async function flushAll() {
   log.title("💥 FLUSH ALL REDIS DATA");
   await flushChapter();
   await flushWhitelist();
   await flushChannels();
+  await flushTrend();
   await redis.del("cache:updates");
   log.success("cache:updates deleted");
   log.title("✅ SEMUA DATA BERHASIL DIHAPUS");
@@ -132,6 +149,7 @@ async function flushAll() {
 // node flush.js chapter     → hapus semua chapter keys
 // node flush.js whitelist   → hapus whitelist
 // node flush.js channels    → hapus channel keys
+// node flush.js trend       → hapus cron:trend keys
 // node flush.js all         → hapus semua data
 // ─────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -150,6 +168,9 @@ switch (mode) {
   case "channels":
     flushChannels().catch(console.error);
     break;
+  case "trend":
+    flushTrend().catch(console.error);
+    break;
   case "all":
     flushAll().catch(console.error);
     break;
@@ -160,6 +181,7 @@ switch (mode) {
     log.item("  node flush.js chapter   → hapus semua chapter keys");
     log.item("  node flush.js whitelist → hapus whitelist");
     log.item("  node flush.js channels  → hapus channel keys");
+    log.item("  node flush.js trend     → hapus cron:trend keys");
     log.item("  node flush.js all       → hapus semua data");
     process.exit(1);
 }
