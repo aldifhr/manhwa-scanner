@@ -1,10 +1,20 @@
-const API_BASE = "https://ikiru-bots.vercel.app";
+const API_BASE = "";
 const POLL_MS = 30_000;
-const $ = (id) => document.getElementById(id);
+const elementCache = new Map();
+const $ = (id) => {
+  if (!elementCache.has(id)) elementCache.set(id, document.getElementById(id));
+  return elementCache.get(id);
+};
+const TIME_FORMATTER = new Intl.DateTimeFormat("id-ID", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
 let secret = localStorage.getItem("ikiru_secret") || "";
 let pollTimer = null;
 let trendChart = null;
 let isProcessing = false;
+let loadAbortController = null;
 
 // ===== WHITELIST STATE =====
 let whitelistItems = [];
@@ -105,10 +115,11 @@ $("secretInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") submitSecret();
 });
 
-async function apiFetch(path) {
+async function apiFetch(path, signal) {
   const r = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
     headers: { Authorization: `Bearer ${secret}` },
+    signal,
   });
   if (r.status === 401) {
     secret = "";
@@ -123,12 +134,7 @@ async function apiFetch(path) {
 // ===== UI HELPERS =====
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const fmt = (d) =>
-  new Intl.DateTimeFormat("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(d);
+const fmt = (d) => TIME_FORMATTER.format(d);
 function timeAgo(iso) {
   if (!iso) return "—";
   const seconds = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -222,31 +228,18 @@ function renderStatsExtended(statusData, uptimeData) {
 function applyWhitelistFilter() {
   const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
   const list = $("mangaList");
+  const items = whitelistItems.map((item, originalIndex) => {
+    const title = typeof item === "string" ? item : item.title;
+    return { item, title, titleLower: title.toLowerCase(), originalIndex };
+  });
 
-  let items = [...whitelistItems];
-
-  // sort
   if (whitelistSortOrder === "az") {
-    items.sort((a, b) => {
-      const ta = (typeof a === "string" ? a : a.title).toLowerCase();
-      const tb = (typeof b === "string" ? b : b.title).toLowerCase();
-      return ta.localeCompare(tb);
-    });
+    items.sort((a, b) => a.titleLower.localeCompare(b.titleLower));
   } else if (whitelistSortOrder === "za") {
-    items.sort((a, b) => {
-      const ta = (typeof a === "string" ? a : a.title).toLowerCase();
-      const tb = (typeof b === "string" ? b : b.title).toLowerCase();
-      return tb.localeCompare(ta);
-    });
+    items.sort((a, b) => b.titleLower.localeCompare(a.titleLower));
   }
 
-  // filter
-  const filtered = query
-    ? items.filter((item) => {
-        const title = (typeof item === "string" ? item : item.title).toLowerCase();
-        return title.includes(query);
-      })
-    : items;
+  const filtered = query ? items.filter((entry) => entry.titleLower.includes(query)) : items;
 
   // update badge
   $("whitelistCount").textContent = whitelistItems.length;
@@ -259,12 +252,10 @@ function applyWhitelistFilter() {
   }
 
   list.innerHTML = filtered
-    .map((item, i) => {
-      const title = typeof item === "string" ? item : item.title;
+    .map((entry, i) => {
+      const { item, title, originalIndex } = entry;
       const url = typeof item === "object" ? item.url : null;
-      // pakai index asli dari whitelistItems untuk nomor urut
-      const realIndex = whitelistItems.indexOf(item);
-      const displayIndex = whitelistSortOrder === "default" ? realIndex : i;
+      const displayIndex = whitelistSortOrder === "default" ? originalIndex : i;
       return `<li class="manga-item" title="${url ? esc(url) : ""}">
         <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
         <span class="manga-item-title">${highlight(title, query)}</span>
@@ -477,6 +468,10 @@ async function loadAll() {
   if (!checkAuth()) return;
   clearAlert();
 
+  if (loadAbortController) loadAbortController.abort();
+  const controller = new AbortController();
+  loadAbortController = controller;
+
   const btn = $("btnRefresh");
   btn.disabled = true;
   btn.textContent = "memuat...";
@@ -488,70 +483,77 @@ async function loadAll() {
   skeleton($("topManhwaList"));
   skeleton($("snapshotList"), 2);
 
-  const [
-    statusR,
-    whitelistR,
-    guildsR,
-    recentR,
-    logsR,
-    uptimeR,
-    topR,
-    trendR,
-    snapshotR,
-  ] = await Promise.allSettled([
-    apiFetch("/api/status"),
-    apiFetch("/api/whitelist"),
-    apiFetch("/api/guilds"),
-    apiFetch("/api/recent"),
-    apiFetch("/api/logs"),
-    apiFetch("/api/uptime"),
-    apiFetch("/api/top"),
-    fetch(`${API_BASE}/api/chart`, {
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${secret}` },
-    }),
-    apiFetch("/api/snapshot"),
-  ]);
+  try {
+    const [
+      statusR,
+      whitelistR,
+      guildsR,
+      recentR,
+      logsR,
+      uptimeR,
+      topR,
+      trendR,
+      snapshotR,
+    ] = await Promise.allSettled([
+      apiFetch("/api/status", controller.signal),
+      apiFetch("/api/whitelist", controller.signal),
+      apiFetch("/api/guilds", controller.signal),
+      apiFetch("/api/recent", controller.signal),
+      apiFetch("/api/logs", controller.signal),
+      apiFetch("/api/uptime", controller.signal),
+      apiFetch("/api/top", controller.signal),
+      fetch(`${API_BASE}/api/chart`, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${secret}` },
+        signal: controller.signal,
+      }),
+      apiFetch("/api/snapshot", controller.signal),
+    ]);
 
-  renderStatsExtended(
-    statusR.status === "fulfilled" ? statusR.value : null,
-    uptimeR.status === "fulfilled" ? uptimeR.value : null,
-  );
+    if (loadAbortController !== controller) return;
 
-  if (trendR.status === "fulfilled" && trendR.value.ok) {
-    try {
-      renderSuccessChart(await trendR.value.json());
-    } catch (e) {
-      console.error("Chart error:", e);
+    renderStatsExtended(
+      statusR.status === "fulfilled" ? statusR.value : null,
+      uptimeR.status === "fulfilled" ? uptimeR.value : null,
+    );
+
+    if (trendR.status === "fulfilled" && trendR.value.ok) {
+      try {
+        renderSuccessChart(await trendR.value.json());
+      } catch (e) {
+        console.error("Chart error:", e);
+      }
     }
+
+    if (topR.status === "fulfilled") renderTopManhwa(topR.value);
+    else renderErr($("topManhwaList"), "Gagal muat");
+
+    if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
+    else renderErr($("mangaList"), "Gagal muat whitelist");
+
+    if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
+    else renderErr($("guildList"), "Gagal muat guilds");
+
+    if (recentR.status === "fulfilled") renderRecent(recentR.value);
+    else renderErr($("recentList"), "Gagal muat");
+
+    if (logsR.status === "fulfilled") renderLogs(logsR.value);
+    else renderErr($("logList"), "Gagal muat logs");
+
+    if (snapshotR.status === "fulfilled") renderSnapshots(snapshotR.value.snapshots ?? []);
+    else renderErr($("snapshotList"), "Gagal muat snapshot");
+
+    const anyFailed = [
+      statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR, snapshotR,
+    ].some((r) => r.status === "rejected" && r.reason?.name !== "AbortError");
+    if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
+
+    $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
+  } finally {
+    if (loadAbortController === controller) loadAbortController = null;
+    btn.disabled = false;
+    btn.textContent = "↻ refresh";
   }
-
-  if (topR.status === "fulfilled") renderTopManhwa(topR.value);
-  else renderErr($("topManhwaList"), "Gagal muat");
-
-  if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
-  else renderErr($("mangaList"), "Gagal muat whitelist");
-
-  if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
-  else renderErr($("guildList"), "Gagal muat guilds");
-
-  if (recentR.status === "fulfilled") renderRecent(recentR.value);
-  else renderErr($("recentList"), "Gagal muat");
-
-  if (logsR.status === "fulfilled") renderLogs(logsR.value);
-  else renderErr($("logList"), "Gagal muat logs");
-
-  if (snapshotR.status === "fulfilled") renderSnapshots(snapshotR.value.snapshots ?? []);
-  else renderErr($("snapshotList"), "Gagal muat snapshot");
-
-  const anyFailed = [
-    statusR, whitelistR, guildsR, recentR, logsR, uptimeR, topR, trendR, snapshotR,
-  ].some((r) => r.status === "rejected");
-  if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
-
-  $("lastUpdated").textContent = `updated ${fmt(new Date())}`;
-  btn.disabled = false;
-  btn.textContent = "↻ refresh";
 }
 
 // ===== SNAPSHOT RELOAD =====

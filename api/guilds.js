@@ -1,12 +1,10 @@
 import { getAllGuildChannels } from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
 
-// BigInt JSON serializer
-BigInt.prototype.toJSON = function () {
-  return this.toString();
-};
-
 export default async function handler(req, res) {
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
+
   if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 
@@ -15,7 +13,7 @@ export default async function handler(req, res) {
     const channelMap = await getAllGuildChannels();
     const guilds = Object.entries(channelMap).map(([guildId, channelId]) => ({
       guildId,
-      channelId: String(BigInt(channelId)), // Force safe string
+      channelId: String(channelId),
     }));
 
     res.json({ guilds });

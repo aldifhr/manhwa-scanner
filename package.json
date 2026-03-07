@@ -6,7 +6,8 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "dev": "npm run lint && vercel dev"
+    "dev": "npm run lint",
+    "dev:vercel": "vercel dev --yes --listen 3000"
   },
   "keywords": [],
   "author": "",

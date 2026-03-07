@@ -2,6 +2,9 @@ import { redis }           from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
 
 export default async function handler(req, res) {
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
+
   if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
 
@@ -9,13 +12,8 @@ export default async function handler(req, res) {
 
   try {
     // Ambil 1000 entry agar 7d data cukup terwakili
-    const raw  = await redis.lrange("cron:logs", 0, 999);
-    const logs = raw
-      .map((entry) => {
-        try { return typeof entry === "string" ? JSON.parse(entry) : entry; }
-        catch { return null; }
-      })
-      .filter(Boolean);
+    const raw = await redis.lrange("cron:logs", 0, 999);
+    const logs = raw.filter(Boolean);
 
     const uptime24h = calculateUptime(logs, 24);
     const uptime7d  = calculateUptime(logs, 168);

@@ -1,6 +1,12 @@
 import { redis }           from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
 
+const CHART_DAY_FORMATTER = new Intl.DateTimeFormat("id-ID", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
 export default async function handler(req, res) {
   if (!isCronAuthorized(req))
     return res.status(401).json({ error: "Unauthorized" });
@@ -17,11 +23,7 @@ export default async function handler(req, res) {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const label = d.toLocaleDateString("id-ID", {
-        weekday: "short",
-        day:     "numeric",
-        month:   "short",
-      });
+      const label = CHART_DAY_FORMATTER.format(d);
       days[label] = { sent: 0, failed: 0 };
     }
 
@@ -37,11 +39,7 @@ export default async function handler(req, res) {
       if (time.getTime() < cutoff) continue;
       if (!["sent", "failed"].includes(entry.tag)) continue;
 
-      const label = time.toLocaleDateString("id-ID", {
-        weekday: "short",
-        day:     "numeric",
-        month:   "short",
-      });
+      const label = CHART_DAY_FORMATTER.format(time);
 
       if (!days[label]) continue;
       days[label][entry.tag]++;

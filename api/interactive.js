@@ -104,16 +104,17 @@ export default async function handler(req, res) {
   const sig = req.headers["x-signature-ed25519"];
   const ts  = req.headers["x-signature-timestamp"];
   const raw = await getRawBody(req);
+  const rawString = raw.toString();
 
   const isValid = await verifyKey(
-    raw.toString(),
+    rawString,
     sig,
     ts,
     process.env.DISCORD_PUBLIC_KEY,
   );
   if (!isValid) return res.status(401).end();
 
-  const payload = JSON.parse(raw.toString());
+  const payload = JSON.parse(rawString);
   const { type, data: interactionData } = payload;
 
   // ── PING ──────────────────────────────────────────────────────────────────
