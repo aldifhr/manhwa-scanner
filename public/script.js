@@ -24,7 +24,6 @@ if (![10_000, 30_000, 60_000].includes(pollMs)) pollMs = DEFAULT_POLL_MS;
 let autoRefreshEnabled = localStorage.getItem("ikiru_auto_refresh") !== "off";
 let isProcessing = false;
 let loadAbortController = null;
-let latestLogs = [];
 
 // ===== WHITELIST STATE =====
 let whitelistItems = [];
@@ -150,7 +149,7 @@ function highlight(text, query) {
 }
 
 // ===== RENDER =====
-function renderStatsExtended(statusData, uptimeData) {
+function renderStatsExtended(statusData) {
   const dot = $("statusDot");
   if (!statusData) {
     [
@@ -158,8 +157,6 @@ function renderStatsExtended(statusData, uptimeData) {
       "statSkipped",
       "statFailed",
       "statDuration",
-      "statUptime24h",
-      "statUptime7d",
     ].forEach((id) => ($(id).textContent = "-"));
     dot.className = "logo-dot offline";
     return;
@@ -170,26 +167,18 @@ function renderStatsExtended(statusData, uptimeData) {
   $("statDuration").textContent = statusData.duration
     ? `${statusData.duration}s`
     : "-";
-  $("statUptime24h").textContent = uptimeData?.uptime24h ?? "-";
-  $("statUptime24h").className =
-    `stat-value ${uptimeData?.uptime24h >= 95 ? "green" : uptimeData?.uptime24h >= 80 ? "amber" : "red"}`;
-  $("statUptime7d").textContent = uptimeData?.uptime7d ?? "-";
-  $("statUptime7d").className =
-    `stat-value ${uptimeData?.uptime7d >= 95 ? "green" : uptimeData?.uptime7d >= 80 ? "amber" : "red"}`;
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
 }
 
-function renderOverview(statusData, whitelistData, guildData, recentData) {
+function renderOverview(statusData, whitelistData, recentData) {
   const healthEl = $("overviewHealth");
   const lastRunEl = $("overviewLastRun");
-  const guildsEl = $("overviewGuilds");
   const whitelistEl = $("overviewWhitelist");
   const sent24hEl = $("overviewSent24h");
 
   if (!statusData) {
     healthEl.textContent = "-";
     lastRunEl.textContent = "-";
-    guildsEl.textContent = "-";
     whitelistEl.textContent = "-";
     sent24hEl.textContent = "-";
     healthEl.className = "stat-value";
@@ -201,7 +190,6 @@ function renderOverview(statusData, whitelistData, guildData, recentData) {
   healthEl.className = `stat-value ${failed > 0 ? "amber" : "green"}`;
 
   lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
-  guildsEl.textContent = Array.isArray(guildData?.guilds) ? guildData.guilds.length : "-";
   whitelistEl.textContent = Array.isArray(whitelistData?.items)
     ? whitelistData.items.length
     : "-";
@@ -300,28 +288,6 @@ function setSortOrder(order) {
   applyWhitelistFilter();
 }
 
-function renderGuilds(data) {
-  const list = $("guildList");
-  const guilds = data?.guilds ?? [];
-  $("guildCount").textContent = guilds.length;
-  if (!guilds.length) {
-    list.innerHTML = `<li class="empty">Belum ada guild</li>`;
-    return;
-  }
-  list.innerHTML = guilds
-    .map(
-      (g) =>
-        `<li class="guild-item">
-      <div class="guild-info">
-        <div class="guild-id">${esc(g.guildName || g.guildId)}</div>
-        <div class="guild-channel">#${esc(g.channelName || g.channelId)}</div>
-      </div>
-      <span class="status-pill ${g.channelId ? "active" : "invalid"}">${g.channelId ? "aktif" : "invalid"}</span>
-    </li>`,
-    )
-    .join("");
-}
-
 function renderRecent(data) {
   const list = $("recentList");
   const items = data?.items ?? [];
@@ -388,7 +354,6 @@ function renderSourceCompare(data) {
 function renderLogs(data) {
   const list = $("logList");
   const logs = data?.logs ?? [];
-  latestLogs = logs;
   $("logCount").textContent = `${logs.length} entries`;
   if (!logs.length) {
     list.innerHTML = `<li class="empty">Belum ada log</li>`;
@@ -404,33 +369,6 @@ function renderLogs(data) {
     </li>`,
     )
     .join("");
-}
-
-function openLogDrilldown() {
-  const overlay = $("logDrilldownOverlay");
-  const list = $("logDrilldownList");
-  const logs = (latestLogs || []).slice(0, 20);
-
-  if (!logs.length) {
-    list.innerHTML = `<li class="empty">Belum ada log</li>`;
-  } else {
-    list.innerHTML = logs
-      .map(
-        (l) => `
-      <li class="log-item">
-        <span class="log-time">${fmt(new Date(l.time))}</span>
-        <span>${esc(l.message)}</span>
-        <span class="log-tag ${esc(l.tag)}">${esc(l.tag)}</span>
-      </li>`,
-      )
-      .join("");
-  }
-
-  overlay.classList.add("show");
-}
-
-function closeLogDrilldown() {
-  $("logDrilldownOverlay").classList.remove("show");
 }
 
 // ===== WHITELIST ADD/DELETE =====
@@ -564,7 +502,6 @@ async function loadAll() {
   btn.textContent = "memuat...";
 
   skeleton($("mangaList"));
-  skeleton($("guildList"), 3);
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 5);
   skeleton($("compareList"), 3);
@@ -573,31 +510,23 @@ async function loadAll() {
     const [
       statusR,
       whitelistR,
-      guildsR,
       recentR,
       logsR,
-      uptimeR,
       compareR,
     ] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/whitelist", controller.signal),
-      apiFetch("/api/guilds", controller.signal),
       apiFetch("/api/recent", controller.signal),
       apiFetch("/api/logs", controller.signal),
-      apiFetch("/api/uptime", controller.signal),
       apiFetch("/api/source-compare", controller.signal),
     ]);
 
     if (loadAbortController !== controller) return;
 
-    renderStatsExtended(
-      statusR.status === "fulfilled" ? statusR.value : null,
-      uptimeR.status === "fulfilled" ? uptimeR.value : null,
-    );
+    renderStatsExtended(statusR.status === "fulfilled" ? statusR.value : null);
     renderOverview(
       statusR.status === "fulfilled" ? statusR.value : null,
       whitelistR.status === "fulfilled" ? whitelistR.value : null,
-      guildsR.status === "fulfilled" ? guildsR.value : null,
       recentR.status === "fulfilled" ? recentR.value : null,
     );
     renderLastCronResult(
@@ -607,9 +536,6 @@ async function loadAll() {
 
     if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
     else renderErr($("mangaList"), "Gagal muat whitelist");
-
-    if (guildsR.status === "fulfilled") renderGuilds(guildsR.value);
-    else renderErr($("guildList"), "Gagal muat guilds");
 
     if (recentR.status === "fulfilled") renderRecent(recentR.value);
     else renderErr($("recentList"), "Gagal muat");
@@ -621,7 +547,7 @@ async function loadAll() {
     else renderErr($("compareList"), "Gagal muat compare");
 
     const anyFailed = [
-      statusR, whitelistR, guildsR, recentR, logsR, uptimeR, compareR,
+      statusR, whitelistR, recentR, logsR, compareR,
     ].some((r) => r.status === "rejected" && r.reason?.name !== "AbortError");
     if (anyFailed && secret) showAlert("Beberapa data gagal dimuat.");
 
@@ -666,10 +592,6 @@ function setPollInterval() {
 
 window.addEventListener("focus", () => {
   if (secret && !isProcessing) loadAll();
-});
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeLogDrilldown();
 });
 
 // ===== THEME =====

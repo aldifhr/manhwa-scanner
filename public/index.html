@@ -69,7 +69,6 @@
           <span class="last-cron-title">Last Cron Result</span>
           <div class="last-cron-actions">
             <span class="last-cron-time" id="lastCronTime">-</span>
-            <button type="button" class="btn-mini" onclick="openLogDrilldown()">View Logs</button>
           </div>
         </div>
         <div class="last-cron-metrics">
@@ -89,10 +88,6 @@
         <div class="stat-card">
           <div class="stat-label">Terakhir dieksekusi</div>
           <div class="stat-value" id="overviewLastRun">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Guilds</div>
-          <div class="stat-value" id="overviewGuilds">-</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Whitelist</div>
@@ -122,72 +117,48 @@
           <div class="stat-label">Duration</div>
           <div class="stat-value" id="statDuration">-</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Uptime 24h</div>
-          <div class="stat-value" id="statUptime24h">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Uptime 7d</div>
-          <div class="stat-value" id="statUptime7d">-</div>
-        </div>
       </div>
 
-      <div class="two-col">
-        <div>
-          <div class="section-label">whitelist manga</div>
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">Manga terpantau</span>
-              <span class="badge" id="whitelistCount">0</span>
-            </div>
-            <div class="whitelist-toolbar">
-              <input
-                type="search"
-                id="inputWhitelistSearch"
-                placeholder="cari manga..."
-                autocomplete="off"
-                oninput="applyWhitelistFilter()"
-              />
-              <div class="sort-btns">
-                <button type="button" id="sortBtn_default" class="sort-btn active" onclick="setSortOrder('default')" title="Urutan default">sort</button>
-                <button type="button" id="sortBtn_az" class="sort-btn" onclick="setSortOrder('az')" title="A-Z">A-Z</button>
-                <button type="button" id="sortBtn_za" class="sort-btn" onclick="setSortOrder('za')" title="Z-A">Z-A</button>
-              </div>
-            </div>
-            <div class="whitelist-form">
-              <input
-                type="text"
-                id="inputMangaTitle"
-                placeholder="Judul manga..."
-                autocomplete="off"
-                onkeydown="if(event.key==='Enter') addManga()"
-              />
-              <input
-                type="text"
-                id="inputMangaUrl"
-                placeholder="URL (opsional)"
-                autocomplete="off"
-                onkeydown="if(event.key==='Enter') addManga()"
-              />
-              <button type="button" class="btn-add" id="btnAddManga" onclick="addManga()">+ Tambah</button>
-            </div>
-            <ul class="manga-list" id="mangaList">
-              <li class="empty">memuat...</li>
-            </ul>
+      <div class="section-label">whitelist manga</div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Manga terpantau</span>
+          <span class="badge" id="whitelistCount">0</span>
+        </div>
+        <div class="whitelist-toolbar">
+          <input
+            type="search"
+            id="inputWhitelistSearch"
+            placeholder="cari manga..."
+            autocomplete="off"
+            oninput="applyWhitelistFilter()"
+          />
+          <div class="sort-btns">
+            <button type="button" id="sortBtn_default" class="sort-btn active" onclick="setSortOrder('default')" title="Urutan default">sort</button>
+            <button type="button" id="sortBtn_az" class="sort-btn" onclick="setSortOrder('az')" title="A-Z">A-Z</button>
+            <button type="button" id="sortBtn_za" class="sort-btn" onclick="setSortOrder('za')" title="Z-A">Z-A</button>
           </div>
         </div>
-        <div>
-          <div class="section-label">guild & channel</div>
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">Server aktif</span>
-              <span class="badge" id="guildCount">0</span>
-            </div>
-            <ul class="guild-list" id="guildList">
-              <li class="empty">memuat...</li>
-            </ul>
-          </div>
+        <div class="whitelist-form">
+          <input
+            type="text"
+            id="inputMangaTitle"
+            placeholder="Judul manga..."
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') addManga()"
+          />
+          <input
+            type="text"
+            id="inputMangaUrl"
+            placeholder="URL (opsional)"
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') addManga()"
+          />
+          <button type="button" class="btn-add" id="btnAddManga" onclick="addManga()">+ Tambah</button>
         </div>
+        <ul class="manga-list" id="mangaList">
+          <li class="empty">memuat...</li>
+        </ul>
       </div>
 
       <div class="section-label">recent manhwa terkirim</div>
@@ -246,17 +217,5 @@
       </div>
     </main>
 
-    <div class="modal-overlay" id="logDrilldownOverlay">
-      <div class="modal modal-wide">
-        <div class="log-drilldown-head">
-          <h2>Log Drilldown</h2>
-          <button type="button" class="btn-mini" onclick="closeLogDrilldown()">Close</button>
-        </div>
-        <p>20 log terbaru dari backend cron.</p>
-        <ul class="log-list" id="logDrilldownList">
-          <li class="empty">Belum ada data</li>
-        </ul>
-      </div>
-    </div>
   </body>
 </html>
