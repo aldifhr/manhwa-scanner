@@ -95,6 +95,16 @@ function getTopManhwa(logs) {
     .map(([title, count]) => ({ title, count }));
 }
 
+function countSentLast24h(recentItems) {
+  if (!Array.isArray(recentItems)) return 0;
+  const cutoff = Date.now() - 24 * 3600000;
+  return recentItems.filter((item) => {
+    if (!item?.sentAt) return false;
+    const t = new Date(item.sentAt).getTime();
+    return !Number.isNaN(t) && t >= cutoff;
+  }).length;
+}
+
 // ===== AUTH =====
 function checkAuth() {
   if (!secret) {
@@ -222,6 +232,70 @@ function renderStatsExtended(statusData, uptimeData) {
   $("statUptime7d").className =
     `stat-value ${uptimeData?.uptime7d >= 95 ? "green" : uptimeData?.uptime7d >= 80 ? "amber" : "red"}`;
   dot.className = "logo-dot" + (statusData.failed > 0 ? " offline" : "");
+}
+
+function renderOverview(statusData, whitelistData, guildData, recentData) {
+  const healthEl = $("overviewHealth");
+  const lastRunEl = $("overviewLastRun");
+  const guildsEl = $("overviewGuilds");
+  const whitelistEl = $("overviewWhitelist");
+  const sent24hEl = $("overviewSent24h");
+
+  if (!statusData) {
+    healthEl.textContent = "—";
+    lastRunEl.textContent = "—";
+    guildsEl.textContent = "—";
+    whitelistEl.textContent = "—";
+    sent24hEl.textContent = "—";
+    healthEl.className = "stat-value";
+    return;
+  }
+
+  const failed = Number(statusData.failed ?? 0);
+  healthEl.textContent = failed > 0 ? "DEGRADED" : "HEALTHY";
+  healthEl.className = `stat-value ${failed > 0 ? "amber" : "green"}`;
+
+  lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "—";
+  guildsEl.textContent = Array.isArray(guildData?.guilds) ? guildData.guilds.length : "—";
+  whitelistEl.textContent = Array.isArray(whitelistData?.items)
+    ? whitelistData.items.length
+    : "—";
+  sent24hEl.textContent = countSentLast24h(recentData?.items);
+}
+
+function renderLastCronResult(statusData, fromManual = false) {
+  const bar = $("lastCronBar");
+  const timeEl = $("lastCronTime");
+  const sentEl = $("lastCronSent");
+  const skippedEl = $("lastCronSkipped");
+  const failedEl = $("lastCronFailed");
+  const durationEl = $("lastCronDuration");
+
+  if (!statusData) {
+    sentEl.textContent = "sent: —";
+    skippedEl.textContent = "skipped: —";
+    failedEl.textContent = "failed: —";
+    durationEl.textContent = "duration: —";
+    timeEl.textContent = "—";
+    bar.className = "last-cron-bar";
+    return;
+  }
+
+  const sent = Number(statusData.sent ?? 0);
+  const skipped = Number(statusData.skipped ?? 0);
+  const failed = Number(statusData.failed ?? 0);
+  const duration = statusData.duration ? `${statusData.duration}s` : "—";
+
+  sentEl.textContent = `sent: ${sent}`;
+  skippedEl.textContent = `skipped: ${skipped}`;
+  failedEl.textContent = `failed: ${failed}`;
+  durationEl.textContent = `duration: ${duration}`;
+
+  const sourceText = fromManual ? "manual" : "auto";
+  const timeText = statusData.timestamp ? timeAgo(statusData.timestamp) : "baru saja";
+  timeEl.textContent = `${sourceText} • ${timeText}`;
+
+  bar.className = `last-cron-bar ${failed > 0 ? "warn" : "ok"}`;
 }
 
 // ===== WHITELIST RENDER + FILTER =====
@@ -463,6 +537,54 @@ async function deleteManga(title) {
   }
 }
 
+async function runCronNow() {
+  if (!checkAuth() || isProcessing) return;
+
+  const btn = $("btnRunCron");
+  const oldText = btn?.textContent || "run cron";
+  isProcessing = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "running...";
+  }
+
+  try {
+    const r = await fetch(`${API_BASE}/api/cron`, {
+      method: "GET",
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showAlert(data.error || "Cron gagal dijalankan");
+      return;
+    }
+
+    showAlert(
+      `Cron selesai: sent ${data.sent ?? 0}, skipped ${data.skipped ?? 0}, failed ${data.failed ?? 0}`,
+    );
+    renderLastCronResult(
+      {
+        sent: data.sent,
+        skipped: data.skipped,
+        failed: data.failed,
+        duration: data.duration,
+        timestamp: new Date().toISOString(),
+      },
+      true,
+    );
+    await loadAll();
+  } catch (e) {
+    showAlert("Gagal trigger cron: " + e.message);
+  } finally {
+    isProcessing = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText;
+    }
+  }
+}
+
 // ===== LOAD ALL =====
 async function loadAll() {
   if (!checkAuth()) return;
@@ -515,6 +637,16 @@ async function loadAll() {
     renderStatsExtended(
       statusR.status === "fulfilled" ? statusR.value : null,
       uptimeR.status === "fulfilled" ? uptimeR.value : null,
+    );
+    renderOverview(
+      statusR.status === "fulfilled" ? statusR.value : null,
+      whitelistR.status === "fulfilled" ? whitelistR.value : null,
+      guildsR.status === "fulfilled" ? guildsR.value : null,
+      recentR.status === "fulfilled" ? recentR.value : null,
+    );
+    renderLastCronResult(
+      statusR.status === "fulfilled" ? statusR.value : null,
+      false,
     );
 
     if (trendR.status === "fulfilled" && trendR.value.ok) {

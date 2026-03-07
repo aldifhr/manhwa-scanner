@@ -89,6 +89,24 @@ header {
   cursor: pointer;
   transition: all 0.15s;
 }
+.btn-run {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid color-mix(in srgb, var(--green) 40%, var(--border));
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-run:hover {
+  filter: brightness(0.96);
+}
+.btn-run:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
 .btn-refresh:hover {
   background: var(--text);
   color: var(--bg);
@@ -141,12 +159,55 @@ main {
   margin-bottom: 10px;
 }
 
+.last-cron-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.last-cron-bar.ok {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
+}
+.last-cron-bar.warn {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--border));
+}
+.last-cron-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.last-cron-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+.last-cron-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.last-cron-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* ── Stats ── */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
   margin-bottom: 28px;
+}
+.stats-grid-overview {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-bottom: 16px;
 }
 @media (max-width: 580px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }

@@ -36,6 +36,9 @@
       </div>
       <div class="header-right">
         <span class="last-updated" id="lastUpdated">—</span>
+        <button type="button" class="btn-run" id="btnRunCron" onclick="runCronNow()">
+          ▶ run cron
+        </button>
         <button
           type="button"
           class="btn-theme"
@@ -53,6 +56,43 @@
 
     <main>
       <div class="alert" id="alertBox" style="display: none"></div>
+
+      <div class="last-cron-bar" id="lastCronBar">
+        <div class="last-cron-head">
+          <span class="last-cron-title">Last Cron Result</span>
+          <span class="last-cron-time" id="lastCronTime">—</span>
+        </div>
+        <div class="last-cron-metrics">
+          <span id="lastCronSent">sent: —</span>
+          <span id="lastCronSkipped">skipped: —</span>
+          <span id="lastCronFailed">failed: —</span>
+          <span id="lastCronDuration">duration: —</span>
+        </div>
+      </div>
+
+      <div class="section-label">overview</div>
+      <div class="stats-grid stats-grid-overview">
+        <div class="stat-card">
+          <div class="stat-label">Health</div>
+          <div class="stat-value" id="overviewHealth">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Last Run</div>
+          <div class="stat-value" id="overviewLastRun">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Guilds</div>
+          <div class="stat-value" id="overviewGuilds">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Whitelist</div>
+          <div class="stat-value" id="overviewWhitelist">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sent 24h</div>
+          <div class="stat-value" id="overviewSent24h">—</div>
+        </div>
+      </div>
 
       <div class="section-label">📊 Success vs Failed (7 Hari Terakhir)</div>
       <div class="chart-container">
