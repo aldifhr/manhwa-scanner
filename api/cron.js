@@ -15,6 +15,7 @@ export const config = { maxDuration: 60 };
 const CHAPTER_TTL = 60 * 60 * 24 * 3;
 const MANGA_HISTORY_LIMIT = 20;
 const MANGA_HISTORY_TTL = 60 * 60 * 24 * 45;
+const CHANNEL_VALIDATION_CACHE_SEC = 60 * 10;
 const SOURCE_FAILURE_THRESHOLD = Number(process.env.SOURCE_FAIL_THRESHOLD || 3);
 const SOURCE_COOLDOWN_SECONDS = Number(process.env.SOURCE_COOLDOWN_SECONDS || 1800);
 const SOURCE_KEYS = ["ikiru", "shinigami_project", "shinigami_mirror"];
@@ -202,6 +203,15 @@ async function saveMangaHistory(item) {
 }
 
 async function validateChannel(channelId, guildId) {
+  const cacheKey = `cache:channel-valid:${channelId}`;
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached === true) return true;
+    if (cached === false) return false;
+  } catch {
+    // ignore cache read errors
+  }
+
   try {
     const resp = await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
       headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
@@ -210,12 +220,14 @@ async function validateChannel(channelId, guildId) {
     log(
       `CONNECTED: #${channel.name} (${channelId.slice(-4)}) in guild ${guildId.slice(-4)}`,
     );
+    await redis.set(cacheKey, true, { ex: CHANNEL_VALIDATION_CACHE_SEC }).catch(() => {});
     return true;
   } catch (err) {
     const status = err.response?.status;
     if (status === 404 || status === 403) {
       warn(`DISCONNECTED: guild ${guildId.slice(-4)} ch ${channelId.slice(-4)} (${status})`);
       await deleteGuildChannel(guildId);
+      await redis.set(cacheKey, false, { ex: CHANNEL_VALIDATION_CACHE_SEC }).catch(() => {});
     } else if (status === 401) {
       warn("Bot token invalid");
     } else {
@@ -330,15 +342,31 @@ export default async function handler(req, res) {
     let sent = 0;
     let skipped = 0;
     let failed = 0;
-
-    for (const item of matched) {
+    const chapterMeta = matched.map((item) => {
       const normalizedChapterUrl = normalizeUrl(item.url);
-      if (!normalizedChapterUrl) {
-        skipped++;
-        continue;
-      }
+      return {
+        item,
+        normalizedChapterUrl,
+        key: normalizedChapterUrl ? `chapter:${normalizedChapterUrl}` : null,
+      };
+    });
+    const validChapterMeta = chapterMeta.filter((entry) => entry.key);
 
-      const key = `chapter:${normalizedChapterUrl}`;
+    const existingFlags = validChapterMeta.length
+      ? await redis.mget(...validChapterMeta.map((entry) => entry.key))
+      : [];
+    const prefiltered = validChapterMeta.filter((_, i) => !existingFlags[i]);
+    skipped += chapterMeta.length - validChapterMeta.length;
+    skipped += validChapterMeta.length - prefiltered.length;
+    const writeTasks = [];
+    const WRITE_TASK_BATCH = 24;
+    const flushWriteTasks = async () => {
+      if (!writeTasks.length) return;
+      await Promise.all(writeTasks.splice(0, writeTasks.length));
+    };
+
+    for (const entry of prefiltered) {
+      const { item, key } = entry;
       const claimed = await redis.set(key, Date.now().toString(), {
         ex: CHAPTER_TTL,
         nx: true,
@@ -369,7 +397,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      await Promise.all([
+      writeTasks.push(
         redis.lpush("recent:chapters", {
           title: item.title,
           chapter: item.chapter,
@@ -387,10 +415,15 @@ export default async function handler(req, res) {
           tag: "sent",
         }),
         saveMangaHistory(item),
-      ]);
+      );
+      if (writeTasks.length >= WRITE_TASK_BATCH) {
+        await flushWriteTasks();
+      }
 
       sent++;
     }
+
+    await flushWriteTasks();
 
     await Promise.all([
       redis.ltrim("recent:chapters", 0, 99),
@@ -400,6 +433,9 @@ export default async function handler(req, res) {
     ]);
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
+    const scrapeMetrics = Object.fromEntries(
+      SOURCE_KEYS.map((source) => [source, sourceStates?.[source]?.metrics ?? null]),
+    );
     const statusPayload = {
       sent,
       skipped,
@@ -408,6 +444,7 @@ export default async function handler(req, res) {
       guilds: activeGuildCount,
       timestamp: new Date().toISOString(),
       sourceHealth: nextSourceHealth,
+      scrapeMetrics,
     };
     await redis.set("cron:last_run", statusPayload);
 
@@ -423,6 +460,7 @@ export default async function handler(req, res) {
       guilds: activeGuildCount,
       duration,
       sourceHealth: nextSourceHealth,
+      scrapeMetrics,
     });
   } catch (err) {
     console.error("[cron] FATAL:", err);

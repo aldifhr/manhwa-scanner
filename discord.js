@@ -88,6 +88,14 @@ const commands = [
       type: 5,
       required: false,
     },
+    {
+      name: "max_send",
+      description: "Batas maksimal chapter yang dikirim (default: 30)",
+      type: 4,
+      required: false,
+      min_value: 1,
+      max_value: 200,
+    },
   ],
 },
 ];
