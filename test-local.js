@@ -1,117 +1,133 @@
 import "dotenv/config";
-import {
-  fetchLatestMangaUpdateTime,
-  searchIkiru,
-  searchShngm,
-} from "./lib/scraper.js";
+import { searchIkiru, searchShngm } from "./lib/scraper.js";
 
-const MAX_STALE_MS = 1000 * 60 * 60 * 24 * 30 * 8; // ~8 months
-
-function parseUpdatedTime(item) {
-  const ts = item?.updatedTime ? new Date(item.updatedTime).getTime() : NaN;
-  return Number.isNaN(ts) ? null : ts;
+function getArg(flag, fallback = "") {
+  const idx = process.argv.indexOf(flag);
+  if (idx === -1) return fallback;
+  return process.argv[idx + 1] ?? fallback;
 }
 
-function sortByActivePriority(results = []) {
-  const now = Date.now();
-  const active = [];
-  const unknown = [];
-  const stale = [];
+function normalizeSource(raw = "ikiru") {
+  const source = String(raw).toLowerCase().trim();
+  if (source === "mirror" || source === "shinigami_mirror") return "shinigami_mirror";
+  if (source === "shinigami" || source === "project" || source === "shinigami_project") {
+    return "shinigami_project";
+  }
+  return "ikiru";
+}
 
-  for (const item of results) {
-    const ts = parseUpdatedTime(item);
-    if (ts === null) {
-      unknown.push(item);
-    } else if (now - ts > MAX_STALE_MS) {
-      stale.push(item);
-    } else {
-      active.push(item);
+function normalizeTitleKey(title = "") {
+  return String(title)
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractMangaIdFromUrl(url = "") {
+  const m = String(url).match(/\/series\/([0-9a-f-]{36})/i);
+  return m ? m[1] : null;
+}
+
+async function fetchShinigamiChaptersByMangaId(mangaId, limit = 24) {
+  if (!mangaId) return [];
+  const base = (process.env.SECONDARY_SOURCE_URL || "https://api.shngm.io").replace(/\/+$/, "");
+  const url =
+    `${base}/v1/chapter/${mangaId}/list` +
+    `?page=1&page_size=${limit}&sort_by=chapter_number&sort_order=desc`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Shinigami chapter endpoint HTTP ${res.status}`);
+  const payload = await res.json();
+  return Array.isArray(payload?.data) ? payload.data : [];
+}
+
+function filterFresh24h(chapters = []) {
+  const cutoff = Date.now() - 24 * 3600 * 1000;
+  return chapters.filter((row) => {
+    const raw = row?.release_date || row?.created_at || row?.updated_at || "";
+    const ts = Date.parse(raw);
+    return Number.isFinite(ts) && ts >= cutoff;
+  });
+}
+
+async function runTitleMode(title, source) {
+  if (!title) throw new Error("title kosong. pakai --title \"judul\"");
+
+  if (source === "ikiru") {
+    const rows = await searchIkiru(title, {}, null);
+    const key = normalizeTitleKey(title);
+    const exact = rows.find((row) => normalizeTitleKey(row.title) === key);
+    if (!exact) {
+      console.log(`Tidak ketemu judul exact di Ikiru: "${title}"`);
+      return;
     }
+
+    console.log(`Title : ${exact.title}`);
+    console.log(`Source: ikiru`);
+    console.log(`URL   : ${exact.mangaUrl || exact.url || "-"}`);
+    console.log(`Info  : Mode title untuk Ikiru menampilkan matching title (chapter list endpoint tidak tersedia).`);
+    return;
   }
 
-  return [...active, ...unknown, ...stale];
+  const rows = await searchShngm(title, source);
+  const key = normalizeTitleKey(title);
+  const exact = rows.find((row) => normalizeTitleKey(row.title) === key) || rows[0];
+  if (!exact) {
+    console.log(`Tidak ketemu judul di ${source}: "${title}"`);
+    return;
+  }
+
+  const mangaId = extractMangaIdFromUrl(exact.mangaUrl);
+  if (!mangaId) throw new Error("gagal extract manga id dari hasil search");
+
+  const chapterRows = await fetchShinigamiChaptersByMangaId(mangaId, 24);
+  const fresh = filterFresh24h(chapterRows);
+
+  console.log(`Title : ${exact.title}`);
+  console.log(`Source: ${source}`);
+  console.log(`URL   : ${exact.mangaUrl}`);
+  console.log(`Fresh <24h: ${fresh.length}`);
+  for (const row of fresh) {
+    console.log(
+      `- Chapter ${row.chapter_number} | ${row.release_date || row.created_at || "-"} | ` +
+      `https://a.shinigami.asia/chapter/${row.chapter_id}`,
+    );
+  }
 }
 
-const IKIRU_ENRICH_LIMIT = 24;
-const IKIRU_ENRICH_CONCURRENCY = 4;
+async function runQueryMode(query, source) {
+  const keyword = String(query || "demon").trim();
+  console.log(`Mode  : query`);
+  console.log(`Source: ${source}`);
+  console.log(`Query : ${keyword}`);
 
-async function enrichIkiruUpdatedTimes(results = []) {
-  const out = results.map((item) => ({ ...item }));
-  const limit = Math.min(out.length, IKIRU_ENRICH_LIMIT);
-  let nextIndex = 0;
+  if (source === "ikiru") {
+    const rows = await searchIkiru(keyword, {}, null);
+    console.log(`Results: ${rows.length}`);
+    rows.slice(0, 10).forEach((row, i) => {
+      console.log(`${String(i + 1).padStart(2, "0")}. ${row.title}`);
+    });
+    return;
+  }
 
-  const workers = Array.from({ length: IKIRU_ENRICH_CONCURRENCY }, async () => {
-    while (true) {
-      const i = nextIndex;
-      nextIndex += 1;
-      if (i >= limit) break;
-
-      const item = out[i];
-      const mangaUrl = item.mangaUrl || item.url;
-      if (!mangaUrl) continue;
-
-      const updatedTime = await fetchLatestMangaUpdateTime(mangaUrl, null);
-      if (updatedTime) item.updatedTime = updatedTime;
-    }
+  const rows = await searchShngm(keyword, source);
+  console.log(`Results: ${rows.length}`);
+  rows.slice(0, 10).forEach((row, i) => {
+    console.log(`${String(i + 1).padStart(2, "0")}. ${row.title}`);
   });
-
-  await Promise.all(workers);
-  return out;
-}
-
-function sourceLabel(source) {
-  if (source === "shinigami_project") return "Shinigami (Project)";
-  if (source === "shinigami_mirror") return "Shinigami (Mirror)";
-  return "Ikiru";
-}
-
-function classify(item) {
-  const ts = parseUpdatedTime(item);
-  if (ts === null) return "unknown";
-  return Date.now() - ts > MAX_STALE_MS ? "stale" : "active";
 }
 
 async function main() {
-  const sourceArg = String(process.argv[2] || "ikiru").toLowerCase().trim();
-  const query = String(process.argv[3] || "demon").trim();
+  const source = normalizeSource(getArg("--source", "ikiru"));
+  const title = getArg("--title", "").trim();
+  const query = getArg("--query", "demon").trim();
 
-  let source = "ikiru";
-  if (sourceArg === "shinigami" || sourceArg === "project") {
-    source = "shinigami_project";
-  } else if (sourceArg === "mirror" || sourceArg === "shinigami_mirror") {
-    source = "shinigami_mirror";
+  if (title) {
+    await runTitleMode(title, source);
+    return;
   }
 
-  console.log(`Live test /add ordering`);
-  console.log(`Source: ${sourceLabel(source)} | Query: "${query}"\n`);
-
-  let results = [];
-  if (source === "ikiru") {
-    const raw = (await searchIkiru(query, {}, null)).map((item) => ({
-      ...item,
-      updatedTime: null,
-    }));
-    results = await enrichIkiruUpdatedTimes(raw);
-  } else {
-    results = await searchShngm(query, source);
-  }
-
-  if (!results.length) {
-    console.log("No results from source.");
-    process.exit(0);
-  }
-
-  const sorted = sortByActivePriority(results);
-  const maxPrint = Math.min(25, sorted.length);
-
-  console.log(`Total results: ${sorted.length} (showing ${maxPrint})`);
-  for (let i = 0; i < maxPrint; i++) {
-    const item = sorted[i];
-    const bucket = classify(item);
-    console.log(
-      `${String(i + 1).padStart(2, "0")}. [${bucket}] ${item.title} | ${item.updatedTime || "-"}`,
-    );
-  }
+  await runQueryMode(query, source);
 }
 
 main().catch((err) => {

@@ -7,19 +7,28 @@ import {
   loadWhitelist,
   redis,
 } from "../lib/redis.js";
-import { scrapeMangaUpdates } from "../lib/scraper.js";
+import { scrapeMangaUpdatesWithMeta } from "../lib/scraper.js";
 import { logApiHit } from "../lib/requestLog.js";
 
 export const config = { maxDuration: 60 };
 
 const CHAPTER_TTL = 60 * 60 * 24 * 3;
+const MANGA_HISTORY_LIMIT = 20;
+const MANGA_HISTORY_TTL = 60 * 60 * 24 * 45;
+const SOURCE_FAILURE_THRESHOLD = Number(process.env.SOURCE_FAIL_THRESHOLD || 3);
+const SOURCE_COOLDOWN_SECONDS = Number(process.env.SOURCE_COOLDOWN_SECONDS || 1800);
+const SOURCE_KEYS = ["ikiru", "shinigami_project", "shinigami_mirror"];
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DEBUG = process.env.CRON_DEBUG === "true";
 const log = (...args) => DEBUG && console.log("[cron]", ...args);
 const warn = (...args) => console.warn("[cron]", ...args);
 
 function normalizeTitle(str) {
-  return str.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+  return String(str)
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeUrl(u) {
@@ -58,10 +67,7 @@ function createWhitelistMatcher(whitelist) {
 
     return prepared.some((entry) => {
       if (entry.source && itemSource !== entry.source) return false;
-      // Jika whitelist punya URL, wajib match URL exact (hindari konflik title lintas source)
       if (entry.hasUrl) return Boolean(itemUrl) && itemUrl === entry.url;
-
-      // Fallback title hanya untuk entry legacy tanpa URL
       if (!entry.title || !itemTitle) return false;
       return (
         itemTitle === entry.title ||
@@ -70,6 +76,129 @@ function createWhitelistMatcher(whitelist) {
       );
     });
   };
+}
+
+function defaultSourceHealth(source) {
+  return {
+    source,
+    status: "healthy",
+    consecutiveFailures: 0,
+    disabledUntil: null,
+    lastError: null,
+    lastSuccessAt: null,
+    lastCheckedAt: null,
+  };
+}
+
+function sanitizeSourceHealth(source, raw = null) {
+  const base = defaultSourceHealth(source);
+  if (!raw || typeof raw !== "object") return base;
+
+  const failures = Number(raw.consecutiveFailures || 0);
+  const disabledUntil = raw.disabledUntil || null;
+  const status = raw.status === "degraded" ? "degraded" : "healthy";
+
+  return {
+    ...base,
+    ...raw,
+    source,
+    status,
+    consecutiveFailures: Number.isFinite(failures) ? failures : 0,
+    disabledUntil,
+  };
+}
+
+function sourceHealthKey(source) {
+  return `source:health:${source}`;
+}
+
+async function loadSourceHealthMap() {
+  const pairs = await Promise.all(
+    SOURCE_KEYS.map(async (source) => {
+      const raw = await redis.get(sourceHealthKey(source));
+      return [source, sanitizeSourceHealth(source, raw)];
+    }),
+  );
+  return Object.fromEntries(pairs);
+}
+
+function isSourceInCooldown(health, nowMs = Date.now()) {
+  if (!health?.disabledUntil) return false;
+  const disabledMs = new Date(health.disabledUntil).getTime();
+  return Number.isFinite(disabledMs) && disabledMs > nowMs;
+}
+
+function applySourceOutcome(current, outcome, nowIso) {
+  const next = { ...current, lastCheckedAt: nowIso };
+  const outcomeStatus = outcome?.status || "ok";
+
+  if (outcomeStatus === "error") {
+    const failures = Number(next.consecutiveFailures || 0) + 1;
+    const isDegraded = failures >= SOURCE_FAILURE_THRESHOLD;
+    next.consecutiveFailures = failures;
+    next.status = isDegraded ? "degraded" : "healthy";
+    next.lastError = outcome.error || "unknown error";
+    next.disabledUntil = isDegraded
+      ? new Date(Date.now() + SOURCE_COOLDOWN_SECONDS * 1000).toISOString()
+      : null;
+    return next;
+  }
+
+  if (outcomeStatus === "ok") {
+    next.status = "healthy";
+    next.consecutiveFailures = 0;
+    next.disabledUntil = null;
+    next.lastError = null;
+    next.lastSuccessAt = nowIso;
+    return next;
+  }
+
+  // skipped: keep current status; if cooldown sudah lewat, otomatis healthy lagi.
+  if (next.status === "degraded" && !isSourceInCooldown(next)) {
+    next.status = "healthy";
+    next.consecutiveFailures = 0;
+    next.disabledUntil = null;
+    next.lastError = null;
+  }
+  return next;
+}
+
+function buildMangaHistoryKey(item) {
+  const source = normalizeSource(item?.source);
+  const mangaUrl = normalizeUrl(item?.mangaUrl || "");
+  if (mangaUrl) return `history:manga:${source}:${mangaUrl}`;
+
+  const title = normalizeTitle(item?.title || "");
+  if (!title) return null;
+  return `history:manga:${source}:title:${title}`;
+}
+
+function buildChapterHistoryRef(item) {
+  const chapterUrl = normalizeUrl(item?.url || "");
+  if (chapterUrl) return chapterUrl;
+
+  const chapter = String(item?.chapter || "").trim();
+  const updated = String(item?.updatedTime || "").trim();
+  if (!chapter && !updated) return null;
+  return `${chapter}|${updated}`;
+}
+
+async function saveMangaHistory(item) {
+  const key = buildMangaHistoryKey(item);
+  const chapterRef = buildChapterHistoryRef(item);
+  if (!key || !chapterRef) return;
+
+  const current = await redis.lrange(key, 0, MANGA_HISTORY_LIMIT - 1);
+  if (Array.isArray(current) && current.includes(chapterRef)) {
+    await redis.expire(key, MANGA_HISTORY_TTL);
+    return;
+  }
+
+  await Promise.all([
+    redis.lpush(key, chapterRef),
+    redis.ltrim(key, 0, MANGA_HISTORY_LIMIT - 1),
+    redis.expire(key, MANGA_HISTORY_TTL),
+  ]);
 }
 
 async function validateChannel(channelId, guildId) {
@@ -111,11 +240,32 @@ export default async function handler(req, res) {
     const start = Date.now();
     console.log("[cron] Starting...");
 
-    const [whitelist, allResults, guildChannels] = await Promise.all([
+    const [whitelist, guildChannels, sourceHealthMap] = await Promise.all([
       loadWhitelist(),
-      scrapeMangaUpdates(redis),
       getAllGuildChannels(),
+      loadSourceHealthMap(),
     ]);
+
+    const disabledSources = SOURCE_KEYS.filter((source) =>
+      isSourceInCooldown(sourceHealthMap[source]),
+    );
+
+    const { items: allResults, sourceStates } = await scrapeMangaUpdatesWithMeta(redis, {
+      disabledSources,
+    });
+
+    const nowIso = new Date().toISOString();
+    const nextSourceHealth = {};
+    for (const source of SOURCE_KEYS) {
+      const current = sourceHealthMap[source] || defaultSourceHealth(source);
+      const outcome = sourceStates?.[source] || { status: "ok" };
+      nextSourceHealth[source] = applySourceOutcome(current, outcome, nowIso);
+    }
+    await Promise.all(
+      SOURCE_KEYS.map((source) =>
+        redis.set(sourceHealthKey(source), nextSourceHealth[source]),
+      ),
+    );
 
     const guildEntries = Object.entries(guildChannels || {});
     console.log(`[cron] Whitelist:${whitelist.length} | Guilds found:${guildEntries.length}`);
@@ -147,6 +297,7 @@ export default async function handler(req, res) {
         ok: true,
         guilds: 0,
         whitelist: whitelist.length,
+        sourceHealth: nextSourceHealth,
         message: "No active guilds",
       });
     }
@@ -155,6 +306,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         guilds: activeGuildCount,
+        sourceHealth: nextSourceHealth,
         message: "No whitelist",
       });
     }
@@ -167,6 +319,7 @@ export default async function handler(req, res) {
         ok: true,
         guilds: activeGuildCount,
         scraped: allResults.length,
+        sourceHealth: nextSourceHealth,
         message: "No new chapters",
       });
     }
@@ -216,24 +369,25 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const nowIso = new Date().toISOString();
-      await redis.lpush("recent:chapters", {
-        title: item.title,
-        chapter: item.chapter,
-        url: item.url,
-        cover: item.cover ?? null,
-        source: item.source ?? "ikiru",
-        updatedTime: item.updatedTime ?? null,
-        sentAt: nowIso,
-      });
-
-      await redis.lpush("cron:logs", {
-        time: nowIso,
-        message: `${item.title} - ${item.chapter}`,
-        title: item.title,
-        chapter: item.chapter,
-        tag: "sent",
-      });
+      await Promise.all([
+        redis.lpush("recent:chapters", {
+          title: item.title,
+          chapter: item.chapter,
+          url: item.url,
+          cover: item.cover ?? null,
+          source: item.source ?? "ikiru",
+          updatedTime: item.updatedTime ?? null,
+          sentAt: nowIso,
+        }),
+        redis.lpush("cron:logs", {
+          time: nowIso,
+          message: `${item.title} - ${item.chapter}`,
+          title: item.title,
+          chapter: item.chapter,
+          tag: "sent",
+        }),
+        saveMangaHistory(item),
+      ]);
 
       sent++;
     }
@@ -246,15 +400,16 @@ export default async function handler(req, res) {
     ]);
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
-
-    await redis.set("cron:last_run", {
+    const statusPayload = {
       sent,
       skipped,
       failed,
       duration,
       guilds: activeGuildCount,
       timestamp: new Date().toISOString(),
-    });
+      sourceHealth: nextSourceHealth,
+    };
+    await redis.set("cron:last_run", statusPayload);
 
     console.log(
       `[cron] Done ${duration}s - sent:${sent} skipped:${skipped} failed:${failed} guilds:${activeGuildCount}`,
@@ -267,6 +422,7 @@ export default async function handler(req, res) {
       failed,
       guilds: activeGuildCount,
       duration,
+      sourceHealth: nextSourceHealth,
     });
   } catch (err) {
     console.error("[cron] FATAL:", err);

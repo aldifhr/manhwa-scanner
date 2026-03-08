@@ -157,6 +157,23 @@ function sourceBadgeClass(source) {
   return "source-ikiru";
 }
 
+function sourceDisplayName(source) {
+  const s = String(source || "").toLowerCase().trim();
+  if (s === "shinigami_project") return "Shinigami (Project)";
+  if (s === "shinigami_mirror") return "Shinigami (Mirror)";
+  return "Ikiru";
+}
+
+function cooldownText(disabledUntil) {
+  if (!disabledUntil) return null;
+  const target = new Date(disabledUntil).getTime();
+  if (Number.isNaN(target)) return null;
+  const remainMs = target - Date.now();
+  if (remainMs <= 0) return "retry now";
+  const mins = Math.ceil(remainMs / 60000);
+  return `retry ${mins}m`;
+}
+
 function skeleton(ul, n = 4) {
   ul.innerHTML = Array.from(
     { length: n },
@@ -238,14 +255,48 @@ function renderOverview(statusData, whitelistData, recentData) {
   }
 
   const failed = Number(statusData.failed ?? 0);
-  healthEl.textContent = failed > 0 ? "DEGRADED" : "HEALTHY";
-  healthEl.className = `stat-value ${failed > 0 ? "amber" : "green"}`;
+  const sourceHealth = statusData.sourceHealth || {};
+  const hasSourceDegraded = Object.values(sourceHealth).some(
+    (source) => source?.status === "degraded",
+  );
+  const degraded = failed > 0 || hasSourceDegraded;
+  healthEl.textContent = degraded ? "DEGRADED" : "HEALTHY";
+  healthEl.className = `stat-value ${degraded ? "amber" : "green"}`;
 
   lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
   whitelistEl.textContent = Array.isArray(whitelistData?.items)
     ? whitelistData.items.length
     : "-";
   sent24hEl.textContent = countSentLast24h(recentData?.items);
+}
+
+function renderSourceHealth(statusData) {
+  const list = $("sourceHealthList");
+  const entries = Object.entries(statusData?.sourceHealth || {});
+  $("sourceHealthCount").textContent = entries.length;
+
+  if (!entries.length) {
+    list.innerHTML = '<li class="empty">Belum ada data source health.</li>';
+    return;
+  }
+
+  list.innerHTML = entries
+    .map(([source, health], i) => {
+      const degraded = health?.status === "degraded";
+      const stateLabel = degraded ? "degraded" : "healthy";
+      const extra = degraded
+        ? cooldownText(health?.disabledUntil) || "cooldown"
+        : `ok${health?.lastSuccessAt ? ` (${timeAgo(health.lastSuccessAt)})` : ""}`;
+      const failures = Number(health?.consecutiveFailures ?? 0);
+      return `<li class="manga-item">
+      <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(sourceDisplayName(source))}
+      <small style="display:block;opacity:.6;font-size:.75em">fail streak: ${failures}${health?.lastError ? ` | ${esc(health.lastError)}` : ""}</small></span>
+      <span class="status-pill ${degraded ? "invalid" : "active"}">${esc(stateLabel)}</span>
+      <span class="badge">${esc(extra || "-")}</span>
+    </li>`;
+    })
+    .join("");
 }
 
 function renderLastCronResult(statusData, fromManual = false) {
@@ -558,6 +609,7 @@ async function loadAll() {
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 5);
   skeleton($("compareList"), 3);
+  skeleton($("sourceHealthList"), 3);
 
   try {
     const [
@@ -586,6 +638,7 @@ async function loadAll() {
       statusR.status === "fulfilled" ? statusR.value : null,
       false,
     );
+    renderSourceHealth(statusR.status === "fulfilled" ? statusR.value : null);
 
     if (whitelistR.status === "fulfilled") renderWhitelist(whitelistR.value);
     else renderErr($("mangaList"), "Gagal muat whitelist");
