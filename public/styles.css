@@ -159,6 +159,7 @@ body {
   font: 500 11px var(--mono);
   padding: 8px 11px;
   cursor: pointer;
+  min-height: 36px;
 }
 
 .poll-select,
@@ -357,6 +358,7 @@ body {
   color: var(--muted);
   font: 500 11px var(--mono);
   cursor: pointer;
+  min-height: 34px;
 }
 
 .btn-mini {
@@ -367,6 +369,7 @@ body {
   padding: 2px 7px;
   font: 500 10px var(--mono);
   cursor: pointer;
+  min-height: 28px;
 }
 
 .btn-mini:hover {
@@ -395,6 +398,7 @@ body {
   margin: 0;
   max-height: 350px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .manga-item,
@@ -611,16 +615,74 @@ body {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+    padding: 12px;
   }
-  .toolbar { justify-content: flex-start; }
-  .toolbar > * { flex: 0 0 auto; }
-  .live-kpi { width: 100%; }
+  .brand-sub { font-size: 11px; }
+  .toolbar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .toolbar > * {
+    width: 100%;
+    min-width: 0;
+  }
+  .live-kpi {
+    grid-column: 1 / -1;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 2px;
+  }
+  .last-updated {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .btn-soft,
+  .btn-strong,
+  .poll-select {
+    min-height: 40px;
+    font-size: 10px;
+    padding: 8px;
+  }
+  .layout { padding: 14px 10px 22px; }
   .stats-grid,
   .stats-grid-overview { grid-template-columns: repeat(2, 1fr); }
+  .chart-wrap { height: 200px; }
+  .toast-container {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
 }
 
 @media (max-width: 560px) {
-  .layout { padding: 16px 10px 24px; }
+  .toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .btn-strong {
+    grid-column: 1 / -1;
+  }
+  .stats-grid,
+  .stats-grid-overview {
+    grid-template-columns: 1fr;
+  }
+  .stat-card { padding: 11px; }
+  .stat-value { font-size: 22px; }
+  .hero-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .card-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .manga-list,
+  .recent-list,
+  .log-list {
+    max-height: 290px;
+  }
   .manga-item {
     grid-template-columns: 26px 1fr auto;
   }
@@ -632,5 +694,10 @@ body {
     grid-template-columns: 34px 1fr;
   }
   .recent-time { grid-column: 2; }
+  .recent-title { white-space: normal; }
   .log-item { grid-template-columns: 1fr; }
+  .modal {
+    padding: 16px;
+    border-radius: 12px;
+  }
 }
