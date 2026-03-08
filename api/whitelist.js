@@ -1,87 +1,95 @@
-import { loadWhitelist, saveWhitelist } from "../lib/redis.js";
-import { isCronAuthorized }             from "../lib/auth.js";
-import { logApiHit } from "../lib/requestLog.js";
+import { isCronAuthorized } from "../lib/auth.js";
+import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
+import {
+  addWhitelistEntry,
+  buildWhitelistListResponse,
+  removeWhitelistEntryByTitle,
+} from "../lib/services/whitelist.js";
 
 export default async function handler(req, res) {
-  logApiHit("whitelist", req);
+  const reqLogger = logApiHit("whitelist", req);
 
-  if (!isCronAuthorized(req))
+  if (!isCronAuthorized(req)) {
+    logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
     return res.status(401).json({ error: "Unauthorized" });
+  }
 
   res.setHeader("Cache-Control", "no-store");
 
-  // GET — ambil semua whitelist
+  // GET: ambil semua whitelist
   if (req.method === "GET") {
     try {
-      const items = await loadWhitelist();
+      const { items } = await buildWhitelistListResponse(1);
+      logApiOk(reqLogger, { status: 200, method: "GET", count: items.length });
       return res.status(200).json({ items });
     } catch (err) {
-      console.error("[whitelist GET] Error:", err);
+      logApiError(reqLogger, err, { status: 500, method: "GET" });
       return res.status(500).json({ error: "Internal error" });
     }
   }
 
-  // POST — tambah manga ke whitelist
+  // POST: tambah manga ke whitelist
   if (req.method === "POST") {
     try {
-      const { title, url } = req.body ?? {};
+      const { title, url, source } = req.body ?? {};
 
       if (!title?.trim()) {
+        logApiOk(reqLogger, { status: 400, method: "POST", reason: "title_required" });
         return res.status(400).json({ error: "Title wajib diisi" });
       }
 
-      // Validasi URL kalau ada
       const cleanUrl = url?.trim() || null;
       if (cleanUrl) {
-        try { new URL(cleanUrl); }
-        catch { return res.status(400).json({ error: "URL tidak valid" }); }
+        try {
+          new URL(cleanUrl);
+        } catch {
+          logApiOk(reqLogger, { status: 400, method: "POST", reason: "invalid_url" });
+          return res.status(400).json({ error: "URL tidak valid" });
+        }
       }
 
-      const items  = await loadWhitelist();
-      const exists = items.some(
-        (w) => w.title.toLowerCase() === title.trim().toLowerCase(),
-      );
+      const result = await addWhitelistEntry({
+        title: title.trim(),
+        url: cleanUrl,
+        source,
+      });
 
-      if (exists) {
+      if (result.status === "exists") {
+        logApiOk(reqLogger, { status: 409, method: "POST", reason: "already_exists" });
         return res.status(409).json({ error: "Manga sudah ada di whitelist" });
       }
 
-      items.push({ title: title.trim(), url: cleanUrl });
-      await saveWhitelist(items);
-
-      return res.status(201).json({ ok: true, items });
+      logApiOk(reqLogger, { status: 201, method: "POST", count: result.whitelist.length });
+      return res.status(201).json({ ok: true, items: result.whitelist });
     } catch (err) {
-      console.error("[whitelist POST] Error:", err);
+      logApiError(reqLogger, err, { status: 500, method: "POST" });
       return res.status(500).json({ error: "Internal error" });
     }
   }
 
-  // DELETE — hapus manga dari whitelist by title
+  // DELETE: hapus manga dari whitelist by title
   if (req.method === "DELETE") {
     try {
-      // Support body dan query param untuk kompatibilitas client
       const title = req.query?.title || req.body?.title;
-
       if (!title?.trim()) {
+        logApiOk(reqLogger, { status: 400, method: "DELETE", reason: "title_required" });
         return res.status(400).json({ error: "Title wajib diisi" });
       }
 
-      const items    = await loadWhitelist();
-      const filtered = items.filter(
-        (w) => w.title.toLowerCase() !== title.trim().toLowerCase(),
-      );
-
-      if (filtered.length === items.length) {
+      const result = await removeWhitelistEntryByTitle(title);
+      if (result.status === "not_found") {
+        logApiOk(reqLogger, { status: 404, method: "DELETE", reason: "not_found" });
         return res.status(404).json({ error: "Manga tidak ditemukan" });
       }
 
-      await saveWhitelist(filtered);
-      return res.status(200).json({ ok: true, items: filtered });
+      logApiOk(reqLogger, { status: 200, method: "DELETE", count: result.items.length });
+      return res.status(200).json({ ok: true, items: result.items });
     } catch (err) {
-      console.error("[whitelist DELETE] Error:", err);
+      logApiError(reqLogger, err, { status: 500, method: "DELETE" });
       return res.status(500).json({ error: "Internal error" });
     }
   }
 
+  logApiOk(reqLogger, { status: 405, reason: "method_not_allowed" });
   return res.status(405).json({ error: "Method not allowed" });
 }
