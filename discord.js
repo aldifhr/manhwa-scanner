@@ -78,6 +78,18 @@ const commands = [
     },
   ],
 },
+{
+  name: "resync24h",
+  description: "Scan ulang update <24 jam dan kirim yang kelewat (owner only)",
+  options: [
+    {
+      name: "dry_run",
+      description: "Hanya simulasi hitung, tanpa kirim notifikasi",
+      type: 5,
+      required: false,
+    },
+  ],
+},
 ];
 
 async function registerCommands() {
