@@ -151,6 +151,15 @@ body {
   margin-right: 4px;
 }
 
+.poll-indicator {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--surface) 84%, var(--bg));
+  color: var(--muted);
+  font: 500 10px var(--mono);
+}
+
 .poll-select,
 .btn-soft,
 .btn-strong {
@@ -637,6 +646,9 @@ body {
   .last-updated {
     grid-column: 1 / -1;
     margin: 0;
+  }
+  .poll-indicator {
+    grid-column: 1 / -1;
   }
   .btn-soft,
   .btn-strong,

@@ -1,33 +1,14 @@
 import { redis } from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
+import { normalizeTitleKey } from "../lib/domain/manga.js";
+import { normalizeSource, sourceLabel } from "../lib/domain/source.js";
 
-function normalizeTitle(str = "") {
-  return String(str)
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeSource(source = "") {
-  const s = String(source).toLowerCase().trim();
-  if (s === "mirror" || s === "shinigami_mirror") return "shinigami_mirror";
-  if (s === "shinigami" || s === "project" || s === "shinigami_project") {
-    return "shinigami_project";
-  }
-  return "ikiru";
-}
+const SOURCE_COMPARE_CACHE_KEY = "cache:api:source-compare:v1";
+const SOURCE_COMPARE_CACHE_SEC = Number(process.env.SOURCE_COMPARE_CACHE_SEC || 60);
 
 function sourceFamily(source = "") {
   return normalizeSource(source) === "ikiru" ? "ikiru" : "shinigami";
-}
-
-function sourceLabel(source = "") {
-  const s = normalizeSource(source);
-  if (s === "shinigami_mirror") return "Shinigami (Mirror)";
-  if (s === "shinigami_project") return "Shinigami (Project)";
-  return "Ikiru";
 }
 
 function chapterKey(chapter = "") {
@@ -57,6 +38,14 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   try {
+    const cacheTtl = Number.isFinite(SOURCE_COMPARE_CACHE_SEC) && SOURCE_COMPARE_CACHE_SEC > 0
+      ? Math.floor(SOURCE_COMPARE_CACHE_SEC)
+      : 60;
+    const cached = await redis.get(SOURCE_COMPARE_CACHE_KEY);
+    if (cached && typeof cached === "object") {
+      return res.status(200).json(cached);
+    }
+
     const raw = await redis.lrange("recent:chapters", 0, 199);
     const entries = Array.isArray(raw) ? raw.filter(Boolean) : [];
 
@@ -69,7 +58,7 @@ export default async function handler(req, res) {
 
       const title = String(entry.title || "").trim();
       const chapter = String(entry.chapter || "").trim();
-      const titleNorm = normalizeTitle(title);
+      const titleNorm = normalizeTitleKey(title);
       const chapterNorm = chapterKey(chapter);
       if (!titleNorm || !chapterNorm) continue;
 
@@ -157,7 +146,7 @@ export default async function handler(req, res) {
       (a, b) => new Date(b.compareAt).getTime() - new Date(a.compareAt).getTime(),
     );
 
-    return res.status(200).json({
+    const payload = {
       summary: {
         totalCompared: comparisons.length,
         ikiruWins,
@@ -166,7 +155,10 @@ export default async function handler(req, res) {
       },
       sourceCounts,
       comparisons: comparisons.slice(0, 20),
-    });
+    };
+
+    await redis.set(SOURCE_COMPARE_CACHE_KEY, payload, { ex: cacheTtl }).catch(() => {});
+    return res.status(200).json(payload);
   } catch (err) {
     console.error("[source-compare] Error:", err);
     return res.status(500).json({

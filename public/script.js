@@ -1,5 +1,6 @@
 const API_BASE = "";
 const DEFAULT_POLL_MS = 30_000;
+const DEFAULT_HEAVY_POLL_MS = 120_000;
 const elementCache = new Map();
 const $ = (id) => {
   if (!elementCache.has(id)) elementCache.set(id, document.getElementById(id));
@@ -18,12 +19,19 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("id-ID", {
 });
 
 let isAuthenticated = false;
-let pollTimer = null;
+let lightPollTimer = null;
+let heavyPollTimer = null;
 let pollMs = Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS);
 if (![10_000, 30_000, 60_000].includes(pollMs)) pollMs = DEFAULT_POLL_MS;
 let autoRefreshEnabled = localStorage.getItem("ikiru_auto_refresh") !== "off";
 let isProcessing = false;
 let loadAbortController = null;
+let lightAbortController = null;
+let heavyAbortController = null;
+let lastHeavyLoadAt = 0;
+let latestStatusData = null;
+let latestWhitelistData = null;
+let latestRecentData = null;
 let whitelistItems = [];
 let whitelistSortOrder = "default";
 let compareItems = [];
@@ -35,6 +43,14 @@ let pendingDeleteResolver = null;
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function resolveHeavyPollMs() {
+  return Math.max(DEFAULT_HEAVY_POLL_MS, pollMs * 4);
+}
+
+function msToSecondsLabel(ms) {
+  return `${Math.round(ms / 1000)}s`;
+}
 
 function fmt(d) {
   return TIME_FORMATTER.format(d);
@@ -487,6 +503,7 @@ function applyWhitelistFilter() {
 }
 
 function renderWhitelist(data) {
+  latestWhitelistData = data ?? latestWhitelistData;
   whitelistItems = data?.items ?? [];
   applyWhitelistFilter();
 }
@@ -754,7 +771,8 @@ async function logoutDashboard() {
   }
   isAuthenticated = false;
   $("modalOverlay").classList.add("show");
-  clearInterval(pollTimer);
+  clearInterval(lightPollTimer);
+  clearInterval(heavyPollTimer);
 }
 
 async function bootstrapAuth() {
@@ -786,10 +804,98 @@ async function apiFetch(path, signal) {
   return r.json();
 }
 
+function renderSummaryPanels() {
+  renderStatsExtended(latestStatusData);
+  renderOverview(latestStatusData, latestWhitelistData, latestRecentData);
+  renderLastCronResult(latestStatusData, false);
+  renderSourceHealth(latestStatusData);
+}
+
+async function loadLightData() {
+  if (!checkAuth()) return;
+
+  if (lightAbortController) lightAbortController.abort();
+  const controller = new AbortController();
+  lightAbortController = controller;
+
+  try {
+    const [statusR, recentR] = await Promise.allSettled([
+      apiFetch("/api/status", controller.signal),
+      apiFetch("/api/recent", controller.signal),
+    ]);
+
+    if (lightAbortController !== controller) return;
+
+    if (statusR.status === "fulfilled") {
+      latestStatusData = statusR.value;
+      renderSummaryPanels();
+    } else if (statusR.reason?.name !== "AbortError" && !latestStatusData) {
+      renderSummaryPanels();
+    }
+
+    if (recentR.status === "fulfilled") {
+      latestRecentData = recentR.value;
+      renderRecent(latestRecentData);
+      renderSummaryPanels();
+    } else if (recentR.reason?.name !== "AbortError" && !latestRecentData) {
+      renderErr($("recentList"), "Gagal muat recent data");
+    }
+
+    $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
+  } finally {
+    if (lightAbortController === controller) lightAbortController = null;
+  }
+}
+
+async function loadHeavyData() {
+  if (!checkAuth()) return;
+
+  if (heavyAbortController) heavyAbortController.abort();
+  const controller = new AbortController();
+  heavyAbortController = controller;
+
+  try {
+    const [whitelistR, logsR, compareR] = await Promise.allSettled([
+      apiFetch("/api/whitelist", controller.signal),
+      apiFetch("/api/logs", controller.signal),
+      apiFetch("/api/source-compare", controller.signal),
+    ]);
+
+    if (heavyAbortController !== controller) return;
+
+    if (whitelistR.status === "fulfilled") {
+      latestWhitelistData = whitelistR.value;
+      renderWhitelist(latestWhitelistData);
+      renderSummaryPanels();
+    } else if (whitelistR.reason?.name !== "AbortError" && !latestWhitelistData) {
+      renderErr($("mangaList"), "Gagal muat whitelist");
+    }
+
+    if (logsR.status === "fulfilled") {
+      renderLogs(logsR.value);
+    } else if (logsR.reason?.name !== "AbortError") {
+      renderErr($("logList"), "Gagal muat logs");
+    }
+
+    if (compareR.status === "fulfilled") {
+      renderSourceCompare(compareR.value);
+    } else if (compareR.reason?.name !== "AbortError") {
+      renderErr($("compareList"), "Gagal muat source compare");
+    }
+
+    lastHeavyLoadAt = Date.now();
+    $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
+  } finally {
+    if (heavyAbortController === controller) heavyAbortController = null;
+  }
+}
+
 async function loadAll() {
   if (!checkAuth()) return;
   clearAlert();
 
+  if (lightAbortController) lightAbortController.abort();
+  if (heavyAbortController) heavyAbortController.abort();
   if (loadAbortController) loadAbortController.abort();
   const controller = new AbortController();
   loadAbortController = controller;
@@ -821,10 +927,10 @@ async function loadAll() {
     const logsData = logsR.status === "fulfilled" ? logsR.value : null;
     const compareData = compareR.status === "fulfilled" ? compareR.value : null;
 
-    renderStatsExtended(statusData);
-    renderOverview(statusData, whitelistData, recentData);
-    renderLastCronResult(statusData, false);
-    renderSourceHealth(statusData);
+    latestStatusData = statusData;
+    latestWhitelistData = whitelistData;
+    latestRecentData = recentData;
+    renderSummaryPanels();
 
     if (whitelistData) renderWhitelist(whitelistData);
     else renderErr($("mangaList"), "Gagal muat whitelist");
@@ -845,6 +951,7 @@ async function loadAll() {
       showAlert("Beberapa endpoint gagal dimuat. Coba refresh lagi.");
     }
 
+    lastHeavyLoadAt = Date.now();
     $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
     renderTrendChart();
     renderSourceChart();
@@ -856,16 +963,31 @@ async function loadAll() {
 }
 
 function startPoll() {
-  clearInterval(pollTimer);
+  clearInterval(lightPollTimer);
+  clearInterval(heavyPollTimer);
   if (!autoRefreshEnabled) return;
-  pollTimer = setInterval(loadAll, pollMs);
+  lightPollTimer = setInterval(() => {
+    if (!isProcessing) loadLightData();
+  }, pollMs);
+  heavyPollTimer = setInterval(() => {
+    if (!isProcessing) loadHeavyData();
+  }, resolveHeavyPollMs());
 }
 
 function updateAutoRefreshUI() {
   const btn = $("btnAutoRefresh");
   const select = $("pollInterval");
+  const pollInfo = $("pollInfo");
   if (select) select.value = String(pollMs);
   if (btn) btn.textContent = autoRefreshEnabled ? "auto: on" : "auto: off";
+  if (pollInfo) {
+    if (!autoRefreshEnabled) {
+      pollInfo.textContent = "light: off | heavy: off";
+      return;
+    }
+    pollInfo.textContent =
+      `light: ${msToSecondsLabel(pollMs)} | heavy: ${msToSecondsLabel(resolveHeavyPollMs())}`;
+  }
 }
 
 function toggleAutoRefresh() {
@@ -886,7 +1008,11 @@ function setPollInterval() {
 }
 
 window.addEventListener("focus", () => {
-  if (isAuthenticated && !isProcessing) loadAll();
+  if (!isAuthenticated || isProcessing) return;
+  loadLightData();
+  if (Date.now() - lastHeavyLoadAt > resolveHeavyPollMs() / 2) {
+    loadHeavyData();
+  }
 });
 
 function applyTheme(dark) {

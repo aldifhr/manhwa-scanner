@@ -1,4 +1,5 @@
-import axios from "axios";
+import { createHash } from "crypto";
+import pLimit from "p-limit";
 import { isCronAuthorized } from "../lib/auth.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 import {
@@ -24,12 +25,68 @@ import {
   saveSourceHealthMap,
 } from "../lib/services/sourceHealth.js";
 import { getLogger } from "../lib/logger.js";
+import { httpGet } from "../lib/httpClient.js";
 
 export const config = { maxDuration: 60 };
 
 const MANGA_HISTORY_LIMIT = 20;
 const MANGA_HISTORY_TTL = 60 * 60 * 24 * 45;
 const CHANNEL_VALIDATION_CACHE_SEC = 60 * 10;
+const CHANNEL_VALIDATION_REFRESH_SECONDS = Number(
+  process.env.CHANNEL_VALIDATION_REFRESH_SECONDS || 3600,
+);
+const CHANNEL_VALIDATION_REFRESH_KEY = "cron:last_channel_validation_at";
+const CHANNEL_VALIDATION_CONCURRENCY_DEFAULT = 8;
+const CHANNEL_VALIDATION_CONCURRENCY_MIN = 1;
+const CHANNEL_VALIDATION_CONCURRENCY_MAX = 20;
+
+function resolveChannelValidationConcurrency(rawValue) {
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return {
+      value: CHANNEL_VALIDATION_CONCURRENCY_DEFAULT,
+      raw: rawValue,
+      reason: null,
+    };
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) {
+    return {
+      value: CHANNEL_VALIDATION_CONCURRENCY_DEFAULT,
+      raw: rawValue,
+      reason: "invalid_number",
+    };
+  }
+
+  const integer = Math.trunc(parsed);
+  if (integer < CHANNEL_VALIDATION_CONCURRENCY_MIN) {
+    return {
+      value: CHANNEL_VALIDATION_CONCURRENCY_MIN,
+      raw: rawValue,
+      reason: "below_min",
+    };
+  }
+
+  if (integer > CHANNEL_VALIDATION_CONCURRENCY_MAX) {
+    return {
+      value: CHANNEL_VALIDATION_CONCURRENCY_MAX,
+      raw: rawValue,
+      reason: "above_max",
+    };
+  }
+
+  return {
+    value: integer,
+    raw: rawValue,
+    reason: null,
+  };
+}
+
+const CHANNEL_VALIDATION_CONCURRENCY_RESOLVED = resolveChannelValidationConcurrency(
+  process.env.CHANNEL_VALIDATION_CONCURRENCY,
+);
+const CHANNEL_VALIDATION_CONCURRENCY =
+  CHANNEL_VALIDATION_CONCURRENCY_RESOLVED.value;
 const SOURCE_FAILURE_THRESHOLD = Number(process.env.SOURCE_FAIL_THRESHOLD || 3);
 const SOURCE_COOLDOWN_SECONDS = Number(process.env.SOURCE_COOLDOWN_SECONDS || 1800);
 const DISCORD_TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -37,6 +94,17 @@ const DEBUG = process.env.CRON_DEBUG === "true";
 const logger = getLogger({ scope: "cron" });
 const log = (...args) => DEBUG && logger.debug({ args }, "debug");
 const warn = (...args) => logger.warn({ args }, "warn");
+
+export function shouldRunChannelValidation(
+  lastValidatedAt,
+  refreshSeconds = CHANNEL_VALIDATION_REFRESH_SECONDS,
+  nowMs = Date.now(),
+) {
+  const refreshMs = Math.max(60, Number(refreshSeconds) || 3600) * 1000;
+  const lastMs = new Date(lastValidatedAt || "").getTime();
+  if (!Number.isFinite(lastMs)) return true;
+  return nowMs - lastMs >= refreshMs;
+}
 
 function buildMangaHistoryKey(item) {
   const source = normalizeSource(item?.source);
@@ -58,13 +126,28 @@ function buildChapterHistoryRef(item) {
   return `${chapter}|${updated}`;
 }
 
+function buildMangaHistorySeenKey(item) {
+  const key = buildMangaHistoryKey(item);
+  const chapterRef = buildChapterHistoryRef(item);
+  if (!key || !chapterRef) return null;
+
+  const digest = createHash("sha1")
+    .update(`${key}|${chapterRef}`)
+    .digest("hex");
+  return `history:seen:${digest}`;
+}
+
 async function saveMangaHistory(item) {
   const key = buildMangaHistoryKey(item);
   const chapterRef = buildChapterHistoryRef(item);
-  if (!key || !chapterRef) return;
+  const seenKey = buildMangaHistorySeenKey(item);
+  if (!key || !chapterRef || !seenKey) return;
 
-  const current = await redis.lrange(key, 0, MANGA_HISTORY_LIMIT - 1);
-  if (Array.isArray(current) && current.includes(chapterRef)) {
+  const claimed = await redis.set(seenKey, "1", {
+    nx: true,
+    ex: MANGA_HISTORY_TTL,
+  });
+  if (!claimed) {
     await redis.expire(key, MANGA_HISTORY_TTL);
     return;
   }
@@ -87,9 +170,16 @@ async function validateChannel(channelId, guildId) {
   }
 
   try {
-    const resp = await axios.get(`https://discord.com/api/v10/channels/${channelId}`, {
-      headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
-    });
+    const resp = await httpGet(
+      `https://discord.com/api/v10/channels/${channelId}`,
+      {
+        headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
+        timeout: 10000,
+      },
+      {
+        retries: 2,
+      },
+    );
     const channel = resp.data;
     log(
       `CONNECTED: #${channel.name} (${channelId.slice(-4)}) in guild ${guildId.slice(-4)}`,
@@ -126,6 +216,17 @@ export default async function handler(req, res) {
 
   try {
     const start = Date.now();
+    if (CHANNEL_VALIDATION_CONCURRENCY_RESOLVED.reason) {
+      warn(
+        `CHANNEL_VALIDATION_CONCURRENCY="${CHANNEL_VALIDATION_CONCURRENCY_RESOLVED.raw}" invalid (${CHANNEL_VALIDATION_CONCURRENCY_RESOLVED.reason}), using ${CHANNEL_VALIDATION_CONCURRENCY}`,
+      );
+    }
+    logger.info(
+      {
+        channelValidationConcurrency: CHANNEL_VALIDATION_CONCURRENCY,
+      },
+      "runtime config",
+    );
     logger.info("starting");
 
     const [whitelist, guildChannels, sourceHealthMap] = await Promise.all([
@@ -154,16 +255,49 @@ export default async function handler(req, res) {
     const guildEntries = Object.entries(guildChannels || {});
     logger.info({ whitelist: whitelist.length, guildsFound: guildEntries.length }, "loaded");
 
-    const validEntries = await Promise.all(
-      guildEntries.map(async ([guildId, channelId]) => {
-        const valid = await validateChannel(channelId, guildId);
-        return valid ? [guildId, channelId] : null;
-      }),
-    );
+    const lastValidation = await redis.get(CHANNEL_VALIDATION_REFRESH_KEY).catch(() => null);
+    const lastValidationAt = typeof lastValidation === "string"
+      ? lastValidation
+      : lastValidation?.at || null;
+    const runFullValidation = shouldRunChannelValidation(lastValidationAt);
 
-    const validGuilds = Object.fromEntries(validEntries.filter(Boolean));
+    let validGuilds;
+    if (runFullValidation) {
+      const validateLimit = pLimit(CHANNEL_VALIDATION_CONCURRENCY);
+      const validEntries = await Promise.all(
+        guildEntries.map(([guildId, channelId]) =>
+          validateLimit(async () => {
+            const valid = await validateChannel(channelId, guildId);
+            return valid ? [guildId, channelId] : null;
+          }),
+        ),
+      );
+      validGuilds = Object.fromEntries(validEntries.filter(Boolean));
+      await redis
+        .set(CHANNEL_VALIDATION_REFRESH_KEY, {
+          at: new Date().toISOString(),
+          total: guildEntries.length,
+          valid: Object.keys(validGuilds).length,
+        })
+        .catch(() => {});
+    } else {
+      validGuilds = Object.fromEntries(
+        guildEntries.filter(([, channelId]) => Boolean(channelId)),
+      );
+      logger.info(
+        {
+          lastValidationAt,
+          refreshSeconds: CHANNEL_VALIDATION_REFRESH_SECONDS,
+        },
+        "guild validation skipped (cached mode)",
+      );
+    }
+
     const activeGuildCount = Object.keys(validGuilds).length;
     const activeChannelIds = Object.values(validGuilds);
+    const channelToGuild = new Map(
+      Object.entries(validGuilds).map(([guildId, channelId]) => [channelId, guildId]),
+    );
 
     logger.info({ guildsFound: guildEntries.length, guildsActive: activeGuildCount }, "guild validation");
 
@@ -223,6 +357,18 @@ export default async function handler(req, res) {
       log,
       warn,
       onDispatchSuccess: (item) => saveMangaHistory(item),
+      onChannelError: async (err, channelId) => {
+        const status = err?.response?.status;
+        if (status !== 403 && status !== 404) return;
+        const guildId = channelToGuild.get(channelId);
+        if (!guildId) return;
+        await deleteGuildChannel(guildId).catch(() => {});
+        await redis
+          .set(`cache:channel-valid:${channelId}`, false, {
+            ex: CHANNEL_VALIDATION_CACHE_SEC,
+          })
+          .catch(() => {});
+      },
     });
 
     const duration = ((Date.now() - start) / 1000).toFixed(1);
