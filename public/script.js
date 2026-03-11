@@ -1,6 +1,9 @@
 const API_BASE = "";
-const DEFAULT_POLL_MS = 30_000;
-const DEFAULT_HEAVY_POLL_MS = 120_000;
+const DEFAULT_POLL_MS = 60_000;
+const DEFAULT_HEAVY_POLL_MS = 300_000;
+const HIDDEN_TAB_MULTIPLIER = 3;
+const FOCUS_REFRESH_COOLDOWN_MS = 30_000;
+const ALLOWED_POLL_MS = [30_000, 60_000, 120_000];
 const elementCache = new Map();
 const $ = (id) => {
   if (!elementCache.has(id)) elementCache.set(id, document.getElementById(id));
@@ -22,13 +25,15 @@ let isAuthenticated = false;
 let lightPollTimer = null;
 let heavyPollTimer = null;
 let pollMs = Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS);
-if (![10_000, 30_000, 60_000].includes(pollMs)) pollMs = DEFAULT_POLL_MS;
+if (!ALLOWED_POLL_MS.includes(pollMs)) pollMs = DEFAULT_POLL_MS;
 let autoRefreshEnabled = localStorage.getItem("ikiru_auto_refresh") !== "off";
 let isProcessing = false;
 let loadAbortController = null;
 let lightAbortController = null;
 let heavyAbortController = null;
 let lastHeavyLoadAt = 0;
+let lastLightLoadAt = 0;
+let lastFocusRefreshAt = 0;
 let latestStatusData = null;
 let latestWhitelistData = null;
 let latestRecentData = null;
@@ -46,6 +51,15 @@ const esc = (s) =>
 
 function resolveHeavyPollMs() {
   return Math.max(DEFAULT_HEAVY_POLL_MS, pollMs * 4);
+}
+
+function currentLightPollMs() {
+  return document.hidden ? pollMs * HIDDEN_TAB_MULTIPLIER : pollMs;
+}
+
+function currentHeavyPollMs() {
+  const base = resolveHeavyPollMs();
+  return document.hidden ? base * HIDDEN_TAB_MULTIPLIER : base;
 }
 
 function msToSecondsLabel(ms) {
@@ -1188,6 +1202,7 @@ async function loadLightData() {
     }
 
     $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
+    lastLightLoadAt = Date.now();
   } finally {
     if (lightAbortController === controller) lightAbortController = null;
   }
@@ -1321,10 +1336,10 @@ function startPoll() {
   if (!autoRefreshEnabled) return;
   lightPollTimer = setInterval(() => {
     if (!isProcessing) loadLightData();
-  }, pollMs);
+  }, currentLightPollMs());
   heavyPollTimer = setInterval(() => {
     if (!isProcessing) loadHeavyData();
-  }, resolveHeavyPollMs());
+  }, currentHeavyPollMs());
 }
 
 function updateAutoRefreshUI() {
@@ -1338,8 +1353,9 @@ function updateAutoRefreshUI() {
       pollInfo.textContent = "light: off | heavy: off";
       return;
     }
+    const hiddenSuffix = document.hidden ? " | bg: hemat" : "";
     pollInfo.textContent =
-      `light: ${msToSecondsLabel(pollMs)} | heavy: ${msToSecondsLabel(resolveHeavyPollMs())}`;
+      `light: ${msToSecondsLabel(currentLightPollMs())} | heavy: ${msToSecondsLabel(currentHeavyPollMs())}${hiddenSuffix}`;
   }
 }
 
@@ -1354,18 +1370,30 @@ function setPollInterval() {
   const select = $("pollInterval");
   if (!select) return;
   const next = Number(select.value);
-  if (![10_000, 30_000, 60_000].includes(next)) return;
+  if (!ALLOWED_POLL_MS.includes(next)) return;
   pollMs = next;
   localStorage.setItem("ikiru_poll_ms", String(pollMs));
+  updateAutoRefreshUI();
   startPoll();
 }
 
 window.addEventListener("focus", () => {
   if (!isAuthenticated || isProcessing) return;
-  loadLightData();
-  if (Date.now() - lastHeavyLoadAt > resolveHeavyPollMs() / 2) {
+  const now = Date.now();
+  if (now - lastFocusRefreshAt < FOCUS_REFRESH_COOLDOWN_MS) return;
+  lastFocusRefreshAt = now;
+
+  if (now - lastLightLoadAt > Math.min(currentLightPollMs(), FOCUS_REFRESH_COOLDOWN_MS)) {
+    loadLightData();
+  }
+  if (now - lastHeavyLoadAt > currentHeavyPollMs() / 2) {
     loadHeavyData();
   }
+});
+
+document.addEventListener("visibilitychange", () => {
+  updateAutoRefreshUI();
+  startPoll();
 });
 
 function applyTheme(dark) {

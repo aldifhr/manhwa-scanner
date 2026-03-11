@@ -16,6 +16,10 @@ import {
   normalizeTitleKey,
 } from "../lib/domain/manga.js";
 import { normalizeSource, normalizeSourceUrl } from "../lib/domain/source.js";
+import {
+  STATUS_API_CACHE_KEY,
+  invalidateDashboardCaches,
+} from "../lib/cacheKeys.js";
 import { dispatchChapters } from "../lib/services/dispatch.js";
 import {
   SOURCE_KEYS,
@@ -386,6 +390,7 @@ export default async function handler(req, res) {
       scrapeMetrics,
     };
     await redis.set("cron:last_run", statusPayload);
+    await invalidateDashboardCaches(redis, [STATUS_API_CACHE_KEY]);
 
     logger.info(
       { duration, sent, skipped, failed, guilds: activeGuildCount },

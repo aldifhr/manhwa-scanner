@@ -56,11 +56,11 @@
         </div>
         <span class="last-updated" id="lastUpdated">-</span>
         <span class="poll-indicator" id="pollInfo">light: - | heavy: -</span>
-        <select id="pollInterval" class="poll-select" onchange="setPollInterval()">
-          <option value="10000">10s</option>
-          <option value="30000">30s</option>
-          <option value="60000">60s</option>
-        </select>
+          <select id="pollInterval" class="poll-select" onchange="setPollInterval()">
+            <option value="30000">30s</option>
+            <option value="60000">60s</option>
+            <option value="120000">120s</option>
+          </select>
         <button type="button" class="btn-soft" id="btnAutoRefresh" onclick="toggleAutoRefresh()">auto: on</button>
         <button type="button" class="btn-strong" id="btnRunCron" onclick="runCronNow()">jalankan cron</button>
         <button type="button" class="btn-soft" id="btnTheme" onclick="toggleTheme()">mode</button>

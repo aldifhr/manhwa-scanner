@@ -3,9 +3,9 @@ import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { normalizeTitleKey } from "../lib/domain/manga.js";
 import { normalizeSource, sourceLabel } from "../lib/domain/source.js";
+import { SOURCE_COMPARE_CACHE_KEY } from "../lib/cacheKeys.js";
 
-const SOURCE_COMPARE_CACHE_KEY = "cache:api:source-compare:v1";
-const SOURCE_COMPARE_CACHE_SEC = Number(process.env.SOURCE_COMPARE_CACHE_SEC || 60);
+const SOURCE_COMPARE_CACHE_SEC = Number(process.env.SOURCE_COMPARE_CACHE_SEC || 180);
 
 function sourceFamily(source = "") {
   return normalizeSource(source) === "ikiru" ? "ikiru" : "shinigami";
@@ -35,12 +35,14 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  res.setHeader("Cache-Control", "no-store");
-
   try {
     const cacheTtl = Number.isFinite(SOURCE_COMPARE_CACHE_SEC) && SOURCE_COMPARE_CACHE_SEC > 0
       ? Math.floor(SOURCE_COMPARE_CACHE_SEC)
-      : 60;
+      : 180;
+    res.setHeader(
+      "Cache-Control",
+      `private, max-age=${Math.min(cacheTtl, 30)}, stale-while-revalidate=${cacheTtl}`,
+    );
     const cached = await redis.get(SOURCE_COMPARE_CACHE_KEY);
     if (cached && typeof cached === "object") {
       return res.status(200).json(cached);

@@ -149,3 +149,60 @@ test("dispatchChapters runs onDispatchSuccess extra tasks", async () => {
   assert.equal(out.sent, 1);
   assert.equal(executed, 1);
 });
+
+test("dispatchChapters writes one summary log for multiple sent chapters", async () => {
+  const redis = createRedisMock();
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "A",
+        chapter: "Chapter 1",
+        url: "https://a.shinigami.asia/chapter/10",
+        source: "shinigami_project",
+      },
+      {
+        title: "B",
+        chapter: "Chapter 2",
+        url: "https://a.shinigami.asia/chapter/11",
+        source: "shinigami_project",
+      },
+    ],
+    channelIds: ["1001"],
+    sendEmbed: async () => {},
+    nowIso: "2026-01-01T00:00:00.000Z",
+  });
+
+  const logs = redis.lists.get("cron:logs") || [];
+  assert.equal(out.sent, 2);
+  assert.equal(logs.length, 1);
+  assert.match(String(logs[0]?.message || ""), /Cron sent 2 chapter\(s\)/);
+});
+
+test("dispatchChapters invalidates dashboard caches after write", async () => {
+  const redis = createRedisMock();
+  redis.kv.set("cache:api:recent:v1", { items: ["stale"] });
+  redis.kv.set("cache:api:logs:v1", { logs: ["stale"] });
+  redis.kv.set("cache:api:source-compare:v1", { comparisons: ["stale"] });
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "Cache",
+        chapter: "Chapter 7",
+        url: "https://a.shinigami.asia/chapter/77",
+        source: "shinigami_project",
+      },
+    ],
+    channelIds: ["1001"],
+    sendEmbed: async () => {},
+    nowIso: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(out.sent, 1);
+  assert.equal(redis.kv.has("cache:api:recent:v1"), false);
+  assert.equal(redis.kv.has("cache:api:logs:v1"), false);
+  assert.equal(redis.kv.has("cache:api:source-compare:v1"), false);
+});
