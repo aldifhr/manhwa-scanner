@@ -127,6 +127,20 @@ function normalizeTitleKey(value = "") {
   return String(value).toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeMarkReason(value = "") {
+  const key = String(value).toLowerCase().trim().replace(/\s+/g, "_");
+  if (key === "hiatus" || key === "end_season" || key === "end") return key;
+  return "";
+}
+
+function markLabel(mark) {
+  const key = normalizeMarkReason(mark);
+  if (key === "hiatus") return "Hiatus";
+  if (key === "end_season") return "End Season";
+  if (key === "end") return "End";
+  return "";
+}
+
 function cooldownText(disabledUntil) {
   const target = parseDateSafe(disabledUntil);
   if (!target) return null;
@@ -487,12 +501,13 @@ function applyWhitelistFilter() {
     .map((entry, idx) => {
       const { item, title, source, originalIndex } = entry;
       const url = typeof item === "object" ? item.url : null;
+      const mark = typeof item === "object" ? markLabel(item.mark) : "";
       const sourceLabel = sourceName(source);
       const badgeClass = sourceBadgeClass(source);
       const displayIndex = whitelistSortOrder === "default" ? originalIndex : idx;
       return `<li class="manga-item" title="${url ? esc(url) : ""}">
         <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
-        <span class="manga-item-title">${highlight(title, query)}</span>
+        <span class="manga-item-title">${highlight(title, query)}${mark ? ` <span class="badge">${esc(mark)}</span>` : ""}</span>
         <span class="source-badge ${badgeClass}">${esc(sourceLabel)}</span>
         <button class="btn-mini" onclick="quickCheckMatch('${esc(title)}')">match</button>
         <button class="btn-mini" onclick="copyUrl('${esc(url || "")}')">copy</button>

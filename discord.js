@@ -38,6 +38,27 @@ const commands = [
     }],
   },
   {
+    name:        "mark",
+    description: "Kasih mark status ke manga di whitelist",
+    options: [{
+      name:        "query",
+      description: "Judul manga atau nomor dari /list",
+      type:        3,
+      required:    true,
+    }, {
+      name:        "reason",
+      description: "Status mark yang mau dipasang",
+      type:        3,
+      required:    true,
+      choices: [
+        { name: "Hiatus", value: "hiatus" },
+        { name: "End Season", value: "end_season" },
+        { name: "End", value: "end" },
+        { name: "Clear", value: "clear" },
+      ],
+    }],
+  },
+  {
     name:        "clear",
     description: "Clear semua whitelist (owner only)",
   },
