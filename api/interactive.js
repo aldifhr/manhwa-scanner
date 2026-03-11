@@ -3,6 +3,10 @@ import { waitUntil } from "@vercel/functions";
 import { redis } from "../lib/redis.js";
 import { editInteractionResponse } from "../lib/discord.js";
 import commands from "../lib/commands/index.js";
+import {
+  buildAddAutocompleteChoices,
+  resolveAddResultValue,
+} from "../lib/commands/add.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
 import { normalizeSource } from "../lib/domain/source.js";
 import {
@@ -47,23 +51,10 @@ async function handleAddManga(payload, title, url = null, source = "ikiru") {
 
 async function resolveAddSelection(interactionData) {
   const rawValue = String(interactionData.values?.[0] || "");
-  const parts = rawValue.split("|||");
+  let { cached, item, selectedSource } = await resolveAddResultValue(rawValue, redis);
 
-  let cached = null;
-  let item = null;
-  let selectedSource = "ikiru";
-
-  if (parts.length === 2) {
-    const [sessionId, idxRaw] = parts;
-    const sessionSource = normalizeSource(sessionId.split(":")[0] || "ikiru");
-    cached = await redis.get(`add:results:${sessionId}`);
-    const idx = Number.parseInt(idxRaw, 10);
-    const results = Array.isArray(cached) ? cached : [];
-    if (Number.isInteger(idx) && idx >= 0 && idx < results.length) {
-      item = results[idx];
-    }
-    selectedSource = normalizeSource(item?.source || sessionSource);
-  } else {
+  if (!item) {
+    const parts = rawValue.split("|||");
     const [rawSource, keyword, id] = parts;
     const legacySource = normalizeSource(rawSource);
     cached = await redis.get(`add:results:${legacySource}:${keyword}`);
@@ -105,6 +96,23 @@ export default async function handler(req, res) {
   if (type === 1) {
     logApiOk(reqLogger, { status: 200, interactionType: type });
     return res.json({ type: 1 });
+  }
+
+  if (type === InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE) {
+    const { name, options } = interactionData;
+
+    if (name !== "add") {
+      logApiOk(reqLogger, { status: 200, event: "autocomplete_ignored", command: name });
+      return res.json({ type: 8, data: { choices: [] } });
+    }
+
+    const choices = await buildAddAutocompleteChoices(options, redis);
+    logApiOk(reqLogger, {
+      status: 200,
+      event: "autocomplete_add",
+      count: choices.length,
+    });
+    return res.json({ type: 8, data: { choices } });
   }
 
   if (type === InteractionType.MESSAGE_COMPONENT) {

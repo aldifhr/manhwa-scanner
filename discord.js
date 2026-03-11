@@ -85,8 +85,9 @@ const commands = [
       name: "source",
       description: "Pilih source manga",
       type: 3,
-      required: true,
+      required: false,
       choices: [
+        { name: "All Sources", value: "all" },
         { name: "Ikiru", value: "ikiru" },
         { name: "Shinigami", value: "shinigami_project" },
       ],
@@ -96,6 +97,7 @@ const commands = [
       description: "Manga title to add",
       type: 3,
       required: true,
+      autocomplete: true,
     },
   ],
 },
