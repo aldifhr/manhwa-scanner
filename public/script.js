@@ -61,6 +61,12 @@ function parseDateSafe(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function dayDiff(a, b) {
+  const one = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
+  const two = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
+  return Math.round((one - two) / 86400000);
+}
+
 function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -103,6 +109,13 @@ function countSentLast24h(items) {
   }).length;
 }
 
+function toRecentSourceFamily(source) {
+  const s = String(source || "").toLowerCase().trim();
+  if (s === "shinigami_mirror") return "Mirror";
+  if (s === "shinigami_project" || s === "shinigami") return "Project";
+  return "Ikiru";
+}
+
 function sourceName(source) {
   const s = String(source || "").toLowerCase().trim();
   if (s === "shinigami_project") return "Project";
@@ -125,6 +138,221 @@ function sourceDisplayName(source) {
 
 function normalizeTitleKey(value = "") {
   return String(value).toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function clampList(items, max = 6) {
+  return Array.isArray(items) ? items.slice(0, max) : [];
+}
+
+function safeText(value, fallback = "-") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function renderSimpleList(listId, countId, items, emptyText, renderer) {
+  const list = $(listId);
+  const badge = $(countId);
+  if (badge) badge.textContent = Array.isArray(items) ? items.length : 0;
+  if (!list) return;
+  if (!Array.isArray(items) || !items.length) {
+    list.innerHTML = `<li class="empty">${esc(emptyText)}</li>`;
+    return;
+  }
+  list.innerHTML = items.map(renderer).join("");
+}
+
+function sourceReliabilityScore(source, health, logs) {
+  let score = 100;
+  const failures = Number(health?.consecutiveFailures ?? 0);
+  if (health?.status === "degraded") score -= 35;
+  score -= Math.min(25, failures * 8);
+  if (health?.lastError) score -= 8;
+
+  const sourceNameLower = String(source || "").toLowerCase();
+  const failedLogHits = (Array.isArray(logs) ? logs : []).filter((log) => {
+    const text = `${log?.message || ""} ${log?.title || ""}`.toLowerCase();
+    return log?.tag === "failed" && text.includes(sourceNameLower.replace("_", " "));
+  }).length;
+  score -= Math.min(18, failedLogHits * 6);
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function deriveInsights({
+  statusData,
+  whitelistData,
+  recentData,
+  logsData,
+  compareData,
+}) {
+  const whitelist = Array.isArray(whitelistData?.items) ? whitelistData.items : [];
+  const recent = Array.isArray(recentData?.items) ? recentData.items : [];
+  const logs = Array.isArray(logsData?.logs) ? logsData.logs : [];
+  const comparisons = Array.isArray(compareData?.comparisons) ? compareData.comparisons : [];
+
+  const titleBuckets = new Map();
+  for (const item of recent) {
+    const title = safeText(item?.title, "Untitled");
+    const key = normalizeTitleKey(title);
+    const ts = parseDateSafe(item?.sentAt)?.getTime() || 0;
+    if (!titleBuckets.has(key)) {
+      titleBuckets.set(key, {
+        title,
+        count: 0,
+        lastSeenAt: item?.sentAt || null,
+        sourceCounts: { Ikiru: 0, Project: 0, Mirror: 0 },
+        timestamps: [],
+      });
+    }
+    const bucket = titleBuckets.get(key);
+    bucket.count += 1;
+    if (ts && (!bucket.lastSeenAt || ts > parseDateSafe(bucket.lastSeenAt)?.getTime())) {
+      bucket.lastSeenAt = item?.sentAt || bucket.lastSeenAt;
+    }
+    bucket.sourceCounts[toRecentSourceFamily(item?.source)] += 1;
+    if (item?.sentAt) bucket.timestamps.push(item.sentAt);
+  }
+
+  const topTitles = [...titleBuckets.values()]
+    .sort((a, b) => b.count - a.count || safeText(a.title).localeCompare(safeText(b.title)))
+    .slice(0, 8);
+
+  const hourBuckets = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+  for (const item of recent) {
+    const d = parseDateSafe(item?.sentAt);
+    if (!d) continue;
+    hourBuckets[d.getHours()].count += 1;
+  }
+  const peakHour = hourBuckets.reduce((best, current) => (current.count > best.count ? current : best), { hour: 0, count: 0 });
+
+  const uniqueDays = [...new Set(recent
+    .map((item) => parseDateSafe(item?.sentAt))
+    .filter(Boolean)
+    .map((d) => dateKey(d)))].sort().reverse();
+  let activityStreak = 0;
+  if (uniqueDays.length) {
+    let cursor = parseDateSafe(uniqueDays[0]);
+    for (const key of uniqueDays) {
+      const current = parseDateSafe(key);
+      if (!current || !cursor) break;
+      if (dayDiff(cursor, current) === 0) {
+        activityStreak += 1;
+        const next = new Date(cursor);
+        next.setDate(next.getDate() - 1);
+        cursor = next;
+      } else {
+        break;
+      }
+    }
+  }
+
+  const compareBuckets = new Map();
+  for (const item of comparisons) {
+    const key = normalizeTitleKey(item?.title || "");
+    if (!key) continue;
+    if (!compareBuckets.has(key)) {
+      compareBuckets.set(key, {
+        title: safeText(item?.title, "Untitled"),
+        total: 0,
+        ikiruWins: 0,
+        shinigamiWins: 0,
+        ties: 0,
+        avgDeltaMinutes: 0,
+      });
+    }
+    const bucket = compareBuckets.get(key);
+    bucket.total += 1;
+    bucket.avgDeltaMinutes += Number(item?.deltaMinutes ?? 0);
+    if (item?.winner === "ikiru") bucket.ikiruWins += 1;
+    else if (item?.winner === "shinigami") bucket.shinigamiWins += 1;
+    else bucket.ties += 1;
+  }
+  const compareLeaderboard = [...compareBuckets.values()]
+    .map((item) => ({ ...item, avgDeltaMinutes: Math.round(item.avgDeltaMinutes / Math.max(1, item.total)) }))
+    .sort((a, b) => b.total - a.total || b.shinigamiWins - a.shinigamiWins || a.title.localeCompare(b.title))
+    .slice(0, 8);
+
+  const lastSeenByTitle = new Map();
+  for (const item of recent) {
+    const key = normalizeTitleKey(item?.title || "");
+    const seenAt = parseDateSafe(item?.sentAt);
+    if (!key || !seenAt) continue;
+    const current = lastSeenByTitle.get(key);
+    if (!current || seenAt.getTime() > current.seenAt.getTime()) {
+      lastSeenByTitle.set(key, {
+        title: safeText(item?.title, "Untitled"),
+        seenAt,
+        source: item?.source || "ikiru",
+        chapter: safeText(item?.chapter, "-"),
+      });
+    }
+  }
+
+  const whitelistLastSeen = whitelist
+    .map((item) => {
+      const key = normalizeTitleKey(item?.title || "");
+      const hit = lastSeenByTitle.get(key);
+      return {
+        title: safeText(item?.title, "Untitled"),
+        source: item?.source || "ikiru",
+        mark: item?.mark || null,
+        lastSeenAt: hit?.seenAt?.toISOString?.() || null,
+        chapter: hit?.chapter || null,
+      };
+    })
+    .sort((a, b) => {
+      const ta = parseDateSafe(a.lastSeenAt)?.getTime() ?? 0;
+      const tb = parseDateSafe(b.lastSeenAt)?.getTime() ?? 0;
+      return tb - ta || a.title.localeCompare(b.title);
+    });
+
+  const missedDetector = whitelistLastSeen
+    .filter((item) => !item.lastSeenAt)
+    .slice(0, 10);
+
+  const sourceReliability = Object.entries(statusData?.sourceHealth || {})
+    .map(([source, health]) => ({
+      source,
+      label: sourceDisplayName(source),
+      score: sourceReliabilityScore(source, health, logs),
+      status: health?.status || "unknown",
+      consecutiveFailures: Number(health?.consecutiveFailures ?? 0),
+      lastSuccessAt: health?.lastSuccessAt || null,
+      lastError: health?.lastError || null,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const failedMonitor = logs
+    .filter((log) => log?.tag === "failed")
+    .slice(0, 10)
+    .map((log) => ({
+      title: safeText(log?.title || log?.message, "Unknown failure"),
+      message: safeText(log?.message, "-"),
+      time: log?.time || null,
+    }));
+
+  const sourceMixMap = new Map();
+  for (const item of recent) {
+    const label = toRecentSourceFamily(item?.source);
+    sourceMixMap.set(label, (sourceMixMap.get(label) || 0) + 1);
+  }
+  const sourceMix = [...sourceMixMap.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    activityStreak,
+    peakHour,
+    topTitles,
+    compareLeaderboard,
+    whitelistLastSeen: whitelistLastSeen.slice(0, 10),
+    missedDetector,
+    sourceReliability,
+    failedMonitor,
+    sourceMix,
+    missedCount: missedDetector.length,
+    failCount: failedMonitor.length,
+  };
 }
 
 function normalizeMarkReason(value = "") {
@@ -608,6 +836,107 @@ function renderSourceCompare(data) {
     .join("");
 }
 
+function renderDerivedInsights() {
+  const insights = deriveInsights({
+    statusData: latestStatusData,
+    whitelistData: latestWhitelistData,
+    recentData: latestRecentData,
+    logsData: { logs: logsItems },
+    compareData: { comparisons: compareItems },
+  });
+
+  $("opsStreakValue").textContent = insights.activityStreak ? `${insights.activityStreak}d` : "0d";
+  $("opsPeakHourValue").textContent = insights.peakHour.count ? `${String(insights.peakHour.hour).padStart(2, "0")}:00` : "-";
+  $("opsTopTitleValue").textContent = insights.topTitles[0]?.title || "-";
+  $("opsMissedValue").textContent = insights.missedCount;
+  $("opsFailValue").textContent = insights.failCount;
+
+  renderSimpleList(
+    "topTitlesList",
+    "topTitlesCount",
+    insights.topTitles,
+    "Belum ada title aktif di recent feed.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">${item.count} update | last seen ${esc(timeAgo(item.lastSeenAt))}</small></span>
+      <span class="badge">${esc(`I:${item.sourceCounts.Ikiru} P:${item.sourceCounts.Project} M:${item.sourceCounts.Mirror}`)}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "compareLeaderboardList",
+    "compareLeaderboardCount",
+    insights.compareLeaderboard,
+    "Belum ada leaderboard compare.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">I:${item.ikiruWins} S:${item.shinigamiWins} T:${item.ties} | avg gap ${item.avgDeltaMinutes} menit</small></span>
+      <span class="badge">${esc(`${item.total} compare`)}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "whitelistLastSeenList",
+    "whitelistLastSeenCount",
+    insights.whitelistLastSeen,
+    "Belum ada data whitelist.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)}${item.mark ? ` <span class="badge">${esc(markLabel(item.mark))}</span>` : ""}<br /><small style="opacity:.7">${item.lastSeenAt ? `last seen ${esc(timeAgo(item.lastSeenAt))}${item.chapter ? ` | ${esc(item.chapter)}` : ""}` : "belum muncul di recent feed"}</small></span>
+      <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "missedDetectorList",
+    "missedDetectorCount",
+    insights.missedDetector,
+    "Semua whitelist muncul di recent feed saat ini.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">belum terlihat di recent feed terbaru</small></span>
+      <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "sourceReliabilityList",
+    "sourceReliabilityCount",
+    insights.sourceReliability,
+    "Belum ada data reliability source.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${item.lastSuccessAt ? `last success ${esc(timeAgo(item.lastSuccessAt))}` : "no success yet"}${item.lastError ? ` | ${esc(item.lastError)}` : ""}</small></span>
+      <span class="status-pill ${item.score >= 80 ? "active" : item.score >= 55 ? "" : "invalid"}">${item.score}/100</span>
+      <span class="badge">${esc(item.status)}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "failedMonitorList",
+    "failedMonitorCount",
+    insights.failedMonitor,
+    "Belum ada failed send di log terbaru.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">${esc(item.message)}</small></span>
+      <span class="badge">${esc(item.time ? timeAgo(item.time) : "-")}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "sourceMixList",
+    "sourceMixCount",
+    insights.sourceMix,
+    "Belum ada source mix.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">distribusi recent delivery</small></span>
+      <span class="badge">${esc(`${item.count} item`)}</span>
+    </li>`,
+  );
+}
+
 function renderLogs(data) {
   logsItems = data?.logs ?? [];
   const list = $("logList");
@@ -625,6 +954,7 @@ function renderLogs(data) {
   );
 
   renderTrendChart();
+  renderDerivedInsights();
 }
 
 async function addManga() {
@@ -824,6 +1154,7 @@ function renderSummaryPanels() {
   renderOverview(latestStatusData, latestWhitelistData, latestRecentData);
   renderLastCronResult(latestStatusData, false);
   renderSourceHealth(latestStatusData);
+  renderDerivedInsights();
 }
 
 async function loadLightData() {
@@ -924,6 +1255,13 @@ async function loadAll() {
   skeleton($("logList"), 6);
   skeleton($("compareList"), 4);
   skeleton($("sourceHealthList"), 3);
+  skeleton($("topTitlesList"), 4);
+  skeleton($("compareLeaderboardList"), 4);
+  skeleton($("whitelistLastSeenList"), 4);
+  skeleton($("missedDetectorList"), 4);
+  skeleton($("sourceReliabilityList"), 3);
+  skeleton($("failedMonitorList"), 3);
+  skeleton($("sourceMixList"), 3);
 
   try {
     const [statusR, whitelistR, recentR, logsR, compareR] = await Promise.allSettled([

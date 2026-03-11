@@ -224,6 +224,7 @@ body {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 12px 14px;
+  margin-bottom: 16px;
 }
 
 .hero-head {
@@ -257,6 +258,11 @@ body {
 
 .stats-grid-overview.compact {
   margin: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.compare-summary-bar {
+  margin-bottom: 12px;
 }
 
 .stat-card {
@@ -280,6 +286,15 @@ body {
   line-height: 1;
 }
 
+.stat-value-title {
+  font-size: 14px;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .stat-value.green { color: var(--green); }
 .stat-value.red { color: var(--red); }
 .stat-value.amber { color: var(--amber); }
@@ -288,6 +303,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  align-items: start;
 }
 
 .card {
@@ -321,8 +337,21 @@ body {
   color: var(--muted);
 }
 
-.chart-card { min-height: 260px; }
-.chart-wrap { padding: 8px 12px 12px; height: 220px; }
+.chart-card {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card .card-header {
+  min-height: 52px;
+}
+
+.chart-wrap {
+  padding: 8px 12px 12px;
+  height: 220px;
+  flex: 1;
+}
 .chart-wrap canvas { width: 100% !important; height: 100% !important; }
 
 .whitelist-toolbar,
@@ -408,6 +437,40 @@ body {
   max-height: 350px;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent;
+  padding-right: 6px;
+}
+
+.manga-list::-webkit-scrollbar,
+.recent-list::-webkit-scrollbar,
+.log-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.manga-list::-webkit-scrollbar-track,
+.recent-list::-webkit-scrollbar-track,
+.log-list::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.manga-list::-webkit-scrollbar-thumb,
+.recent-list::-webkit-scrollbar-thumb,
+.log-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.manga-list::-webkit-scrollbar-thumb:hover,
+.recent-list::-webkit-scrollbar-thumb:hover,
+.log-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted) 46%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .manga-item,
@@ -660,6 +723,7 @@ body {
   .layout { padding: 14px 10px 22px; }
   .stats-grid,
   .stats-grid-overview { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid-overview.compact { grid-template-columns: repeat(3, 1fr); }
   .chart-wrap { height: 200px; }
   .toast-container {
     right: 10px;
@@ -678,6 +742,9 @@ body {
   .stats-grid,
   .stats-grid-overview {
     grid-template-columns: 1fr;
+  }
+  .stats-grid-overview.compact {
+    grid-template-columns: repeat(2, 1fr);
   }
   .stat-card { padding: 11px; }
   .stat-value { font-size: 22px; }

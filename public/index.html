@@ -196,7 +196,8 @@
         </div>
       </section>
 
-      <section class="panel two-col">
+      <section class="panel">
+        <div class="two-col">
         <div class="card">
           <div class="card-header">
             <span class="card-title">recent manhwa terkirim</span>
@@ -212,29 +213,138 @@
             <span class="card-title">source compare</span>
             <span class="badge" id="compareCount">0</span>
           </div>
-          <div class="stats-grid stats-grid-overview compact">
-            <div class="stat-card">
-              <div class="stat-label">Ikiru Faster</div>
-              <div class="stat-value green" id="compareIkiruWins">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Shinigami Faster</div>
-              <div class="stat-value amber" id="compareShinigamiWins">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Tie</div>
-              <div class="stat-value" id="compareTies">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Recent Ikiru</div>
-              <div class="stat-value" id="sourceCountIkiru">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Recent Shinigami</div>
-              <div class="stat-value" id="sourceCountShinigami">-</div>
-            </div>
-          </div>
           <ul class="manga-list" id="compareList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="stats-grid stats-grid-overview compare-summary-bar">
+          <div class="stat-card">
+            <div class="stat-label">Ikiru Faster</div>
+            <div class="stat-value green" id="compareIkiruWins">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Shinigami Faster</div>
+            <div class="stat-value amber" id="compareShinigamiWins">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Tie</div>
+            <div class="stat-value" id="compareTies">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Recent Ikiru</div>
+            <div class="stat-value" id="sourceCountIkiru">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Recent Shinigami</div>
+            <div class="stat-value" id="sourceCountShinigami">-</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">ops pulse</div>
+        <div class="stats-grid stats-grid-overview" id="opsPulseGrid">
+          <div class="stat-card">
+            <div class="stat-label">Activity Streak</div>
+            <div class="stat-value" id="opsStreakValue">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Peak Hour</div>
+            <div class="stat-value" id="opsPeakHourValue">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Top Title</div>
+            <div class="stat-value stat-value-title" id="opsTopTitleValue">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Missed In Recent</div>
+            <div class="stat-value" id="opsMissedValue">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Fail Entries</div>
+            <div class="stat-value red" id="opsFailValue">-</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel two-col analytics-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Top Titles</span>
+            <span class="badge" id="topTitlesCount">0</span>
+          </div>
+          <ul class="manga-list" id="topTitlesList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Compare Leaderboard</span>
+            <span class="badge" id="compareLeaderboardCount">0</span>
+          </div>
+          <ul class="manga-list" id="compareLeaderboardList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel two-col analytics-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Whitelist Last Seen</span>
+            <span class="badge" id="whitelistLastSeenCount">0</span>
+          </div>
+          <ul class="manga-list" id="whitelistLastSeenList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Missed Update Detector</span>
+            <span class="badge" id="missedDetectorCount">0</span>
+          </div>
+          <ul class="manga-list" id="missedDetectorList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel two-col analytics-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Source Reliability</span>
+            <span class="badge" id="sourceReliabilityCount">0</span>
+          </div>
+          <ul class="manga-list" id="sourceReliabilityList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Failed Send Monitor</span>
+            <span class="badge" id="failedMonitorCount">0</span>
+          </div>
+          <ul class="manga-list" id="failedMonitorList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">source mix</div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Distribusi Source Recent</span>
+            <span class="badge" id="sourceMixCount">0</span>
+          </div>
+          <ul class="manga-list" id="sourceMixList">
             <li class="empty">memuat...</li>
           </ul>
         </div>
