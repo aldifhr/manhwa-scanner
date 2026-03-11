@@ -82,6 +82,13 @@ const commands = [
   description: "Tambah manga ke whitelist",
   options: [
     {
+      name: "title",
+      description: "Manga title to add",
+      type: 3,
+      required: true,
+      autocomplete: true,
+    },
+    {
       name: "source",
       description: "Pilih source manga",
       type: 3,
@@ -91,13 +98,6 @@ const commands = [
         { name: "Ikiru", value: "ikiru" },
         { name: "Shinigami", value: "shinigami_project" },
       ],
-    },
-    {
-      name: "title",
-      description: "Manga title to add",
-      type: 3,
-      required: true,
-      autocomplete: true,
     },
   ],
 },
