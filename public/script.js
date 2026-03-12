@@ -37,6 +37,8 @@ let lastFocusRefreshAt = 0;
 let latestStatusData = null;
 let latestWhitelistData = null;
 let latestRecentData = null;
+let latestCacheMonitorData = null;
+let latestTtlAuditData = null;
 let whitelistItems = [];
 let whitelistSortOrder = "default";
 let compareItems = [];
@@ -192,6 +194,42 @@ function sourceReliabilityScore(source, health, logs) {
   return Math.max(0, Math.min(100, score));
 }
 
+function classifyErrorBucket(message = "", source = "", code = "", type = "") {
+  const normalizedCode = String(code || "").toLowerCase().trim();
+  const normalizedType = String(type || "").toLowerCase().trim();
+  if (normalizedCode) return normalizedCode;
+  if (normalizedType) return normalizedType;
+  const text = `${message} ${source}`.toLowerCase();
+  if (!text.trim()) return null;
+  if (text.includes(" 403") || text.includes("forbidden")) return "discord_403";
+  if (text.includes(" 404") || text.includes("not found")) return "discord_404";
+  if (text.includes(" 429") || text.includes("rate limit")) return "discord_429";
+  if (text.includes("timeout") || text.includes("timed out") || text.includes("etimedout")) return "source_timeout";
+  if (text.includes("parse") || text.includes("selector") || text.includes("cheerio")) return "source_parse";
+  if (text.includes("redis")) return "redis_error";
+  if (text.includes("send failed") || text.includes("all guilds failed") || text.includes("failed")) return "failed_send";
+  if (text.includes("degraded")) return "degraded_source";
+  return "other";
+}
+
+function errorBucketLabel(key = "") {
+  if (key === "discord_403") return "Discord 403";
+  if (key === "discord_404") return "Discord 404";
+  if (key === "discord_429") return "Discord 429";
+  if (key === "source_timeout") return "Source Timeout";
+  if (key === "source_parse") return "Source Parse";
+  if (key === "redis_error") return "Redis Error";
+  if (key === "failed_send") return "Failed Send";
+  if (key === "degraded_source") return "Degraded Source";
+  return "Other Error";
+}
+
+function errorBucketSeverity(key = "") {
+  if (key === "discord_429" || key === "redis_error") return "invalid";
+  if (key === "source_timeout" || key === "failed_send" || key === "degraded_source") return "";
+  return "active";
+}
+
 function deriveInsights({
   statusData,
   whitelistData,
@@ -324,6 +362,31 @@ function deriveInsights({
     .filter((item) => !item.lastSeenAt)
     .slice(0, 10);
 
+  const whitelistHealth = whitelistLastSeen
+    .map((item) => ({
+      ...item,
+      health: whitelistHealthStatus(item),
+    }))
+    .sort((a, b) => {
+      const rank = { unseen: 0, stale: 1, cooling: 2, active: 3 };
+      return rank[a.health] - rank[b.health] ||
+        ((parseDateSafe(a.lastSeenAt)?.getTime() ?? 0) - (parseDateSafe(b.lastSeenAt)?.getTime() ?? 0)) ||
+        a.title.localeCompare(b.title);
+    });
+  const whitelistHealthSummary = whitelistHealth.reduce((acc, item) => {
+    acc.total += 1;
+    acc[item.health] += 1;
+    if (item.mark) acc.marked += 1;
+    return acc;
+  }, {
+    total: 0,
+    active: 0,
+    cooling: 0,
+    stale: 0,
+    unseen: 0,
+    marked: 0,
+  });
+
   const sourceReliability = Object.entries(statusData?.sourceHealth || {})
     .map(([source, health]) => ({
       source,
@@ -354,15 +417,73 @@ function deriveInsights({
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
 
+  const errorBucketsMap = new Map();
+  const pushBucket = ({ bucketKey, message, sourceLabel, time }) => {
+    if (!bucketKey) return;
+    if (!errorBucketsMap.has(bucketKey)) {
+      errorBucketsMap.set(bucketKey, {
+        key: bucketKey,
+        label: errorBucketLabel(bucketKey),
+        count: 0,
+        lastSeenAt: null,
+        sample: null,
+        sourceLabel: null,
+      });
+    }
+    const bucket = errorBucketsMap.get(bucketKey);
+    bucket.count += 1;
+    const timeValue = parseDateSafe(time)?.getTime() ?? 0;
+    const currentValue = parseDateSafe(bucket.lastSeenAt)?.getTime() ?? 0;
+    if (!bucket.lastSeenAt || timeValue >= currentValue) {
+      bucket.lastSeenAt = time || bucket.lastSeenAt;
+      bucket.sample = message || bucket.sample;
+      bucket.sourceLabel = sourceLabel || bucket.sourceLabel;
+    }
+  };
+
+  for (const log of logs) {
+    const message = safeText(log?.message, "");
+    const bucketKey = classifyErrorBucket(
+      message,
+      log?.source || log?.title || "",
+      log?.code || "",
+      log?.type || "",
+    );
+    if (!bucketKey || log?.tag === "sent") continue;
+    pushBucket({
+      bucketKey,
+      message,
+      sourceLabel: safeText(log?.source || log?.title || log?.tag, ""),
+      time: log?.time || null,
+    });
+  }
+
+  for (const [source, health] of Object.entries(statusData?.sourceHealth || {})) {
+    if (!health?.lastError && health?.status !== "degraded") continue;
+    pushBucket({
+      bucketKey: classifyErrorBucket(health?.lastError || health?.status || "", source),
+      message: safeText(health?.lastError || health?.status, "unknown issue"),
+      sourceLabel: sourceDisplayName(source),
+      time: health?.lastFailureAt || health?.disabledUntil || health?.lastSuccessAt || null,
+    });
+  }
+
+  const errorBuckets = [...errorBucketsMap.values()]
+    .sort((a, b) => b.count - a.count || (parseDateSafe(b.lastSeenAt)?.getTime() ?? 0) - (parseDateSafe(a.lastSeenAt)?.getTime() ?? 0))
+    .slice(0, 8);
+
   return {
     activityStreak,
     peakHour,
     topTitles,
     compareLeaderboard,
     whitelistLastSeen: whitelistLastSeen.slice(0, 10),
+    whitelistHealth: whitelistHealth.slice(0, 12),
+    whitelistHealthSummary,
     missedDetector,
     sourceReliability,
     failedMonitor,
+    errorBuckets,
     sourceMix,
     missedCount: missedDetector.length,
     failCount: failedMonitor.length,
@@ -389,6 +510,25 @@ function cooldownText(disabledUntil) {
   const mins = Math.ceil((target.getTime() - Date.now()) / 60000);
   if (mins <= 0) return "retry now";
   return `retry ${mins}m`;
+}
+
+function ttlLabel(ttl) {
+  if (ttl === null || ttl === undefined) return "-";
+  if (ttl === -1) return "no-expiry";
+  if (ttl === -2) return "missing";
+  if (ttl < 60) return `${ttl}s`;
+  if (ttl < 3600) return `${Math.round(ttl / 60)}m`;
+  if (ttl < 86400) return `${Math.round(ttl / 3600)}h`;
+  return `${Math.round(ttl / 86400)}d`;
+}
+
+function whitelistHealthStatus(item) {
+  const lastSeen = parseDateSafe(item?.lastSeenAt);
+  if (!lastSeen) return "unseen";
+  const ageMs = Date.now() - lastSeen.getTime();
+  if (ageMs >= 7 * 24 * 3600 * 1000) return "stale";
+  if (ageMs >= 3 * 24 * 3600 * 1000) return "cooling";
+  return "active";
 }
 
 function getCssVar(name, fallback) {
@@ -639,15 +779,20 @@ function renderLastCronResult(statusData, fromManual = false) {
     $("lastCronSkipped").textContent = "skipped: -";
     $("lastCronFailed").textContent = "failed: -";
     $("lastCronDuration").textContent = "duration: -";
+    $("lastCronOutcome").textContent = "state: -";
     $("lastCronTime").textContent = "-";
     bar.className = "hero-card";
     return;
   }
 
+  const stateText = statusData.shortCircuitReason
+    ? statusData.shortCircuitReason.replace(/_/g, " ")
+    : statusData.outcome || "ok";
   $("lastCronSent").textContent = `sent: ${statusData.sent ?? 0}`;
   $("lastCronSkipped").textContent = `skipped: ${statusData.skipped ?? 0}`;
   $("lastCronFailed").textContent = `failed: ${statusData.failed ?? 0}`;
   $("lastCronDuration").textContent = `duration: ${statusData.duration ? `${statusData.duration}s` : "-"}`;
+  $("lastCronOutcome").textContent = `state: ${stateText}`;
   $("lastCronTime").textContent = `${fromManual ? "manual" : "otomatis"} - ${statusData.timestamp ? timeAgo(statusData.timestamp) : "baru saja"}`;
   bar.className = "hero-card";
 }
@@ -850,6 +995,57 @@ function renderSourceCompare(data) {
     .join("");
 }
 
+function renderWhitelistHealth(insights) {
+  $("whHealthActive").textContent = insights.whitelistHealthSummary.active;
+  $("whHealthCooling").textContent = insights.whitelistHealthSummary.cooling;
+  $("whHealthStale").textContent = insights.whitelistHealthSummary.stale;
+  $("whHealthUnseen").textContent = insights.whitelistHealthSummary.unseen;
+
+  renderSimpleList(
+    "whitelistHealthList",
+    "whitelistHealthCount",
+    insights.whitelistHealth,
+    "Belum ada data whitelist health.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.title)}${item.mark ? ` <span class="badge">${esc(markLabel(item.mark))}</span>` : ""}<br /><small style="opacity:.7">${item.lastSeenAt ? `last seen ${esc(timeAgo(item.lastSeenAt))}${item.chapter ? ` | ${esc(item.chapter)}` : ""}` : "belum pernah terlihat di recent feed"}</small></span>
+      <span class="status-pill ${item.health === "active" ? "active" : item.health === "unseen" || item.health === "stale" ? "invalid" : ""}">${esc(item.health)}</span>
+      <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span>
+    </li>`,
+  );
+}
+
+function renderCacheMonitor(data) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  renderSimpleList(
+    "cacheMonitorList",
+    "cacheMonitorCount",
+    items,
+    "Belum ada data cache monitor.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${esc(item.key)}${item.generatedAt ? ` | warm ${esc(timeAgo(item.generatedAt))}` : ""}</small></span>
+      <span class="status-pill ${item.exists ? "active" : "invalid"}">${item.exists ? "cached" : "cold"}</span>
+      <span class="badge">${esc(ttlLabel(item.ttl))}${item.sizeHint !== null && item.sizeHint !== undefined ? ` | ${esc(String(item.sizeHint))}` : ""}</span>
+    </li>`,
+  );
+}
+
+function renderTtlAudit(data) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  renderSimpleList(
+    "ttlAuditList",
+    "ttlAuditCount",
+    items,
+    "Belum ada data TTL audit.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${esc(item.key || "sample tidak ditemukan")}</small></span>
+      <span class="badge">${esc(ttlLabel(item.ttl))}</span>
+    </li>`,
+  );
+}
+
 function renderDerivedInsights() {
   const insights = deriveInsights({
     statusData: latestStatusData,
@@ -864,6 +1060,7 @@ function renderDerivedInsights() {
   $("opsTopTitleValue").textContent = insights.topTitles[0]?.title || "-";
   $("opsMissedValue").textContent = insights.missedCount;
   $("opsFailValue").textContent = insights.failCount;
+  renderWhitelistHealth(insights);
 
   renderSimpleList(
     "topTitlesList",
@@ -935,6 +1132,19 @@ function renderDerivedInsights() {
       <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
       <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">${esc(item.message)}</small></span>
       <span class="badge">${esc(item.time ? timeAgo(item.time) : "-")}</span>
+    </li>`,
+  );
+
+  renderSimpleList(
+    "errorBucketList",
+    "errorBucketCount",
+    insights.errorBuckets,
+    "Belum ada error bucket menonjol.",
+    (item, index) => `<li class="manga-item">
+      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${esc(item.sample || "-")}${item.sourceLabel ? ` | ${esc(item.sourceLabel)}` : ""}</small></span>
+      <span class="status-pill ${errorBucketSeverity(item.key)}">${esc(`${item.count}x`)}</span>
+      <span class="badge">${esc(item.lastSeenAt ? timeAgo(item.lastSeenAt) : "-")}</span>
     </li>`,
   );
 
@@ -1216,10 +1426,12 @@ async function loadHeavyData() {
   heavyAbortController = controller;
 
   try {
-    const [whitelistR, logsR, compareR] = await Promise.allSettled([
+    const [whitelistR, logsR, compareR, cacheMonitorR, ttlAuditR] = await Promise.allSettled([
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/logs", controller.signal),
       apiFetch("/api/source-compare", controller.signal),
+      apiFetch("/api/cache-monitor", controller.signal),
+      apiFetch("/api/ttl-audit", controller.signal),
     ]);
 
     if (heavyAbortController !== controller) return;
@@ -1242,6 +1454,20 @@ async function loadHeavyData() {
       renderSourceCompare(compareR.value);
     } else if (compareR.reason?.name !== "AbortError") {
       renderErr($("compareList"), "Gagal muat source compare");
+    }
+
+    if (cacheMonitorR.status === "fulfilled") {
+      latestCacheMonitorData = cacheMonitorR.value;
+      renderCacheMonitor(latestCacheMonitorData);
+    } else if (cacheMonitorR.reason?.name !== "AbortError") {
+      renderErr($("cacheMonitorList"), "Gagal muat cache monitor");
+    }
+
+    if (ttlAuditR.status === "fulfilled") {
+      latestTtlAuditData = ttlAuditR.value;
+      renderTtlAudit(latestTtlAuditData);
+    } else if (ttlAuditR.reason?.name !== "AbortError") {
+      renderErr($("ttlAuditList"), "Gagal muat TTL audit");
     }
 
     lastHeavyLoadAt = Date.now();
@@ -1273,18 +1499,24 @@ async function loadAll() {
   skeleton($("topTitlesList"), 4);
   skeleton($("compareLeaderboardList"), 4);
   skeleton($("whitelistLastSeenList"), 4);
+  skeleton($("whitelistHealthList"), 4);
   skeleton($("missedDetectorList"), 4);
   skeleton($("sourceReliabilityList"), 3);
   skeleton($("failedMonitorList"), 3);
+  skeleton($("errorBucketList"), 3);
+  skeleton($("cacheMonitorList"), 3);
+  skeleton($("ttlAuditList"), 3);
   skeleton($("sourceMixList"), 3);
 
   try {
-    const [statusR, whitelistR, recentR, logsR, compareR] = await Promise.allSettled([
+    const [statusR, whitelistR, recentR, logsR, compareR, cacheMonitorR, ttlAuditR] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/recent", controller.signal),
       apiFetch("/api/logs", controller.signal),
       apiFetch("/api/source-compare", controller.signal),
+      apiFetch("/api/cache-monitor", controller.signal),
+      apiFetch("/api/ttl-audit", controller.signal),
     ]);
 
     if (loadAbortController !== controller) return;
@@ -1294,10 +1526,14 @@ async function loadAll() {
     const recentData = recentR.status === "fulfilled" ? recentR.value : null;
     const logsData = logsR.status === "fulfilled" ? logsR.value : null;
     const compareData = compareR.status === "fulfilled" ? compareR.value : null;
+    const cacheMonitorData = cacheMonitorR.status === "fulfilled" ? cacheMonitorR.value : null;
+    const ttlAuditData = ttlAuditR.status === "fulfilled" ? ttlAuditR.value : null;
 
     latestStatusData = statusData;
     latestWhitelistData = whitelistData;
     latestRecentData = recentData;
+    latestCacheMonitorData = cacheMonitorData;
+    latestTtlAuditData = ttlAuditData;
     renderSummaryPanels();
 
     if (whitelistData) renderWhitelist(whitelistData);
@@ -1312,7 +1548,13 @@ async function loadAll() {
     if (compareData) renderSourceCompare(compareData);
     else renderErr($("compareList"), "Gagal muat source compare");
 
-    const anyFailed = [statusR, whitelistR, recentR, logsR, compareR].some(
+    if (cacheMonitorData) renderCacheMonitor(cacheMonitorData);
+    else renderErr($("cacheMonitorList"), "Gagal muat cache monitor");
+
+    if (ttlAuditData) renderTtlAudit(ttlAuditData);
+    else renderErr($("ttlAuditList"), "Gagal muat TTL audit");
+
+    const anyFailed = [statusR, whitelistR, recentR, logsR, compareR, cacheMonitorR, ttlAuditR].some(
       (r) => r.status === "rejected" && r.reason?.name !== "AbortError",
     );
     if (anyFailed && isAuthenticated) {

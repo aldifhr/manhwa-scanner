@@ -20,6 +20,7 @@ import {
   STATUS_API_CACHE_KEY,
   invalidateDashboardCaches,
 } from "../lib/cacheKeys.js";
+import { appendCronLog, buildCronErrorLog } from "../lib/cronLogs.js";
 import { dispatchChapters } from "../lib/services/dispatch.js";
 import {
   SOURCE_KEYS,
@@ -98,6 +99,34 @@ const DEBUG = process.env.CRON_DEBUG === "true";
 const logger = getLogger({ scope: "cron" });
 const log = (...args) => DEBUG && logger.debug({ args }, "debug");
 const warn = (...args) => logger.warn({ args }, "warn");
+
+async function persistCronStatus(statusPayload) {
+  await redis.set("cron:last_run", statusPayload);
+  await invalidateDashboardCaches(redis, [STATUS_API_CACHE_KEY]);
+}
+
+function buildShortCircuitStatus({
+  reason,
+  start,
+  guilds = 0,
+  whitelist = 0,
+  scraped = 0,
+  sourceHealth = {},
+}) {
+  return {
+    sent: 0,
+    skipped: 0,
+    failed: 0,
+    duration: ((Date.now() - start) / 1000).toFixed(1),
+    guilds,
+    whitelist,
+    scraped,
+    timestamp: new Date().toISOString(),
+    sourceHealth,
+    outcome: "short_circuit",
+    shortCircuitReason: reason,
+  };
+}
 
 export function shouldRunChannelValidation(
   lastValidatedAt,
@@ -315,22 +344,49 @@ export default async function handler(req, res) {
     }
 
     if (!activeGuildCount) {
-      logApiOk(reqLogger, { status: 200, reason: "no_active_guilds" });
-      return res.status(200).json({
-        ok: true,
+      const statusPayload = buildShortCircuitStatus({
+        reason: "no_active_guilds",
+        start,
         guilds: 0,
         whitelist: whitelist.length,
         sourceHealth: nextSourceHealth,
+      });
+      await persistCronStatus(statusPayload);
+      await appendCronLog(redis, {
+        tag: "info",
+        code: "no_active_guilds",
+        type: "short_circuit",
+        source: "cron",
+        message: "Cron skipped because no active guilds were available.",
+      });
+      logApiOk(reqLogger, { status: 200, reason: "no_active_guilds" });
+      return res.status(200).json({
+        ok: true,
+        ...statusPayload,
         message: "No active guilds",
       });
     }
 
     if (!whitelist.length) {
+      const statusPayload = buildShortCircuitStatus({
+        reason: "no_whitelist",
+        start,
+        guilds: activeGuildCount,
+        whitelist: 0,
+        sourceHealth: nextSourceHealth,
+      });
+      await persistCronStatus(statusPayload);
+      await appendCronLog(redis, {
+        tag: "info",
+        code: "no_whitelist",
+        type: "short_circuit",
+        source: "cron",
+        message: "Cron skipped because whitelist is empty.",
+      });
       logApiOk(reqLogger, { status: 200, reason: "no_whitelist" });
       return res.status(200).json({
         ok: true,
-        guilds: activeGuildCount,
-        sourceHealth: nextSourceHealth,
+        ...statusPayload,
         message: "No whitelist",
       });
     }
@@ -339,12 +395,26 @@ export default async function handler(req, res) {
     const matched = allResults.filter(isMatched);
 
     if (!matched.length) {
+      const statusPayload = buildShortCircuitStatus({
+        reason: "no_new_chapters",
+        start,
+        guilds: activeGuildCount,
+        whitelist: whitelist.length,
+        scraped: allResults.length,
+        sourceHealth: nextSourceHealth,
+      });
+      await persistCronStatus(statusPayload);
+      await appendCronLog(redis, {
+        tag: "info",
+        code: "no_new_chapters",
+        type: "short_circuit",
+        source: "cron",
+        message: `Cron found no new chapters across ${allResults.length} scraped item(s).`,
+      });
       logApiOk(reqLogger, { status: 200, reason: "no_new_chapters" });
       return res.status(200).json({
         ok: true,
-        guilds: activeGuildCount,
-        scraped: allResults.length,
-        sourceHealth: nextSourceHealth,
+        ...statusPayload,
         message: "No new chapters",
       });
     }
@@ -388,9 +458,10 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString(),
       sourceHealth: nextSourceHealth,
       scrapeMetrics,
+      outcome: failed > 0 ? "partial" : "ok",
+      shortCircuitReason: null,
     };
-    await redis.set("cron:last_run", statusPayload);
-    await invalidateDashboardCaches(redis, [STATUS_API_CACHE_KEY]);
+    await persistCronStatus(statusPayload);
 
     logger.info(
       { duration, sent, skipped, failed, guilds: activeGuildCount },
@@ -410,6 +481,25 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     logger.error({ err: err.message }, "fatal");
+    const statusPayload = {
+      sent: 0,
+      skipped: 0,
+      failed: 1,
+      duration: null,
+      guilds: 0,
+      timestamp: new Date().toISOString(),
+      sourceHealth: {},
+      scrapeMetrics: null,
+      outcome: "fatal_error",
+      shortCircuitReason: "fatal_error",
+      error: err?.message || "Internal error",
+    };
+    await persistCronStatus(statusPayload).catch(() => {});
+    await appendCronLog(redis, buildCronErrorLog(err, {
+      code: "cron_fatal",
+      type: "runtime_error",
+      source: "cron",
+    })).catch(() => {});
     logApiError(reqLogger, err, { status: 500 });
     return res.status(500).json({ error: "Internal error" });
   }

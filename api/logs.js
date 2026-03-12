@@ -31,7 +31,19 @@ export default async function handler(req, res) {
     }
 
     const raw = await redis.lrange("cron:logs", 0, 49);
-    const payload = { logs: raw.filter(Boolean) };
+    const payload = {
+      logs: raw
+        .filter(Boolean)
+        .map((log) => ({
+          time: log?.time || null,
+          tag: log?.tag || "info",
+          code: log?.code || null,
+          type: log?.type || null,
+          source: log?.source || null,
+          title: log?.title || null,
+          message: log?.message || "-",
+        })),
+    };
 
     await redis.set(LOGS_API_CACHE_KEY, payload, { ex: cacheTtl }).catch(() => {});
     return res.status(200).json(payload);

@@ -83,6 +83,7 @@
             <span id="lastCronSkipped">skipped: -</span>
             <span id="lastCronFailed">failed: -</span>
             <span id="lastCronDuration">duration: -</span>
+            <span id="lastCronOutcome">state: -</span>
           </div>
         </div>
       </section>
@@ -296,6 +297,34 @@
       <section class="panel two-col analytics-grid">
         <div class="card">
           <div class="card-header">
+            <span class="card-title">Whitelist Health View</span>
+            <span class="badge" id="whitelistHealthCount">0</span>
+          </div>
+          <div class="stats-grid stats-grid-overview compact">
+            <div class="stat-card">
+              <div class="stat-label">Active</div>
+              <div class="stat-value green" id="whHealthActive">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Cooling</div>
+              <div class="stat-value amber" id="whHealthCooling">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Stale</div>
+              <div class="stat-value amber" id="whHealthStale">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Unseen</div>
+              <div class="stat-value red" id="whHealthUnseen">-</div>
+            </div>
+          </div>
+          <ul class="manga-list" id="whitelistHealthList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
             <span class="card-title">Whitelist Last Seen</span>
             <span class="badge" id="whitelistLastSeenCount">0</span>
           </div>
@@ -337,14 +366,45 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-title">source mix</div>
+      <section class="panel two-col analytics-grid">
         <div class="card">
           <div class="card-header">
-            <span class="card-title">Distribusi Source Recent</span>
+            <span class="card-title">Error Buckets</span>
+            <span class="badge" id="errorBucketCount">0</span>
+          </div>
+          <ul class="manga-list" id="errorBucketList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Source Mix</span>
             <span class="badge" id="sourceMixCount">0</span>
           </div>
           <ul class="manga-list" id="sourceMixList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel two-col analytics-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Cache Monitor</span>
+            <span class="badge" id="cacheMonitorCount">0</span>
+          </div>
+          <ul class="manga-list" id="cacheMonitorList">
+            <li class="empty">memuat...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">TTL Audit</span>
+            <span class="badge" id="ttlAuditCount">0</span>
+          </div>
+          <ul class="manga-list" id="ttlAuditList">
             <li class="empty">memuat...</li>
           </ul>
         </div>

@@ -1,10 +1,14 @@
 import { isCronAuthorized } from "../lib/auth.js";
+import { redis } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
+import { WHITELIST_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import {
   addWhitelistEntry,
   buildWhitelistListResponse,
   removeWhitelistEntryByTitle,
 } from "../lib/services/whitelist.js";
+
+const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 180);
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("whitelist", req);
@@ -14,14 +18,28 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  res.setHeader("Cache-Control", "no-store");
+  const cacheTtl = Number.isFinite(WHITELIST_CACHE_SEC) && WHITELIST_CACHE_SEC > 0
+    ? Math.floor(WHITELIST_CACHE_SEC)
+    : 180;
+  res.setHeader(
+    "Cache-Control",
+    `private, max-age=${Math.min(cacheTtl, 30)}, stale-while-revalidate=${cacheTtl}`,
+  );
 
   // GET: ambil semua whitelist
   if (req.method === "GET") {
     try {
+      const cached = await redis.get(WHITELIST_API_CACHE_KEY);
+      if (cached && typeof cached === "object") {
+        logApiOk(reqLogger, { status: 200, method: "GET", count: cached.items?.length ?? 0, cache: "hit" });
+        return res.status(200).json(cached);
+      }
+
       const { items } = await buildWhitelistListResponse(1);
+      const payload = { items };
+      await redis.set(WHITELIST_API_CACHE_KEY, payload, { ex: cacheTtl }).catch(() => {});
       logApiOk(reqLogger, { status: 200, method: "GET", count: items.length });
-      return res.status(200).json({ items });
+      return res.status(200).json(payload);
     } catch (err) {
       logApiError(reqLogger, err, { status: 500, method: "GET" });
       return res.status(500).json({ error: "Internal error" });
