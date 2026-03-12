@@ -159,6 +159,19 @@ function buildPreferredSecondaryTitles(whitelist = []) {
   return out;
 }
 
+function buildPreferredIkiruTitles(whitelist = []) {
+  const out = [];
+
+  for (const entry of whitelist) {
+    const source = normalizeSource(entry?.source);
+    if (source === "ikiru" && entry?.title) {
+      out.push(entry.title);
+    }
+  }
+
+  return out;
+}
+
 function buildMangaHistoryKey(item) {
   const source = normalizeSource(item?.source);
   const mangaUrl = normalizeSourceUrl(item?.mangaUrl || "");
@@ -396,6 +409,7 @@ export default async function handler(req, res) {
 
     const { items: allResults, sourceStates } = await scrapeMangaUpdatesWithMeta(redis, {
       disabledSources,
+      preferredIkiruTitles: buildPreferredIkiruTitles(whitelist),
       preferredSecondaryTitles: buildPreferredSecondaryTitles(whitelist),
     });
 
