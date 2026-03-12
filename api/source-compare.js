@@ -1,6 +1,6 @@
 import { redis } from "../lib/redis.js";
-import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
+import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { SOURCE_COMPARE_CACHE_KEY, SOURCE_COMPARE_STATE_KEY } from "../lib/cacheKeys.js";
 import {
   buildSourceCompareState,
@@ -13,22 +13,15 @@ const SOURCE_COMPARE_CACHE_SEC = Number(process.env.SOURCE_COMPARE_CACHE_SEC || 
 export default async function handler(req, res) {
   logApiHit("source-compare", req);
 
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  if (!isCronAuthorized(req)) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  const prepared = prepareAuthorizedGet(req, res, {
+    defaultCacheTtl: 180,
+    rawCacheTtl: SOURCE_COMPARE_CACHE_SEC,
+    maxAgeCap: 30,
+  });
+  if (!prepared) return;
+  const { cacheTtl } = prepared;
 
   try {
-    const cacheTtl = Number.isFinite(SOURCE_COMPARE_CACHE_SEC) && SOURCE_COMPARE_CACHE_SEC > 0
-      ? Math.floor(SOURCE_COMPARE_CACHE_SEC)
-      : 180;
-    res.setHeader(
-      "Cache-Control",
-      `private, max-age=${Math.min(cacheTtl, 30)}, stale-while-revalidate=${cacheTtl}`,
-    );
     const cached = await redis.get(SOURCE_COMPARE_CACHE_KEY);
     if (cached && typeof cached === "object") {
       return res.status(200).json(cached);

@@ -1,6 +1,6 @@
 import { redis } from "../lib/redis.js";
-import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
+import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import {
   LOGS_API_CACHE_KEY,
   RECENT_API_CACHE_KEY,
@@ -22,15 +22,12 @@ const CACHE_KEYS = [
 export default async function handler(req, res) {
   logApiHit("cache-monitor", req);
 
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  if (!isCronAuthorized(req)) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+  const prepared = prepareAuthorizedGet(req, res, {
+    defaultCacheTtl: 60,
+    rawCacheTtl: 60,
+    maxAgeCap: 30,
+  });
+  if (!prepared) return;
 
   try {
     const items = await Promise.all(

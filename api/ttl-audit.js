@@ -1,6 +1,6 @@
 import { redis } from "../lib/redis.js";
-import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
+import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import {
   LOGS_API_CACHE_KEY,
   RECENT_API_CACHE_KEY,
@@ -42,15 +42,12 @@ async function findFirstKey(match) {
 export default async function handler(req, res) {
   logApiHit("ttl-audit", req);
 
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  if (!isCronAuthorized(req)) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=180");
+  const prepared = prepareAuthorizedGet(req, res, {
+    defaultCacheTtl: 180,
+    rawCacheTtl: 180,
+    maxAgeCap: 60,
+  });
+  if (!prepared) return;
 
   try {
     const cached = await redis.get(TTL_AUDIT_CACHE_KEY).catch(() => null);

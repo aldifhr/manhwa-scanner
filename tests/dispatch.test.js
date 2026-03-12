@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dispatchChapters } from "../lib/services/dispatch.js";
+import {
+  dispatchChapters,
+  prepareDispatchQueue,
+} from "../lib/services/dispatch.js";
 
 function createRedisMock() {
   const kv = new Map();
@@ -205,4 +208,38 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
   assert.equal(redis.kv.has("cache:api:recent:v1"), false);
   assert.equal(redis.kv.has("cache:api:logs:v1"), false);
   assert.equal(redis.kv.has("cache:api:source-compare:v1"), false);
+});
+
+test("prepareDispatchQueue reports invalid, already sent, and over-limit counts", async () => {
+  const redis = createRedisMock();
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2", "sent");
+
+  const out = await prepareDispatchQueue(redis, [
+    { title: "No Url", chapter: "Chapter 1", url: "", source: "ikiru" },
+    {
+      title: "Already",
+      chapter: "Chapter 2",
+      url: "https://a.shinigami.asia/chapter/2",
+      source: "shinigami_project",
+    },
+    {
+      title: "Queued",
+      chapter: "Chapter 3",
+      url: "https://a.shinigami.asia/chapter/3",
+      source: "shinigami_project",
+    },
+    {
+      title: "Over",
+      chapter: "Chapter 4",
+      url: "https://a.shinigami.asia/chapter/4",
+      source: "shinigami_project",
+    },
+  ], 1);
+
+  assert.equal(out.invalidCount, 1);
+  assert.equal(out.alreadySentCount, 1);
+  assert.equal(out.overLimitCount, 1);
+  assert.equal(out.unsentMeta.length, 2);
+  assert.equal(out.queuedMeta.length, 1);
+  assert.equal(out.queuedMeta[0].item.title, "Queued");
 });

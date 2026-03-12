@@ -1,6 +1,6 @@
 import { redis }           from "../lib/redis.js";
-import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
+import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { RECENT_API_CACHE_KEY } from "../lib/cacheKeys.js";
 
 const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 90);
@@ -8,16 +8,13 @@ const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 90);
 export default async function handler(req, res) {
   logApiHit("recent", req);
 
-  if (req.method !== "GET")
-    return res.status(405).json({ error: "Method not allowed" });
-
-  if (!isCronAuthorized(req))
-    return res.status(401).json({ error: "Unauthorized" });
-
-  const cacheTtl = Number.isFinite(RECENT_CACHE_SEC) && RECENT_CACHE_SEC > 0
-    ? Math.floor(RECENT_CACHE_SEC)
-    : 90;
-  res.setHeader("Cache-Control", `private, max-age=${Math.min(cacheTtl, 30)}, stale-while-revalidate=${cacheTtl}`);
+  const prepared = prepareAuthorizedGet(req, res, {
+    defaultCacheTtl: 90,
+    rawCacheTtl: RECENT_CACHE_SEC,
+    maxAgeCap: 30,
+  });
+  if (!prepared) return;
+  const { cacheTtl } = prepared;
 
   try {
     const cached = await redis.get(RECENT_API_CACHE_KEY);

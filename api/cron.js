@@ -143,6 +143,22 @@ function buildGuildChannelMap(entries = []) {
   return Object.fromEntries(entries.filter(([, channelId]) => Boolean(channelId)));
 }
 
+function buildPreferredSecondaryTitles(whitelist = []) {
+  const out = {
+    shinigami_project: [],
+    shinigami_mirror: [],
+  };
+
+  for (const entry of whitelist) {
+    const source = normalizeSource(entry?.source);
+    if ((source === "shinigami_project" || source === "shinigami_mirror") && entry?.title) {
+      out[source].push(entry.title);
+    }
+  }
+
+  return out;
+}
+
 function buildMangaHistoryKey(item) {
   const source = normalizeSource(item?.source);
   const mangaUrl = normalizeSourceUrl(item?.mangaUrl || "");
@@ -380,6 +396,7 @@ export default async function handler(req, res) {
 
     const { items: allResults, sourceStates } = await scrapeMangaUpdatesWithMeta(redis, {
       disabledSources,
+      preferredSecondaryTitles: buildPreferredSecondaryTitles(whitelist),
     });
 
     const nowIso = new Date().toISOString();
