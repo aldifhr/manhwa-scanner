@@ -5,6 +5,7 @@ import { WHITELIST_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import {
   addWhitelistEntry,
   buildWhitelistListResponse,
+  removeWhitelistEntryIdentity,
   removeWhitelistEntryByTitle,
 } from "../lib/services/whitelist.js";
 
@@ -89,12 +90,20 @@ export default async function handler(req, res) {
   if (req.method === "DELETE") {
     try {
       const title = req.query?.title || req.body?.title;
+      const source = req.query?.source || req.body?.source || null;
+      const url = req.query?.url || req.body?.url || null;
       if (!title?.trim()) {
         logApiOk(reqLogger, { status: 400, method: "DELETE", reason: "title_required" });
         return res.status(400).json({ error: "Title wajib diisi" });
       }
 
-      const result = await removeWhitelistEntryByTitle(title);
+      const result = source || url
+        ? await removeWhitelistEntryIdentity({
+            title: title.trim(),
+            source,
+            url,
+          })
+        : await removeWhitelistEntryByTitle(title);
       if (result.status === "not_found") {
         logApiOk(reqLogger, { status: 404, method: "DELETE", reason: "not_found" });
         return res.status(404).json({ error: "Manga tidak ditemukan" });

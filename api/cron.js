@@ -139,6 +139,10 @@ export function shouldRunChannelValidation(
   return nowMs - lastMs >= refreshMs;
 }
 
+function buildGuildChannelMap(entries = []) {
+  return Object.fromEntries(entries.filter(([, channelId]) => Boolean(channelId)));
+}
+
 function buildMangaHistoryKey(item) {
   const source = normalizeSource(item?.source);
   const mangaUrl = normalizeSourceUrl(item?.mangaUrl || "");
@@ -268,25 +272,32 @@ export default async function handler(req, res) {
       loadSourceHealthMap(redis, SOURCE_KEYS),
     ]);
 
-    const disabledSources = getDisabledSources(sourceHealthMap, SOURCE_KEYS);
-
-    const { items: allResults, sourceStates } = await scrapeMangaUpdatesWithMeta(redis, {
-      disabledSources,
-    });
-
-    const nowIso = new Date().toISOString();
-    const nextSourceHealth = buildNextSourceHealthMap({
-      sourceKeys: SOURCE_KEYS,
-      currentMap: sourceHealthMap,
-      sourceStates,
-      nowIso,
-      failureThreshold: SOURCE_FAILURE_THRESHOLD,
-      cooldownSeconds: SOURCE_COOLDOWN_SECONDS,
-    });
-    await saveSourceHealthMap(redis, nextSourceHealth, SOURCE_KEYS);
-
     const guildEntries = Object.entries(guildChannels || {});
     logger.info({ whitelist: whitelist.length, guildsFound: guildEntries.length }, "loaded");
+
+    if (!whitelist.length) {
+      const statusPayload = buildShortCircuitStatus({
+        reason: "no_whitelist",
+        start,
+        guilds: guildEntries.length,
+        whitelist: 0,
+        sourceHealth: sourceHealthMap,
+      });
+      await persistCronStatus(statusPayload);
+      await appendCronLog(redis, {
+        tag: "info",
+        code: "no_whitelist",
+        type: "short_circuit",
+        source: "cron",
+        message: "Cron skipped because whitelist is empty.",
+      });
+      logApiOk(reqLogger, { status: 200, reason: "no_whitelist" });
+      return res.status(200).json({
+        ok: true,
+        ...statusPayload,
+        message: "No whitelist",
+      });
+    }
 
     const lastValidation = await redis.get(CHANNEL_VALIDATION_REFRESH_KEY).catch(() => null);
     const lastValidationAt = typeof lastValidation === "string"
@@ -314,9 +325,7 @@ export default async function handler(req, res) {
         })
         .catch(() => {});
     } else {
-      validGuilds = Object.fromEntries(
-        guildEntries.filter(([, channelId]) => Boolean(channelId)),
-      );
+      validGuilds = buildGuildChannelMap(guildEntries);
       logger.info(
         {
           lastValidationAt,
@@ -325,6 +334,8 @@ export default async function handler(req, res) {
         "guild validation skipped (cached mode)",
       );
     }
+
+    const disabledSources = getDisabledSources(sourceHealthMap, SOURCE_KEYS);
 
     const activeGuildCount = Object.keys(validGuilds).length;
     const activeChannelIds = Object.values(validGuilds);
@@ -349,7 +360,7 @@ export default async function handler(req, res) {
         start,
         guilds: 0,
         whitelist: whitelist.length,
-        sourceHealth: nextSourceHealth,
+        sourceHealth: sourceHealthMap,
       });
       await persistCronStatus(statusPayload);
       await appendCronLog(redis, {
@@ -367,29 +378,20 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!whitelist.length) {
-      const statusPayload = buildShortCircuitStatus({
-        reason: "no_whitelist",
-        start,
-        guilds: activeGuildCount,
-        whitelist: 0,
-        sourceHealth: nextSourceHealth,
-      });
-      await persistCronStatus(statusPayload);
-      await appendCronLog(redis, {
-        tag: "info",
-        code: "no_whitelist",
-        type: "short_circuit",
-        source: "cron",
-        message: "Cron skipped because whitelist is empty.",
-      });
-      logApiOk(reqLogger, { status: 200, reason: "no_whitelist" });
-      return res.status(200).json({
-        ok: true,
-        ...statusPayload,
-        message: "No whitelist",
-      });
-    }
+    const { items: allResults, sourceStates } = await scrapeMangaUpdatesWithMeta(redis, {
+      disabledSources,
+    });
+
+    const nowIso = new Date().toISOString();
+    const nextSourceHealth = buildNextSourceHealthMap({
+      sourceKeys: SOURCE_KEYS,
+      currentMap: sourceHealthMap,
+      sourceStates,
+      nowIso,
+      failureThreshold: SOURCE_FAILURE_THRESHOLD,
+      cooldownSeconds: SOURCE_COOLDOWN_SECONDS,
+    });
+    await saveSourceHealthMap(redis, nextSourceHealth, SOURCE_KEYS);
 
     const isMatched = createWhitelistMatcher(whitelist);
     const matched = allResults.filter(isMatched);

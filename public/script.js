@@ -896,9 +896,9 @@ function applyWhitelistFilter() {
         <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
         <span class="manga-item-title">${highlight(title, query)}${mark ? ` <span class="badge">${esc(mark)}</span>` : ""}</span>
         <span class="source-badge ${badgeClass}">${esc(sourceLabel)}</span>
-        <button class="btn-mini" onclick="quickCheckMatch('${esc(title)}')">match</button>
-        <button class="btn-mini" onclick="copyUrl('${esc(url || "")}')">copy</button>
-        <button class="btn-delete" onclick="deleteManga('${esc(title)}')">x</button>
+        <button class="btn-mini" onclick="quickCheckMatchByIndex(${originalIndex})">match</button>
+        <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
+        <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
       </li>`;
     })
     .join("");
@@ -1247,6 +1247,53 @@ async function deleteManga(title) {
   }
 }
 
+function quickCheckMatchByIndex(index) {
+  const item = whitelistItems?.[index];
+  if (!item) return;
+  quickCheckMatch(typeof item === "string" ? item : item.title);
+}
+
+function copyWhitelistUrlByIndex(index) {
+  const item = whitelistItems?.[index];
+  if (!item || typeof item === "string") {
+    copyUrl("");
+    return;
+  }
+  copyUrl(item.url || "");
+}
+
+async function deleteMangaByIndex(index) {
+  const item = whitelistItems?.[index];
+  if (!item) return;
+
+  const title = typeof item === "string" ? item : item.title;
+  const source = typeof item === "object" ? item.source || null : null;
+  const url = typeof item === "object" ? item.url || null : null;
+  const ok = await openDeleteConfirm(title);
+  if (!ok) return;
+
+  isProcessing = true;
+  try {
+    const r = await fetch(`${API_BASE}/api/whitelist`, {
+      method: "DELETE",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, source, url }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      showAlert(data.error || "Gagal menghapus");
+      return;
+    }
+    renderWhitelist(data);
+    showToast("Manga berhasil dihapus", "success");
+  } catch (e) {
+    showAlert(`Gagal: ${e.message}`);
+  } finally {
+    isProcessing = false;
+  }
+}
+
 async function runCronNow() {
   if (!checkAuth() || isProcessing) return;
   const btn = $("btnRunCron");
@@ -1426,12 +1473,11 @@ async function loadHeavyData() {
   heavyAbortController = controller;
 
   try {
-    const [whitelistR, logsR, compareR, cacheMonitorR, ttlAuditR] = await Promise.allSettled([
+    const [whitelistR, logsR, compareR, cacheMonitorR] = await Promise.allSettled([
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/logs", controller.signal),
       apiFetch("/api/source-compare", controller.signal),
       apiFetch("/api/cache-monitor", controller.signal),
-      apiFetch("/api/ttl-audit", controller.signal),
     ]);
 
     if (heavyAbortController !== controller) return;
@@ -1461,13 +1507,6 @@ async function loadHeavyData() {
       renderCacheMonitor(latestCacheMonitorData);
     } else if (cacheMonitorR.reason?.name !== "AbortError") {
       renderErr($("cacheMonitorList"), "Gagal muat cache monitor");
-    }
-
-    if (ttlAuditR.status === "fulfilled") {
-      latestTtlAuditData = ttlAuditR.value;
-      renderTtlAudit(latestTtlAuditData);
-    } else if (ttlAuditR.reason?.name !== "AbortError") {
-      renderErr($("ttlAuditList"), "Gagal muat TTL audit");
     }
 
     lastHeavyLoadAt = Date.now();
@@ -1657,4 +1696,7 @@ bootstrapAuth();
 
 window.copyUrl = copyUrl;
 window.quickCheckMatch = quickCheckMatch;
+window.quickCheckMatchByIndex = quickCheckMatchByIndex;
+window.copyWhitelistUrlByIndex = copyWhitelistUrlByIndex;
+window.deleteMangaByIndex = deleteMangaByIndex;
 window.renderTrendChart = renderTrendChart;

@@ -2,7 +2,11 @@ import { redis } from "../lib/redis.js";
 import { isCronAuthorized } from "../lib/auth.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { SOURCE_COMPARE_CACHE_KEY, SOURCE_COMPARE_STATE_KEY } from "../lib/cacheKeys.js";
-import { buildSourceComparePayload } from "../lib/sourceCompareState.js";
+import {
+  buildSourceCompareState,
+  getSourceCompareHeadSignature,
+  SOURCE_COMPARE_STATE_TTL_SEC,
+} from "../lib/sourceCompareState.js";
 
 const SOURCE_COMPARE_CACHE_SEC = Number(process.env.SOURCE_COMPARE_CACHE_SEC || 180);
 
@@ -32,16 +36,28 @@ export default async function handler(req, res) {
 
     const state = await redis.get(SOURCE_COMPARE_STATE_KEY);
     let payload = state?.payload ?? null;
-    if (!payload || typeof payload !== "object") {
+    const [headEntries, recentCountRaw] = await Promise.all([
+      redis.lrange("recent:chapters", 0, 4),
+      redis.llen("recent:chapters"),
+    ]);
+    const recentHead = Array.isArray(headEntries) ? headEntries.filter(Boolean) : [];
+    const headSignature = getSourceCompareHeadSignature(recentHead);
+    const recentCount = Number.isFinite(Number(recentCountRaw))
+      ? Number(recentCountRaw)
+      : recentHead.length;
+    const stateMatchesRecent =
+      typeof state?.headSignature === "string" &&
+      state.headSignature === headSignature &&
+      Number(state?.recentCount ?? -1) === recentCount &&
+      (recentHead.length > 0 || recentCount === 0);
+
+    if (!payload || typeof payload !== "object" || !stateMatchesRecent) {
       const raw = await redis.lrange("recent:chapters", 0, 199);
       const entries = Array.isArray(raw) ? raw.filter(Boolean) : [];
-      payload = buildSourceComparePayload(entries);
+      const nextState = buildSourceCompareState(entries);
+      payload = nextState.payload;
       await redis
-        .set(SOURCE_COMPARE_STATE_KEY, {
-          generatedAt: new Date().toISOString(),
-          recentCount: entries.length,
-          payload,
-        })
+        .set(SOURCE_COMPARE_STATE_KEY, nextState, { ex: SOURCE_COMPARE_STATE_TTL_SEC })
         .catch(() => {});
     }
 

@@ -30,6 +30,8 @@ const DYNAMIC_PATTERNS = [
   { label: "history:manga:* sample", match: "history:manga:*" },
   { label: "cache:channel-valid:* sample", match: "cache:channel-valid:*" },
 ];
+const TTL_AUDIT_CACHE_KEY = "cache:api:ttl-audit:v1";
+const TTL_AUDIT_CACHE_SEC = 120;
 
 async function findFirstKey(match) {
   const [nextCursor, keys] = await redis.scan(0, { match, count: 1 }).catch(() => [0, []]);
@@ -51,6 +53,11 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=180");
 
   try {
+    const cached = await redis.get(TTL_AUDIT_CACHE_KEY).catch(() => null);
+    if (cached && typeof cached === "object") {
+      return res.status(200).json(cached);
+    }
+
     const fixed = await Promise.all(
       FIXED_KEYS.map(async ({ label, key }) => ({
         label,
@@ -70,7 +77,9 @@ export default async function handler(req, res) {
       }),
     );
 
-    return res.status(200).json({ items: [...fixed, ...dynamic] });
+    const payload = { items: [...fixed, ...dynamic] };
+    await redis.set(TTL_AUDIT_CACHE_KEY, payload, { ex: TTL_AUDIT_CACHE_SEC }).catch(() => {});
+    return res.status(200).json(payload);
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
   }
