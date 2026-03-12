@@ -190,7 +190,6 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
   const redis = createRedisMock();
   redis.kv.set("cache:api:recent:v1", { items: ["stale"] });
   redis.kv.set("cache:api:logs:v1", { logs: ["stale"] });
-  redis.kv.set("cache:api:source-compare:v1", { comparisons: ["stale"] });
 
   const out = await dispatchChapters({
     redis,
@@ -210,7 +209,6 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
   assert.equal(out.sent, 1);
   assert.equal(redis.kv.has("cache:api:recent:v1"), false);
   assert.equal(redis.kv.has("cache:api:logs:v1"), false);
-  assert.equal(redis.kv.has("cache:api:source-compare:v1"), false);
 });
 
 test("prepareDispatchQueue reports invalid, already sent, and over-limit counts", async () => {

@@ -871,17 +871,6 @@ function copyUrl(url) {
   );
 }
 
-function quickCheckMatch(title) {
-  const key = normalizeTitleKey(title);
-  const hit = compareItems.find((item) => normalizeTitleKey(item.title) === key || normalizeTitleKey(item.title).includes(key) || key.includes(normalizeTitleKey(item.title)));
-  if (!hit) {
-    showAlert(`Belum ada data compare match untuk "${title}"`);
-    return;
-  }
-  const winnerText = hit.winner === "ikiru" ? "Ikiru lebih cepat" : hit.winner === "shinigami" ? "Shinigami lebih cepat" : "Tie";
-  showAlert(`${hit.title} - ${hit.chapter} | ${winnerText} (${Number(hit.deltaMinutes ?? 0)} menit)`);
-}
-
 function applyWhitelistFilter() {
   const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
   const sourceFilter = ($("inputWhitelistSource")?.value ?? "").trim().toLowerCase();
@@ -927,7 +916,6 @@ function applyWhitelistFilter() {
         <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
         <span class="manga-item-title">${highlight(title, query)}${mark ? ` <span class="badge">${esc(mark)}</span>` : ""}</span>
         <span class="source-badge ${badgeClass}">${esc(sourceLabel)}</span>
-        <button class="btn-mini" onclick="quickCheckMatchByIndex(${originalIndex})">match</button>
         <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
         <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
       </li>`;
@@ -995,201 +983,6 @@ function renderRecent(data) {
   );
 
   renderSourceChart();
-}
-
-function renderSourceCompare(data) {
-  const summary = data?.summary ?? {};
-  const sourceCounts = data?.sourceCounts ?? {};
-  compareItems = data?.comparisons ?? [];
-
-  $("compareCount").textContent = summary.totalCompared ?? 0;
-  $("compareIkiruWins").textContent = summary.ikiruWins ?? 0;
-  $("compareShinigamiWins").textContent = summary.shinigamiWins ?? 0;
-  $("compareTies").textContent = summary.ties ?? 0;
-  $("sourceCountIkiru").textContent = sourceCounts.ikiru ?? 0;
-  $("sourceCountShinigami").textContent = (sourceCounts.shinigami_project ?? 0) + (sourceCounts.shinigami_mirror ?? 0);
-
-  const list = $("compareList");
-  if (!compareItems.length) {
-    list.innerHTML = '<li class="empty">Belum ada data compare judul/chapter yang sama.</li>';
-    return;
-  }
-
-  list.innerHTML = compareItems
-    .map((item, i) => {
-      const winnerText = item.winner === "ikiru" ? "Ikiru lebih cepat" : item.winner === "shinigami" ? "Shinigami lebih cepat" : "Tie";
-      return `<li class="manga-item">
-        <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
-        <span class="manga-item-title">${esc(item.title)} - ${esc(item.chapter)}<br /><small style="opacity:.7">${esc(winnerText)} (${Number(item.deltaMinutes ?? 0)} menit)</small></span>
-      </li>`;
-    })
-    .join("");
-}
-
-function renderWhitelistHealth(insights) {
-  $("whHealthActive").textContent = insights.whitelistHealthSummary.active;
-  $("whHealthCooling").textContent = insights.whitelistHealthSummary.cooling;
-  $("whHealthStale").textContent = insights.whitelistHealthSummary.stale;
-  $("whHealthUnseen").textContent = insights.whitelistHealthSummary.unseen;
-
-  renderSimpleList(
-    "whitelistHealthList",
-    "whitelistHealthCount",
-    insights.whitelistHealth,
-    "Belum ada data whitelist health.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}${item.mark ? ` <span class="badge">${esc(markLabel(item.mark))}</span>` : ""}<br /><small style="opacity:.7">${item.lastSeenAt ? `last seen ${esc(timeAgo(item.lastSeenAt))}${item.chapter ? ` | ${esc(item.chapter)}` : ""}` : "belum pernah terlihat di recent feed"}</small></span>
-      <span class="status-pill ${item.health === "active" ? "active" : item.health === "unseen" || item.health === "stale" ? "invalid" : ""}">${esc(item.health)}</span>
-      <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span>
-    </li>`,
-  );
-}
-
-function renderCacheMonitor(data) {
-  const items = Array.isArray(data?.items) ? data.items : [];
-  renderSimpleList(
-    "cacheMonitorList",
-    "cacheMonitorCount",
-    items,
-    "Belum ada data cache monitor.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${esc(item.key)}${item.generatedAt ? ` | warm ${esc(timeAgo(item.generatedAt))}` : ""}</small></span>
-      <span class="status-pill ${item.exists ? "active" : "invalid"}">${item.exists ? "cached" : "cold"}</span>
-      <span class="badge">${esc(ttlLabel(item.ttl))}${item.sizeHint !== null && item.sizeHint !== undefined ? ` | ${esc(String(item.sizeHint))}` : ""}</span>
-    </li>`,
-  );
-}
-
-function renderTtlAudit(data) {
-  const items = Array.isArray(data?.items) ? data.items : [];
-  renderSimpleList(
-    "ttlAuditList",
-    "ttlAuditCount",
-    items,
-    "Belum ada data TTL audit.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${esc(item.key || "sample tidak ditemukan")}</small></span>
-      <span class="badge">${esc(ttlLabel(item.ttl))}</span>
-    </li>`,
-  );
-}
-
-function renderDerivedInsights() {
-  const insights = deriveInsights({
-    statusData: latestStatusData,
-    whitelistData: latestWhitelistData,
-    recentData: latestRecentData,
-    logsData: { logs: logsItems },
-    compareData: { comparisons: compareItems },
-  });
-
-  $("opsStreakValue").textContent = insights.activityStreak ? `${insights.activityStreak}d` : "0d";
-  $("opsPeakHourValue").textContent = insights.peakHour.count ? `${String(insights.peakHour.hour).padStart(2, "0")}:00` : "-";
-  $("opsTopTitleValue").textContent = insights.topTitles[0]?.title || "-";
-  $("opsMissedValue").textContent = insights.missedCount;
-  $("opsFailValue").textContent = insights.failCount;
-  renderWhitelistHealth(insights);
-
-  renderSimpleList(
-    "topTitlesList",
-    "topTitlesCount",
-    insights.topTitles,
-    "Belum ada title aktif di recent feed.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">${item.count} update | last seen ${esc(timeAgo(item.lastSeenAt))}</small></span>
-      <span class="badge">${esc(`I:${item.sourceCounts.Ikiru} P:${item.sourceCounts.Project} M:${item.sourceCounts.Mirror}`)}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "compareLeaderboardList",
-    "compareLeaderboardCount",
-    insights.compareLeaderboard,
-    "Belum ada leaderboard compare.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">I:${item.ikiruWins} S:${item.shinigamiWins} T:${item.ties} | avg gap ${item.avgDeltaMinutes} menit</small></span>
-      <span class="badge">${esc(`${item.total} compare`)}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "whitelistLastSeenList",
-    "whitelistLastSeenCount",
-    insights.whitelistLastSeen,
-    "Belum ada data whitelist.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}${item.mark ? ` <span class="badge">${esc(markLabel(item.mark))}</span>` : ""}<br /><small style="opacity:.7">${item.lastSeenAt ? `last seen ${esc(timeAgo(item.lastSeenAt))}${item.chapter ? ` | ${esc(item.chapter)}` : ""}` : "belum muncul di recent feed"}${item.sourceSummary ? ` | ${esc(item.sourceSummary)}` : ""}</small></span>
-      <span class="badge">${esc(item.sourceCount > 1 ? `${item.sourceCount} sources` : sourceName(item.source))}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "missedDetectorList",
-    "missedDetectorCount",
-    insights.missedDetector,
-    "Semua whitelist muncul di recent feed saat ini.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">belum terlihat di recent feed terbaru${item.sourceSummary ? ` | ${esc(item.sourceSummary)}` : ""}</small></span>
-      <span class="badge">${esc(item.sourceCount > 1 ? `${item.sourceCount} sources` : sourceName(item.source))}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "sourceReliabilityList",
-    "sourceReliabilityCount",
-    insights.sourceReliability,
-    "Belum ada data reliability source.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${item.lastSuccessAt ? `last success ${esc(timeAgo(item.lastSuccessAt))}` : "no success yet"}${item.lastError ? ` | ${esc(item.lastError)}` : ""}</small></span>
-      <span class="status-pill ${item.score >= 80 ? "active" : item.score >= 55 ? "" : "invalid"}">${item.score}/100</span>
-      <span class="badge">${esc(item.status)}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "failedMonitorList",
-    "failedMonitorCount",
-    insights.failedMonitor,
-    "Belum ada failed send di log terbaru.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">${esc(item.message)}</small></span>
-      <span class="badge">${esc(item.time ? timeAgo(item.time) : "-")}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "errorBucketList",
-    "errorBucketCount",
-    insights.errorBuckets,
-    "Belum ada error bucket menonjol.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">${esc(item.sample || "-")}${item.sourceLabel ? ` | ${esc(item.sourceLabel)}` : ""}</small></span>
-      <span class="status-pill ${errorBucketSeverity(item.key)}">${esc(`${item.count}x`)}</span>
-      <span class="badge">${esc(item.lastSeenAt ? timeAgo(item.lastSeenAt) : "-")}</span>
-    </li>`,
-  );
-
-  renderSimpleList(
-    "sourceMixList",
-    "sourceMixCount",
-    insights.sourceMix,
-    "Belum ada source mix.",
-    (item, index) => `<li class="manga-item">
-      <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.label)}<br /><small style="opacity:.7">distribusi recent delivery</small></span>
-      <span class="badge">${esc(`${item.count} item`)}</span>
-    </li>`,
-  );
 }
 
 function renderLogs(data) {
@@ -1275,12 +1068,6 @@ async function deleteManga(title) {
   } finally {
     isProcessing = false;
   }
-}
-
-function quickCheckMatchByIndex(index) {
-  const item = whitelistItems?.[index];
-  if (!item) return;
-  quickCheckMatch(typeof item === "string" ? item : item.title);
 }
 
 function copyWhitelistUrlByIndex(index) {
@@ -1680,8 +1467,6 @@ updateAutoRefreshUI();
 bootstrapAuth();
 
 window.copyUrl = copyUrl;
-window.quickCheckMatch = quickCheckMatch;
-window.quickCheckMatchByIndex = quickCheckMatchByIndex;
 window.copyWhitelistUrlByIndex = copyWhitelistUrlByIndex;
 window.deleteMangaByIndex = deleteMangaByIndex;
 window.renderTrendChart = renderTrendChart;

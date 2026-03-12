@@ -1,187 +1,212 @@
 import { Redis } from "@upstash/redis";
 import dotenv from "dotenv";
+
 dotenv.config();
 
 const redis = new Redis({
-  url:   process.env.UPSTASH_REDIS_REST_URL,
+  url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-const CHAPTER_TTL   = 60 * 60 * 24 * 3;      // 3 hari dalam detik
-const THREE_DAYS_MS = 1000 * 60 * 60 * 24 * 3; // 3 hari dalam ms
+const CHAPTER_TTL_SEC = 60 * 60 * 24 * 3;
+const THREE_DAYS_MS = CHAPTER_TTL_SEC * 1000;
 
-const log = {
-  info:    (msg) => console.log(`\x1b[36mℹ️  ${msg}\x1b[0m`),
-  success: (msg) => console.log(`\x1b[32m✅ ${msg}\x1b[0m`),
-  warn:    (msg) => console.log(`\x1b[33m⚠️  ${msg}\x1b[0m`),
-  error:   (msg) => console.log(`\x1b[31m❌ ${msg}\x1b[0m`),
-  title:   (msg) => console.log(`\x1b[35m\n${"─".repeat(50)}\n   ${msg}\n${"─".repeat(50)}\x1b[0m`),
-  item:    (msg) => console.log(`\x1b[37m   ${msg}\x1b[0m`),
-};
+function out(line = "") {
+  process.stdout.write(`${line}\n`);
+}
 
-// ─────────────────────────────────────────────────────────
-// Hapus chapter key yang umurnya > 3 hari
-// Logic: value disimpan sebagai timestamp (Date.now().toString())
-// Kalau value bukan timestamp (misal "sent") → set TTL saja supaya auto expire
-// ─────────────────────────────────────────────────────────
-async function flushExpired() {
-  log.title("🗑️  FLUSH CHAPTER KEYS > 3 HARI");
+function section(title) {
+  const border = "-".repeat(48);
+  out("");
+  out(border);
+  out(title);
+  out(border);
+}
 
-  const keys = await redis.keys("chapter:*");
-  if (keys.length === 0) {
-    log.warn("Tidak ada chapter key di Redis.");
+function info(message) {
+  out(`[info] ${message}`);
+}
+
+function warn(message) {
+  out(`[warn] ${message}`);
+}
+
+function success(message) {
+  out(`[ok] ${message}`);
+}
+
+function fail(message) {
+  out(`[error] ${message}`);
+}
+
+async function listKeys(pattern) {
+  const keys = await redis.keys(pattern);
+  return Array.isArray(keys) ? keys : [];
+}
+
+async function deleteKeys(keys = []) {
+  let deleted = 0;
+  for (const key of keys) {
+    await redis.del(key);
+    out(`  deleted: ${key}`);
+    deleted += 1;
+  }
+  return deleted;
+}
+
+async function flushExpiredChapters() {
+  section("Flush Expired Chapter Keys");
+
+  const keys = await listKeys("chapter:*");
+  if (!keys.length) {
+    warn("Tidak ada chapter key di Redis.");
     return;
   }
 
-  log.info(`Scanning ${keys.length} chapter keys...`);
+  info(`Scanning ${keys.length} chapter key(s)...`);
 
-  const now    = Date.now();
-  let deleted  = 0;
-  let kept     = 0;
+  const nowMs = Date.now();
+  let deleted = 0;
+  let kept = 0;
   let migrated = 0;
 
   for (const key of keys) {
-    const value     = await redis.get(key);
-    const timestamp = parseInt(value);
+    const value = await redis.get(key);
+    const rawTimestamp = typeof value === "string" ? Number.parseInt(value, 10) : NaN;
 
-    if (!isNaN(timestamp)) {
-      // Value berupa timestamp → bisa cek umur
-      const ageMs = now - timestamp;
+    if (Number.isFinite(rawTimestamp)) {
+      const ageMs = nowMs - rawTimestamp;
       if (ageMs > THREE_DAYS_MS) {
         await redis.del(key);
-        log.item(`🗑️  Deleted (${Math.floor(ageMs / 86400000)} hari): ${key}`);
-        deleted++;
+        out(`  deleted expired (${Math.floor(ageMs / 86400000)}d): ${key}`);
+        deleted += 1;
       } else {
-        const hoursOld = Math.floor(ageMs / 3600000);
-        log.item(`✅ Keep   (${hoursOld}h old): ${key}`);
-        kept++;
+        out(`  keep (${Math.floor(ageMs / 3600000)}h old): ${key}`);
+        kept += 1;
       }
+      continue;
+    }
+
+    const ttl = await redis.ttl(key);
+    if (ttl === -1) {
+      await redis.expire(key, CHAPTER_TTL_SEC);
+      out(`  migrated ttl=3d: ${key}`);
+      migrated += 1;
     } else {
-      // Value "sent" (format lama) → tidak ada timestamp, set TTL supaya auto expire
-      const ttl = await redis.ttl(key);
-      if (ttl === -1) {
-        await redis.expire(key, CHAPTER_TTL);
-        log.warn(`🔧 Migrated (set TTL 3 hari): ${key}`);
-        migrated++;
-      } else {
-        log.item(`✅ Keep   (TTL: ${Math.ceil(ttl / 3600)}h left): ${key}`);
-        kept++;
-      }
+      out(`  keep (ttl=${ttl}s): ${key}`);
+      kept += 1;
     }
   }
 
-  console.log("");
-  log.success(`Deleted  : ${deleted} keys`);
-  if (migrated > 0) log.warn(`Migrated : ${migrated} keys (format lama, TTL di-set)`);
-  log.item(`Kept     : ${kept} keys`);
+  success(`deleted=${deleted}`);
+  success(`kept=${kept}`);
+  if (migrated > 0) success(`migrated=${migrated}`);
 }
 
-async function flushChapter() {
-  log.title("🗑️  FLUSH ALL CHAPTER KEYS");
-  const keys = await redis.keys("chapter:*");
-
-  if (keys.length === 0) {
-    log.warn("Tidak ada chapter key di Redis.");
+async function flushAllChapterKeys() {
+  section("Flush All Chapter Keys");
+  const keys = await listKeys("chapter:*");
+  if (!keys.length) {
+    warn("Tidak ada chapter key di Redis.");
     return;
   }
-
-  for (const key of keys) {
-    await redis.del(key);
-    log.item(`Deleted: ${key}`);
-  }
-  log.success(`Total deleted: ${keys.length} keys`);
+  const deleted = await deleteKeys(keys);
+  success(`total deleted=${deleted}`);
 }
 
 async function flushWhitelist() {
-  log.title("🗑️  FLUSH WHITELIST");
-  const whitelist = await redis.get("whitelist:manga") || [];
-  log.info(`Found ${whitelist.length} manga in whitelist...`);
+  section("Flush Whitelist");
+  const whitelist = (await redis.get("whitelist:manga")) || [];
+  info(`found ${Array.isArray(whitelist) ? whitelist.length : 0} whitelist item(s)`);
   await redis.del("whitelist:manga");
-  log.success("Whitelist cleared!");
+  success("whitelist cleared");
 }
 
-async function flushChannels() {
-  log.title("🗑️  FLUSH CHANNEL KEYS");
-  const keys = await redis.keys("channel:*");
-
-  if (keys.length === 0) {
-    log.warn("Tidak ada channel key di Redis.");
-    return;
-  }
-
-  for (const key of keys) {
-    await redis.del(key);
-    log.item(`Deleted: ${key}`);
-  }
-  log.success(`Total deleted: ${keys.length} keys`);
+async function flushChannelStore() {
+  section("Flush Channel Store");
+  const legacyKeys = await listKeys("channel:*");
+  const deleted = await deleteKeys(legacyKeys);
+  await redis.del("channels:guild-map");
+  success(`legacy deleted=${deleted}`);
+  success("hash deleted=channels:guild-map");
 }
 
-async function flushTrend() {
-  log.title("🗑️  FLUSH CRON TREND KEYS");
-  const keys = await redis.keys("cron:trend:*");
-
-  if (keys.length === 0) {
-    log.warn("Tidak ada cron:trend key di Redis.");
-    return;
-  }
-
-  for (const key of keys) {
-    await redis.del(key);
-    log.item(`Deleted: ${key}`);
-  }
-  log.success(`Total deleted: ${keys.length} keys`);
+async function flushDashboardCaches() {
+  section("Flush Dashboard Caches");
+  const keys = [
+    "cache:api:status:v1",
+    "cache:api:whitelist:v1",
+    "cache:api:recent:v1",
+    "cache:api:logs:v1",
+    "cron:last_run",
+  ];
+  const deleted = await deleteKeys(keys);
+  success(`total deleted=${deleted}`);
 }
 
-async function flushAll() {
-  log.title("💥 FLUSH ALL REDIS DATA");
-  await flushChapter();
+async function flushAllSafe() {
+  section("Flush All Safe Bot Data");
+  await flushAllChapterKeys();
   await flushWhitelist();
-  await flushChannels();
-  await flushTrend();
-  await redis.del("cache:updates");
-  log.success("cache:updates deleted");
-  log.title("✅ SEMUA DATA BERHASIL DIHAPUS");
+  await flushChannelStore();
+  await flushDashboardCaches();
+  success("selesai");
 }
 
-// ─────────────────────────────────────────────────────────
-// Entry point
-// node flush.js             → hapus chapter > 3 hari (default)
-// node flush.js chapter     → hapus semua chapter keys
-// node flush.js whitelist   → hapus whitelist
-// node flush.js channels    → hapus channel keys
-// node flush.js trend       → hapus cron:trend keys
-// node flush.js all         → hapus semua data
-// ─────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const mode = args[0] || "expired";
-
-switch (mode) {
-  case "expired":
-    flushExpired().catch(console.error);
-    break;
-  case "chapter":
-    flushChapter().catch(console.error);
-    break;
-  case "whitelist":
-    flushWhitelist().catch(console.error);
-    break;
-  case "channels":
-    flushChannels().catch(console.error);
-    break;
-  case "trend":
-    flushTrend().catch(console.error);
-    break;
-  case "all":
-    flushAll().catch(console.error);
-    break;
-  default:
-    log.error(`Unknown mode: "${mode}"`);
-    log.item("Usage:");
-    log.item("  node flush.js           → hapus chapter > 3 hari");
-    log.item("  node flush.js chapter   → hapus semua chapter keys");
-    log.item("  node flush.js whitelist → hapus whitelist");
-    log.item("  node flush.js channels  → hapus channel keys");
-    log.item("  node flush.js trend     → hapus cron:trend keys");
-    log.item("  node flush.js all       → hapus semua data");
-    process.exit(1);
+function printUsage() {
+  out("Usage:");
+  out("  node flush.js");
+  out("  node flush.js expired");
+  out("  node flush.js chapter");
+  out("  node flush.js whitelist");
+  out("  node flush.js channels");
+  out("  node flush.js cache");
+  out("  node flush.js all");
+  out("");
+  out("Modes:");
+  out("  expired   hapus chapter key yang expired > 3 hari atau set ttl legacy key");
+  out("  chapter   hapus semua chapter key");
+  out("  whitelist hapus whitelist");
+  out("  channels  hapus channel store");
+  out("  cache     hapus cache dashboard utama");
+  out("  all       gabungan chapter + whitelist + channels + cache");
 }
+
+async function main() {
+  const mode = String(process.argv[2] || "expired").toLowerCase().trim();
+
+  switch (mode) {
+    case "expired":
+      await flushExpiredChapters();
+      return;
+    case "chapter":
+      await flushAllChapterKeys();
+      return;
+    case "whitelist":
+      await flushWhitelist();
+      return;
+    case "channels":
+      await flushChannelStore();
+      return;
+    case "cache":
+      await flushDashboardCaches();
+      return;
+    case "all":
+      await flushAllSafe();
+      return;
+    case "help":
+    case "--help":
+    case "-h":
+      printUsage();
+      return;
+    default:
+      fail(`Unknown mode: ${mode}`);
+      printUsage();
+      process.exitCode = 1;
+  }
+}
+
+main().catch((err) => {
+  fail(err?.message || String(err));
+  process.exitCode = 1;
+});
