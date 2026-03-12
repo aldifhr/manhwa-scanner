@@ -314,6 +314,14 @@ body {
   overflow: hidden;
 }
 
+.card.is-empty-card {
+  display: none;
+}
+
+.card.card-full {
+  grid-column: 1 / -1;
+}
+
 .card-header {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);

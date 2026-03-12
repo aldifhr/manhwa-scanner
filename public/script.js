@@ -170,10 +170,23 @@ function renderSimpleList(listId, countId, items, emptyText, renderer) {
   const badge = $(countId);
   if (badge) badge.textContent = Array.isArray(items) ? items.length : 0;
   if (!list) return;
+  const card = list.closest(".card");
+  const grid = card?.parentElement;
+  const syncGrid = () => {
+    if (!grid?.classList?.contains("two-col")) return;
+    const cards = [...grid.querySelectorAll(":scope > .card")];
+    const visibleCards = cards.filter((entry) => !entry.classList.contains("is-empty-card"));
+    cards.forEach((entry) => entry.classList.remove("card-full"));
+    if (visibleCards.length === 1) visibleCards[0].classList.add("card-full");
+  };
   if (!Array.isArray(items) || !items.length) {
+    if (card) card.classList.add("is-empty-card");
+    syncGrid();
     list.innerHTML = `<li class="empty">${esc(emptyText)}</li>`;
     return;
   }
+  if (card) card.classList.remove("is-empty-card");
+  syncGrid();
   list.innerHTML = items.map(renderer).join("");
 }
 
@@ -340,14 +353,35 @@ function deriveInsights({
     }
   }
 
-  const whitelistLastSeen = whitelist
-    .map((item) => {
-      const key = normalizeTitleKey(item?.title || "");
+  const whitelistTitleBuckets = new Map();
+  for (const item of whitelist) {
+    const title = safeText(item?.title, "Untitled");
+    const key = normalizeTitleKey(title);
+    if (!key) continue;
+    if (!whitelistTitleBuckets.has(key)) {
+      whitelistTitleBuckets.set(key, {
+        title,
+        sources: new Set(),
+        marks: new Set(),
+      });
+    }
+    const bucket = whitelistTitleBuckets.get(key);
+    bucket.sources.add(item?.source || "ikiru");
+    if (item?.mark) bucket.marks.add(item.mark);
+  }
+
+  const whitelistLastSeen = [...whitelistTitleBuckets.entries()]
+    .map(([key, bucket]) => {
       const hit = lastSeenByTitle.get(key);
+      const sources = [...bucket.sources];
+      const marks = [...bucket.marks];
       return {
-        title: safeText(item?.title, "Untitled"),
-        source: item?.source || "ikiru",
-        mark: item?.mark || null,
+        title: bucket.title,
+        source: sources[0] || "ikiru",
+        sourceSummary: sources.map((source) => sourceName(source)).join(", "),
+        sourceCount: sources.length,
+        mark: marks[0] || null,
+        markCount: marks.length,
         lastSeenAt: hit?.seenAt?.toISOString?.() || null,
         chapter: hit?.chapter || null,
       };
@@ -1093,8 +1127,8 @@ function renderDerivedInsights() {
     "Belum ada data whitelist.",
     (item, index) => `<li class="manga-item">
       <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}${item.mark ? ` <span class="badge">${esc(markLabel(item.mark))}</span>` : ""}<br /><small style="opacity:.7">${item.lastSeenAt ? `last seen ${esc(timeAgo(item.lastSeenAt))}${item.chapter ? ` | ${esc(item.chapter)}` : ""}` : "belum muncul di recent feed"}</small></span>
-      <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span>
+      <span class="manga-item-title">${esc(item.title)}${item.mark ? ` <span class="badge">${esc(markLabel(item.mark))}</span>` : ""}<br /><small style="opacity:.7">${item.lastSeenAt ? `last seen ${esc(timeAgo(item.lastSeenAt))}${item.chapter ? ` | ${esc(item.chapter)}` : ""}` : "belum muncul di recent feed"}${item.sourceSummary ? ` | ${esc(item.sourceSummary)}` : ""}</small></span>
+      <span class="badge">${esc(item.sourceCount > 1 ? `${item.sourceCount} sources` : sourceName(item.source))}</span>
     </li>`,
   );
 
@@ -1105,8 +1139,8 @@ function renderDerivedInsights() {
     "Semua whitelist muncul di recent feed saat ini.",
     (item, index) => `<li class="manga-item">
       <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">belum terlihat di recent feed terbaru</small></span>
-      <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span>
+      <span class="manga-item-title">${esc(item.title)}<br /><small style="opacity:.7">belum terlihat di recent feed terbaru${item.sourceSummary ? ` | ${esc(item.sourceSummary)}` : ""}</small></span>
+      <span class="badge">${esc(item.sourceCount > 1 ? `${item.sourceCount} sources` : sourceName(item.source))}</span>
     </li>`,
   );
 

@@ -243,3 +243,65 @@ test("prepareDispatchQueue reports invalid, already sent, and over-limit counts"
   assert.equal(out.queuedMeta.length, 1);
   assert.equal(out.queuedMeta[0].item.title, "Queued");
 });
+
+test("prepareDispatchQueue ignores stale pending claims but blocks fresh pending claims", async () => {
+  const redis = createRedisMock();
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2", {
+    status: "pending",
+    claimedAt: "2026-01-01T00:00:00.000Z",
+  });
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/3", {
+    status: "pending",
+    claimedAt: new Date().toISOString(),
+  });
+
+  const out = await prepareDispatchQueue(
+    redis,
+    [
+      {
+        title: "Stale Pending",
+        chapter: "Chapter 2",
+        url: "https://a.shinigami.asia/chapter/2",
+        source: "shinigami_project",
+      },
+      {
+        title: "Fresh Pending",
+        chapter: "Chapter 3",
+        url: "https://a.shinigami.asia/chapter/3",
+        source: "shinigami_project",
+      },
+    ],
+    Infinity,
+    60 * 1000,
+  );
+
+  assert.equal(out.alreadySentCount, 1);
+  assert.equal(out.unsentMeta.length, 1);
+  assert.equal(out.queuedMeta[0].item.title, "Stale Pending");
+});
+
+test("dispatchChapters promotes successful pending claim to sent state", async () => {
+  const redis = createRedisMock();
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "Promote",
+        chapter: "Chapter 5",
+        url: "https://a.shinigami.asia/chapter/5",
+        source: "shinigami_project",
+      },
+    ],
+    channelIds: ["1001"],
+    sendEmbed: async () => {},
+    nowIso: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(out.sent, 1);
+  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/5"), {
+    status: "sent",
+    claimedAt: "2026-01-01T00:00:00.000Z",
+    sentAt: "2026-01-01T00:00:00.000Z",
+  });
+});
