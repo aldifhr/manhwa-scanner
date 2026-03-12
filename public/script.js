@@ -37,11 +37,8 @@ let lastFocusRefreshAt = 0;
 let latestStatusData = null;
 let latestWhitelistData = null;
 let latestRecentData = null;
-let latestCacheMonitorData = null;
-let latestTtlAuditData = null;
 let whitelistItems = [];
 let whitelistSortOrder = "default";
-let compareItems = [];
 let logsItems = [];
 let recentItems = [];
 let trendChart = null;
@@ -1212,7 +1209,6 @@ function renderLogs(data) {
   );
 
   renderTrendChart();
-  renderDerivedInsights();
 }
 
 async function addManga() {
@@ -1459,7 +1455,6 @@ function renderSummaryPanels() {
   renderOverview(latestStatusData, latestWhitelistData, latestRecentData);
   renderLastCronResult(latestStatusData, false);
   renderSourceHealth(latestStatusData);
-  renderDerivedInsights();
 }
 
 async function loadLightData() {
@@ -1507,11 +1502,9 @@ async function loadHeavyData() {
   heavyAbortController = controller;
 
   try {
-    const [whitelistR, logsR, compareR, cacheMonitorR] = await Promise.allSettled([
+    const [whitelistR, logsR] = await Promise.allSettled([
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/logs", controller.signal),
-      apiFetch("/api/source-compare", controller.signal),
-      apiFetch("/api/cache-monitor", controller.signal),
     ]);
 
     if (heavyAbortController !== controller) return;
@@ -1528,19 +1521,6 @@ async function loadHeavyData() {
       renderLogs(logsR.value);
     } else if (logsR.reason?.name !== "AbortError") {
       renderErr($("logList"), "Gagal muat logs");
-    }
-
-    if (compareR.status === "fulfilled") {
-      renderSourceCompare(compareR.value);
-    } else if (compareR.reason?.name !== "AbortError") {
-      renderErr($("compareList"), "Gagal muat source compare");
-    }
-
-    if (cacheMonitorR.status === "fulfilled") {
-      latestCacheMonitorData = cacheMonitorR.value;
-      renderCacheMonitor(latestCacheMonitorData);
-    } else if (cacheMonitorR.reason?.name !== "AbortError") {
-      renderErr($("cacheMonitorList"), "Gagal muat cache monitor");
     }
 
     lastHeavyLoadAt = Date.now();
@@ -1567,29 +1547,14 @@ async function loadAll() {
   skeleton($("mangaList"), 5);
   skeletonRecent($("recentList"), 4);
   skeleton($("logList"), 6);
-  skeleton($("compareList"), 4);
   skeleton($("sourceHealthList"), 3);
-  skeleton($("topTitlesList"), 4);
-  skeleton($("compareLeaderboardList"), 4);
-  skeleton($("whitelistLastSeenList"), 4);
-  skeleton($("whitelistHealthList"), 4);
-  skeleton($("missedDetectorList"), 4);
-  skeleton($("sourceReliabilityList"), 3);
-  skeleton($("failedMonitorList"), 3);
-  skeleton($("errorBucketList"), 3);
-  skeleton($("cacheMonitorList"), 3);
-  skeleton($("ttlAuditList"), 3);
-  skeleton($("sourceMixList"), 3);
 
   try {
-    const [statusR, whitelistR, recentR, logsR, compareR, cacheMonitorR, ttlAuditR] = await Promise.allSettled([
+    const [statusR, whitelistR, recentR, logsR] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/recent", controller.signal),
       apiFetch("/api/logs", controller.signal),
-      apiFetch("/api/source-compare", controller.signal),
-      apiFetch("/api/cache-monitor", controller.signal),
-      apiFetch("/api/ttl-audit", controller.signal),
     ]);
 
     if (loadAbortController !== controller) return;
@@ -1598,15 +1563,10 @@ async function loadAll() {
     const whitelistData = whitelistR.status === "fulfilled" ? whitelistR.value : null;
     const recentData = recentR.status === "fulfilled" ? recentR.value : null;
     const logsData = logsR.status === "fulfilled" ? logsR.value : null;
-    const compareData = compareR.status === "fulfilled" ? compareR.value : null;
-    const cacheMonitorData = cacheMonitorR.status === "fulfilled" ? cacheMonitorR.value : null;
-    const ttlAuditData = ttlAuditR.status === "fulfilled" ? ttlAuditR.value : null;
 
     latestStatusData = statusData;
     latestWhitelistData = whitelistData;
     latestRecentData = recentData;
-    latestCacheMonitorData = cacheMonitorData;
-    latestTtlAuditData = ttlAuditData;
     renderSummaryPanels();
 
     if (whitelistData) renderWhitelist(whitelistData);
@@ -1618,16 +1578,7 @@ async function loadAll() {
     if (logsData) renderLogs(logsData);
     else renderErr($("logList"), "Gagal muat logs");
 
-    if (compareData) renderSourceCompare(compareData);
-    else renderErr($("compareList"), "Gagal muat source compare");
-
-    if (cacheMonitorData) renderCacheMonitor(cacheMonitorData);
-    else renderErr($("cacheMonitorList"), "Gagal muat cache monitor");
-
-    if (ttlAuditData) renderTtlAudit(ttlAuditData);
-    else renderErr($("ttlAuditList"), "Gagal muat TTL audit");
-
-    const anyFailed = [statusR, whitelistR, recentR, logsR, compareR, cacheMonitorR, ttlAuditR].some(
+    const anyFailed = [statusR, whitelistR, recentR, logsR].some(
       (r) => r.status === "rejected" && r.reason?.name !== "AbortError",
     );
     if (anyFailed && isAuthenticated) {

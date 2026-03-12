@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import pLimit from "p-limit";
 import { isCronAuthorized } from "../lib/auth.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
@@ -13,15 +12,19 @@ import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
 import {
   createWhitelistMatcher,
   getChapterNumber,
-  normalizeTitleKey,
 } from "../lib/domain/manga.js";
-import { normalizeSource, normalizeSourceUrl } from "../lib/domain/source.js";
+import { normalizeSource } from "../lib/domain/source.js";
 import {
   STATUS_API_CACHE_KEY,
   invalidateDashboardCaches,
 } from "../lib/cacheKeys.js";
 import { appendCronLog, buildCronErrorLog } from "../lib/cronLogs.js";
 import { dispatchChapters } from "../lib/services/dispatch.js";
+import {
+  CHANNEL_VALIDATION_CACHE_SEC,
+  channelValidationCacheKey,
+  validateDiscordChannel,
+} from "../lib/services/channelValidation.js";
 import {
   SOURCE_KEYS,
   buildNextSourceHealthMap,
@@ -30,13 +33,8 @@ import {
   saveSourceHealthMap,
 } from "../lib/services/sourceHealth.js";
 import { getLogger } from "../lib/logger.js";
-import { httpGet } from "../lib/httpClient.js";
 
 export const config = { maxDuration: 60 };
-
-const MANGA_HISTORY_LIMIT = 20;
-const MANGA_HISTORY_TTL = 60 * 60 * 24 * 45;
-const CHANNEL_VALIDATION_CACHE_SEC = 60 * 10;
 const CHANNEL_VALIDATION_REFRESH_SECONDS = Number(
   process.env.CHANNEL_VALIDATION_REFRESH_SECONDS || 3600,
 );
@@ -172,99 +170,30 @@ function buildPreferredIkiruTitles(whitelist = []) {
   return out;
 }
 
-function buildMangaHistoryKey(item) {
-  const source = normalizeSource(item?.source);
-  const mangaUrl = normalizeSourceUrl(item?.mangaUrl || "");
-  if (mangaUrl) return `history:manga:${source}:${mangaUrl}`;
-
-  const title = normalizeTitleKey(item?.title || "");
-  if (!title) return null;
-  return `history:manga:${source}:title:${title}`;
-}
-
-function buildChapterHistoryRef(item) {
-  const chapterUrl = normalizeSourceUrl(item?.url || "");
-  if (chapterUrl) return chapterUrl;
-
-  const chapter = String(item?.chapter || "").trim();
-  const updated = String(item?.updatedTime || "").trim();
-  if (!chapter && !updated) return null;
-  return `${chapter}|${updated}`;
-}
-
-function buildMangaHistorySeenKey(item) {
-  const key = buildMangaHistoryKey(item);
-  const chapterRef = buildChapterHistoryRef(item);
-  if (!key || !chapterRef) return null;
-
-  const digest = createHash("sha1")
-    .update(`${key}|${chapterRef}`)
-    .digest("hex");
-  return `history:seen:${digest}`;
-}
-
-async function saveMangaHistory(item) {
-  const key = buildMangaHistoryKey(item);
-  const chapterRef = buildChapterHistoryRef(item);
-  const seenKey = buildMangaHistorySeenKey(item);
-  if (!key || !chapterRef || !seenKey) return;
-
-  const claimed = await redis.set(seenKey, "1", {
-    nx: true,
-    ex: MANGA_HISTORY_TTL,
-  });
-  if (!claimed) {
-    await redis.expire(key, MANGA_HISTORY_TTL);
-    return;
-  }
-
-  await Promise.all([
-    redis.lpush(key, chapterRef),
-    redis.ltrim(key, 0, MANGA_HISTORY_LIMIT - 1),
-    redis.expire(key, MANGA_HISTORY_TTL),
-  ]);
-}
-
 async function validateChannel(channelId, guildId) {
-  const cacheKey = `cache:channel-valid:${channelId}`;
-  try {
-    const cached = await redis.get(cacheKey);
-    if (cached === true) return true;
-    if (cached === false) return false;
-  } catch {
-    // ignore cache read errors
-  }
-
-  try {
-    const resp = await httpGet(
-      `https://discord.com/api/v10/channels/${channelId}`,
-      {
-        headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
-        timeout: 10000,
-      },
-      {
-        retries: 2,
-      },
-    );
-    const channel = resp.data;
-    log(
-      `CONNECTED: #${channel.name} (${channelId.slice(-4)}) in guild ${guildId.slice(-4)}`,
-    );
-    await redis.set(cacheKey, true, { ex: CHANNEL_VALIDATION_CACHE_SEC }).catch(() => {});
-    return true;
-  } catch (err) {
-    const status = err.response?.status;
-    if (status === 404 || status === 403) {
-      warn(`DISCONNECTED: guild ${guildId.slice(-4)} ch ${channelId.slice(-4)} (${status})`);
-      await deleteGuildChannel(guildId);
-      await redis.set(cacheKey, false, { ex: CHANNEL_VALIDATION_CACHE_SEC }).catch(() => {});
-    } else if (status === 401) {
-      warn("Bot token invalid");
-    } else {
-      warn(`Validate ${guildId.slice(-4)}: ${err.message}`);
-    }
-    return false;
-  }
+  return validateDiscordChannel({
+    redis,
+    channelId,
+    botToken: DISCORD_TOKEN,
+    cacheSec: CHANNEL_VALIDATION_CACHE_SEC,
+    writeCache: true,
+    onValid: (channel) => {
+      log(
+        `CONNECTED: #${channel.name} (${channelId.slice(-4)}) in guild ${guildId.slice(-4)}`,
+      );
+    },
+    onInvalid: async (err) => {
+      const status = err?.response?.status;
+      if (status === 404 || status === 403) {
+        warn(`DISCONNECTED: guild ${guildId.slice(-4)} ch ${channelId.slice(-4)} (${status})`);
+        await deleteGuildChannel(guildId);
+      } else if (status === 401) {
+        warn("Bot token invalid");
+      } else {
+        warn(`Validate ${guildId.slice(-4)}: ${err.message}`);
+      }
+    },
+  });
 }
 
 export default async function handler(req, res) {
@@ -463,7 +392,6 @@ export default async function handler(req, res) {
       nowIso,
       log,
       warn,
-      onDispatchSuccess: (item) => saveMangaHistory(item),
       onChannelError: async (err, channelId) => {
         const status = err?.response?.status;
         if (status !== 403 && status !== 404) return;
@@ -471,7 +399,7 @@ export default async function handler(req, res) {
         if (!guildId) return;
         await deleteGuildChannel(guildId).catch(() => {});
         await redis
-          .set(`cache:channel-valid:${channelId}`, false, {
+          .set(channelValidationCacheKey(channelId), false, {
             ex: CHANNEL_VALIDATION_CACHE_SEC,
           })
           .catch(() => {});

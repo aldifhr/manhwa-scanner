@@ -26,8 +26,6 @@ const FIXED_KEYS = [
 
 const DYNAMIC_PATTERNS = [
   { label: "chapter:* sample", match: "chapter:*" },
-  { label: "history:seen:* sample", match: "history:seen:*" },
-  { label: "history:manga:* sample", match: "history:manga:*" },
   { label: "cache:channel-valid:* sample", match: "cache:channel-valid:*" },
 ];
 const TTL_AUDIT_CACHE_KEY = "cache:api:ttl-audit:v1";

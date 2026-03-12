@@ -12,6 +12,9 @@ function createRedisMock() {
   const api = {
     kv,
     lists,
+    async get(key) {
+      return kv.has(key) ? kv.get(key) : null;
+    },
     async mget(...keys) {
       return keys.map((k) => (kv.has(k) ? kv.get(k) : null));
     },
@@ -303,5 +306,36 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
     status: "sent",
     claimedAt: "2026-01-01T00:00:00.000Z",
     sentAt: "2026-01-01T00:00:00.000Z",
+  });
+});
+
+test("dispatchChapters reclaims stale pending claim before sending", async () => {
+  const redis = createRedisMock();
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/6", {
+    status: "pending",
+    claimedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "Reclaim",
+        chapter: "Chapter 6",
+        url: "https://a.shinigami.asia/chapter/6",
+        source: "shinigami_project",
+      },
+    ],
+    channelIds: ["1001"],
+    sendEmbed: async () => {},
+    nowIso: "2026-01-01T00:10:01.000Z",
+    pendingClaimTtl: 60,
+  });
+
+  assert.equal(out.sent, 1);
+  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/6"), {
+    status: "sent",
+    claimedAt: "2026-01-01T00:10:01.000Z",
+    sentAt: "2026-01-01T00:10:01.000Z",
   });
 });
