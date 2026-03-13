@@ -186,6 +186,46 @@ test("dispatchChapters writes one summary log for multiple sent chapters", async
   assert.match(String(logs[0]?.message || ""), /Cron sent 2 chapter\(s\)/);
 });
 
+test("dispatchChapters preserves chapter order even when later sends finish faster", async () => {
+  const redis = createRedisMock();
+  const sent = [];
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "Series",
+        chapter: "Chapter 82",
+        url: "https://a.shinigami.asia/chapter/82",
+        source: "shinigami_project",
+      },
+      {
+        title: "Series",
+        chapter: "Chapter 87",
+        url: "https://a.shinigami.asia/chapter/87",
+        source: "shinigami_project",
+      },
+      {
+        title: "Series",
+        chapter: "Chapter 89",
+        url: "https://a.shinigami.asia/chapter/89",
+        source: "shinigami_project",
+      },
+    ],
+    channelIds: ["1001"],
+    chapterConcurrency: 3,
+    sendEmbed: async (item) => {
+      const wait = item.chapter === "Chapter 82" ? 30 : item.chapter === "Chapter 87" ? 5 : 0;
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      sent.push(item.chapter);
+    },
+    nowIso: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(out.sent, 3);
+  assert.deepEqual(sent, ["Chapter 82", "Chapter 87", "Chapter 89"]);
+});
+
 test("dispatchChapters invalidates dashboard caches after write", async () => {
   const redis = createRedisMock();
   redis.kv.set("cache:api:recent:v1", { items: ["stale"] });
