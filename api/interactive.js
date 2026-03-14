@@ -83,10 +83,11 @@ async function resolveAddSelection(interactionData) {
 export default async function handler(req, res) {
   const reqLogger = logApiHit("interactive", req);
 
-  if (req.method !== "POST") {
-    logApiOk(reqLogger, { status: 405 });
-    return res.status(405).end();
-  }
+  try {
+    if (req.method !== "POST") {
+      logApiOk(reqLogger, { status: 405 });
+      return res.status(405).end();
+    }
 
   const sig = req.headers["x-signature-ed25519"];
   const ts = req.headers["x-signature-timestamp"];
@@ -200,5 +201,12 @@ export default async function handler(req, res) {
   }
 
   logApiError(reqLogger, new Error("Unknown interaction type"), { status: 400 });
-  res.status(400).json({ error: "Unknown interaction type" });
+  return res.status(400).json({ error: "Unknown interaction type" });
+  } catch (err) {
+    console.error("[interactive] Unhandled error:", err);
+    logApiError(reqLogger, err, { status: 500 });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
 }
