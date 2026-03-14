@@ -5,6 +5,7 @@ import {
   formatMarkedTitle,
   normalizeMarkReason,
   resolveWhitelistQuery,
+  resolveWhitelistSource,
 } from "../lib/services/whitelist.js";
 
 test("normalizeMarkReason accepts supported values", () => {
@@ -79,4 +80,21 @@ test("resolveWhitelistQuery keeps numeric remove behavior stable", () => {
   assert.equal(result.index, 1);
   assert.equal(result.item.source, "shinigami_project");
   assert.equal(result.item.title, "Solo Leveling");
+});
+
+test("resolveWhitelistSource aligns source with canonical url", () => {
+  assert.equal(
+    resolveWhitelistSource({
+      url: "https://02.ikiru.wtf/manga/nano-machine/",
+      source: "shinigami_project",
+    }),
+    "ikiru",
+  );
+  assert.equal(
+    resolveWhitelistSource({
+      url: "https://a.shinigami.asia/series/abc",
+      source: "ikiru",
+    }),
+    "shinigami_project",
+  );
 });

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  inferSourceFromUrl,
   normalizeSource,
   normalizeSourceUrl,
   sourceLabel,
@@ -40,4 +41,17 @@ test("normalizeSourceUrl lowercases and trims trailing slash", () => {
     normalizeSourceUrl("HTTPS://A.SHINIGAMI.ASIA/SERIES/ABC/"),
     "https://a.shinigami.asia/series/abc",
   );
+});
+
+
+test("inferSourceFromUrl detects canonical source from url", () => {
+  assert.equal(
+    inferSourceFromUrl("https://02.ikiru.wtf/manga/nano-machine/"),
+    "ikiru",
+  );
+  assert.equal(
+    inferSourceFromUrl("https://a.shinigami.asia/series/abc/"),
+    "shinigami_project",
+  );
+  assert.equal(inferSourceFromUrl("https://example.com/series/abc"), null);
 });
