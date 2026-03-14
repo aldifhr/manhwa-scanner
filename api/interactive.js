@@ -1,7 +1,10 @@
 import { verifyKey, InteractionType } from "discord-interactions";
 import { waitUntil } from "@vercel/functions";
 import { redis } from "../lib/redis.js";
-import { editInteractionResponse } from "../lib/discord.js";
+import {
+  editInteractionResponse,
+  editInteractionResponseWithComponents,
+} from "../lib/discord.js";
 import commands from "../lib/commands/index.js";
 import {
   buildAddAutocompleteChoices,
@@ -45,6 +48,17 @@ async function handleAddManga(payload, title, url = null, source = "ikiru") {
     );
   } catch (err) {
     console.error("[handleAddManga] Error:", err);
+    await editInteractionResponse(payload, `Error: ${err.message}`);
+  }
+}
+
+async function handleListResponse(payload, page, reqLogger, event) {
+  try {
+    const { content, components } = await buildWhitelistListResponse(page);
+    await editInteractionResponseWithComponents(payload, content, components);
+    logApiOk(reqLogger, { status: 200, event });
+  } catch (err) {
+    logApiError(reqLogger, err, { status: 500, event });
     await editInteractionResponse(payload, `Error: ${err.message}`);
   }
 }
@@ -158,9 +172,8 @@ export default async function handler(req, res) {
 
     if (custom_id.startsWith("list:")) {
       const page = parseInt(custom_id.split(":")[1], 10) || 1;
-      const { content, components } = await buildWhitelistListResponse(page);
-      logApiOk(reqLogger, { status: 200, event: "list_component" });
-      return res.json({ type: 7, data: { content, components, flags: 64 } });
+      res.json({ type: 6 });
+      return waitUntil(handleListResponse(payload, page, reqLogger, "list_component"));
     }
 
     logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
@@ -178,9 +191,8 @@ export default async function handler(req, res) {
 
     if (name === "list") {
       const page = parseInt(options?.[0]?.value, 10) || 1;
-      const { content, components } = await buildWhitelistListResponse(page);
-      logApiOk(reqLogger, { status: 200, event: "list_command" });
-      return res.json({ type: 4, data: { content, components, flags: 64 } });
+      res.json({ type: 5, data: { flags: 64 } });
+      return waitUntil(handleListResponse(payload, page, reqLogger, "list_command"));
     }
 
     logApiOk(reqLogger, { status: 200, event: "command_dispatch", command: name });
