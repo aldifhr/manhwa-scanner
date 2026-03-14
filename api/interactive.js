@@ -183,17 +183,18 @@ export default async function handler(req, res) {
 
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
-    const handle = commands[name];
-
-    if (!handle) {
-      logApiOk(reqLogger, { status: 400, reason: "unknown_command", command: name });
-      return res.status(400).json({ error: "Unknown command" });
-    }
 
     if (name === "list") {
       const page = parseInt(options?.[0]?.value, 10) || 1;
       res.json({ type: 5, data: { flags: 64 } });
       return waitUntil(handleListResponse(payload, page, reqLogger, "list_command"));
+    }
+
+    const handle = commands[name];
+
+    if (!handle) {
+      logApiOk(reqLogger, { status: 400, reason: "unknown_command", command: name });
+      return res.status(400).json({ error: "Unknown command" });
     }
 
     logApiOk(reqLogger, { status: 200, event: "command_dispatch", command: name });
