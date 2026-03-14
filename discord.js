@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const MANAGE_GUILD_PERMISSION = "32";
+
 if (!process.env.DISCORD_BOT_TOKEN || !process.env.DISCORD_APPLICATION_ID) {
   console.error("❌ Please set DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID in .env");
   process.exit(1);
@@ -15,10 +17,12 @@ const commands = [
   {
     name:        "check",
     description: "Cek chapter baru sekarang tanpa nunggu cron",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
   },
   {
     name:        "remove",
     description: "Remove manga from whitelist (by title or number)",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
     options: [{
       name:        "query",
       description: "Manga title or number from /list",
@@ -40,6 +44,7 @@ const commands = [
   {
     name:        "mark",
     description: "Kasih mark status ke manga di whitelist",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
     options: [{
       name:        "query",
       description: "Judul manga atau nomor dari /list",
@@ -61,14 +66,17 @@ const commands = [
   {
     name:        "clear",
     description: "Clear semua whitelist (owner only)",
+    default_member_permissions: "0",
   },
   {
     name:        "status",
     description: "Show bot status dan notification channel",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
   },
   {
     name:        "setchannel",
     description: "Set notification channel untuk manga updates",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
     options: [{
       name:         "channel",
       description:  "Channel to send notifications",
@@ -93,6 +101,7 @@ const commands = [
 {
   name: "resync24h",
   description: "Scan ulang update <24 jam dan kirim yang kelewat (owner only)",
+  default_member_permissions: "0",
   options: [
     {
       name: "dry_run",

@@ -90,7 +90,13 @@ export default async function handler(req, res) {
     return res.status(401).end();
   }
 
-  const payload = JSON.parse(rawString);
+  let payload;
+  try {
+    payload = JSON.parse(rawString);
+  } catch (err) {
+    logApiError(reqLogger, err, { status: 400, reason: "invalid_json" });
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
   const { type, data: interactionData } = payload;
 
   if (type === 1) {

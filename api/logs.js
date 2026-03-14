@@ -33,6 +33,8 @@ export default async function handler(req, res) {
           type: log?.type || null,
           source: log?.source || null,
           title: log?.title || null,
+          count: Number.isFinite(Number(log?.count)) ? Number(log.count) : null,
+          failed: Number.isFinite(Number(log?.failed)) ? Number(log.failed) : null,
           message: log?.message || "-",
         })),
     };

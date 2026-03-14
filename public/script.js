@@ -240,6 +240,25 @@ function errorBucketSeverity(key = "") {
   return "active";
 }
 
+function logSentCount(log) {
+  const count = Number(log?.count);
+  if (log?.tag === "sent" || log?.tag === "partial") {
+    return Number.isFinite(count) && count > 0 ? count : 1;
+  }
+  return 0;
+}
+
+function logFailedCount(log) {
+  const failed = Number(log?.failed);
+  if (log?.tag === "partial") {
+    return Number.isFinite(failed) && failed > 0 ? failed : 0;
+  }
+  if (log?.tag === "failed") {
+    return Number.isFinite(failed) && failed > 0 ? failed : 1;
+  }
+  return 0;
+}
+
 function deriveInsights({
   statusData,
   whitelistData,
@@ -431,7 +450,7 @@ function deriveInsights({
     .sort((a, b) => b.score - a.score);
 
   const failedMonitor = logs
-    .filter((log) => log?.tag === "failed")
+    .filter((log) => logFailedCount(log) > 0)
     .slice(0, 10)
     .map((log) => ({
       title: safeText(log?.title || log?.message, "Unknown failure"),
@@ -607,9 +626,9 @@ function renderTrendChart() {
       if (!d) continue;
       const idx = buckets.findIndex((b) => b.key === dateKey(d));
       if (idx === -1) continue;
-      if (log.tag === "sent") sent[idx] += 1;
+      sent[idx] += logSentCount(log);
       if (log.tag === "skipped") skipped[idx] += 1;
-      if (log.tag === "failed") failed[idx] += 1;
+      failed[idx] += logFailedCount(log);
     }
   } else {
     for (let i = 23; i >= 0; i -= 1) {
@@ -630,9 +649,9 @@ function renderTrendChart() {
       const key = `${dateKey(d)}-${d.getHours()}`;
       const idx = buckets.findIndex((b) => b.key === key);
       if (idx === -1) continue;
-      if (log.tag === "sent") sent[idx] += 1;
+      sent[idx] += logSentCount(log);
       if (log.tag === "skipped") skipped[idx] += 1;
-      if (log.tag === "failed") failed[idx] += 1;
+      failed[idx] += logFailedCount(log);
     }
   }
 

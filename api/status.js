@@ -2,6 +2,11 @@ import { redis } from "../lib/redis.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { STATUS_API_CACHE_KEY } from "../lib/cacheKeys.js";
+import {
+  decodeStatusCacheValue,
+  encodeStatusCacheValue,
+  hasStatusCacheValue,
+} from "../lib/statusCache.js";
 
 const SOURCE_KEYS = ["ikiru", "shinigami_project", "shinigami_mirror"];
 const STATUS_CACHE_SEC = Number(process.env.STATUS_CACHE_SEC || 30);
@@ -18,18 +23,22 @@ export default async function handler(req, res) {
   const { cacheTtl } = prepared;
 
   try {
-    const cached = await redis.get(STATUS_API_CACHE_KEY);
-    if (cached !== null && cached !== undefined) {
-      return res.json(cached);
+    const rawCached = await redis.get(STATUS_API_CACHE_KEY);
+    if (hasStatusCacheValue(rawCached)) {
+      return res.json(decodeStatusCacheValue(rawCached));
     }
 
     const data = await redis.get("cron:last_run");
     if (!data) {
-      await redis.set(STATUS_API_CACHE_KEY, null, { ex: cacheTtl }).catch(() => {});
+      await redis
+        .set(STATUS_API_CACHE_KEY, encodeStatusCacheValue(null), { ex: cacheTtl })
+        .catch(() => {});
       return res.json(null);
     }
     if (data.sourceHealth) {
-      await redis.set(STATUS_API_CACHE_KEY, data, { ex: cacheTtl }).catch(() => {});
+      await redis
+        .set(STATUS_API_CACHE_KEY, encodeStatusCacheValue(data), { ex: cacheTtl })
+        .catch(() => {});
       return res.json(data);
     }
 
@@ -44,7 +53,9 @@ export default async function handler(req, res) {
       ...data,
       sourceHealth: Object.fromEntries(sourceHealthPairs),
     };
-    await redis.set(STATUS_API_CACHE_KEY, payload, { ex: cacheTtl }).catch(() => {});
+    await redis
+      .set(STATUS_API_CACHE_KEY, encodeStatusCacheValue(payload), { ex: cacheTtl })
+      .catch(() => {});
     return res.json(payload);
   } catch (err) {
     console.error("[last-run] Error:", err);
