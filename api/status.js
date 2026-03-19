@@ -1,14 +1,12 @@
 import { redis } from "../lib/redis.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
-import { STATUS_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import {
-  decodeStatusCacheValue,
-  encodeStatusCacheValue,
-  hasStatusCacheValue,
-} from "../lib/statusCache.js";
+  readStatusCache,
+  writeStatusCache,
+} from "../lib/monitorStore.js";
+import { readCronStatusWithHealth } from "../lib/cronRuntime.js";
 
-const SOURCE_KEYS = ["ikiru", "shinigami_project", "shinigami_mirror"];
 const STATUS_CACHE_SEC = Number(process.env.STATUS_CACHE_SEC || 30);
 
 export default async function handler(req, res) {
@@ -23,39 +21,13 @@ export default async function handler(req, res) {
   const { cacheTtl } = prepared;
 
   try {
-    const rawCached = await redis.get(STATUS_API_CACHE_KEY);
-    if (hasStatusCacheValue(rawCached)) {
-      return res.json(decodeStatusCacheValue(rawCached));
+    const cached = await readStatusCache(redis);
+    if (cached.hit) {
+      return res.json(cached.value);
     }
 
-    const data = await redis.get("cron:last_run");
-    if (!data) {
-      await redis
-        .set(STATUS_API_CACHE_KEY, encodeStatusCacheValue(null), { ex: cacheTtl })
-        .catch(() => {});
-      return res.json(null);
-    }
-    if (data.sourceHealth) {
-      await redis
-        .set(STATUS_API_CACHE_KEY, encodeStatusCacheValue(data), { ex: cacheTtl })
-        .catch(() => {});
-      return res.json(data);
-    }
-
-    const sourceHealthPairs = await Promise.all(
-      SOURCE_KEYS.map(async (source) => {
-        const raw = await redis.get(`source:health:${source}`);
-        return [source, raw ?? null];
-      }),
-    );
-
-    const payload = {
-      ...data,
-      sourceHealth: Object.fromEntries(sourceHealthPairs),
-    };
-    await redis
-      .set(STATUS_API_CACHE_KEY, encodeStatusCacheValue(payload), { ex: cacheTtl })
-      .catch(() => {});
+    const payload = await readCronStatusWithHealth(redis);
+    await writeStatusCache(redis, payload, cacheTtl);
     return res.json(payload);
   } catch (err) {
     console.error("[last-run] Error:", err);

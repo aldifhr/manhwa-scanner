@@ -1,0 +1,418 @@
+import {
+  bucketKeyForDate,
+  countSentLast24h,
+  cooldownText,
+  fmt,
+  getCssVar,
+  logFailedCount,
+  logSentCount,
+  markLabel,
+  parseDateSafe,
+  sourceBadgeClass,
+  sourceDisplayName,
+  sourceName,
+  timeAgo,
+  timelineLabel,
+} from "./dashboard-utils.js";
+
+export function createDashboardRenderer({ state, $, esc }) {
+  function renderTrendChart() {
+    const canvas = $("chartTrend");
+    if (!canvas || !window.Chart) return;
+
+    const range = $("chartRange")?.value || "24h";
+    const now = new Date();
+    const buckets = [];
+    const sent = [];
+    const skipped = [];
+    const failed = [];
+
+    if (range === "7d") {
+      for (let i = 6; i >= 0; i -= 1) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        buckets.push({
+          key: bucketKeyForDate(d),
+          label: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+        });
+        sent.push(0);
+        skipped.push(0);
+        failed.push(0);
+      }
+
+      for (const log of state.logsItems) {
+        const d = parseDateSafe(log?.time);
+        if (!d) continue;
+        const idx = buckets.findIndex((bucket) => bucket.key === bucketKeyForDate(d));
+        if (idx === -1) continue;
+        sent[idx] += logSentCount(log);
+        if (log.tag === "skipped") skipped[idx] += 1;
+        failed[idx] += logFailedCount(log);
+      }
+    } else {
+      for (let i = 23; i >= 0; i -= 1) {
+        const d = new Date(now);
+        d.setHours(now.getHours() - i, 0, 0, 0);
+        buckets.push({
+          key: `${bucketKeyForDate(d)}-${d.getHours()}`,
+          label: `${String(d.getHours()).padStart(2, "0")}:00`,
+        });
+        sent.push(0);
+        skipped.push(0);
+        failed.push(0);
+      }
+
+      for (const log of state.logsItems) {
+        const d = parseDateSafe(log?.time);
+        if (!d) continue;
+        const key = `${bucketKeyForDate(d)}-${d.getHours()}`;
+        const idx = buckets.findIndex((bucket) => bucket.key === key);
+        if (idx === -1) continue;
+        sent[idx] += logSentCount(log);
+        if (log.tag === "skipped") skipped[idx] += 1;
+        failed[idx] += logFailedCount(log);
+      }
+    }
+
+    if (state.trendChart) state.trendChart.destroy();
+    state.trendChart = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: buckets.map((bucket) => bucket.label),
+        datasets: [
+          { label: "sent", data: sent, borderColor: getCssVar("--green", "#1b8f5a"), backgroundColor: "transparent", tension: 0.25 },
+          { label: "skipped", data: skipped, borderColor: getCssVar("--amber", "#b06b17"), backgroundColor: "transparent", tension: 0.25 },
+          { label: "failed", data: failed, borderColor: getCssVar("--red", "#c0392b"), backgroundColor: "transparent", tension: 0.25 },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: getCssVar("--muted", "#777") } } },
+        scales: {
+          x: { ticks: { color: getCssVar("--muted", "#777"), maxTicksLimit: range === "7d" ? 7 : 8 }, grid: { color: "transparent" } },
+          y: { ticks: { color: getCssVar("--muted", "#777"), precision: 0 }, grid: { color: "rgba(120,120,120,.12)" }, beginAtZero: true },
+        },
+      },
+    });
+  }
+
+  function renderSourceChart() {
+    const canvas = $("chartSourceHealth");
+    if (!canvas || !window.Chart) return;
+
+    let ikiru = 0;
+    let project = 0;
+    let mirror = 0;
+    for (const item of state.recentItems) {
+      const source = String(item?.source || "ikiru").toLowerCase();
+      if (source === "shinigami_project") project += 1;
+      else if (source === "shinigami_mirror") mirror += 1;
+      else ikiru += 1;
+    }
+
+    if (state.sourceChart) state.sourceChart.destroy();
+    state.sourceChart = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: ["Ikiru", "Project", "Mirror"],
+        datasets: [
+          {
+            label: "updates",
+            data: [ikiru, project, mirror],
+            backgroundColor: [
+              getCssVar("--green", "#1b8f5a"),
+              getCssVar("--amber", "#b06b17"),
+              getCssVar("--accent-2", "#1b9aaa"),
+            ],
+            borderRadius: 8,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: getCssVar("--muted", "#777") }, grid: { color: "transparent" } },
+          y: { beginAtZero: true, ticks: { color: getCssVar("--muted", "#777"), precision: 0 }, grid: { color: "rgba(120,120,120,.12)" } },
+        },
+      },
+    });
+  }
+
+  function skeleton(ul, n = 4) {
+    ul.innerHTML = Array.from({ length: n }, () => `<li style="padding:10px 12px"><div class="skel"></div></li>`).join("");
+  }
+
+  function skeletonRecent(ul, n = 4) {
+    ul.innerHTML = Array.from({ length: n }, () => `<li style="padding:10px 12px"><div class="skel" style="width:70%"></div></li>`).join("");
+  }
+
+  function renderErr(ul, msg) {
+    ul.innerHTML = `<li class="empty">${esc(msg)} <button class="btn-mini" onclick="loadAll()">retry</button></li>`;
+  }
+
+  function renderLiveHeader(statusData) {
+    $("liveSent").textContent = `S:${statusData?.sent ?? "-"}`;
+    $("liveSkipped").textContent = `K:${statusData?.skipped ?? "-"}`;
+    $("liveFailed").textContent = `F:${statusData?.failed ?? "-"}`;
+    $("liveGuilds").textContent = `G:${statusData?.guilds ?? "-"}`;
+    $("liveDuration").textContent = `D:${statusData?.duration ? `${statusData.duration}s` : "-"}`;
+  }
+
+  function renderStatsExtended(statusData) {
+    const dot = $("statusDot");
+    if (!statusData) {
+      ["statSent", "statSkipped", "statFailed", "statDuration"].forEach((id) => ($(id).textContent = "-"));
+      dot.className = "logo-dot offline";
+      renderLiveHeader(null);
+      return;
+    }
+    $("statSent").textContent = statusData.sent ?? "-";
+    $("statSkipped").textContent = statusData.skipped ?? "-";
+    $("statFailed").textContent = statusData.failed ?? "-";
+    $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "-";
+    dot.className = "logo-dot" + (Number(statusData.failed || 0) > 0 ? " offline" : "");
+    renderLiveHeader(statusData);
+  }
+
+  function renderOverview(statusData, whitelistData, recentData) {
+    const healthEl = $("overviewHealth");
+    const lastRunEl = $("overviewLastRun");
+    const whitelistEl = $("overviewWhitelist");
+    const sent24hEl = $("overviewSent24h");
+
+    if (!statusData) {
+      healthEl.textContent = "-";
+      lastRunEl.textContent = "-";
+      whitelistEl.textContent = "-";
+      sent24hEl.textContent = "-";
+      healthEl.className = "stat-value";
+      return;
+    }
+
+    const degraded = Number(statusData.failed ?? 0) > 0 ||
+      Object.values(statusData.sourceHealth || {}).some((entry) => entry?.status === "degraded");
+    healthEl.textContent = degraded ? "DEGRADED" : "HEALTHY";
+    healthEl.className = `stat-value ${degraded ? "amber" : "green"}`;
+
+    lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
+    whitelistEl.textContent = Array.isArray(whitelistData?.items) ? whitelistData.items.length : "-";
+    sent24hEl.textContent = countSentLast24h(recentData?.items);
+  }
+
+  function renderLastCronResult(statusData, fromManual = false) {
+    const bar = $("lastCronBar");
+    if (!statusData) {
+      $("lastCronSent").textContent = "sent: -";
+      $("lastCronSkipped").textContent = "skipped: -";
+      $("lastCronFailed").textContent = "failed: -";
+      $("lastCronDuration").textContent = "duration: -";
+      $("lastCronOutcome").textContent = "state: -";
+      $("lastCronTime").textContent = "-";
+      bar.className = "hero-card";
+      return;
+    }
+
+    const stateText = statusData.shortCircuitReason
+      ? statusData.shortCircuitReason.replace(/_/g, " ")
+      : statusData.outcome || "ok";
+    $("lastCronSent").textContent = `sent: ${statusData.sent ?? 0}`;
+    $("lastCronSkipped").textContent = `skipped: ${statusData.skipped ?? 0}`;
+    $("lastCronFailed").textContent = `failed: ${statusData.failed ?? 0}`;
+    $("lastCronDuration").textContent = `duration: ${statusData.duration ? `${statusData.duration}s` : "-"}`;
+    $("lastCronOutcome").textContent = `state: ${stateText}`;
+    $("lastCronTime").textContent = `${fromManual ? "manual" : "otomatis"} - ${statusData.timestamp ? timeAgo(statusData.timestamp) : "baru saja"}`;
+    bar.className = "hero-card";
+  }
+
+  function renderSourceHealth(statusData) {
+    const list = $("sourceHealthList");
+    const entries = Object.entries(statusData?.sourceHealth || {});
+    $("sourceHealthCount").textContent = entries.length;
+
+    if (!entries.length) {
+      list.innerHTML = '<li class="empty">Belum ada data source health.</li>';
+      return;
+    }
+
+    list.innerHTML = entries
+      .map(([source, health], index) => {
+        const degraded = health?.status === "degraded";
+        const failures = Number(health?.consecutiveFailures ?? 0);
+        const extra = degraded
+          ? cooldownText(health?.disabledUntil) || "cooldown"
+          : `ok${health?.lastSuccessAt ? ` (${timeAgo(health.lastSuccessAt)})` : ""}`;
+        return `<li class="manga-item">
+          <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
+          <span class="manga-item-title">${esc(sourceDisplayName(source))}<br /><small style="opacity:.7">fail streak: ${failures}${health?.lastError ? ` | ${esc(health.lastError)}` : ""}</small></span>
+          <span class="status-pill ${degraded ? "invalid" : "active"}">${degraded ? "degraded" : "healthy"}</span>
+          <span class="badge">${esc(extra || "-")}</span>
+        </li>`;
+      })
+      .join("");
+  }
+
+  function highlight(text, query) {
+    if (!query) return esc(text);
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(${escaped})`, "gi");
+    return esc(text).replace(re, "<mark>$1</mark>");
+  }
+
+  function applyWhitelistFilter() {
+    const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
+    const sourceFilter = ($("inputWhitelistSource")?.value ?? "").trim().toLowerCase();
+    const list = $("mangaList");
+
+    const entries = state.whitelistItems.map((item, originalIndex) => {
+      const title = typeof item === "string" ? item : item.title;
+      const source = typeof item === "object" ? String(item.source || "ikiru").toLowerCase() : "ikiru";
+      return {
+        item,
+        title,
+        source,
+        titleLower: String(title).toLowerCase(),
+        originalIndex,
+      };
+    });
+
+    if (state.whitelistSortOrder === "az") {
+      entries.sort((a, b) => a.titleLower.localeCompare(b.titleLower));
+    }
+    if (state.whitelistSortOrder === "za") {
+      entries.sort((a, b) => b.titleLower.localeCompare(a.titleLower));
+    }
+
+    const filtered = entries.filter((entry) => {
+      if (query && !entry.titleLower.includes(query)) return false;
+      if (sourceFilter && entry.source !== sourceFilter) return false;
+      return true;
+    });
+
+    $("whitelistCount").textContent = state.whitelistItems.length;
+
+    if (!filtered.length) {
+      list.innerHTML = '<li class="empty">Tidak ada hasil filter.</li>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map((entry, index) => {
+        const { item, title, source, originalIndex } = entry;
+        const url = typeof item === "object" ? item.url : null;
+        const mark = typeof item === "object" ? markLabel(item.mark) : "";
+        const displayIndex = state.whitelistSortOrder === "default" ? originalIndex : index;
+        return `<li class="manga-item" title="${url ? esc(url) : ""}">
+          <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
+          <span class="manga-item-title">${highlight(title, query)}${mark ? ` <span class="badge">${esc(mark)}</span>` : ""}</span>
+          <span class="source-badge ${sourceBadgeClass(source)}">${esc(sourceName(source))}</span>
+          <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
+          <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
+        </li>`;
+      })
+      .join("");
+  }
+
+  function renderWhitelist(data) {
+    state.latestWhitelistData = data ?? state.latestWhitelistData;
+    state.whitelistItems = data?.items ?? [];
+    applyWhitelistFilter();
+  }
+
+  function setSortOrder(order) {
+    state.whitelistSortOrder = order;
+    ["default", "az", "za"].forEach((value) => {
+      const btn = $(`sortBtn_${value}`);
+      if (btn) btn.classList.toggle("active", value === order);
+    });
+    applyWhitelistFilter();
+  }
+
+  function renderTimelineList(ul, items, rowRenderer, getDateValue) {
+    if (!items.length) {
+      ul.innerHTML = '<li class="empty">Belum ada data.</li>';
+      return;
+    }
+
+    let html = "";
+    let lastKey = "";
+    for (const item of items) {
+      const d = parseDateSafe(getDateValue(item));
+      const key = d ? bucketKeyForDate(d) : "unknown";
+      if (key !== lastKey) {
+        html += `<li class="timeline-group">${d ? timelineLabel(d) : "Unknown date"}</li>`;
+        lastKey = key;
+      }
+      html += rowRenderer(item);
+    }
+    ul.innerHTML = html;
+  }
+
+  function renderRecent(data) {
+    const list = $("recentList");
+    state.recentItems = data?.items ?? [];
+    $("recentCount").textContent = state.recentItems.length;
+
+    renderTimelineList(
+      list,
+      state.recentItems,
+      (item) => {
+        const cover = item.cover
+          ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="recent-cover-placeholder" style="display:none">img</div>`
+          : '<div class="recent-cover-placeholder">img</div>';
+        return `<a class="recent-item" href="${item.url ? esc(item.url) : "#"}" target="_blank" rel="noopener">
+          ${cover}
+          <div class="recent-info">
+            <div class="recent-title">${esc(item.title)}</div>
+            <div class="recent-chapter">${esc(item.chapter || "-")} - <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span></div>
+          </div>
+          <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "-"}</span>
+        </a>`;
+      },
+      (item) => item.sentAt,
+    );
+
+    renderSourceChart();
+  }
+
+  function renderLogs(data) {
+    state.logsItems = data?.logs ?? [];
+    const list = $("logList");
+    $("logCount").textContent = `${state.logsItems.length} entries`;
+
+    renderTimelineList(
+      list,
+      state.logsItems,
+      (log) => `<li class="log-item">
+        <span class="log-time">${fmt(new Date(log.time || Date.now()))}</span>
+        <span>${esc(log.message || "-")}</span>
+        <span class="log-tag ${esc(log.tag || "info")}">${esc(log.tag || "info")}</span>
+      </li>`,
+      (log) => log.time,
+    );
+
+    renderTrendChart();
+  }
+
+  function renderSummaryPanels() {
+    renderStatsExtended(state.latestStatusData);
+    renderOverview(state.latestStatusData, state.latestWhitelistData, state.latestRecentData);
+    renderLastCronResult(state.latestStatusData, false);
+    renderSourceHealth(state.latestStatusData);
+  }
+
+  return {
+    applyWhitelistFilter,
+    renderErr,
+    renderLastCronResult,
+    renderLogs,
+    renderRecent,
+    renderSourceChart,
+    renderSummaryPanels,
+    renderTrendChart,
+    renderWhitelist,
+    setSortOrder,
+    skeleton,
+    skeletonRecent,
+  };
+}

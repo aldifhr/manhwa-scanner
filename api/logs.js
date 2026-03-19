@@ -2,6 +2,11 @@ import { redis } from "../lib/redis.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { LOGS_API_CACHE_KEY } from "../lib/cacheKeys.js";
+import {
+  readCronLogs,
+  readObjectCache,
+  writeObjectCache,
+} from "../lib/monitorStore.js";
 
 const LOGS_CACHE_SEC = Number(process.env.LOGS_CACHE_SEC || 120);
 
@@ -17,12 +22,12 @@ export default async function handler(req, res) {
   const { cacheTtl } = prepared;
 
   try {
-    const cached = await redis.get(LOGS_API_CACHE_KEY);
-    if (cached && typeof cached === "object") {
+    const cached = await readObjectCache(redis, LOGS_API_CACHE_KEY);
+    if (cached) {
       return res.status(200).json(cached);
     }
 
-    const raw = await redis.lrange("cron:logs", 0, 49);
+    const raw = await readCronLogs(redis, 0, 49);
     const payload = {
       logs: raw
         .filter(Boolean)
@@ -39,7 +44,7 @@ export default async function handler(req, res) {
         })),
     };
 
-    await redis.set(LOGS_API_CACHE_KEY, payload, { ex: cacheTtl }).catch(() => {});
+    await writeObjectCache(redis, LOGS_API_CACHE_KEY, payload, cacheTtl);
     return res.status(200).json(payload);
   } catch (err) {
     console.error("[logs] Error:", err);

@@ -1,59 +1,72 @@
+import { createDashboardRenderer } from "./dashboard-render.js";
+import {
+  fmt,
+  msToSecondsLabel,
+} from "./dashboard-utils.js";
+
 const API_BASE = "";
 const DEFAULT_POLL_MS = 60_000;
 const DEFAULT_HEAVY_POLL_MS = 300_000;
 const HIDDEN_TAB_MULTIPLIER = 3;
 const FOCUS_REFRESH_COOLDOWN_MS = 30_000;
 const ALLOWED_POLL_MS = [30_000, 60_000, 120_000];
+
 const elementCache = new Map();
 const $ = (id) => {
   if (!elementCache.has(id)) elementCache.set(id, document.getElementById(id));
   return elementCache.get(id);
 };
+const esc = (value) =>
+  String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const TIME_FORMATTER = new Intl.DateTimeFormat("id-ID", {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-});
-const DATE_FORMATTER = new Intl.DateTimeFormat("id-ID", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+const state = {
+  isAuthenticated: false,
+  lightPollTimer: null,
+  heavyPollTimer: null,
+  pollMs: Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS),
+  autoRefreshEnabled: localStorage.getItem("ikiru_auto_refresh") !== "off",
+  isProcessing: false,
+  loadAbortController: null,
+  lightAbortController: null,
+  heavyAbortController: null,
+  lastHeavyLoadAt: 0,
+  lastLightLoadAt: 0,
+  lastFocusRefreshAt: 0,
+  latestStatusData: null,
+  latestWhitelistData: null,
+  latestRecentData: null,
+  whitelistItems: [],
+  whitelistSortOrder: "default",
+  logsItems: [],
+  recentItems: [],
+  trendChart: null,
+  sourceChart: null,
+  pendingDeleteResolver: null,
+};
+if (!ALLOWED_POLL_MS.includes(state.pollMs)) state.pollMs = DEFAULT_POLL_MS;
 
-let isAuthenticated = false;
-let lightPollTimer = null;
-let heavyPollTimer = null;
-let pollMs = Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS);
-if (!ALLOWED_POLL_MS.includes(pollMs)) pollMs = DEFAULT_POLL_MS;
-let autoRefreshEnabled = localStorage.getItem("ikiru_auto_refresh") !== "off";
-let isProcessing = false;
-let loadAbortController = null;
-let lightAbortController = null;
-let heavyAbortController = null;
-let lastHeavyLoadAt = 0;
-let lastLightLoadAt = 0;
-let lastFocusRefreshAt = 0;
-let latestStatusData = null;
-let latestWhitelistData = null;
-let latestRecentData = null;
-let whitelistItems = [];
-let whitelistSortOrder = "default";
-let logsItems = [];
-let recentItems = [];
-let trendChart = null;
-let sourceChart = null;
-let pendingDeleteResolver = null;
-
-const esc = (s) =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const renderer = createDashboardRenderer({ state, $, esc });
+const {
+  applyWhitelistFilter,
+  renderErr,
+  renderLastCronResult,
+  renderLogs,
+  renderRecent,
+  renderSourceChart,
+  renderSummaryPanels,
+  renderTrendChart,
+  renderWhitelist,
+  setSortOrder,
+  skeleton,
+  skeletonRecent,
+} = renderer;
 
 function resolveHeavyPollMs() {
-  return Math.max(DEFAULT_HEAVY_POLL_MS, pollMs * 4);
+  return Math.max(DEFAULT_HEAVY_POLL_MS, state.pollMs * 4);
 }
 
 function currentLightPollMs() {
-  return document.hidden ? pollMs * HIDDEN_TAB_MULTIPLIER : pollMs;
+  return document.hidden ? state.pollMs * HIDDEN_TAB_MULTIPLIER : state.pollMs;
 }
 
 function currentHeavyPollMs() {
@@ -61,685 +74,20 @@ function currentHeavyPollMs() {
   return document.hidden ? base * HIDDEN_TAB_MULTIPLIER : base;
 }
 
-function msToSecondsLabel(ms) {
-  return `${Math.round(ms / 1000)}s`;
-}
-
-function fmt(d) {
-  return TIME_FORMATTER.format(d);
-}
-
-function parseDateSafe(value) {
-  const d = new Date(value || "");
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function dayDiff(a, b) {
-  const one = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
-  const two = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
-  return Math.round((one - two) / 86400000);
-}
-
-function dateKey(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function timelineLabel(d) {
-  const now = new Date();
-  const todayKey = dateKey(now);
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yKey = dateKey(yesterday);
-  const dKey = dateKey(d);
-  if (dKey === todayKey) return "Today";
-  if (dKey === yKey) return "Yesterday";
-  return DATE_FORMATTER.format(d);
-}
-
-function timeAgo(iso) {
-  const d = parseDateSafe(iso);
-  if (!d) return "-";
-  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  const units = [
-    ["hari", 86400],
-    ["jam", 3600],
-    ["menit", 60],
-    ["detik", 1],
-  ];
-  for (const [label, size] of units) {
-    const value = Math.floor(seconds / size);
-    if (value >= 1) return `${value} ${label} lalu`;
-  }
-  return "baru saja";
-}
-
-function countSentLast24h(items) {
-  if (!Array.isArray(items)) return 0;
-  const cutoff = Date.now() - 24 * 3600 * 1000;
-  return items.filter((i) => {
-    const d = parseDateSafe(i?.sentAt);
-    return d && d.getTime() >= cutoff;
-  }).length;
-}
-
-function toRecentSourceFamily(source) {
-  const s = String(source || "").toLowerCase().trim();
-  if (s === "shinigami_mirror") return "Mirror";
-  if (s === "shinigami_project" || s === "shinigami") return "Project";
-  return "Ikiru";
-}
-
-function sourceName(source) {
-  const s = String(source || "").toLowerCase().trim();
-  if (s === "shinigami_project") return "Project";
-  if (s === "shinigami_mirror") return "Mirror";
-  if (s === "shinigami") return "Shinigami";
-  return "Ikiru";
-}
-
-function sourceBadgeClass(source) {
-  const s = String(source || "").toLowerCase().trim();
-  return s === "ikiru" ? "source-ikiru" : "source-shinigami";
-}
-
-function sourceDisplayName(source) {
-  const s = String(source || "").toLowerCase().trim();
-  if (s === "shinigami_project") return "Shinigami (Project)";
-  if (s === "shinigami_mirror") return "Shinigami (Mirror)";
-  return "Ikiru";
-}
-
-function normalizeTitleKey(value = "") {
-  return String(value).toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-}
-
-function clampList(items, max = 6) {
-  return Array.isArray(items) ? items.slice(0, max) : [];
-}
-
-function safeText(value, fallback = "-") {
-  const text = String(value ?? "").trim();
-  return text || fallback;
-}
-
-function renderSimpleList(listId, countId, items, emptyText, renderer) {
-  const list = $(listId);
-  const badge = $(countId);
-  if (badge) badge.textContent = Array.isArray(items) ? items.length : 0;
-  if (!list) return;
-  const card = list.closest(".card");
-  const grid = card?.parentElement;
-  const syncGrid = () => {
-    if (!grid?.classList?.contains("two-col")) return;
-    const cards = [...grid.querySelectorAll(":scope > .card")];
-    const visibleCards = cards.filter((entry) => !entry.classList.contains("is-empty-card"));
-    cards.forEach((entry) => entry.classList.remove("card-full"));
-    if (visibleCards.length === 1) visibleCards[0].classList.add("card-full");
-  };
-  if (!Array.isArray(items) || !items.length) {
-    if (card) card.classList.add("is-empty-card");
-    syncGrid();
-    list.innerHTML = `<li class="empty">${esc(emptyText)}</li>`;
-    return;
-  }
-  if (card) card.classList.remove("is-empty-card");
-  syncGrid();
-  list.innerHTML = items.map(renderer).join("");
-}
-
-function sourceReliabilityScore(source, health, logs) {
-  let score = 100;
-  const failures = Number(health?.consecutiveFailures ?? 0);
-  if (health?.status === "degraded") score -= 35;
-  score -= Math.min(25, failures * 8);
-  if (health?.lastError) score -= 8;
-
-  const sourceNameLower = String(source || "").toLowerCase();
-  const failedLogHits = (Array.isArray(logs) ? logs : []).filter((log) => {
-    const text = `${log?.message || ""} ${log?.title || ""}`.toLowerCase();
-    return log?.tag === "failed" && text.includes(sourceNameLower.replace("_", " "));
-  }).length;
-  score -= Math.min(18, failedLogHits * 6);
-
-  return Math.max(0, Math.min(100, score));
-}
-
-function classifyErrorBucket(message = "", source = "", code = "", type = "") {
-  const normalizedCode = String(code || "").toLowerCase().trim();
-  const normalizedType = String(type || "").toLowerCase().trim();
-  if (normalizedCode) return normalizedCode;
-  if (normalizedType) return normalizedType;
-  const text = `${message} ${source}`.toLowerCase();
-  if (!text.trim()) return null;
-  if (text.includes(" 403") || text.includes("forbidden")) return "discord_403";
-  if (text.includes(" 404") || text.includes("not found")) return "discord_404";
-  if (text.includes(" 429") || text.includes("rate limit")) return "discord_429";
-  if (text.includes("timeout") || text.includes("timed out") || text.includes("etimedout")) return "source_timeout";
-  if (text.includes("parse") || text.includes("selector") || text.includes("cheerio")) return "source_parse";
-  if (text.includes("redis")) return "redis_error";
-  if (text.includes("send failed") || text.includes("all guilds failed") || text.includes("failed")) return "failed_send";
-  if (text.includes("degraded")) return "degraded_source";
-  return "other";
-}
-
-function errorBucketLabel(key = "") {
-  if (key === "discord_403") return "Discord 403";
-  if (key === "discord_404") return "Discord 404";
-  if (key === "discord_429") return "Discord 429";
-  if (key === "source_timeout") return "Source Timeout";
-  if (key === "source_parse") return "Source Parse";
-  if (key === "redis_error") return "Redis Error";
-  if (key === "failed_send") return "Failed Send";
-  if (key === "degraded_source") return "Degraded Source";
-  return "Other Error";
-}
-
-function errorBucketSeverity(key = "") {
-  if (key === "discord_429" || key === "redis_error") return "invalid";
-  if (key === "source_timeout" || key === "failed_send" || key === "degraded_source") return "";
-  return "active";
-}
-
-function logSentCount(log) {
-  const count = Number(log?.count);
-  if (log?.tag === "sent" || log?.tag === "partial") {
-    return Number.isFinite(count) && count > 0 ? count : 1;
-  }
-  return 0;
-}
-
-function logFailedCount(log) {
-  const failed = Number(log?.failed);
-  if (log?.tag === "partial") {
-    return Number.isFinite(failed) && failed > 0 ? failed : 0;
-  }
-  if (log?.tag === "failed") {
-    return Number.isFinite(failed) && failed > 0 ? failed : 1;
-  }
-  return 0;
-}
-
-function deriveInsights({
-  statusData,
-  whitelistData,
-  recentData,
-  logsData,
-  compareData,
-}) {
-  const whitelist = Array.isArray(whitelistData?.items) ? whitelistData.items : [];
-  const recent = Array.isArray(recentData?.items) ? recentData.items : [];
-  const logs = Array.isArray(logsData?.logs) ? logsData.logs : [];
-  const comparisons = Array.isArray(compareData?.comparisons) ? compareData.comparisons : [];
-
-  const titleBuckets = new Map();
-  for (const item of recent) {
-    const title = safeText(item?.title, "Untitled");
-    const key = normalizeTitleKey(title);
-    const ts = parseDateSafe(item?.sentAt)?.getTime() || 0;
-    if (!titleBuckets.has(key)) {
-      titleBuckets.set(key, {
-        title,
-        count: 0,
-        lastSeenAt: item?.sentAt || null,
-        sourceCounts: { Ikiru: 0, Project: 0, Mirror: 0 },
-        timestamps: [],
-      });
-    }
-    const bucket = titleBuckets.get(key);
-    bucket.count += 1;
-    if (ts && (!bucket.lastSeenAt || ts > parseDateSafe(bucket.lastSeenAt)?.getTime())) {
-      bucket.lastSeenAt = item?.sentAt || bucket.lastSeenAt;
-    }
-    bucket.sourceCounts[toRecentSourceFamily(item?.source)] += 1;
-    if (item?.sentAt) bucket.timestamps.push(item.sentAt);
-  }
-
-  const topTitles = [...titleBuckets.values()]
-    .sort((a, b) => b.count - a.count || safeText(a.title).localeCompare(safeText(b.title)))
-    .slice(0, 8);
-
-  const hourBuckets = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
-  for (const item of recent) {
-    const d = parseDateSafe(item?.sentAt);
-    if (!d) continue;
-    hourBuckets[d.getHours()].count += 1;
-  }
-  const peakHour = hourBuckets.reduce((best, current) => (current.count > best.count ? current : best), { hour: 0, count: 0 });
-
-  const uniqueDays = [...new Set(recent
-    .map((item) => parseDateSafe(item?.sentAt))
-    .filter(Boolean)
-    .map((d) => dateKey(d)))].sort().reverse();
-  let activityStreak = 0;
-  if (uniqueDays.length) {
-    let cursor = parseDateSafe(uniqueDays[0]);
-    for (const key of uniqueDays) {
-      const current = parseDateSafe(key);
-      if (!current || !cursor) break;
-      if (dayDiff(cursor, current) === 0) {
-        activityStreak += 1;
-        const next = new Date(cursor);
-        next.setDate(next.getDate() - 1);
-        cursor = next;
-      } else {
-        break;
-      }
-    }
-  }
-
-  const compareBuckets = new Map();
-  for (const item of comparisons) {
-    const key = normalizeTitleKey(item?.title || "");
-    if (!key) continue;
-    if (!compareBuckets.has(key)) {
-      compareBuckets.set(key, {
-        title: safeText(item?.title, "Untitled"),
-        total: 0,
-        ikiruWins: 0,
-        shinigamiWins: 0,
-        ties: 0,
-        avgDeltaMinutes: 0,
-      });
-    }
-    const bucket = compareBuckets.get(key);
-    bucket.total += 1;
-    bucket.avgDeltaMinutes += Number(item?.deltaMinutes ?? 0);
-    if (item?.winner === "ikiru") bucket.ikiruWins += 1;
-    else if (item?.winner === "shinigami") bucket.shinigamiWins += 1;
-    else bucket.ties += 1;
-  }
-  const compareLeaderboard = [...compareBuckets.values()]
-    .map((item) => ({ ...item, avgDeltaMinutes: Math.round(item.avgDeltaMinutes / Math.max(1, item.total)) }))
-    .sort((a, b) => b.total - a.total || b.shinigamiWins - a.shinigamiWins || a.title.localeCompare(b.title))
-    .slice(0, 8);
-
-  const lastSeenByTitle = new Map();
-  for (const item of recent) {
-    const key = normalizeTitleKey(item?.title || "");
-    const seenAt = parseDateSafe(item?.sentAt);
-    if (!key || !seenAt) continue;
-    const current = lastSeenByTitle.get(key);
-    if (!current || seenAt.getTime() > current.seenAt.getTime()) {
-      lastSeenByTitle.set(key, {
-        title: safeText(item?.title, "Untitled"),
-        seenAt,
-        source: item?.source || "ikiru",
-        chapter: safeText(item?.chapter, "-"),
-      });
-    }
-  }
-
-  const whitelistTitleBuckets = new Map();
-  for (const item of whitelist) {
-    const title = safeText(item?.title, "Untitled");
-    const key = normalizeTitleKey(title);
-    if (!key) continue;
-    if (!whitelistTitleBuckets.has(key)) {
-      whitelistTitleBuckets.set(key, {
-        title,
-        sources: new Set(),
-        marks: new Set(),
-      });
-    }
-    const bucket = whitelistTitleBuckets.get(key);
-    bucket.sources.add(item?.source || "ikiru");
-    if (item?.mark) bucket.marks.add(item.mark);
-  }
-
-  const whitelistLastSeen = [...whitelistTitleBuckets.entries()]
-    .map(([key, bucket]) => {
-      const hit = lastSeenByTitle.get(key);
-      const sources = [...bucket.sources];
-      const marks = [...bucket.marks];
-      return {
-        title: bucket.title,
-        source: sources[0] || "ikiru",
-        sourceSummary: sources.map((source) => sourceName(source)).join(", "),
-        sourceCount: sources.length,
-        mark: marks[0] || null,
-        markCount: marks.length,
-        lastSeenAt: hit?.seenAt?.toISOString?.() || null,
-        chapter: hit?.chapter || null,
-      };
-    })
-    .sort((a, b) => {
-      const ta = parseDateSafe(a.lastSeenAt)?.getTime() ?? 0;
-      const tb = parseDateSafe(b.lastSeenAt)?.getTime() ?? 0;
-      return tb - ta || a.title.localeCompare(b.title);
-    });
-
-  const missedDetector = whitelistLastSeen
-    .filter((item) => !item.lastSeenAt)
-    .slice(0, 10);
-
-  const whitelistHealth = whitelistLastSeen
-    .map((item) => ({
-      ...item,
-      health: whitelistHealthStatus(item),
-    }))
-    .sort((a, b) => {
-      const rank = { unseen: 0, stale: 1, cooling: 2, active: 3 };
-      return rank[a.health] - rank[b.health] ||
-        ((parseDateSafe(a.lastSeenAt)?.getTime() ?? 0) - (parseDateSafe(b.lastSeenAt)?.getTime() ?? 0)) ||
-        a.title.localeCompare(b.title);
-    });
-  const whitelistHealthSummary = whitelistHealth.reduce((acc, item) => {
-    acc.total += 1;
-    acc[item.health] += 1;
-    if (item.mark) acc.marked += 1;
-    return acc;
-  }, {
-    total: 0,
-    active: 0,
-    cooling: 0,
-    stale: 0,
-    unseen: 0,
-    marked: 0,
-  });
-
-  const sourceReliability = Object.entries(statusData?.sourceHealth || {})
-    .map(([source, health]) => ({
-      source,
-      label: sourceDisplayName(source),
-      score: sourceReliabilityScore(source, health, logs),
-      status: health?.status || "unknown",
-      consecutiveFailures: Number(health?.consecutiveFailures ?? 0),
-      lastSuccessAt: health?.lastSuccessAt || null,
-      lastError: health?.lastError || null,
-    }))
-    .sort((a, b) => b.score - a.score);
-
-  const failedMonitor = logs
-    .filter((log) => logFailedCount(log) > 0)
-    .slice(0, 10)
-    .map((log) => ({
-      title: safeText(log?.title || log?.message, "Unknown failure"),
-      message: safeText(log?.message, "-"),
-      time: log?.time || null,
-    }));
-
-  const sourceMixMap = new Map();
-  for (const item of recent) {
-    const label = toRecentSourceFamily(item?.source);
-    sourceMixMap.set(label, (sourceMixMap.get(label) || 0) + 1);
-  }
-  const sourceMix = [...sourceMixMap.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const errorBucketsMap = new Map();
-  const pushBucket = ({ bucketKey, message, sourceLabel, time }) => {
-    if (!bucketKey) return;
-    if (!errorBucketsMap.has(bucketKey)) {
-      errorBucketsMap.set(bucketKey, {
-        key: bucketKey,
-        label: errorBucketLabel(bucketKey),
-        count: 0,
-        lastSeenAt: null,
-        sample: null,
-        sourceLabel: null,
-      });
-    }
-    const bucket = errorBucketsMap.get(bucketKey);
-    bucket.count += 1;
-    const timeValue = parseDateSafe(time)?.getTime() ?? 0;
-    const currentValue = parseDateSafe(bucket.lastSeenAt)?.getTime() ?? 0;
-    if (!bucket.lastSeenAt || timeValue >= currentValue) {
-      bucket.lastSeenAt = time || bucket.lastSeenAt;
-      bucket.sample = message || bucket.sample;
-      bucket.sourceLabel = sourceLabel || bucket.sourceLabel;
-    }
-  };
-
-  for (const log of logs) {
-    const message = safeText(log?.message, "");
-    const bucketKey = classifyErrorBucket(
-      message,
-      log?.source || log?.title || "",
-      log?.code || "",
-      log?.type || "",
-    );
-    if (!bucketKey || log?.tag === "sent") continue;
-    pushBucket({
-      bucketKey,
-      message,
-      sourceLabel: safeText(log?.source || log?.title || log?.tag, ""),
-      time: log?.time || null,
-    });
-  }
-
-  for (const [source, health] of Object.entries(statusData?.sourceHealth || {})) {
-    if (!health?.lastError && health?.status !== "degraded") continue;
-    pushBucket({
-      bucketKey: classifyErrorBucket(health?.lastError || health?.status || "", source),
-      message: safeText(health?.lastError || health?.status, "unknown issue"),
-      sourceLabel: sourceDisplayName(source),
-      time: health?.lastFailureAt || health?.disabledUntil || health?.lastSuccessAt || null,
-    });
-  }
-
-  const errorBuckets = [...errorBucketsMap.values()]
-    .sort((a, b) => b.count - a.count || (parseDateSafe(b.lastSeenAt)?.getTime() ?? 0) - (parseDateSafe(a.lastSeenAt)?.getTime() ?? 0))
-    .slice(0, 8);
-
-  return {
-    activityStreak,
-    peakHour,
-    topTitles,
-    compareLeaderboard,
-    whitelistLastSeen: whitelistLastSeen.slice(0, 10),
-    whitelistHealth: whitelistHealth.slice(0, 12),
-    whitelistHealthSummary,
-    missedDetector,
-    sourceReliability,
-    failedMonitor,
-    errorBuckets,
-    sourceMix,
-    missedCount: missedDetector.length,
-    failCount: failedMonitor.length,
-  };
-}
-
-function normalizeMarkReason(value = "") {
-  const key = String(value).toLowerCase().trim().replace(/\s+/g, "_");
-  if (key === "hiatus" || key === "end_season" || key === "end") return key;
-  return "";
-}
-
-function markLabel(mark) {
-  const key = normalizeMarkReason(mark);
-  if (key === "hiatus") return "Hiatus";
-  if (key === "end_season") return "End Season";
-  if (key === "end") return "End";
-  return "";
-}
-
-function cooldownText(disabledUntil) {
-  const target = parseDateSafe(disabledUntil);
-  if (!target) return null;
-  const mins = Math.ceil((target.getTime() - Date.now()) / 60000);
-  if (mins <= 0) return "retry now";
-  return `retry ${mins}m`;
-}
-
-function ttlLabel(ttl) {
-  if (ttl === null || ttl === undefined) return "-";
-  if (ttl === -1) return "no-expiry";
-  if (ttl === -2) return "missing";
-  if (ttl < 60) return `${ttl}s`;
-  if (ttl < 3600) return `${Math.round(ttl / 60)}m`;
-  if (ttl < 86400) return `${Math.round(ttl / 3600)}h`;
-  return `${Math.round(ttl / 86400)}d`;
-}
-
-function whitelistHealthStatus(item) {
-  const lastSeen = parseDateSafe(item?.lastSeenAt);
-  if (!lastSeen) return "unseen";
-  const ageMs = Date.now() - lastSeen.getTime();
-  if (ageMs >= 7 * 24 * 3600 * 1000) return "stale";
-  if (ageMs >= 3 * 24 * 3600 * 1000) return "cooling";
-  return "active";
-}
-
-function getCssVar(name, fallback) {
-  const v = getComputedStyle(document.body).getPropertyValue(name).trim();
-  return v || fallback;
-}
-
-function ensureChartsDestroyed() {
-  if (trendChart) {
-    trendChart.destroy();
-    trendChart = null;
-  }
-  if (sourceChart) {
-    sourceChart.destroy();
-    sourceChart = null;
-  }
-}
-
-function renderTrendChart() {
-  const canvas = $("chartTrend");
-  if (!canvas || !window.Chart) return;
-
-  const range = $("chartRange")?.value || "24h";
-  const now = new Date();
-  let buckets = [];
-  const sent = [];
-  const skipped = [];
-  const failed = [];
-
-  if (range === "7d") {
-    for (let i = 6; i >= 0; i -= 1) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      buckets.push({
-        key: dateKey(d),
-        label: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
-      });
-      sent.push(0);
-      skipped.push(0);
-      failed.push(0);
-    }
-
-    for (const log of logsItems) {
-      const d = parseDateSafe(log?.time);
-      if (!d) continue;
-      const idx = buckets.findIndex((b) => b.key === dateKey(d));
-      if (idx === -1) continue;
-      sent[idx] += logSentCount(log);
-      if (log.tag === "skipped") skipped[idx] += 1;
-      failed[idx] += logFailedCount(log);
-    }
-  } else {
-    for (let i = 23; i >= 0; i -= 1) {
-      const d = new Date(now);
-      d.setHours(now.getHours() - i, 0, 0, 0);
-      buckets.push({
-        key: `${dateKey(d)}-${d.getHours()}`,
-        label: `${String(d.getHours()).padStart(2, "0")}:00`,
-      });
-      sent.push(0);
-      skipped.push(0);
-      failed.push(0);
-    }
-
-    for (const log of logsItems) {
-      const d = parseDateSafe(log?.time);
-      if (!d) continue;
-      const key = `${dateKey(d)}-${d.getHours()}`;
-      const idx = buckets.findIndex((b) => b.key === key);
-      if (idx === -1) continue;
-      sent[idx] += logSentCount(log);
-      if (log.tag === "skipped") skipped[idx] += 1;
-      failed[idx] += logFailedCount(log);
-    }
-  }
-
-  if (trendChart) trendChart.destroy();
-  trendChart = new Chart(canvas, {
-    type: "line",
-    data: {
-      labels: buckets.map((b) => b.label),
-      datasets: [
-        { label: "sent", data: sent, borderColor: getCssVar("--green", "#1b8f5a"), backgroundColor: "transparent", tension: 0.25 },
-        { label: "skipped", data: skipped, borderColor: getCssVar("--amber", "#b06b17"), backgroundColor: "transparent", tension: 0.25 },
-        { label: "failed", data: failed, borderColor: getCssVar("--red", "#c0392b"), backgroundColor: "transparent", tension: 0.25 },
-      ],
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: getCssVar("--muted", "#777") } } },
-      scales: {
-        x: { ticks: { color: getCssVar("--muted", "#777"), maxTicksLimit: range === "7d" ? 7 : 8 }, grid: { color: "transparent" } },
-        y: { ticks: { color: getCssVar("--muted", "#777"), precision: 0 }, grid: { color: "rgba(120,120,120,.12)" }, beginAtZero: true },
-      },
-    },
-  });
-}
-
-function renderSourceChart() {
-  const canvas = $("chartSourceHealth");
-  if (!canvas || !window.Chart) return;
-
-  let ikiru = 0;
-  let project = 0;
-  let mirror = 0;
-  for (const item of recentItems) {
-    const s = String(item?.source || "ikiru").toLowerCase();
-    if (s === "shinigami_project") project += 1;
-    else if (s === "shinigami_mirror") mirror += 1;
-    else ikiru += 1;
-  }
-
-  if (sourceChart) sourceChart.destroy();
-  sourceChart = new Chart(canvas, {
-    type: "bar",
-    data: {
-      labels: ["Ikiru", "Project", "Mirror"],
-      datasets: [
-        {
-          label: "updates",
-          data: [ikiru, project, mirror],
-          backgroundColor: [
-            getCssVar("--green", "#1b8f5a"),
-            getCssVar("--amber", "#b06b17"),
-            getCssVar("--accent-2", "#1b9aaa"),
-          ],
-          borderRadius: 8,
-        },
-      ],
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: getCssVar("--muted", "#777") }, grid: { color: "transparent" } },
-        y: { beginAtZero: true, ticks: { color: getCssVar("--muted", "#777"), precision: 0 }, grid: { color: "rgba(120,120,120,.12)" } },
-      },
-    },
-  });
-}
-
-function skeleton(ul, n = 4) {
-  ul.innerHTML = Array.from({ length: n }, () => `<li style="padding:10px 12px"><div class="skel"></div></li>`).join("");
-}
-
-function skeletonRecent(ul, n = 4) {
-  ul.innerHTML = Array.from({ length: n }, () => `<li style="padding:10px 12px"><div class="skel" style="width:70%"></div></li>`).join("");
-}
-
-function showAlert(msg) {
+function showAlert(message) {
   const el = $("alertBox");
+  if (!el) return;
   el.style.display = "block";
-  el.textContent = msg;
+  el.textContent = message;
   setTimeout(() => {
     el.style.display = "none";
   }, 8000);
-  showToast(msg, "warn");
+  showToast(message, "warn");
 }
 
 function clearAlert() {
-  $("alertBox").style.display = "none";
+  const el = $("alertBox");
+  if (el) el.style.display = "none";
 }
 
 function showToast(message, type = "success", timeoutMs = 2600) {
@@ -759,124 +107,15 @@ function openDeleteConfirm(title) {
   text.textContent = `Yakin ingin menghapus "${title}" dari whitelist?`;
   overlay.classList.add("show");
   return new Promise((resolve) => {
-    pendingDeleteResolver = resolve;
+    state.pendingDeleteResolver = resolve;
   });
 }
 
 function resolveDeleteConfirm(accepted) {
   const overlay = $("deleteConfirmOverlay");
   if (overlay) overlay.classList.remove("show");
-  if (pendingDeleteResolver) pendingDeleteResolver(Boolean(accepted));
-  pendingDeleteResolver = null;
-}
-
-function renderErr(ul, msg) {
-  ul.innerHTML = `<li class="empty">${esc(msg)} <button class="btn-mini" onclick="loadAll()">retry</button></li>`;
-}
-
-function renderLiveHeader(statusData) {
-  $("liveSent").textContent = `S:${statusData?.sent ?? "-"}`;
-  $("liveSkipped").textContent = `K:${statusData?.skipped ?? "-"}`;
-  $("liveFailed").textContent = `F:${statusData?.failed ?? "-"}`;
-  $("liveGuilds").textContent = `G:${statusData?.guilds ?? "-"}`;
-  $("liveDuration").textContent = `D:${statusData?.duration ? `${statusData.duration}s` : "-"}`;
-}
-
-function renderStatsExtended(statusData) {
-  const dot = $("statusDot");
-  if (!statusData) {
-    ["statSent", "statSkipped", "statFailed", "statDuration"].forEach((id) => ($(id).textContent = "-"));
-    dot.className = "logo-dot offline";
-    renderLiveHeader(null);
-    return;
-  }
-  $("statSent").textContent = statusData.sent ?? "-";
-  $("statSkipped").textContent = statusData.skipped ?? "-";
-  $("statFailed").textContent = statusData.failed ?? "-";
-  $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "-";
-  dot.className = "logo-dot" + (Number(statusData.failed || 0) > 0 ? " offline" : "");
-  renderLiveHeader(statusData);
-}
-
-function renderOverview(statusData, whitelistData, recentData) {
-  const healthEl = $("overviewHealth");
-  const lastRunEl = $("overviewLastRun");
-  const whitelistEl = $("overviewWhitelist");
-  const sent24hEl = $("overviewSent24h");
-
-  if (!statusData) {
-    healthEl.textContent = "-";
-    lastRunEl.textContent = "-";
-    whitelistEl.textContent = "-";
-    sent24hEl.textContent = "-";
-    healthEl.className = "stat-value";
-    return;
-  }
-
-  const degraded = Number(statusData.failed ?? 0) > 0 || Object.values(statusData.sourceHealth || {}).some((s) => s?.status === "degraded");
-  healthEl.textContent = degraded ? "DEGRADED" : "HEALTHY";
-  healthEl.className = `stat-value ${degraded ? "amber" : "green"}`;
-
-  lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
-  whitelistEl.textContent = Array.isArray(whitelistData?.items) ? whitelistData.items.length : "-";
-  sent24hEl.textContent = countSentLast24h(recentData?.items);
-}
-
-function renderLastCronResult(statusData, fromManual = false) {
-  const bar = $("lastCronBar");
-  if (!statusData) {
-    $("lastCronSent").textContent = "sent: -";
-    $("lastCronSkipped").textContent = "skipped: -";
-    $("lastCronFailed").textContent = "failed: -";
-    $("lastCronDuration").textContent = "duration: -";
-    $("lastCronOutcome").textContent = "state: -";
-    $("lastCronTime").textContent = "-";
-    bar.className = "hero-card";
-    return;
-  }
-
-  const stateText = statusData.shortCircuitReason
-    ? statusData.shortCircuitReason.replace(/_/g, " ")
-    : statusData.outcome || "ok";
-  $("lastCronSent").textContent = `sent: ${statusData.sent ?? 0}`;
-  $("lastCronSkipped").textContent = `skipped: ${statusData.skipped ?? 0}`;
-  $("lastCronFailed").textContent = `failed: ${statusData.failed ?? 0}`;
-  $("lastCronDuration").textContent = `duration: ${statusData.duration ? `${statusData.duration}s` : "-"}`;
-  $("lastCronOutcome").textContent = `state: ${stateText}`;
-  $("lastCronTime").textContent = `${fromManual ? "manual" : "otomatis"} - ${statusData.timestamp ? timeAgo(statusData.timestamp) : "baru saja"}`;
-  bar.className = "hero-card";
-}
-
-function renderSourceHealth(statusData) {
-  const list = $("sourceHealthList");
-  const entries = Object.entries(statusData?.sourceHealth || {});
-  $("sourceHealthCount").textContent = entries.length;
-
-  if (!entries.length) {
-    list.innerHTML = '<li class="empty">Belum ada data source health.</li>';
-    return;
-  }
-
-  list.innerHTML = entries
-    .map(([source, health], i) => {
-      const degraded = health?.status === "degraded";
-      const failures = Number(health?.consecutiveFailures ?? 0);
-      const extra = degraded ? cooldownText(health?.disabledUntil) || "cooldown" : `ok${health?.lastSuccessAt ? ` (${timeAgo(health.lastSuccessAt)})` : ""}`;
-      return `<li class="manga-item">
-        <span class="manga-index">${String(i + 1).padStart(2, "0")}</span>
-        <span class="manga-item-title">${esc(sourceDisplayName(source))}<br /><small style="opacity:.7">fail streak: ${failures}${health?.lastError ? ` | ${esc(health.lastError)}` : ""}</small></span>
-        <span class="status-pill ${degraded ? "invalid" : "active"}">${degraded ? "degraded" : "healthy"}</span>
-        <span class="badge">${esc(extra || "-")}</span>
-      </li>`;
-    })
-    .join("");
-}
-
-function highlight(text, query) {
-  if (!query) return esc(text);
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(${escaped})`, "gi");
-  return esc(text).replace(re, "<mark>$1</mark>");
+  if (state.pendingDeleteResolver) state.pendingDeleteResolver(Boolean(accepted));
+  state.pendingDeleteResolver = null;
 }
 
 function copyUrl(url) {
@@ -890,207 +129,53 @@ function copyUrl(url) {
   );
 }
 
-function applyWhitelistFilter() {
-  const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
-  const sourceFilter = ($("inputWhitelistSource")?.value ?? "").trim().toLowerCase();
-  const list = $("mangaList");
-
-  const entries = whitelistItems.map((item, originalIndex) => {
-    const title = typeof item === "string" ? item : item.title;
-    const source = typeof item === "object" ? String(item.source || "ikiru").toLowerCase() : "ikiru";
-    return {
-      item,
-      title,
-      source,
-      titleLower: String(title).toLowerCase(),
-      originalIndex,
-    };
-  });
-
-  if (whitelistSortOrder === "az") entries.sort((a, b) => a.titleLower.localeCompare(b.titleLower));
-  if (whitelistSortOrder === "za") entries.sort((a, b) => b.titleLower.localeCompare(a.titleLower));
-
-  const filtered = entries.filter((entry) => {
-    if (query && !entry.titleLower.includes(query)) return false;
-    if (sourceFilter && entry.source !== sourceFilter) return false;
-    return true;
-  });
-
-  $("whitelistCount").textContent = whitelistItems.length;
-
-  if (!filtered.length) {
-    list.innerHTML = '<li class="empty">Tidak ada hasil filter.</li>';
-    return;
-  }
-
-  list.innerHTML = filtered
-    .map((entry, idx) => {
-      const { item, title, source, originalIndex } = entry;
-      const url = typeof item === "object" ? item.url : null;
-      const mark = typeof item === "object" ? markLabel(item.mark) : "";
-      const sourceLabel = sourceName(source);
-      const badgeClass = sourceBadgeClass(source);
-      const displayIndex = whitelistSortOrder === "default" ? originalIndex : idx;
-      return `<li class="manga-item" title="${url ? esc(url) : ""}">
-        <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
-        <span class="manga-item-title">${highlight(title, query)}${mark ? ` <span class="badge">${esc(mark)}</span>` : ""}</span>
-        <span class="source-badge ${badgeClass}">${esc(sourceLabel)}</span>
-        <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
-        <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
-      </li>`;
-    })
-    .join("");
-}
-
-function renderWhitelist(data) {
-  latestWhitelistData = data ?? latestWhitelistData;
-  whitelistItems = data?.items ?? [];
-  applyWhitelistFilter();
-}
-
-function setSortOrder(order) {
-  whitelistSortOrder = order;
-  ["default", "az", "za"].forEach((o) => {
-    const btn = $(`sortBtn_${o}`);
-    if (btn) btn.classList.toggle("active", o === order);
-  });
-  applyWhitelistFilter();
-}
-
-function renderTimelineList(ul, items, rowRenderer, getDateValue) {
-  if (!items.length) {
-    ul.innerHTML = '<li class="empty">Belum ada data.</li>';
-    return;
-  }
-
-  let html = "";
-  let lastKey = "";
-  for (const item of items) {
-    const d = parseDateSafe(getDateValue(item));
-    const key = d ? dateKey(d) : "unknown";
-    if (key !== lastKey) {
-      html += `<li class="timeline-group">${d ? timelineLabel(d) : "Unknown date"}</li>`;
-      lastKey = key;
-    }
-    html += rowRenderer(item);
-  }
-  ul.innerHTML = html;
-}
-
-function renderRecent(data) {
-  const list = $("recentList");
-  recentItems = data?.items ?? [];
-  $("recentCount").textContent = recentItems.length;
-
-  renderTimelineList(
-    list,
-    recentItems,
-    (item) => {
-      const cover = item.cover
-        ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="recent-cover-placeholder" style="display:none">img</div>`
-        : '<div class="recent-cover-placeholder">img</div>';
-      return `<a class="recent-item" href="${item.url ? esc(item.url) : "#"}" target="_blank" rel="noopener">
-        ${cover}
-        <div class="recent-info">
-          <div class="recent-title">${esc(item.title)}</div>
-          <div class="recent-chapter">${esc(item.chapter || "-")} - <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span></div>
-        </div>
-        <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "-"}</span>
-      </a>`;
-    },
-    (item) => item.sentAt,
-  );
-
-  renderSourceChart();
-}
-
-function renderLogs(data) {
-  logsItems = data?.logs ?? [];
-  const list = $("logList");
-  $("logCount").textContent = `${logsItems.length} entries`;
-
-  renderTimelineList(
-    list,
-    logsItems,
-    (log) => `<li class="log-item">
-      <span class="log-time">${fmt(new Date(log.time || Date.now()))}</span>
-      <span>${esc(log.message || "-")}</span>
-      <span class="log-tag ${esc(log.tag || "info")}">${esc(log.tag || "info")}</span>
-    </li>`,
-    (log) => log.time,
-  );
-
-  renderTrendChart();
-}
-
 async function addManga() {
   const titleInput = $("inputMangaTitle");
   const urlInput = $("inputMangaUrl");
   const btn = $("btnAddManga");
-  const title = titleInput.value.trim();
-  const url = urlInput.value.trim();
+  const title = titleInput?.value.trim() || "";
+  const url = urlInput?.value.trim() || "";
 
   if (!title) {
-    titleInput.focus();
+    titleInput?.focus();
     return;
   }
 
-  isProcessing = true;
-  btn.disabled = true;
-  btn.textContent = "...";
+  state.isProcessing = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "...";
+  }
 
   try {
-    const r = await fetch(`${API_BASE}/api/whitelist`, {
+    const response = await fetch(`${API_BASE}/api/whitelist`, {
       method: "POST",
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, url: url || null }),
     });
-    const data = await r.json();
-    if (!r.ok) {
+    const data = await response.json();
+    if (!response.ok) {
       showAlert(data.error || "Gagal menambah manga");
       return;
     }
-    titleInput.value = "";
-    urlInput.value = "";
+    if (titleInput) titleInput.value = "";
+    if (urlInput) urlInput.value = "";
     renderWhitelist(data);
     showToast("Manga berhasil ditambahkan", "success");
-  } catch (e) {
-    showAlert(`Gagal: ${e.message}`);
+  } catch (err) {
+    showAlert(`Gagal: ${err.message}`);
   } finally {
-    isProcessing = false;
-    btn.disabled = false;
-    btn.textContent = "+ Tambah";
-  }
-}
-
-async function deleteManga(title) {
-  const ok = await openDeleteConfirm(title);
-  if (!ok) return;
-  isProcessing = true;
-  try {
-    const r = await fetch(`${API_BASE}/api/whitelist`, {
-      method: "DELETE",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      showAlert(data.error || "Gagal menghapus");
-      return;
+    state.isProcessing = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "+ Tambah";
     }
-    renderWhitelist(data);
-    showToast("Manga berhasil dihapus", "success");
-  } catch (e) {
-    showAlert(`Gagal: ${e.message}`);
-  } finally {
-    isProcessing = false;
   }
 }
 
 function copyWhitelistUrlByIndex(index) {
-  const item = whitelistItems?.[index];
+  const item = state.whitelistItems?.[index];
   if (!item || typeof item === "string") {
     copyUrl("");
     return;
@@ -1099,7 +184,7 @@ function copyWhitelistUrlByIndex(index) {
 }
 
 async function deleteMangaByIndex(index) {
-  const item = whitelistItems?.[index];
+  const item = state.whitelistItems?.[index];
   if (!item) return;
 
   const title = typeof item === "string" ? item : item.title;
@@ -1108,42 +193,50 @@ async function deleteMangaByIndex(index) {
   const ok = await openDeleteConfirm(title);
   if (!ok) return;
 
-  isProcessing = true;
+  state.isProcessing = true;
   try {
-    const r = await fetch(`${API_BASE}/api/whitelist`, {
+    const response = await fetch(`${API_BASE}/api/whitelist`, {
       method: "DELETE",
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, source, url }),
     });
-    const data = await r.json();
-    if (!r.ok) {
+    const data = await response.json();
+    if (!response.ok) {
       showAlert(data.error || "Gagal menghapus");
       return;
     }
     renderWhitelist(data);
     showToast("Manga berhasil dihapus", "success");
-  } catch (e) {
-    showAlert(`Gagal: ${e.message}`);
+  } catch (err) {
+    showAlert(`Gagal: ${err.message}`);
   } finally {
-    isProcessing = false;
+    state.isProcessing = false;
   }
 }
 
+function checkAuth() {
+  if (!state.isAuthenticated) {
+    $("modalOverlay")?.classList.add("show");
+    return false;
+  }
+  return true;
+}
+
 async function runCronNow() {
-  if (!checkAuth() || isProcessing) return;
+  if (!checkAuth() || state.isProcessing) return;
   const btn = $("btnRunCron");
   const oldText = btn?.textContent || "jalankan cron";
-  isProcessing = true;
+  state.isProcessing = true;
   if (btn) {
     btn.disabled = true;
     btn.textContent = "running...";
   }
 
   try {
-    const r = await fetch(`${API_BASE}/api/cron`, { method: "GET", cache: "no-store" });
-    const data = await r.json();
-    if (!r.ok) {
+    const response = await fetch(`${API_BASE}/api/cron`, { method: "GET", cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) {
       showAlert(data.error || "Cron gagal dijalankan");
       return;
     }
@@ -1159,10 +252,10 @@ async function runCronNow() {
       true,
     );
     await loadAll();
-  } catch (e) {
-    showAlert(`Gagal trigger cron: ${e.message}`);
+  } catch (err) {
+    showAlert(`Gagal trigger cron: ${err.message}`);
   } finally {
-    isProcessing = false;
+    state.isProcessing = false;
     if (btn) {
       btn.disabled = false;
       btn.textContent = oldText;
@@ -1170,169 +263,147 @@ async function runCronNow() {
   }
 }
 
-function checkAuth() {
-  if (!isAuthenticated) {
-    $("modalOverlay").classList.add("show");
-    return false;
-  }
-  return true;
-}
-
 async function submitPassword() {
   const input = $("passwordInput");
-  const password = input.value.trim();
+  const password = input?.value.trim() || "";
   if (!password) return;
 
   try {
-    const r = await fetch(`${API_BASE}/api/login`, {
+    const response = await fetch(`${API_BASE}/api/login`, {
       method: "POST",
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
     });
-    const data = await r.json();
-    if (!r.ok) {
+    const data = await response.json();
+    if (!response.ok) {
       showAlert(data.error || "Login gagal");
       return;
     }
 
-    isAuthenticated = true;
-    input.value = "";
-    $("modalOverlay").classList.remove("show");
+    state.isAuthenticated = true;
+    if (input) input.value = "";
+    $("modalOverlay")?.classList.remove("show");
     await loadAll();
     startPoll();
-  } catch (e) {
-    showAlert(`Login gagal: ${e.message}`);
+  } catch (err) {
+    showAlert(`Login gagal: ${err.message}`);
   }
 }
-
-$("passwordInput")?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") submitPassword();
-});
-$("deleteCancelBtn")?.addEventListener("click", () => resolveDeleteConfirm(false));
-$("deleteConfirmBtn")?.addEventListener("click", () => resolveDeleteConfirm(true));
-$("deleteConfirmOverlay")?.addEventListener("click", (e) => {
-  if (e.target === $("deleteConfirmOverlay")) resolveDeleteConfirm(false);
-});
 
 async function logoutDashboard() {
   try {
     await fetch(`${API_BASE}/api/logout`, { method: "POST", cache: "no-store" });
-  } catch (_e) {
+  } catch (_err) {
     // noop
   }
-  isAuthenticated = false;
-  $("modalOverlay").classList.add("show");
-  clearInterval(lightPollTimer);
-  clearInterval(heavyPollTimer);
+  state.isAuthenticated = false;
+  $("modalOverlay")?.classList.add("show");
+  clearInterval(state.lightPollTimer);
+  clearInterval(state.heavyPollTimer);
 }
 
 async function bootstrapAuth() {
   try {
-    const r = await fetch(`${API_BASE}/api/auth-status`, { method: "GET", cache: "no-store" });
-    const data = await r.json();
-    isAuthenticated = Boolean(data?.authenticated);
+    const response = await fetch(`${API_BASE}/api/auth-status`, { method: "GET", cache: "no-store" });
+    const data = await response.json();
+    state.isAuthenticated = Boolean(data?.authenticated);
   } catch {
-    isAuthenticated = false;
+    state.isAuthenticated = false;
   }
 
-  if (isAuthenticated) {
-    $("modalOverlay").classList.remove("show");
+  if (state.isAuthenticated) {
+    $("modalOverlay")?.classList.remove("show");
     loadAll();
     startPoll();
   } else {
-    $("modalOverlay").classList.add("show");
+    $("modalOverlay")?.classList.add("show");
   }
 }
 
 async function apiFetch(path, signal) {
-  const r = await fetch(`${API_BASE}${path}`, { cache: "no-store", signal });
-  if (r.status === 401) {
-    isAuthenticated = false;
-    $("modalOverlay").classList.add("show");
+  const response = await fetch(`${API_BASE}${path}`, { cache: "no-store", signal });
+  if (response.status === 401) {
+    state.isAuthenticated = false;
+    $("modalOverlay")?.classList.add("show");
     throw new Error("Unauthorized");
   }
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
-}
-
-function renderSummaryPanels() {
-  renderStatsExtended(latestStatusData);
-  renderOverview(latestStatusData, latestWhitelistData, latestRecentData);
-  renderLastCronResult(latestStatusData, false);
-  renderSourceHealth(latestStatusData);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
 }
 
 async function loadLightData() {
   if (!checkAuth()) return;
 
-  if (lightAbortController) lightAbortController.abort();
+  if (state.lightAbortController) state.lightAbortController.abort();
   const controller = new AbortController();
-  lightAbortController = controller;
+  state.lightAbortController = controller;
 
   try {
-    const [statusR, recentR] = await Promise.allSettled([
+    const [statusResult, recentResult] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/recent", controller.signal),
     ]);
 
-    if (lightAbortController !== controller) return;
+    if (state.lightAbortController !== controller) return;
 
-    if (statusR.status === "fulfilled") {
-      latestStatusData = statusR.value;
+    if (statusResult.status === "fulfilled") {
+      state.latestStatusData = statusResult.value;
       renderSummaryPanels();
-    } else if (statusR.reason?.name !== "AbortError" && !latestStatusData) {
+    } else if (statusResult.reason?.name !== "AbortError" && !state.latestStatusData) {
       renderSummaryPanels();
     }
 
-    if (recentR.status === "fulfilled") {
-      latestRecentData = recentR.value;
-      renderRecent(latestRecentData);
+    if (recentResult.status === "fulfilled") {
+      state.latestRecentData = recentResult.value;
+      renderRecent(state.latestRecentData);
       renderSummaryPanels();
-    } else if (recentR.reason?.name !== "AbortError" && !latestRecentData) {
+    } else if (recentResult.reason?.name !== "AbortError" && !state.latestRecentData) {
       renderErr($("recentList"), "Gagal muat recent data");
     }
 
-    $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
-    lastLightLoadAt = Date.now();
+    const lastUpdated = $("lastUpdated");
+    if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
+    state.lastLightLoadAt = Date.now();
   } finally {
-    if (lightAbortController === controller) lightAbortController = null;
+    if (state.lightAbortController === controller) state.lightAbortController = null;
   }
 }
 
 async function loadHeavyData() {
   if (!checkAuth()) return;
 
-  if (heavyAbortController) heavyAbortController.abort();
+  if (state.heavyAbortController) state.heavyAbortController.abort();
   const controller = new AbortController();
-  heavyAbortController = controller;
+  state.heavyAbortController = controller;
 
   try {
-    const [whitelistR, logsR] = await Promise.allSettled([
+    const [whitelistResult, logsResult] = await Promise.allSettled([
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/logs", controller.signal),
     ]);
 
-    if (heavyAbortController !== controller) return;
+    if (state.heavyAbortController !== controller) return;
 
-    if (whitelistR.status === "fulfilled") {
-      latestWhitelistData = whitelistR.value;
-      renderWhitelist(latestWhitelistData);
+    if (whitelistResult.status === "fulfilled") {
+      state.latestWhitelistData = whitelistResult.value;
+      renderWhitelist(state.latestWhitelistData);
       renderSummaryPanels();
-    } else if (whitelistR.reason?.name !== "AbortError" && !latestWhitelistData) {
+    } else if (whitelistResult.reason?.name !== "AbortError" && !state.latestWhitelistData) {
       renderErr($("mangaList"), "Gagal muat whitelist");
     }
 
-    if (logsR.status === "fulfilled") {
-      renderLogs(logsR.value);
-    } else if (logsR.reason?.name !== "AbortError") {
+    if (logsResult.status === "fulfilled") {
+      renderLogs(logsResult.value);
+    } else if (logsResult.reason?.name !== "AbortError") {
       renderErr($("logList"), "Gagal muat logs");
     }
 
-    lastHeavyLoadAt = Date.now();
-    $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
+    const lastUpdated = $("lastUpdated");
+    if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
+    state.lastHeavyLoadAt = Date.now();
   } finally {
-    if (heavyAbortController === controller) heavyAbortController = null;
+    if (state.heavyAbortController === controller) state.heavyAbortController = null;
   }
 }
 
@@ -1340,15 +411,17 @@ async function loadAll() {
   if (!checkAuth()) return;
   clearAlert();
 
-  if (lightAbortController) lightAbortController.abort();
-  if (heavyAbortController) heavyAbortController.abort();
-  if (loadAbortController) loadAbortController.abort();
+  if (state.lightAbortController) state.lightAbortController.abort();
+  if (state.heavyAbortController) state.heavyAbortController.abort();
+  if (state.loadAbortController) state.loadAbortController.abort();
   const controller = new AbortController();
-  loadAbortController = controller;
+  state.loadAbortController = controller;
 
   const btn = $("btnRefresh");
-  btn.disabled = true;
-  btn.textContent = "memuat...";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "memuat...";
+  }
 
   skeleton($("mangaList"), 5);
   skeletonRecent($("recentList"), 4);
@@ -1356,23 +429,23 @@ async function loadAll() {
   skeleton($("sourceHealthList"), 3);
 
   try {
-    const [statusR, whitelistR, recentR, logsR] = await Promise.allSettled([
+    const [statusResult, whitelistResult, recentResult, logsResult] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/whitelist", controller.signal),
       apiFetch("/api/recent", controller.signal),
       apiFetch("/api/logs", controller.signal),
     ]);
 
-    if (loadAbortController !== controller) return;
+    if (state.loadAbortController !== controller) return;
 
-    const statusData = statusR.status === "fulfilled" ? statusR.value : null;
-    const whitelistData = whitelistR.status === "fulfilled" ? whitelistR.value : null;
-    const recentData = recentR.status === "fulfilled" ? recentR.value : null;
-    const logsData = logsR.status === "fulfilled" ? logsR.value : null;
+    const statusData = statusResult.status === "fulfilled" ? statusResult.value : null;
+    const whitelistData = whitelistResult.status === "fulfilled" ? whitelistResult.value : null;
+    const recentData = recentResult.status === "fulfilled" ? recentResult.value : null;
+    const logsData = logsResult.status === "fulfilled" ? logsResult.value : null;
 
-    latestStatusData = statusData;
-    latestWhitelistData = whitelistData;
-    latestRecentData = recentData;
+    state.latestStatusData = statusData;
+    state.latestWhitelistData = whitelistData;
+    state.latestRecentData = recentData;
     renderSummaryPanels();
 
     if (whitelistData) renderWhitelist(whitelistData);
@@ -1384,33 +457,36 @@ async function loadAll() {
     if (logsData) renderLogs(logsData);
     else renderErr($("logList"), "Gagal muat logs");
 
-    const anyFailed = [statusR, whitelistR, recentR, logsR].some(
-      (r) => r.status === "rejected" && r.reason?.name !== "AbortError",
+    const anyFailed = [statusResult, whitelistResult, recentResult, logsResult].some(
+      (result) => result.status === "rejected" && result.reason?.name !== "AbortError",
     );
-    if (anyFailed && isAuthenticated) {
+    if (anyFailed && state.isAuthenticated) {
       showAlert("Beberapa endpoint gagal dimuat. Coba refresh lagi.");
     }
 
-    lastHeavyLoadAt = Date.now();
-    $("lastUpdated").textContent = `diperbarui ${fmt(new Date())}`;
+    const lastUpdated = $("lastUpdated");
+    if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
+    state.lastHeavyLoadAt = Date.now();
     renderTrendChart();
     renderSourceChart();
   } finally {
-    if (loadAbortController === controller) loadAbortController = null;
-    btn.disabled = false;
-    btn.textContent = "refresh";
+    if (state.loadAbortController === controller) state.loadAbortController = null;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "refresh";
+    }
   }
 }
 
 function startPoll() {
-  clearInterval(lightPollTimer);
-  clearInterval(heavyPollTimer);
-  if (!autoRefreshEnabled) return;
-  lightPollTimer = setInterval(() => {
-    if (!isProcessing) loadLightData();
+  clearInterval(state.lightPollTimer);
+  clearInterval(state.heavyPollTimer);
+  if (!state.autoRefreshEnabled) return;
+  state.lightPollTimer = setInterval(() => {
+    if (!state.isProcessing) loadLightData();
   }, currentLightPollMs());
-  heavyPollTimer = setInterval(() => {
-    if (!isProcessing) loadHeavyData();
+  state.heavyPollTimer = setInterval(() => {
+    if (!state.isProcessing) loadHeavyData();
   }, currentHeavyPollMs());
 }
 
@@ -1418,22 +494,21 @@ function updateAutoRefreshUI() {
   const btn = $("btnAutoRefresh");
   const select = $("pollInterval");
   const pollInfo = $("pollInfo");
-  if (select) select.value = String(pollMs);
-  if (btn) btn.textContent = autoRefreshEnabled ? "auto: on" : "auto: off";
-  if (pollInfo) {
-    if (!autoRefreshEnabled) {
-      pollInfo.textContent = "light: off | heavy: off";
-      return;
-    }
-    const hiddenSuffix = document.hidden ? " | bg: hemat" : "";
-    pollInfo.textContent =
-      `light: ${msToSecondsLabel(currentLightPollMs())} | heavy: ${msToSecondsLabel(currentHeavyPollMs())}${hiddenSuffix}`;
+  if (select) select.value = String(state.pollMs);
+  if (btn) btn.textContent = state.autoRefreshEnabled ? "auto: on" : "auto: off";
+  if (!pollInfo) return;
+  if (!state.autoRefreshEnabled) {
+    pollInfo.textContent = "light: off | heavy: off";
+    return;
   }
+  const hiddenSuffix = document.hidden ? " | bg: hemat" : "";
+  pollInfo.textContent =
+    `light: ${msToSecondsLabel(currentLightPollMs())} | heavy: ${msToSecondsLabel(currentHeavyPollMs())}${hiddenSuffix}`;
 }
 
 function toggleAutoRefresh() {
-  autoRefreshEnabled = !autoRefreshEnabled;
-  localStorage.setItem("ikiru_auto_refresh", autoRefreshEnabled ? "on" : "off");
+  state.autoRefreshEnabled = !state.autoRefreshEnabled;
+  localStorage.setItem("ikiru_auto_refresh", state.autoRefreshEnabled ? "on" : "off");
   updateAutoRefreshUI();
   startPoll();
 }
@@ -1443,34 +518,16 @@ function setPollInterval() {
   if (!select) return;
   const next = Number(select.value);
   if (!ALLOWED_POLL_MS.includes(next)) return;
-  pollMs = next;
-  localStorage.setItem("ikiru_poll_ms", String(pollMs));
+  state.pollMs = next;
+  localStorage.setItem("ikiru_poll_ms", String(state.pollMs));
   updateAutoRefreshUI();
   startPoll();
 }
 
-window.addEventListener("focus", () => {
-  if (!isAuthenticated || isProcessing) return;
-  const now = Date.now();
-  if (now - lastFocusRefreshAt < FOCUS_REFRESH_COOLDOWN_MS) return;
-  lastFocusRefreshAt = now;
-
-  if (now - lastLightLoadAt > Math.min(currentLightPollMs(), FOCUS_REFRESH_COOLDOWN_MS)) {
-    loadLightData();
-  }
-  if (now - lastHeavyLoadAt > currentHeavyPollMs() / 2) {
-    loadHeavyData();
-  }
-});
-
-document.addEventListener("visibilitychange", () => {
-  updateAutoRefreshUI();
-  startPoll();
-});
-
 function applyTheme(dark) {
   document.body.classList.toggle("dark", dark);
-  $("btnTheme").textContent = dark ? "dark" : "light";
+  const themeButton = $("btnTheme");
+  if (themeButton) themeButton.textContent = dark ? "dark" : "light";
   renderTrendChart();
   renderSourceChart();
 }
@@ -1481,11 +538,51 @@ function toggleTheme() {
   applyTheme(isDark);
 }
 
+$("passwordInput")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") submitPassword();
+});
+$("deleteCancelBtn")?.addEventListener("click", () => resolveDeleteConfirm(false));
+$("deleteConfirmBtn")?.addEventListener("click", () => resolveDeleteConfirm(true));
+$("deleteConfirmOverlay")?.addEventListener("click", (event) => {
+  if (event.target === $("deleteConfirmOverlay")) resolveDeleteConfirm(false);
+});
+
+window.addEventListener("focus", () => {
+  if (!state.isAuthenticated || state.isProcessing) return;
+  const now = Date.now();
+  if (now - state.lastFocusRefreshAt < FOCUS_REFRESH_COOLDOWN_MS) return;
+  state.lastFocusRefreshAt = now;
+
+  if (now - state.lastLightLoadAt > Math.min(currentLightPollMs(), FOCUS_REFRESH_COOLDOWN_MS)) {
+    loadLightData();
+  }
+  if (now - state.lastHeavyLoadAt > currentHeavyPollMs() / 2) {
+    loadHeavyData();
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  updateAutoRefreshUI();
+  startPoll();
+});
+
 applyTheme(localStorage.getItem("ikiru_theme") === "dark");
 updateAutoRefreshUI();
 bootstrapAuth();
 
-window.copyUrl = copyUrl;
-window.copyWhitelistUrlByIndex = copyWhitelistUrlByIndex;
-window.deleteMangaByIndex = deleteMangaByIndex;
-window.renderTrendChart = renderTrendChart;
+Object.assign(window, {
+  addManga,
+  applyWhitelistFilter,
+  copyUrl,
+  copyWhitelistUrlByIndex,
+  deleteMangaByIndex,
+  loadAll,
+  logoutDashboard,
+  renderTrendChart,
+  runCronNow,
+  setPollInterval,
+  setSortOrder,
+  submitPassword,
+  toggleAutoRefresh,
+  toggleTheme,
+});

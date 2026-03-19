@@ -2,6 +2,11 @@ import { redis } from "../lib/redis.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { RECENT_API_CACHE_KEY } from "../lib/cacheKeys.js";
+import {
+  readObjectCache,
+  readRecentChapters,
+  writeObjectCache,
+} from "../lib/monitorStore.js";
 
 const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 90);
 
@@ -34,12 +39,12 @@ export default async function handler(req, res) {
   const { cacheTtl } = prepared;
 
   try {
-    const cached = await redis.get(RECENT_API_CACHE_KEY);
-    if (cached && typeof cached === "object") {
+    const cached = await readObjectCache(redis, RECENT_API_CACHE_KEY);
+    if (cached) {
       return res.status(200).json(cached);
     }
 
-    const raw = await redis.lrange("recent:chapters", 0, 49);
+    const raw = await readRecentChapters(redis, 0, 49);
     const items = sortRecentItems(
       raw
         .filter((item) => item && item.sentAt)
@@ -51,7 +56,7 @@ export default async function handler(req, res) {
     ).slice(0, 20);
 
     const payload = { items };
-    await redis.set(RECENT_API_CACHE_KEY, payload, { ex: cacheTtl }).catch(() => {});
+    await writeObjectCache(redis, RECENT_API_CACHE_KEY, payload, cacheTtl);
 
     return res.status(200).json(payload);
   } catch (err) {
