@@ -292,6 +292,9 @@ async function submitPassword() {
 }
 
 async function logoutDashboard() {
+  if (state.lightAbortController) state.lightAbortController.abort();
+  if (state.heavyAbortController) state.heavyAbortController.abort();
+  if (state.loadAbortController) state.loadAbortController.abort();
   try {
     await fetch(`${API_BASE}/api/logout`, { method: "POST", cache: "no-store" });
   } catch (_err) {
@@ -301,6 +304,9 @@ async function logoutDashboard() {
   $("modalOverlay")?.classList.add("show");
   clearInterval(state.lightPollTimer);
   clearInterval(state.heavyPollTimer);
+  state.lightAbortController = null;
+  state.heavyAbortController = null;
+  state.loadAbortController = null;
 }
 
 async function bootstrapAuth() {
@@ -346,6 +352,7 @@ async function loadLightData() {
     ]);
 
     if (state.lightAbortController !== controller) return;
+    if (!state.isAuthenticated) return;
 
     if (statusResult.status === "fulfilled") {
       state.latestStatusData = statusResult.value;
@@ -384,6 +391,7 @@ async function loadHeavyData() {
     ]);
 
     if (state.heavyAbortController !== controller) return;
+    if (!state.isAuthenticated) return;
 
     if (whitelistResult.status === "fulfilled") {
       state.latestWhitelistData = whitelistResult.value;
@@ -437,6 +445,7 @@ async function loadAll() {
     ]);
 
     if (state.loadAbortController !== controller) return;
+    if (!state.isAuthenticated) return;
 
     const statusData = statusResult.status === "fulfilled" ? statusResult.value : null;
     const whitelistData = whitelistResult.status === "fulfilled" ? whitelistResult.value : null;

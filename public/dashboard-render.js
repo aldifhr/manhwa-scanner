@@ -16,6 +16,30 @@ import {
 } from "./dashboard-utils.js";
 
 export function createDashboardRenderer({ state, $, esc }) {
+  function classifySourceHealth(health) {
+    if (!health || typeof health !== "object") {
+      return {
+        tone: "unknown",
+        label: "unknown",
+        failures: 0,
+        extra: "no data",
+        errorText: null,
+      };
+    }
+
+    const degraded = health.status === "degraded";
+    const failures = Number(health.consecutiveFailures ?? 0);
+    return {
+      tone: degraded ? "degraded" : "healthy",
+      label: degraded ? "degraded" : "healthy",
+      failures,
+      extra: degraded
+        ? cooldownText(health.disabledUntil) || "cooldown"
+        : `ok${health.lastSuccessAt ? ` (${timeAgo(health.lastSuccessAt)})` : ""}`,
+      errorText: health.lastError || null,
+    };
+  }
+
   function renderTrendChart() {
     const canvas = $("chartTrend");
     if (!canvas || !window.Chart) return;
@@ -75,7 +99,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     }
 
     if (state.trendChart) state.trendChart.destroy();
-    state.trendChart = new Chart(canvas, {
+    state.trendChart = new window.Chart(canvas, {
       type: "line",
       data: {
         labels: buckets.map((bucket) => bucket.label),
@@ -111,7 +135,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     }
 
     if (state.sourceChart) state.sourceChart.destroy();
-    state.sourceChart = new Chart(canvas, {
+    state.sourceChart = new window.Chart(canvas, {
       type: "bar",
       data: {
         labels: ["Ikiru", "Project", "Mirror"],
@@ -190,10 +214,12 @@ export function createDashboardRenderer({ state, $, esc }) {
       return;
     }
 
+    const sourceHealthEntries = Object.values(statusData.sourceHealth || {});
+    const hasUnknownSource = sourceHealthEntries.some((entry) => !entry || typeof entry !== "object");
     const degraded = Number(statusData.failed ?? 0) > 0 ||
-      Object.values(statusData.sourceHealth || {}).some((entry) => entry?.status === "degraded");
-    healthEl.textContent = degraded ? "DEGRADED" : "HEALTHY";
-    healthEl.className = `stat-value ${degraded ? "amber" : "green"}`;
+      sourceHealthEntries.some((entry) => entry?.status === "degraded");
+    healthEl.textContent = degraded ? "DEGRADED" : hasUnknownSource ? "UNKNOWN" : "HEALTHY";
+    healthEl.className = `stat-value ${degraded ? "amber" : hasUnknownSource ? "amber" : "green"}`;
 
     lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
     whitelistEl.textContent = Array.isArray(whitelistData?.items) ? whitelistData.items.length : "-";
@@ -237,16 +263,12 @@ export function createDashboardRenderer({ state, $, esc }) {
 
     list.innerHTML = entries
       .map(([source, health], index) => {
-        const degraded = health?.status === "degraded";
-        const failures = Number(health?.consecutiveFailures ?? 0);
-        const extra = degraded
-          ? cooldownText(health?.disabledUntil) || "cooldown"
-          : `ok${health?.lastSuccessAt ? ` (${timeAgo(health.lastSuccessAt)})` : ""}`;
+        const status = classifySourceHealth(health);
         return `<li class="manga-item">
           <span class="manga-index">${String(index + 1).padStart(2, "0")}</span>
-          <span class="manga-item-title">${esc(sourceDisplayName(source))}<br /><small style="opacity:.7">fail streak: ${failures}${health?.lastError ? ` | ${esc(health.lastError)}` : ""}</small></span>
-          <span class="status-pill ${degraded ? "invalid" : "active"}">${degraded ? "degraded" : "healthy"}</span>
-          <span class="badge">${esc(extra || "-")}</span>
+          <span class="manga-item-title">${esc(sourceDisplayName(source))}<br /><small style="opacity:.7">fail streak: ${status.failures}${status.errorText ? ` | ${esc(status.errorText)}` : ""}</small></span>
+          <span class="status-pill ${status.tone === "degraded" ? "invalid" : status.tone === "unknown" ? "" : "active"}">${status.label}</span>
+          <span class="badge">${esc(status.extra || "-")}</span>
         </li>`;
       })
       .join("");
