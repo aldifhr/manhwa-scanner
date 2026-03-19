@@ -97,4 +97,11 @@ test("resolveWhitelistSource aligns source with canonical url", () => {
     }),
     "shinigami_project",
   );
+  assert.equal(
+    resolveWhitelistSource({
+      url: "https://a.shinigami.asia/series/abc",
+      source: "shinigami_mirror",
+    }),
+    "shinigami_mirror",
+  );
 });
