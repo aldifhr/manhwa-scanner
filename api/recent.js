@@ -8,7 +8,7 @@ import {
   writeObjectCache,
 } from "../lib/monitorStore.js";
 
-const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 90);
+const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 180);
 
 export function sortRecentItems(items = []) {
   return [...items].sort((a, b) => {
@@ -31,9 +31,9 @@ export default async function handler(req, res) {
   logApiHit("recent", req);
 
   const prepared = prepareAuthorizedGet(req, res, {
-    defaultCacheTtl: 90,
+    defaultCacheTtl: 180,
     rawCacheTtl: RECENT_CACHE_SEC,
-    maxAgeCap: 30,
+    maxAgeCap: 60,
   });
   if (!prepared) return;
   const { cacheTtl } = prepared;

@@ -9,7 +9,7 @@ import {
   removeWhitelistEntryByTitle,
 } from "../lib/services/whitelist.js";
 
-const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 180);
+const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 300);
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("whitelist", req);
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     : 180;
   res.setHeader(
     "Cache-Control",
-    `private, max-age=${Math.min(cacheTtl, 30)}, stale-while-revalidate=${cacheTtl}`,
+    `private, max-age=${Math.min(cacheTtl, 60)}, stale-while-revalidate=${cacheTtl}`,
   );
 
   // GET: ambil semua whitelist

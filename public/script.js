@@ -5,11 +5,11 @@ import {
 } from "./dashboard-utils.js";
 
 const API_BASE = "";
-const DEFAULT_POLL_MS = 60_000;
-const DEFAULT_HEAVY_POLL_MS = 300_000;
-const HIDDEN_TAB_MULTIPLIER = 3;
+const DEFAULT_POLL_MS = 120_000;
+const DEFAULT_HEAVY_POLL_MS = 600_000;
+const HIDDEN_TAB_MULTIPLIER = 5;
 const FOCUS_REFRESH_COOLDOWN_MS = 30_000;
-const ALLOWED_POLL_MS = [30_000, 60_000, 120_000];
+const ALLOWED_POLL_MS = [60_000, 120_000, 300_000];
 
 const elementCache = new Map();
 const $ = (id) => {
@@ -565,7 +565,7 @@ window.addEventListener("focus", () => {
   if (now - state.lastLightLoadAt > Math.min(currentLightPollMs(), FOCUS_REFRESH_COOLDOWN_MS)) {
     loadLightData();
   }
-  if (now - state.lastHeavyLoadAt > currentHeavyPollMs() / 2) {
+  if (now - state.lastHeavyLoadAt > currentHeavyPollMs()) {
     loadHeavyData();
   }
 });

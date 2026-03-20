@@ -9,15 +9,15 @@ import {
   writeObjectCache,
 } from "../lib/monitorStore.js";
 
-const LOGS_CACHE_SEC = Number(process.env.LOGS_CACHE_SEC || 120);
+const LOGS_CACHE_SEC = Number(process.env.LOGS_CACHE_SEC || 300);
 
 export default async function handler(req, res) {
   logApiHit("logs", req);
 
   const prepared = prepareAuthorizedGet(req, res, {
-    defaultCacheTtl: 120,
+    defaultCacheTtl: 300,
     rawCacheTtl: LOGS_CACHE_SEC,
-    maxAgeCap: 30,
+    maxAgeCap: 60,
   });
   if (!prepared) return;
   const { cacheTtl } = prepared;
