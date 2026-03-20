@@ -377,3 +377,69 @@ test("dispatchChapters reclaims stale pending claim before sending", async () =>
     sentAt: "2026-01-01T00:10:01.000Z",
   });
 });
+
+test("prepareDispatchQueue blocks same title and chapter already sent from another source", async () => {
+  const redis = createRedisMock();
+  redis.kv.set("chapter:dedupe:overlord of sichuan:num:50", "sent");
+
+  const out = await prepareDispatchQueue(redis, [
+    {
+      title: "Overlord Of Sichuan",
+      chapter: "Chapter 50",
+      url: "https://02.ikiru.wtf/manga/overlord-of-sichuan/chapter-50/",
+      source: "ikiru",
+    },
+  ]);
+
+  assert.equal(out.alreadySentCount, 1);
+  assert.equal(out.unsentMeta.length, 0);
+  assert.equal(out.queuedMeta.length, 0);
+});
+
+test("dispatchChapters dedupes same chapter across sources and prefers earliest update", async () => {
+  const redis = createRedisMock();
+  const sent = [];
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "Overlord Of Sichuan",
+        chapter: "Chapter 50",
+        url: "https://02.ikiru.wtf/manga/overlord-of-sichuan/chapter-50/",
+        source: "ikiru",
+        updatedTime: "2026-01-01T01:00:00.000Z",
+      },
+      {
+        title: "Overlord Of Sichuan",
+        chapter: "Chapter 50",
+        url: "https://a.shinigami.asia/chapter/overlord-50",
+        source: "shinigami_mirror",
+        updatedTime: "2026-01-01T03:00:00.000Z",
+      },
+    ],
+    channelIds: ["1001"],
+    sendEmbed: async (item) => {
+      sent.push({ title: item.title, source: item.source, chapter: item.chapter });
+    },
+    nowIso: "2026-01-01T05:00:00.000Z",
+  });
+
+  assert.equal(out.sent, 1);
+  assert.equal(out.skipped, 1);
+  assert.deepEqual(sent, [
+    {
+      title: "Overlord Of Sichuan",
+      source: "ikiru",
+      chapter: "Chapter 50",
+    },
+  ]);
+  assert.deepEqual(
+    redis.kv.get("chapter:dedupe:overlord of sichuan:num:50"),
+    {
+      status: "sent",
+      claimedAt: "2026-01-01T05:00:00.000Z",
+      sentAt: "2026-01-01T05:00:00.000Z",
+    },
+  );
+});
