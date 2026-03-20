@@ -107,3 +107,108 @@ test("Ikiru whitelist flow narrows orchestration results before dispatch queuein
   assert.equal(queue.unsentMeta.length, 1);
   assert.equal(queue.queuedMeta[0].item.chapter, "Chapter 89");
 });
+
+test("orchestrateScrapeSources skips source fetches when whitelist is empty", async () => {
+  let cookieCalls = 0;
+  let ikiruCalls = 0;
+  let secondaryCalls = 0;
+
+  const orchestrated = await orchestrateScrapeSources({
+    redis: createRedisMock(),
+    options: {},
+    getCookie: async () => {
+      cookieCalls += 1;
+      return "cookie";
+    },
+    scrapeIkiruUpdatesWithMeta: async () => {
+      ikiruCalls += 1;
+      return {
+        results: [],
+        state: { status: "ok", count: 0, error: null, metrics: { pagesScanned: 0 } },
+      };
+    },
+    scrapeSecondarySourceUpdates: async () => {
+      secondaryCalls += 1;
+      return {
+        results: [],
+        metrics: {
+          detailAttempts: 0,
+          detailSuccesses: 0,
+          detailFallbacks: 0,
+          detail429: 0,
+          detailSkippedNonPriority: 0,
+        },
+      };
+    },
+    logger: createLoggerMock(),
+  });
+
+  assert.equal(cookieCalls, 0);
+  assert.equal(ikiruCalls, 0);
+  assert.equal(secondaryCalls, 0);
+  assert.equal(orchestrated.items.length, 0);
+  assert.equal(orchestrated.sourceStates.ikiru.status, "skipped");
+  assert.equal(orchestrated.sourceStates.ikiru.error, "no whitelist titles");
+  assert.equal(orchestrated.sourceStates.shinigami_project.status, "skipped");
+  assert.equal(orchestrated.sourceStates.shinigami_mirror.status, "skipped");
+});
+
+test("orchestrateScrapeSources only scrapes secondary sources that have whitelist titles", async () => {
+  let cookieCalls = 0;
+  let ikiruCalls = 0;
+  const secondaryCalls = [];
+
+  const orchestrated = await orchestrateScrapeSources({
+    redis: createRedisMock(),
+    options: {
+      preferredSecondaryTitles: {
+        shinigami_mirror: ["Lookism"],
+      },
+    },
+    getCookie: async () => {
+      cookieCalls += 1;
+      return "cookie";
+    },
+    scrapeIkiruUpdatesWithMeta: async () => {
+      ikiruCalls += 1;
+      return {
+        results: [],
+        state: { status: "ok", count: 0, error: null, metrics: { pagesScanned: 0 } },
+      };
+    },
+    scrapeSecondarySourceUpdates: async (source) => {
+      secondaryCalls.push(source);
+      return {
+        results: [
+          {
+            title: "Lookism",
+            chapter: "Chapter 599",
+            url: "https://a.shinigami.asia/chapter/abc",
+            mangaUrl: "https://a.shinigami.asia/series/lookism",
+            source,
+            updatedTime: "2026-03-20T01:00:00.000Z",
+          },
+        ],
+        metrics: {
+          detailAttempts: 0,
+          detailSuccesses: 0,
+          detailFallbacks: 0,
+          detail429: 0,
+          detailSkippedNonPriority: 0,
+        },
+      };
+    },
+    logger: createLoggerMock(),
+  });
+
+  assert.equal(cookieCalls, 0);
+  assert.equal(ikiruCalls, 0);
+  assert.deepEqual(secondaryCalls, ["shinigami_mirror"]);
+  assert.equal(orchestrated.items.length, 1);
+  assert.equal(orchestrated.items[0].source, "shinigami_mirror");
+  assert.equal(orchestrated.sourceStates.ikiru.status, "skipped");
+  assert.equal(orchestrated.sourceStates.shinigami_project.status, "skipped");
+  assert.equal(orchestrated.sourceStates.shinigami_project.error, "no whitelist titles");
+  assert.equal(orchestrated.sourceStates.shinigami_mirror.status, "ok");
+  assert.equal(orchestrated.sourceStates.shinigami_mirror.count, 1);
+});

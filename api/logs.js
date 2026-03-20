@@ -2,6 +2,7 @@ import { redis } from "../lib/redis.js";
 import { logApiHit } from "../lib/requestLog.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { LOGS_API_CACHE_KEY } from "../lib/cacheKeys.js";
+import { readCronDailyStats } from "../lib/cronLogs.js";
 import {
   readCronLogs,
   readObjectCache,
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
     }
 
     const raw = await readCronLogs(redis, 0, 49);
+    const dailyStats = await readCronDailyStats(redis, 30);
     const payload = {
       logs: raw
         .filter(Boolean)
@@ -42,6 +44,7 @@ export default async function handler(req, res) {
           failed: Number.isFinite(Number(log?.failed)) ? Number(log.failed) : null,
           message: log?.message || "-",
         })),
+      dailyStats,
     };
 
     await writeObjectCache(redis, LOGS_API_CACHE_KEY, payload, cacheTtl);

@@ -5,6 +5,9 @@ import {
   collectIkiruRecentChaptersFromAjaxHtml,
   collectIkiruRecentChaptersFromMangaPage,
 } from "../lib/scraper.js";
+import {
+  shouldBreakIkiruLatestScan,
+} from "../lib/scrapers/ikiru.js";
 
 test("collectIkiruRecentChaptersFromMangaPage reads full series chapter list within 24h", () => {
   const freshA = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -127,4 +130,30 @@ test("collectIkiruRecentChaptersFromAjaxHtml reads multiple fresh chapters from 
     "Chapter 88",
     "Chapter 87",
   ]);
+});
+
+test("shouldBreakIkiruLatestScan stops after consecutive stale pages", () => {
+  assert.equal(
+    shouldBreakIkiruLatestScan({
+      emptyPageStreak: 0,
+      stalePageStreak: 1,
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldBreakIkiruLatestScan({
+      emptyPageStreak: 0,
+      stalePageStreak: 2,
+    }),
+    true,
+  );
+
+  assert.equal(
+    shouldBreakIkiruLatestScan({
+      emptyPageStreak: 1,
+      stalePageStreak: 0,
+    }),
+    true,
+  );
 });

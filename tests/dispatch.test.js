@@ -46,7 +46,7 @@ function createRedisMock() {
   return api;
 }
 
-test("dispatchChapters sends new chapter and writes recent/log entries", async () => {
+test("dispatchChapters sends new chapter and writes recent entries plus daily stats", async () => {
   const redis = createRedisMock();
   const sent = [];
   const out = await dispatchChapters({
@@ -71,7 +71,9 @@ test("dispatchChapters sends new chapter and writes recent/log entries", async (
   assert.equal(out.failed, 0);
   assert.deepEqual(sent, ["A:1001"]);
   assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
-  assert.equal((redis.lists.get("cron:logs") || []).length, 1);
+  assert.equal((redis.lists.get("cron:logs") || []).length, 0);
+  const statsEntry = [...redis.kv.entries()].find(([key]) => key.startsWith("cron:stats:"));
+  assert.equal(statsEntry?.[1]?.chapters_sent, 1);
 });
 
 test("dispatchChapters skips invalid or already-sent chapters", async () => {
@@ -182,8 +184,9 @@ test("dispatchChapters writes one summary log for multiple sent chapters", async
 
   const logs = redis.lists.get("cron:logs") || [];
   assert.equal(out.sent, 2);
-  assert.equal(logs.length, 1);
-  assert.match(String(logs[0]?.message || ""), /Cron sent 2 chapter\(s\)/);
+  assert.equal(logs.length, 0);
+  const statsEntry = [...redis.kv.entries()].find(([key]) => key.startsWith("cron:stats:"));
+  assert.equal(statsEntry?.[1]?.chapters_sent, 2);
 });
 
 test("dispatchChapters preserves chapter order even when later sends finish faster", async () => {

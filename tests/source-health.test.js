@@ -122,8 +122,10 @@ test("getDisabledSources returns sources currently in cooldown", () => {
 test("loadSourceHealthMap and saveSourceHealthMap use redis keys correctly", async () => {
   const store = new Map();
   let setCount = 0;
+  let getCount = 0;
   const redis = {
     async get(key) {
+      getCount += 1;
       return store.get(key) ?? null;
     },
     async set(key, value) {
@@ -161,6 +163,8 @@ test("loadSourceHealthMap and saveSourceHealthMap use redis keys correctly", asy
       },
     },
     ["ikiru"],
+    loaded,
   );
   assert.equal(setCount, 1);
+  assert.equal(getCount, 2);
 });
