@@ -5,8 +5,8 @@ import { WHITELIST_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import {
   addWhitelistEntry,
   buildWhitelistListResponse,
+  removeWhitelistEntry,
   removeWhitelistEntryIdentity,
-  removeWhitelistEntryByTitle,
 } from "../lib/services/whitelist.js";
 
 const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 300);
@@ -103,7 +103,19 @@ export default async function handler(req, res) {
             source,
             url,
           })
-        : await removeWhitelistEntryByTitle(title);
+        : await removeWhitelistEntry(title.trim());
+      if (result.status === "ambiguous") {
+        logApiOk(reqLogger, { status: 409, method: "DELETE", reason: "ambiguous_title" });
+        return res.status(409).json({
+          error: "Title mengarah ke lebih dari satu manga. Kirim source atau url.",
+          matches: result.matches?.map(({ index, item }) => ({
+            index: index + 1,
+            title: item.title,
+            source: item.source,
+            url: item.url ?? null,
+          })) ?? [],
+        });
+      }
       if (result.status === "not_found") {
         logApiOk(reqLogger, { status: 404, method: "DELETE", reason: "not_found" });
         return res.status(404).json({ error: "Manga tidak ditemukan" });

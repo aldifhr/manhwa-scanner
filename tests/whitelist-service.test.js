@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   findWhitelistEntryIndex,
   formatMarkedTitle,
+  markWhitelistEntry,
   normalizeMarkReason,
+  removeWhitelistEntry,
   resolveWhitelistQuery,
   resolveWhitelistSource,
 } from "../lib/services/whitelist.js";
@@ -104,4 +106,62 @@ test("resolveWhitelistSource aligns source with canonical url", () => {
     }),
     "shinigami_mirror",
   );
+});
+
+test("removeWhitelistEntry returns ambiguous for duplicate titles across sources", async () => {
+  let saveCalls = 0;
+  const result = await removeWhitelistEntry("Solo Leveling", {
+    loadWhitelistFn: async () => ([
+      { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo" },
+      { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo" },
+    ]),
+    saveWhitelistFn: async () => {
+      saveCalls += 1;
+    },
+    redisClient: { del: async () => 0 },
+  });
+
+  assert.equal(result.status, "ambiguous");
+  assert.equal(result.matches.length, 2);
+  assert.equal(saveCalls, 0);
+});
+
+test("markWhitelistEntry returns ambiguous for duplicate titles across sources", async () => {
+  let saveCalls = 0;
+  const result = await markWhitelistEntry("Solo Leveling", "hiatus", {
+    loadWhitelistFn: async () => ([
+      { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo", mark: null },
+      { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo", mark: null },
+    ]),
+    saveWhitelistFn: async () => {
+      saveCalls += 1;
+    },
+    redisClient: { del: async () => 0 },
+  });
+
+  assert.equal(result.status, "ambiguous");
+  assert.equal(result.matches.length, 2);
+  assert.equal(saveCalls, 0);
+});
+
+test("markWhitelistEntry keeps numeric disambiguation stable", async () => {
+  let savedItems = null;
+  const items = [
+    { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo", mark: null },
+    { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo", mark: null },
+  ];
+
+  const result = await markWhitelistEntry("2", "end", {
+    loadWhitelistFn: async () => items.map((item) => ({ ...item })),
+    saveWhitelistFn: async (nextItems) => {
+      savedItems = nextItems;
+    },
+    redisClient: { del: async () => 0 },
+  });
+
+  assert.equal(result.status, "updated");
+  assert.equal(result.item.source, "shinigami_project");
+  assert.equal(result.item.mark, "end");
+  assert.equal(savedItems[0].mark, null);
+  assert.equal(savedItems[1].mark, "end");
 });
