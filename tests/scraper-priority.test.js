@@ -7,9 +7,10 @@ test("shouldPrioritizeSecondaryTitle defaults to true when no preferred set", ()
   assert.equal(shouldPrioritizeSecondaryTitle("Nano Machine", new Set()), true);
 });
 
-test("shouldPrioritizeSecondaryTitle matches normalized and partial titles", () => {
+test("shouldPrioritizeSecondaryTitle matches exact normalized titles only", () => {
   const preferred = new Set(["nano machine", "return of the devourer"]);
   assert.equal(shouldPrioritizeSecondaryTitle("Nano Machine", preferred), true);
-  assert.equal(shouldPrioritizeSecondaryTitle("Return of the Devourer S2", preferred), true);
+  assert.equal(shouldPrioritizeSecondaryTitle("Return of the Devourer!!!", preferred), true);
+  assert.equal(shouldPrioritizeSecondaryTitle("Return of the Devourer S2", preferred), false);
   assert.equal(shouldPrioritizeSecondaryTitle("Some Other Series", preferred), false);
 });

@@ -1,4 +1,4 @@
-import { isCronAuthorized } from "../lib/auth.js";
+import { isMonitorAuthorized } from "../lib/auth.js";
 import { redis } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
 import { WHITELIST_API_CACHE_KEY } from "../lib/cacheKeys.js";
@@ -14,7 +14,7 @@ const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 300);
 export default async function handler(req, res) {
   const reqLogger = logApiHit("whitelist", req);
 
-  if (!isCronAuthorized(req)) {
+  if (!isMonitorAuthorized(req)) {
     logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
     return res.status(401).json({ error: "Unauthorized" });
   }

@@ -127,6 +127,9 @@ SOURCE_COOLDOWN_SECONDS=1800
 CHANNEL_VALIDATION_REFRESH_SECONDS=21600
 CHANNEL_VALIDATION_CACHE_SEC=21600
 CHANNEL_VALIDATION_CONCURRENCY=8
+DASHBOARD_LOGIN_MAX_ATTEMPTS=5
+DASHBOARD_LOGIN_WINDOW_SECONDS=600
+ALLOW_DASHBOARD_CRON=false
 
 STATUS_CACHE_SEC=60
 RECENT_CACHE_SEC=180
@@ -141,6 +144,8 @@ RECENT_LIST_TTL_SEC=
 
 Catatan:
 - `CRON_SECRET` dipakai oleh [api/cron.js](/d:/ikiru-bot/api/cron.js) untuk otorisasi request cron
+- Session dashboard tidak lagi bisa menjalankan cron kecuali `ALLOW_DASHBOARD_CRON=true`
+- Login dashboard sekarang dibatasi oleh `DASHBOARD_LOGIN_MAX_ATTEMPTS` per `DASHBOARD_LOGIN_WINDOW_SECONDS`
 - `IKIRU_LATEST_MAX_PAGES` default sekarang `7`
 
 ## Redis Keys Penting
@@ -219,3 +224,4 @@ Coverage yang sudah ada mencakup:
 - Dedupe lintas source sengaja hanya exact-title agar tidak menimbulkan false positive
 - Raw `cron:logs` sekarang hanya untuk event penting; ringkasan bulanan disimpan di `cron:stats:<yyyy-mm-dd>` agar Redis tidak bengkak
 - Optimasi CPU utama saat ini datang dari source gating dan pembatasan scope scrape, bukan dari fuzzy matching
+

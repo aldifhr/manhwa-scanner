@@ -3,12 +3,18 @@ import assert from "node:assert/strict";
 import {
   createWhitelistMatcher,
   getChapterNumber,
+  isSameNormalizedTitle,
   normalizeTitleKey,
 } from "../lib/domain/manga.js";
 
 test("normalizeTitleKey removes punctuation and normalizes spaces", () => {
   assert.equal(normalizeTitleKey("  Solo-Leveling!!!  "), "sololeveling");
   assert.equal(normalizeTitleKey("A   B   C"), "a b c");
+});
+
+test("isSameNormalizedTitle matches punctuation variants only", () => {
+  assert.equal(isSameNormalizedTitle("Solo-Leveling", "Solo Leveling"), true);
+  assert.equal(isSameNormalizedTitle("The Beginning After The End", "The Beginning After The End S2"), false);
 });
 
 test("getChapterNumber extracts numeric chapter", () => {
@@ -36,7 +42,22 @@ test("createWhitelistMatcher matches by normalized url", () => {
   );
 });
 
-test("createWhitelistMatcher matches by normalized title if url missing", () => {
+test("createWhitelistMatcher matches exact normalized title if url missing", () => {
+  const isMatched = createWhitelistMatcher([
+    { title: "Solo-Leveling", source: "ikiru" },
+  ]);
+
+  assert.equal(
+    isMatched({
+      title: "Solo Leveling",
+      mangaUrl: null,
+      source: "ikiru",
+    }),
+    true,
+  );
+});
+
+test("createWhitelistMatcher rejects partial title matches if url missing", () => {
   const isMatched = createWhitelistMatcher([
     { title: "The Beginning After The End", source: "ikiru" },
   ]);
@@ -47,7 +68,7 @@ test("createWhitelistMatcher matches by normalized title if url missing", () => 
       mangaUrl: null,
       source: "ikiru",
     }),
-    true,
+    false,
   );
 });
 

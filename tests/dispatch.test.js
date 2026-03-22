@@ -446,3 +446,40 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
     },
   );
 });
+
+test("dispatchChapters persists sent state before moving to the next chapter", async () => {
+  const redis = createRedisMock();
+  const firstKey = "chapter:https://a.shinigami.asia/chapter/200";
+
+  const out = await dispatchChapters({
+    redis,
+    matched: [
+      {
+        title: "First",
+        chapter: "Chapter 1",
+        url: "https://a.shinigami.asia/chapter/200",
+        source: "shinigami_project",
+      },
+      {
+        title: "Second",
+        chapter: "Chapter 2",
+        url: "https://a.shinigami.asia/chapter/201",
+        source: "shinigami_project",
+      },
+    ],
+    channelIds: ["1001"],
+    sendEmbed: async (item) => {
+      if (item.title === "Second") {
+        assert.deepEqual(redis.kv.get(firstKey), {
+          status: "sent",
+          claimedAt: "2026-01-01T00:00:00.000Z",
+          sentAt: "2026-01-01T00:00:00.000Z",
+        });
+        assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
+      }
+    },
+    nowIso: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(out.sent, 2);
+});
