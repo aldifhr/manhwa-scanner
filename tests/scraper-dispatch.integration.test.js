@@ -212,3 +212,52 @@ test("orchestrateScrapeSources only scrapes secondary sources that have whitelis
   assert.equal(orchestrated.sourceStates.shinigami_mirror.status, "ok");
   assert.equal(orchestrated.sourceStates.shinigami_mirror.count, 1);
 });
+
+test("orchestrateScrapeSources scrapes secondary source when whitelist is keyed by canonical url", async () => {
+  let receivedMatcher = null;
+
+  const orchestrated = await orchestrateScrapeSources({
+    redis: createRedisMock(),
+    options: {
+      preferredSecondaryUrls: {
+        shinigami_project: ["https://shngm.id/series/lookism/"],
+      },
+    },
+    getCookie: async () => "cookie",
+    scrapeIkiruUpdatesWithMeta: async () => ({
+      results: [],
+      state: { status: "ok", count: 0, error: null, metrics: { pagesScanned: 0 } },
+    }),
+    scrapeSecondarySourceUpdates: async (source, options) => {
+      receivedMatcher = options.preferredMatcher;
+      return {
+        results: [
+          {
+            title: "Lookism Season 2",
+            chapter: "Chapter 600",
+            url: "https://a.shinigami.asia/chapter/lookism-600",
+            mangaUrl: "https://a.shinigami.asia/series/lookism",
+            source,
+            updatedTime: "2026-03-20T02:00:00.000Z",
+          },
+        ],
+        metrics: {
+          detailAttempts: 0,
+          detailSuccesses: 0,
+          detailFallbacks: 0,
+          detail429: 0,
+          detailSkippedNonPriority: 0,
+        },
+      };
+    },
+    logger: createLoggerMock(),
+  });
+
+  assert.equal(receivedMatcher.titleKeys.size, 0);
+  assert.equal(
+    receivedMatcher.urlKeys.has("https://a.shinigami.asia/series/lookism"),
+    true,
+  );
+  assert.equal(orchestrated.items.length, 1);
+  assert.equal(orchestrated.sourceStates.shinigami_project.status, "ok");
+});

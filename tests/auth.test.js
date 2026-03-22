@@ -29,17 +29,58 @@ async function withEnv(patch, fn) {
 
 function createRedisMock() {
   const kv = new Map();
+  const expiresAt = new Map();
+  let nowMs = 0;
+
+  const pruneExpired = () => {
+    for (const [key, expiryMs] of expiresAt.entries()) {
+      if (expiryMs <= nowMs) {
+        kv.delete(key);
+        expiresAt.delete(key);
+      }
+    }
+  };
+
   return {
     kv,
+    setNow(value) {
+      nowMs = Number(value) || 0;
+      pruneExpired();
+    },
     async get(key) {
+      pruneExpired();
       return kv.has(key) ? kv.get(key) : null;
     },
-    async set(key, value) {
+    async set(key, value, options = {}) {
+      pruneExpired();
       kv.set(key, value);
+      if (Number.isFinite(Number(options?.ex)) && Number(options.ex) > 0) {
+        expiresAt.set(key, nowMs + Number(options.ex) * 1000);
+      }
       return "OK";
+    },
+    async incr(key) {
+      pruneExpired();
+      const next = Number(kv.get(key) ?? 0) + 1;
+      kv.set(key, next);
+      return next;
+    },
+    async expire(key, seconds) {
+      pruneExpired();
+      if (!kv.has(key)) return 0;
+      expiresAt.set(key, nowMs + Number(seconds) * 1000);
+      return 1;
+    },
+    async ttl(key) {
+      pruneExpired();
+      if (!kv.has(key)) return -2;
+      const expiryMs = expiresAt.get(key);
+      if (!Number.isFinite(expiryMs)) return -1;
+      return Math.max(0, Math.ceil((expiryMs - nowMs) / 1000));
     },
     async del(key) {
       kv.delete(key);
+      expiresAt.delete(key);
       return 1;
     },
   };
@@ -158,22 +199,53 @@ test("dashboard login failures are throttled per client", async () =>
       const redis = createRedisMock();
       const req = { headers: { "x-forwarded-for": "1.2.3.4" } };
 
-      const first = await registerDashboardLoginFailure(redis, req, 1000);
+      redis.setNow(1000);
+      const first = await registerDashboardLoginFailure(redis, req);
       assert.equal(first.count, 1);
       assert.equal(first.limited, false);
 
-      const second = await registerDashboardLoginFailure(redis, req, 1500);
+      redis.setNow(1500);
+      const second = await registerDashboardLoginFailure(redis, req);
       assert.equal(second.count, 2);
       assert.equal(second.limited, true);
       assert.equal(second.retryAfterSec > 0, true);
 
-      const snapshot = await readDashboardLoginThrottle(redis, req, 2000);
+      redis.setNow(2000);
+      const snapshot = await readDashboardLoginThrottle(redis, req);
       assert.equal(snapshot.limited, true);
 
       await clearDashboardLoginThrottle(redis, req);
-      const cleared = await readDashboardLoginThrottle(redis, req, 2500);
+      redis.setNow(2500);
+      const cleared = await readDashboardLoginThrottle(redis, req);
       assert.equal(cleared.limited, false);
       assert.equal(cleared.count, 0);
+    },
+  ));
+
+test("dashboard login throttle increments atomically across concurrent failures", async () =>
+  withEnv(
+    {
+      DASHBOARD_LOGIN_MAX_ATTEMPTS: "3",
+      DASHBOARD_LOGIN_WINDOW_SECONDS: "120",
+    },
+    async () => {
+      const redis = createRedisMock();
+      const req = { headers: { "x-forwarded-for": "5.6.7.8" } };
+
+      redis.setNow(1000);
+      const counts = (await Promise.all([
+        registerDashboardLoginFailure(redis, req),
+        registerDashboardLoginFailure(redis, req),
+        registerDashboardLoginFailure(redis, req),
+      ]))
+        .map((entry) => entry.count)
+        .sort((left, right) => left - right);
+
+      assert.deepEqual(counts, [1, 2, 3]);
+
+      const snapshot = await readDashboardLoginThrottle(redis, req);
+      assert.equal(snapshot.count, 3);
+      assert.equal(snapshot.limited, true);
     },
   ));
 
@@ -190,4 +262,3 @@ test("session cookie headers include security attributes", () => {
   assert.match(clearCookie, /Max-Age=0/);
   assert.doesNotMatch(clearCookie, /Secure/);
 });
-
