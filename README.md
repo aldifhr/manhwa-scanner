@@ -1,227 +1,141 @@
-# Ikiru Bot
+# ikiru-bot 🤖
 
-Discord manga update bot berbasis Vercel + Upstash Redis.
+Discord bot for manga update notifications. Tracks releases from multiple manga sources, notifies subscribed users via Discord slash commands and embed messages.
 
-Bot ini memantau update chapter dari:
-- `ikiru`
-- `shinigami_project`
-- `shinigami_mirror`
+## Tech Stack
 
-Lalu bot akan:
-- mencocokkan hasil scrape dengan whitelist per source
-- menghindari notifikasi duplikat untuk judul exact sama + chapter yang sama
-- mengirim embed ke channel Discord yang sudah diset per guild
+- **Runtime**: Vercel (serverless)
+- **Bot**: discord.js v14
+- **Cache/Queue**: Upstash Redis
+- **Scraping**: Custom scraper with selector-based selectors
+- **Dashboard**: Public web dashboard (HTML + vanilla JS)
+- **Testing**: Vitest
 
-## Fitur
+## Features
 
-- Slash command Discord untuk tambah, hapus, list, mark, cek manual, dan set channel
-- Cron endpoint untuk scrape dan dispatch notifikasi
-- Whitelist tersimpan di Redis
-- Status runtime, recent chapters, raw cron logs, dan daily cron stats tersedia via endpoint API
-- Source health tracking dengan cooldown saat source sering gagal
-- Anti-spam notifikasi lintas source untuk `judul exact sama + chapter sama`
-- Optimasi scrape supaya source yang tidak dipakai whitelist tidak ikut discrape
+- **Slash Commands** — `/manga add`, `/manga list`, `/manga remove`, `/manga check`
+- **Auto-updates** — Cron-based scraping every 30s, notifies Discord on new chapter
+- **Multi-source** — Selector-based scraper supporting different manga sites
+- **Whitelist** — Admin-managed whitelist of allowed manga/sources
+- **Dashboard** — Public HTML dashboard showing tracked manga + last update times
+- **Auth** — Admin-only endpoints protected by `AUTH_TOKEN`
+- **Rate Limiting** — Upstash Redis for per-user/request rate limiting
+- **Health Checks** — Cron runtime + source health monitoring
 
-## Arsitektur Singkat
+## Project Structure
 
-- [api/interactive.js](/d:/ikiru-bot/api/interactive.js)
-  Endpoint Discord interactions.
-- [api/cron.js](/d:/ikiru-bot/api/cron.js)
-  Endpoint cron untuk scrape, match whitelist, lalu dispatch.
-- [lib/cronRuntime.js](/d:/ikiru-bot/lib/cronRuntime.js)
-  Runtime utama cron.
-- [lib/scraper.js](/d:/ikiru-bot/lib/scraper.js)
-  Entry point scraping.
-- [lib/scrapers/ikiru.js](/d:/ikiru-bot/lib/scrapers/ikiru.js)
-  Scraper `ikiru`.
-- [lib/scrapers/secondary.js](/d:/ikiru-bot/lib/scrapers/secondary.js)
-  Scraper `shinigami_project` dan `shinigami_mirror`.
-- [lib/services/dispatch.js](/d:/ikiru-bot/lib/services/dispatch.js)
-  Queueing, dedupe, locking, dan kirim ke Discord.
-- [lib/redis.js](/d:/ikiru-bot/lib/redis.js)
-  Akses Redis dan storage whitelist/channel.
-
-## Flow Cron
-
-1. Load whitelist, guild channels, dan source health dari Redis.
-2. Skip source yang whitelist-nya kosong.
-3. Scrape update dari source aktif.
-4. Untuk `Ikiru`, scan `latest-update` sampai maksimal 7 page, lalu stop saat feed sudah stale.
-5. Filter hasil scrape dengan whitelist.
-6. Dedupe exact-title lintas source untuk chapter yang sama.
-7. Kirim embed ke semua channel guild aktif.
-8. Simpan status cron, recent chapters, logs, dan source health.
-
-## Anti-Spam
-
-Bot hanya dedupe untuk kasus:
-- judul sama persis setelah normalisasi
-- chapter sama
-
-Contoh:
-- `Overlord Of Sichuan Chapter 50` dari `ikiru` terkirim duluan
-- `Overlord Of Sichuan Chapter 50` dari `shinigami_project` yang datang belakangan akan diskip
-
-Kalau chapter berbeda, notifikasi tetap jalan.
-
-## Endpoint
-
-- `POST /api/interactive`
-  Endpoint Discord interactions.
-- `GET|POST /api/cron`
-  Menjalankan cron. Perlu otorisasi cron.
-- `GET /api/status`
-  Status runtime terakhir.
-- `GET /api/recent`
-  Recent chapters yang terkirim.
-- `GET /api/logs`
-  Raw recent cron logs + daily summary stats 30 hari.
-- `GET /api/whitelist`
-  Whitelist aktif.
-
-## Slash Commands
-
-Command registration ada di [discord.js](/d:/ikiru-bot/discord.js).
-
-Perintah utama:
-- `/ping`
-- `/check`
-- `/add`
-- `/remove`
-- `/list`
-- `/mark`
-- `/status`
-- `/setchannel`
-- `/clear`
-- `/resync24h`
-
-## Environment Variables
-
-Minimal yang perlu:
-
-```env
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-DISCORD_BOT_TOKEN=
-DISCORD_APPLICATION_ID=
-DISCORD_PUBLIC_KEY=
-CRON_SECRET=
+```
+ikiru-bot/
+├── api/                    # Vercel serverless API routes
+│   ├── auth-status.js     # Admin auth check
+│   ├── cron.js            # Triggered by Vercel Cron (every 30s)
+│   ├── interactive.js     # Discord interaction handler
+│   ├── login.js           # Admin login
+│   ├── logout.js          # Admin logout
+│   ├── logs.js            # Cron run logs
+│   ├── recent.js          # Recent updates API
+│   ├── status.js          # Bot/source health status
+│   └── whitelist.js       # Whitelist management
+├── lib/                   # Core business logic
+│   ├── auth.js            # Admin authentication
+│   ├── cacheKeys.js       # Redis key schemas
+│   ├── commands/          # Discord slash commands
+│   ├── consts.js         # Constants
+│   ├── cookie.js          # Cookie management for scraping
+│   ├── cronLogs.js       # Cron execution logging
+│   ├── cronRuntime.js    # Cron health tracking
+│   ├── discord.js         # Discord client wrapper
+│   ├── domain/           # Domain/manga source models
+│   ├── httpClient.js     # HTTP client with retry
+│   ├── logger.js         # Structured logging
+│   ├── monitorStore.js   # Manga monitor state
+│   ├── permissions.js     # Admin permission checks
+│   ├── redis.js          # Upstash Redis client
+│   ├── requestLog.js     # HTTP request logging
+│   ├── runtimeConfig.js  # Runtime configuration
+│   ├── scraper.js        # Main scraper
+│   ├── scrapers/         # Source-specific scrapers
+│   ├── services/         # Business services
+│   └── statusCache.js    # Health status cache
+├── public/               # Dashboard (no build step)
+│   ├── dashboard-render.js
+│   ├── dashboard-utils.js
+│   ├── index.html
+│   ├── script.js
+│   └── styles.css
+├── tests/                # Vitest unit + integration tests
+├── whitelist.json        # Default whitelist
+├── vercel.json           # Vercel config (cron: every 30s)
+├── discord.js            # Discord bot entry point
+├── flush.js             # Manual cache flush
+└── package.json
 ```
 
-Yang umum dipakai untuk tuning:
-
-```env
-SECONDARY_SOURCE_URL=
-SECONDARY_PUBLIC_BASE=
-SECONDARY_DETAIL_WINDOW_HOURS=2
-SECONDARY_DETAIL_MAX_MANGA=6
-SECONDARY_DETAIL_THROTTLE_MS=200
-SECONDARY_CHAPTER_LIST_MAX_PAGES=2
-
-IKIRU_LATEST_MAX_PAGES=7
-IKIRU_EMPTY_PAGE_BREAK_STREAK=1
-IKIRU_CHAPTER_LIST_MAX_PAGES=4
-
-SOURCE_FAIL_THRESHOLD=3
-SOURCE_COOLDOWN_SECONDS=1800
-CHANNEL_VALIDATION_REFRESH_SECONDS=21600
-CHANNEL_VALIDATION_CACHE_SEC=21600
-CHANNEL_VALIDATION_CONCURRENCY=8
-DASHBOARD_LOGIN_MAX_ATTEMPTS=5
-DASHBOARD_LOGIN_WINDOW_SECONDS=600
-ALLOW_DASHBOARD_CRON=false
-
-STATUS_CACHE_SEC=60
-RECENT_CACHE_SEC=180
-LOGS_CACHE_SEC=300
-WHITELIST_CACHE_SEC=300
-CRON_LOG_LIST_LIMIT=300
-CRON_LOG_LIST_TTL=1209600
-CRON_DAILY_STATS_TTL=3888000
-CRON_INFO_LOG_THROTTLE_SEC=1800
-RECENT_LIST_TTL_SEC=
-```
-
-Catatan:
-- `CRON_SECRET` dipakai oleh [api/cron.js](/d:/ikiru-bot/api/cron.js) untuk otorisasi request cron
-- Session dashboard tidak lagi bisa menjalankan cron kecuali `ALLOW_DASHBOARD_CRON=true`
-- Login dashboard sekarang dibatasi oleh `DASHBOARD_LOGIN_MAX_ATTEMPTS` per `DASHBOARD_LOGIN_WINDOW_SECONDS`
-- `IKIRU_LATEST_MAX_PAGES` default sekarang `7`
-
-## Redis Keys Penting
-
-- `whitelist:manga`
-- `channels:guild-map`
-- `cron:last_run`
-- `cron:logs`
-- `cron:stats:<yyyy-mm-dd>`
-- `recent:chapters`
-- `source:health:<source>`
-- `chapter:<chapter-url>`
-- `chapter:dedupe:<normalized-title>:<chapter-identity>`
-
-## Local Development
-
-Install dependency:
+## Setup
 
 ```bash
 npm install
-```
 
-Lint:
+# Environment variables
+cp .env.example .env
+# Fill in:
+#   DISCORD_BOT_TOKEN
+#   REDIS_REST_URL
+#   REDIS_REST_TOKEN
+#   AUTH_TOKEN
+#   ADMIN_IDS (comma-separated Discord user IDs)
+#   WHITELIST_FILE (path to whitelist.json)
 
-```bash
-npm run lint
-```
+# Run locally (requires ngrok for Discord webhooks)
+node discord.js
 
-Test:
-
-```bash
+# Run tests
 npm test
 ```
 
-Jalankan local Vercel dev:
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Discord bot token (from Discord Developer Portal) |
+| `REDIS_REST_URL` | Upstash Redis REST URL |
+| `REDIS_REST_TOKEN` | Upstash Redis REST token |
+| `AUTH_TOKEN` | Admin auth token for dashboard |
+| `ADMIN_IDS` | Comma-separated Discord user IDs with admin access |
+| `WHITELIST_FILE` | Path to `whitelist.json` |
+| `BASE_URL` | Public URL (for Vercel deployment) |
+
+## Discord Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/manga add <url>` | Subscribe to a manga |
+| `/manga list` | List all subscribed manga |
+| `/manga remove <url>` | Unsubscribe from a manga |
+| `/manga check <url>` | Force check for new chapters |
+
+Admin-only: `/manga flush`, `/manga reload`
+
+## Dashboard
+
+Public dashboard at `BASE_URL` shows:
+- All tracked manga
+- Last checked time per manga
+- Source health status
+- Recent update logs
+
+Admin login at `BASE_URL/admin` (requires `AUTH_TOKEN`).
+
+## Deployment
 
 ```bash
-npm run dev:vercel
+# Vercel (recommended)
+vercel --prod
+
+# Discord bot must be online 24/7
+# Vercel serverless functions handle API + cron
 ```
 
-Register slash commands:
+## License
 
-```bash
-node discord.js
-```
-
-## Deploy
-
-Project ini ditujukan untuk Vercel. Batas function penting:
-
-- [vercel.json](/d:/ikiru-bot/vercel.json)
-  `api/cron.js` dan `api/interactive.js` diberi `maxDuration`.
-
-Setelah deploy:
-- pastikan env vars sudah lengkap
-- register slash commands
-- set notification channel per guild
-- panggil endpoint cron dari scheduler dengan header/secret yang benar
-
-## Testing
-
-Test ada di folder [tests](/d:/ikiru-bot/tests).
-
-Coverage yang sudah ada mencakup:
-- dispatch dan dedupe
-- cron logs
-- source health
-- Ikiru scraper helper
-- scraper orchestration
-- status cache
-
-## Catatan Operasional
-
-- Runtime produksi membaca whitelist dari Redis, bukan dari `whitelist.json`
-- `whitelist.json` hanya berguna sebagai snapshot/manual reference
-- Dedupe lintas source sengaja hanya exact-title agar tidak menimbulkan false positive
-- Raw `cron:logs` sekarang hanya untuk event penting; ringkasan bulanan disimpan di `cron:stats:<yyyy-mm-dd>` agar Redis tidak bengkak
-- Optimasi CPU utama saat ini datang dari source gating dan pembatasan scope scrape, bukan dari fuzzy matching
-
+MIT
