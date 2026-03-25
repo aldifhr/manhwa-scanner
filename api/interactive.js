@@ -53,9 +53,9 @@ async function handleAddManga(payload, title, url = null, source = "ikiru") {
   }
 }
 
-async function handleListResponse(payload, page, reqLogger, event) {
+async function handleListResponse(payload, page, reqLogger, event, options = {}) {
   try {
-    const { content, components } = await buildWhitelistListResponse(page);
+    const { content, components } = await buildWhitelistListResponse(page, 10, options);
     await editInteractionResponseWithComponents(payload, content, components);
     logApiOk(reqLogger, { status: 200, event });
   } catch (err) {
@@ -186,9 +186,23 @@ export default async function handler(req, res) {
     }
 
     if (custom_id.startsWith("list:")) {
-      const page = parseInt(custom_id.split(":")[1], 10) || 1;
+      const parts = custom_id.split(":");
+      const page = parseInt(parts[1], 10) || 1;
+      const searchFilter = parts[2] || "";
+      const [search, filter] = searchFilter.split("|");
+      
       res.json({ type: 6 });
-      return waitUntil(handleListResponse(payload, page, reqLogger, "list_component"));
+      return waitUntil(handleListResponse(payload, page, reqLogger, "list_component", { 
+        search: search || null, 
+        filter: filter || null 
+      }));
+    }
+
+    if (custom_id.startsWith("read:")) {
+      const handleProgress = commands["myprogress"];
+      if (handleProgress) {
+        return handleProgress(payload, [{ name: "button", value: custom_id }], res, redis);
+      }
     }
 
     logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
@@ -199,9 +213,13 @@ export default async function handler(req, res) {
     const { name, options } = interactionData;
 
     if (name === "list") {
-      const page = parseInt(options?.[0]?.value, 10) || 1;
+      const opts = interactionData.options || [];
+      const page = parseInt(opts.find(o => o.name === "page")?.value, 10) || 1;
+      const search = opts.find(o => o.name === "search")?.value || null;
+      const filter = opts.find(o => o.name === "status")?.value || null;
+
       res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil(handleListResponse(payload, page, reqLogger, "list_command"));
+      return waitUntil(handleListResponse(payload, page, reqLogger, "list_command", { search, filter }));
     }
 
     const handle = commands[name];

@@ -31,15 +31,38 @@ const commands = [
     }],
   },
   {
-    name:        "list",
-    description: "List all whitelisted manga (20 per halaman)",
-    options: [{
-      name:        "page",
-      description: "Halaman ke berapa (default: 1)",
-      type:        4,
-      required:    false,
-      min_value:   1,
-    }],
+    name: "list",
+    description: "Lihat daftar manga di whitelist (search & filter available)",
+    options: [
+      {
+        name: "page",
+        description: "Halaman ke berapa (default: 1)",
+        type: 4,
+        required: false,
+        min_value: 1,
+      },
+      {
+        name: "search",
+        description: "Cari judul manga (misal: Lookism)",
+        type: 3,
+        required: false,
+      },
+      {
+        name: "status",
+        description: "Filter berdasarkan status manga",
+        type: 3,
+        required: false,
+        choices: [
+          { name: "Hiatus", value: "hiatus" },
+          { name: "End Season", value: "end_season" },
+          { name: "End", value: "end" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "myprogress",
+    description: "Lihat history baca / progress manga kamu",
   },
   {
     name:        "mark",
