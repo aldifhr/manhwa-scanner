@@ -61,8 +61,12 @@ test("runCronJob includes per-step timing metrics in success status", async () =
     loadWhitelistFn: async () => [
       {
         title: "Lookism",
-        source: "shinigami_mirror",
-        url: "https://a.shinigami.asia/series/lookism",
+        sources: [
+          {
+            source: "shinigami_mirror",
+            url: "https://a.shinigami.asia/series/lookism",
+          }
+        ]
       },
     ],
     getAllGuildChannelsFn: async () => ({

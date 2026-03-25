@@ -23,12 +23,16 @@ test("getChapterNumber extracts numeric chapter", () => {
   assert.equal(getChapterNumber("Special"), 0);
 });
 
-test("createWhitelistMatcher matches by normalized url", () => {
+test("createWhitelistMatcher matches by normalized url in sources", () => {
   const isMatched = createWhitelistMatcher([
     {
       title: "Ignored Title",
-      url: "https://a.shinigami.asia/series/abc/",
-      source: "shinigami_project",
+      sources: [
+        {
+          url: "https://a.shinigami.asia/series/abc/",
+          source: "shinigami_project",
+        }
+      ]
     },
   ]);
 
@@ -44,7 +48,7 @@ test("createWhitelistMatcher matches by normalized url", () => {
 
 test("createWhitelistMatcher matches exact normalized title if url missing", () => {
   const isMatched = createWhitelistMatcher([
-    { title: "Solo-Leveling", source: "ikiru" },
+    { title: "Solo-Leveling", sources: [{ source: "ikiru" }] },
   ]);
 
   assert.equal(
@@ -59,7 +63,7 @@ test("createWhitelistMatcher matches exact normalized title if url missing", () 
 
 test("createWhitelistMatcher rejects partial title matches if url missing", () => {
   const isMatched = createWhitelistMatcher([
-    { title: "The Beginning After The End", source: "ikiru" },
+    { title: "The Beginning After The End", sources: [{ source: "ikiru" }] },
   ]);
 
   assert.equal(
@@ -74,7 +78,7 @@ test("createWhitelistMatcher rejects partial title matches if url missing", () =
 
 test("createWhitelistMatcher rejects source mismatch", () => {
   const isMatched = createWhitelistMatcher([
-    { title: "Solo Leveling", source: "shinigami_project" },
+    { title: "Solo Leveling", sources: [{ source: "shinigami_project" }] },
   ]);
 
   assert.equal(

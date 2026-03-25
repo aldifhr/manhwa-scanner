@@ -19,6 +19,7 @@ test("normalizeMarkReason accepts supported values", () => {
 });
 
 test("formatMarkedTitle appends label when mark exists", () => {
+  // Now item has mark or sources
   assert.equal(
     formatMarkedTitle({ title: "Solo Leveling", mark: "end_season" }),
     "Solo Leveling [End Season]",
@@ -29,15 +30,25 @@ test("formatMarkedTitle appends label when mark exists", () => {
   );
 });
 
-test("findWhitelistEntryIndex respects source and normalized url identity", () => {
+test("findWhitelistEntryIndex respects nested sources", () => {
   const items = [
-    { title: "Nano Machine", source: "ikiru", url: "https://02.ikiru.wtf/manga/nano-machine/" },
-    { title: "Nano Machine", source: "shinigami_project", url: "https://a.shinigami.asia/series/abc" },
+    { 
+      title: "Nano Machine", 
+      sources: [
+        { source: "ikiru", url: "https://02.ikiru.wtf/manga/nano-machine/" }
+      ]
+    },
+    { 
+      title: "Solo Leveling", 
+      sources: [
+        { source: "shinigami_project", url: "https://a.shinigami.asia/series/abc" }
+      ]
+    },
   ];
 
   assert.equal(
     findWhitelistEntryIndex(items, {
-      title: "Nano Machine",
+      title: "Solo Leveling",
       source: "shinigami_project",
       url: "https://a.shinigami.asia/series/abc/",
     }),
@@ -46,42 +57,44 @@ test("findWhitelistEntryIndex respects source and normalized url identity", () =
   assert.equal(
     findWhitelistEntryIndex(items, {
       title: "Nano Machine",
-      source: "ikiru",
     }),
     0,
   );
 });
 
-test("resolveWhitelistQuery returns ambiguous matches for duplicate titles across sources", () => {
+test("resolveWhitelistQuery handles consolidated titles", () => {
   const items = [
-    { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo" },
-    { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo" },
-    { title: "Nano Machine", source: "ikiru", url: "https://ikiru.example/nano" },
+    { 
+      title: "Solo Leveling", 
+      sources: [
+        { source: "ikiru", url: "https://ikiru.example/solo" },
+        { source: "shinigami_project", url: "https://shinigami.example/solo" }
+      ]
+    },
+    { 
+      title: "Nano Machine", 
+      sources: [
+        { source: "ikiru", url: "https://ikiru.example/nano" }
+      ]
+    },
   ];
 
   const result = resolveWhitelistQuery(items, "Solo Leveling");
-  assert.equal(result.status, "ambiguous");
-  assert.deepEqual(
-    result.matches.map(({ index, item }) => ({ index, source: item.source, title: item.title })),
-    [
-      { index: 0, source: "ikiru", title: "Solo Leveling" },
-      { index: 1, source: "shinigami_project", title: "Solo Leveling" },
-    ],
-  );
+  assert.equal(result.status, "matched");
+  assert.equal(result.index, 0);
+  assert.equal(result.item.title, "Solo Leveling");
 });
 
 test("resolveWhitelistQuery keeps numeric remove behavior stable", () => {
   const items = [
-    { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo" },
-    { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo" },
-    { title: "Nano Machine", source: "ikiru", url: "https://ikiru.example/nano" },
+    { title: "Solo Leveling", sources: [{ source: "ikiru" }] },
+    { title: "Nano Machine", sources: [{ source: "ikiru" }] },
   ];
 
   const result = resolveWhitelistQuery(items, "2");
   assert.equal(result.status, "matched");
   assert.equal(result.index, 1);
-  assert.equal(result.item.source, "shinigami_project");
-  assert.equal(result.item.title, "Solo Leveling");
+  assert.equal(result.item.title, "Nano Machine");
 });
 
 test("resolveWhitelistSource aligns source with canonical url", () => {
@@ -108,50 +121,30 @@ test("resolveWhitelistSource aligns source with canonical url", () => {
   );
 });
 
-test("removeWhitelistEntry returns ambiguous for duplicate titles across sources", async () => {
+test("removeWhitelistEntry handles nested items", async () => {
   let saveCalls = 0;
   const result = await removeWhitelistEntry("Solo Leveling", {
     loadWhitelistFn: async () => ([
-      { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo" },
-      { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo" },
+      { title: "Solo Leveling", sources: [{ source: "ikiru" }] },
     ]),
-    saveWhitelistFn: async () => {
+    saveWhitelistFn: async (items) => {
       saveCalls += 1;
+      assert.equal(items.length, 0);
     },
     redisClient: { del: async () => 0 },
   });
 
-  assert.equal(result.status, "ambiguous");
-  assert.equal(result.matches.length, 2);
-  assert.equal(saveCalls, 0);
+  assert.equal(result.status, "removed");
+  assert.equal(saveCalls, 1);
 });
 
-test("markWhitelistEntry returns ambiguous for duplicate titles across sources", async () => {
-  let saveCalls = 0;
-  const result = await markWhitelistEntry("Solo Leveling", "hiatus", {
-    loadWhitelistFn: async () => ([
-      { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo", mark: null },
-      { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo", mark: null },
-    ]),
-    saveWhitelistFn: async () => {
-      saveCalls += 1;
-    },
-    redisClient: { del: async () => 0 },
-  });
-
-  assert.equal(result.status, "ambiguous");
-  assert.equal(result.matches.length, 2);
-  assert.equal(saveCalls, 0);
-});
-
-test("markWhitelistEntry keeps numeric disambiguation stable", async () => {
+test("markWhitelistEntry marks all sources", async () => {
   let savedItems = null;
   const items = [
-    { title: "Solo Leveling", source: "ikiru", url: "https://ikiru.example/solo", mark: null },
-    { title: "Solo Leveling", source: "shinigami_project", url: "https://shinigami.example/solo", mark: null },
+    { title: "Solo Leveling", sources: [{ source: "ikiru", mark: null }, { source: "shinigami", mark: null }] },
   ];
 
-  const result = await markWhitelistEntry("2", "end", {
+  const result = await markWhitelistEntry("Solo Leveling", "hiatus", {
     loadWhitelistFn: async () => items.map((item) => ({ ...item })),
     saveWhitelistFn: async (nextItems) => {
       savedItems = nextItems;
@@ -160,8 +153,6 @@ test("markWhitelistEntry keeps numeric disambiguation stable", async () => {
   });
 
   assert.equal(result.status, "updated");
-  assert.equal(result.item.source, "shinigami_project");
-  assert.equal(result.item.mark, "end");
-  assert.equal(savedItems[0].mark, null);
-  assert.equal(savedItems[1].mark, "end");
+  assert.equal(savedItems[0].sources[0].mark, "hiatus");
+  assert.equal(savedItems[0].sources[1].mark, "hiatus");
 });
