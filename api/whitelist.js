@@ -4,10 +4,10 @@ import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
 import { WHITELIST_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import {
   addWhitelistEntry,
-  buildWhitelistListResponse,
   removeWhitelistEntry,
   removeWhitelistEntryIdentity,
 } from "../lib/services/whitelist.js";
+import { buildWhitelistListResponse } from "../lib/services/whitelistUi.js";
 
 const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 300);
 

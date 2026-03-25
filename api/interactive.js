@@ -13,12 +13,12 @@ import {
 import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
 import { normalizeSource } from "../lib/domain/source.js";
 import { isAddAllowedUser } from "../lib/permissions.js";
+import { addWhitelistEntry } from "../lib/services/whitelist.js";
 import {
-  addWhitelistEntry,
   buildAddExistsMessage,
   buildAddSuccessMessage,
   buildWhitelistListResponse,
-} from "../lib/services/whitelist.js";
+} from "../lib/services/whitelistUi.js";
 
 export const config = { api: { bodyParser: false } };
 

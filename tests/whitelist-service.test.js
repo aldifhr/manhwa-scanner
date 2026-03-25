@@ -2,13 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   findWhitelistEntryIndex,
-  formatMarkedTitle,
   markWhitelistEntry,
-  normalizeMarkReason,
   removeWhitelistEntry,
   resolveWhitelistQuery,
   resolveWhitelistSource,
 } from "../lib/services/whitelist.js";
+import { formatMarkedTitle } from "../lib/services/whitelistUi.js";
+import { normalizeMarkReason } from "../lib/domain/whitelist.js";
 
 test("normalizeMarkReason accepts supported values", () => {
   assert.equal(normalizeMarkReason("hiatus"), "hiatus");
