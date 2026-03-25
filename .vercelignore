@@ -1,0 +1,37 @@
+# Vercel Deployment Ignore File
+# Exclude heavy or unnecessary files from the build and serverless environment
+
+# Dependencies (handled by Vercel)
+node_modules/
+
+# Local Environment & Secrets
+.env
+.env.*
+.vercel/
+.qoder/
+
+# Test Files & Data
+tests/
+whitelist-test.json
+test-local.js
+test-local-health-history.js
+whitelist.json
+flush.js
+30s
+
+# Documentation & Git
+.git/
+.github/
+README.md
+LICENSE
+.DS_Store
+
+# Temporary Files
+tmp/
+temp/
+logs/
+*.log
+
+# Scripts (unless needed by production)
+scripts/
+image/
