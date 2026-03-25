@@ -119,6 +119,11 @@ const commands = [
     },
   ],
 },
+  {
+    name: "health",
+    description: "Show bot health, statistics, and broken links summary",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
+  },
 ];
 
 async function registerCommands() {
