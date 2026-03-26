@@ -288,11 +288,18 @@ export function createDashboardRenderer({ state, $, esc }) {
 
     const entries = state.whitelistItems.map((item, originalIndex) => {
       const title = typeof item === "string" ? item : item.title;
-      const source = typeof item === "object" ? String(item.source || "ikiru").toLowerCase() : "ikiru";
+      let sources = [];
+      if (typeof item === "object" && Array.isArray(item.sources) && item.sources.length > 0) {
+        sources = item.sources;
+      } else if (typeof item === "object") {
+        sources = [{ url: item.url, source: item.source || "ikiru", mark: item.mark }];
+      } else {
+        sources = [{ url: null, source: "ikiru" }];
+      }
       return {
         item,
         title,
-        source,
+        sources,
         titleLower: String(title).toLowerCase(),
         originalIndex,
       };
@@ -307,7 +314,7 @@ export function createDashboardRenderer({ state, $, esc }) {
 
     const filtered = entries.filter((entry) => {
       if (query && !entry.titleLower.includes(query)) return false;
-      if (sourceFilter && entry.source !== sourceFilter) return false;
+      if (sourceFilter && !entry.sources.some(s => String(s.source || "ikiru").toLowerCase() === sourceFilter)) return false;
       return true;
     });
 
@@ -320,14 +327,22 @@ export function createDashboardRenderer({ state, $, esc }) {
 
     list.innerHTML = filtered
       .map((entry, index) => {
-        const { item, title, source, originalIndex } = entry;
-        const url = typeof item === "object" ? item.url : null;
-        const mark = typeof item === "object" ? markLabel(item.mark) : "";
+        const { title, sources, originalIndex } = entry;
         const displayIndex = state.whitelistSortOrder === "default" ? originalIndex : index;
-        return `<li class="manga-item" title="${url ? esc(url) : ""}">
+        
+        let badgesHtml = "";
+        let marksHtml = "";
+        for (const s of sources) {
+          badgesHtml += `<span class="source-badge ${sourceBadgeClass(s.source)}" title="${s.url ? esc(s.url) : ""}">${esc(sourceName(s.source))}</span>`;
+          if (s.mark) {
+            marksHtml += ` <span class="badge">${esc(markLabel(s.mark))}</span>`;
+          }
+        }
+
+        return `<li class="manga-item">
           <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
-          <span class="manga-item-title">${highlight(title, query)}${mark ? ` <span class="badge">${esc(mark)}</span>` : ""}</span>
-          <span class="source-badge ${sourceBadgeClass(source)}">${esc(sourceName(source))}</span>
+          <span class="manga-item-title">${highlight(title, query)}${marksHtml}</span>
+          ${badgesHtml}
           <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
           <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
         </li>`;

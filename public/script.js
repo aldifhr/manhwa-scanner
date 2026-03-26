@@ -180,7 +180,10 @@ function copyWhitelistUrlByIndex(index) {
     copyUrl("");
     return;
   }
-  copyUrl(item.url || "");
+  const targetUrl = Array.isArray(item.sources) && item.sources.length > 0
+    ? (item.sources.find(s => s.url)?.url || item.sources[0].url)
+    : item.url;
+  copyUrl(targetUrl || "");
 }
 
 async function deleteMangaByIndex(index) {
@@ -188,8 +191,6 @@ async function deleteMangaByIndex(index) {
   if (!item) return;
 
   const title = typeof item === "string" ? item : item.title;
-  const source = typeof item === "object" ? item.source || null : null;
-  const url = typeof item === "object" ? item.url || null : null;
   const ok = await openDeleteConfirm(title);
   if (!ok) return;
 
@@ -199,7 +200,7 @@ async function deleteMangaByIndex(index) {
       method: "DELETE",
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, source, url }),
+      body: JSON.stringify({ title }),
     });
     const data = await response.json();
     if (!response.ok) {
