@@ -423,6 +423,28 @@ body {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 
+.btn-mini.active-red {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+.btn-mini.active-red:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}
+
+.btn-mini.active-green {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.btn-mini.active-green:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}
+
 .sort-btn { padding: 8px 10px; }
 .sort-btn.active {
   background: color-mix(in srgb, var(--accent) 20%, var(--surface));

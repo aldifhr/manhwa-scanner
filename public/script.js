@@ -186,6 +186,36 @@ function copyWhitelistUrlByIndex(index) {
   copyUrl(targetUrl || "");
 }
 
+async function toggleMarkReadByIndex(index) {
+  const item = state.whitelistItems?.[index];
+  if (!item) return;
+
+  const title = typeof item === "string" ? item : item.title;
+  const isRead = (item.sources || []).some(s => s.mark === "read");
+  const nextMark = isRead ? null : "read";
+
+  state.isProcessing = true;
+  try {
+    const response = await fetch(`${API_BASE}/api/whitelist`, {
+      method: "PATCH",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, mark: nextMark }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      showAlert(data.error || "Gagal update status");
+      return;
+    }
+    renderWhitelist(data);
+    showToast(nextMark === "read" ? "Ditandai sudah baca" : "Status baca dihapus", "success");
+  } catch (err) {
+    showAlert(`Gagal: ${err.message}`);
+  } finally {
+    state.isProcessing = false;
+  }
+}
+
 async function deleteMangaByIndex(index) {
   const item = state.whitelistItems?.[index];
   if (!item) return;
@@ -595,4 +625,5 @@ Object.assign(window, {
   submitPassword,
   toggleAutoRefresh,
   toggleTheme,
+  toggleMarkReadByIndex,
 });

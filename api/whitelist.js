@@ -6,6 +6,7 @@ import {
   addWhitelistEntry,
   removeWhitelistEntry,
   removeWhitelistEntryIdentity,
+  markWhitelistEntry,
 } from "../lib/services/whitelist.js";
 import { buildWhitelistListResponse } from "../lib/services/whitelistUi.js";
 
@@ -125,6 +126,38 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, items: result.items });
     } catch (err) {
       logApiError(reqLogger, err, { status: 500, method: "DELETE" });
+      return res.status(500).json({ error: "Internal error" });
+    }
+  }
+
+  // PATCH: update mark status (e.g. mark as read)
+  if (req.method === "PATCH") {
+    try {
+      const { title, mark } = req.body ?? {};
+      if (!title?.trim()) {
+        logApiOk(reqLogger, { status: 400, method: "PATCH", reason: "title_required" });
+        return res.status(400).json({ error: "Title wajib diisi" });
+      }
+
+      const result = await markWhitelistEntry(title.trim(), mark);
+
+      if (result.status === "ambiguous") {
+        logApiOk(reqLogger, { status: 409, method: "PATCH", reason: "ambiguous_title" });
+        return res.status(409).json({
+          error: "Title mengarah ke lebih dari satu manga.",
+          matches: result.matches?.map(({ item }) => item.title) ?? [],
+        });
+      }
+
+      if (result.status === "not_found") {
+        logApiOk(reqLogger, { status: 404, method: "PATCH", reason: "not_found" });
+        return res.status(404).json({ error: "Manga tidak ditemukan" });
+      }
+
+      logApiOk(reqLogger, { status: 200, method: "PATCH", mark: result.reason });
+      return res.status(200).json({ ok: true, items: result.items, mark: result.reason });
+    } catch (err) {
+      logApiError(reqLogger, err, { status: 500, method: "PATCH" });
       return res.status(500).json({ error: "Internal error" });
     }
   }

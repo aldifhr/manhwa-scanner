@@ -330,19 +330,13 @@ export function createDashboardRenderer({ state, $, esc }) {
         const { title, sources, originalIndex } = entry;
         const displayIndex = state.whitelistSortOrder === "default" ? originalIndex : index;
         
-        let badgesHtml = "";
-        let marksHtml = "";
-        for (const s of sources) {
-          badgesHtml += `<span class="source-badge ${sourceBadgeClass(s.source)}" title="${s.url ? esc(s.url) : ""}">${esc(sourceName(s.source))}</span>`;
-          if (s.mark) {
-            marksHtml += ` <span class="badge">${esc(markLabel(s.mark))}</span>`;
-          }
-        }
+        const isRead = sources.some(s => s.mark === "read");
 
         return `<li class="manga-item">
           <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
           <span class="manga-item-title">${highlight(title, query)}${marksHtml}</span>
           ${badgesHtml}
+          <button class="btn-mini ${isRead ? "active-red" : "active-green"}" onclick="toggleMarkReadByIndex(${originalIndex})">${isRead ? "sudah ✓" : "mark"}</button>
           <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
           <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
         </li>`;
