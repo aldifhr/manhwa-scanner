@@ -197,7 +197,7 @@ export default async function handler(req, res) {
       }));
     }
 
-    if (custom_id.startsWith("read:")) {
+    if (custom_id.startsWith("read:") || custom_id.startsWith("unread:")) {
       const handleProgress = commands["myprogress"];
       if (handleProgress) {
         return handleProgress(payload, [{ name: "button", value: custom_id }], res, redis);
