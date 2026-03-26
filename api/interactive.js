@@ -71,11 +71,10 @@ async function resolveAddSelection(interactionData) {
   if (!item) {
     const parts = rawValue.split("|||");
     const [rawSource, keyword, id] = parts;
-    const legacySource = normalizeSource(rawSource);
-    cached = await redis.get(`add:results:${legacySource}:${keyword}`);
+    cached = await redis.get(`add:results:${rawSource}:${keyword}`);
     const results = Array.isArray(cached) ? cached : [];
     item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
-    selectedSource = normalizeSource(item?.source || legacySource);
+    selectedSource = normalizeSource(item?.source || rawSource);
   }
 
   return { cached, item, selectedSource };

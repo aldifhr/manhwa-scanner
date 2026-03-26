@@ -1,12 +1,10 @@
 import { isCronAuthorized } from "../lib/auth.js";
 import { performHealthCheck } from "../lib/services/healthCheck.js";
-import { getLogger } from "../lib/logger.js";
 import { logApiHit, logApiOk, logApiError } from "../lib/requestLog.js";
 import { getAllGuildChannels } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 
 export const config = { maxDuration: 300 }; // 5 minutes for deep health check
-const logger = getLogger({ scope: "health-api" });
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("health", req);
@@ -33,9 +31,14 @@ export default async function handler(req, res) {
     }
 
     logApiOk(reqLogger, { status: 200, brokenCount: brokenLinks.length });
-    return res.status(200).json({ ok: true, brokenCount: brokenLinks.length });
+    return res.status(200).json({ 
+      ok: true, 
+      brokenCount: brokenLinks.length,
+      brokenLinks: brokenLinks,
+      timestamp: new Date().toISOString()
+    });
   } catch (err) {
     logApiError(reqLogger, err, { status: 500 });
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, ok: false });
   }
 }

@@ -6,7 +6,7 @@ import { writeCronStatus } from "../lib/monitorStore.js";
 import { redis } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 300 };
 const logger = getLogger({ scope: "cron" });
 
 export { shouldRunChannelValidation };

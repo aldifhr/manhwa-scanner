@@ -253,8 +253,8 @@ async function runCronNow() {
       true,
     );
     await loadAll();
-  } catch (err) {
-    showAlert(`Gagal trigger cron: ${err.message}`);
+  } catch {
+    showAlert("Gagal trigger cron. Periksa koneksi atau console.");
   } finally {
     state.isProcessing = false;
     if (btn) {
@@ -298,7 +298,7 @@ async function logoutDashboard() {
   if (state.loadAbortController) state.loadAbortController.abort();
   try {
     await fetch(`${API_BASE}/api/logout`, { method: "POST", cache: "no-store" });
-  } catch (_err) {
+  } catch {
     // noop
   }
   state.isAuthenticated = false;
