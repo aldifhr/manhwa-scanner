@@ -3,24 +3,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { saveWhitelist } from "../lib/redis.js";
+import { normalizeWhitelist } from "../lib/domain/whitelist.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const WHITELIST_PATH = path.resolve(__dirname, "../whitelist.json");
-
-function cleanObject(obj) {
-  const cleaned = {};
-  // Fields we want to keep
-  const keep = ["title", "url", "source", "mark"];
-  
-  for (const key of keep) {
-    if (obj[key] !== undefined && obj[key] !== null) {
-      cleaned[key] = obj[key];
-    }
-  }
-  return cleaned;
-}
 
 async function formatWhitelist() {
   try {
@@ -37,21 +25,14 @@ async function formatWhitelist() {
       return;
     }
 
-    console.log(`📊 Current entries: ${data.length}`);
+    console.log(`📊 Current raw entries: ${data.length}`);
 
-    // 1. Clean and deduplicate
-    const unique = new Map();
-    for (const item of data) {
-      const cleaned = cleanObject(item);
-      // Create a key for deduplication based on title, url, and source
-      const key = `${cleaned.title}|||${cleaned.url}|||${cleaned.source}`;
-      if (!unique.has(key)) {
-        unique.set(key, cleaned);
-      }
-    }
+    // 1. Normalize and Deduplicate into Multi-Source structure
+    // normalizeWhitelist can handle both legacy flat arrays and new nested arrays.
+    let normalized = normalizeWhitelist(data);
 
-    // 2. Sort by title (case-insensitive)
-    const sorted = Array.from(unique.values()).sort((a, b) => {
+    // 2. Sort alphabetically by title
+    normalized.sort((a, b) => {
       const titleA = (a.title || "").toLowerCase();
       const titleB = (b.title || "").toLowerCase();
       if (titleA < titleB) return -1;
@@ -60,14 +41,13 @@ async function formatWhitelist() {
     });
 
     // 3. Write back to file
-    fs.writeFileSync(WHITELIST_PATH, JSON.stringify(sorted, null, 2), "utf8");
+    fs.writeFileSync(WHITELIST_PATH, JSON.stringify(normalized, null, 2), "utf8");
 
     // 4. Sync to Redis
     console.log("🔄 Syncing to Redis...");
-    await saveWhitelist(sorted);
+    await saveWhitelist(normalized);
 
-    console.log(`✅ Formatted, sorted, and synced to Redis! New total: ${sorted.length}`);
-    console.log(`♻️ Removed ${data.length - sorted.length} redundant/duplicate entries.`);
+    console.log(`✅ Formatted, merged sources, and synced to Redis! New unique titles: ${normalized.length}`);
   } catch (err) {
     console.error("❌ Error formatting whitelist:", err.message);
   }
