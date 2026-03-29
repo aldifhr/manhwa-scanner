@@ -127,12 +127,13 @@ export default async function handler(req, res) {
       return res.json({ type: 8, data: { choices: [] } });
     }
 
-    if (!isAddAllowedUser(payload)) {
+    if (!(await isAddAllowedUser(payload, redis))) {
       logApiOk(reqLogger, { status: 200, event: "autocomplete_add_denied" });
       return res.json({ type: 8, data: { choices: [] } });
     }
 
     const choices = await buildAddAutocompleteChoices(options, redis);
+
     logApiOk(reqLogger, {
       status: 200,
       event: "autocomplete_add",
@@ -145,13 +146,14 @@ export default async function handler(req, res) {
     const { custom_id } = interactionData;
 
     if (custom_id === "select_add_src") {
-      if (!isAddAllowedUser(payload)) {
+      if (!(await isAddAllowedUser(payload, redis))) {
         logApiOk(reqLogger, { status: 200, event: "add_selection_denied" });
         return res.json({
           type: 4,
           data: { content: "Command `/add` hanya diizinkan untuk user tertentu.", flags: 64 },
         });
       }
+
 
       const { cached, item, selectedSource } =
         await resolveAddSelection(interactionData);

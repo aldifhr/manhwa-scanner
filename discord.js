@@ -153,15 +153,50 @@ const commands = [
         required: false,
         choices: [
           { name: "Ikiru", value: "ikiru" },
-          { name: "Shinigami", value: "shinigami" }
+          { name: "Shinigami (Project)", value: "shinigami_project" },
+          { name: "Shinigami (Mirror)", value: "shinigami_mirror" }
         ]
       }
     ]
   },
   {
     name: "health",
-    description: "Show bot health, statistics, and broken links summary",
+    description: "Lihat kesehatan & statistik bot",
     default_member_permissions: MANAGE_GUILD_PERMISSION,
+  },
+  {
+    name: "permission",
+    description: "Kelola akses /add untuk user tertentu (owner only)",
+    default_member_permissions: "0",
+    options: [
+      {
+        name: "add",
+        description: "Berikan akses /add ke seorang user",
+        type: 1,
+        options: [{
+          name: "user_id",
+          description: "Discord User ID yang ingin diberi akses",
+          type: 3,
+          required: true,
+        }],
+      },
+      {
+        name: "remove",
+        description: "Cabut akses /add dari seorang user",
+        type: 1,
+        options: [{
+          name: "user_id",
+          description: "Discord User ID yang ingin dicabut aksesnya",
+          type: 3,
+          required: true,
+        }],
+      },
+      {
+        name: "list",
+        description: "Lihat semua user yang punya akses /add dinamis",
+        type: 1,
+      },
+    ],
   },
 ];
 
