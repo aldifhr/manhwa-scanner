@@ -143,23 +143,6 @@ const commands = [
   ],
 },
   {
-    name: "random",
-    description: "Ambil rekomendasi Manga/Manhwa secara acak dari database web asli!",
-    options: [
-      {
-        name: "source",
-        description: "Pilih sumber bacaan (default: Ikiru)",
-        type: 3,
-        required: false,
-        choices: [
-          { name: "Ikiru", value: "ikiru" },
-          { name: "Shinigami (Project)", value: "shinigami_project" },
-          { name: "Shinigami (Mirror)", value: "shinigami_mirror" }
-        ]
-      }
-    ]
-  },
-  {
     name: "health",
     description: "Lihat kesehatan & statistik bot",
     default_member_permissions: MANAGE_GUILD_PERMISSION,
