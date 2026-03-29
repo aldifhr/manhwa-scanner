@@ -187,8 +187,20 @@ export default async function handler(req, res) {
     if (custom_id.startsWith("list:")) {
       const parts = custom_id.split(":");
       const page = parseInt(parts[1], 10) || 1;
-      const searchFilter = parts[2] || "";
-      const [search, filter] = searchFilter.split("|");
+      const remainder = parts.slice(2).join(":"); 
+      
+      let search = null;
+      let filter = null;
+
+      if (remainder) {
+        const pipeIndex = remainder.lastIndexOf("|");
+        if (pipeIndex !== -1) {
+          search = remainder.substring(0, pipeIndex) || null;
+          filter = remainder.substring(pipeIndex + 1) || null;
+        } else {
+          search = remainder;
+        }
+      }
       
       res.json({ type: 6 });
       return waitUntil(handleListResponse(payload, page, reqLogger, "list_component", { 
