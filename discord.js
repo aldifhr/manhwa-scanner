@@ -114,10 +114,16 @@ const commands = [
   options: [
     {
       name: "title",
-      description: "Manga title to add",
+      description: "Judul manga untuk dicari (isi salah satu: title atau url)",
       type: 3,
-      required: true,
+      required: false,
       autocomplete: true,
+    },
+    {
+      name: "url",
+      description: "URL langsung halaman series (Ikiru / Shinigami) — lebih akurat dari pencarian",
+      type: 3,
+      required: false,
     },
   ],
 },
