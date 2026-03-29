@@ -196,6 +196,16 @@ export default async function handler(req, res) {
         filter: filter || null 
       }));
     }
+    if (custom_id.startsWith("myprogress:")) {
+      const parts = custom_id.split(":");
+      const page = parseInt(parts[1], 10) || 1;
+
+      res.json({ type: 6 });
+      const handleProgress = commands["myprogress"];
+      if (handleProgress) {
+        return waitUntil(handleProgress(payload, [{ name: "page", value: page }], res, redis));
+      }
+    }
 
     if (custom_id.startsWith("read:") || custom_id.startsWith("unread:")) {
       const handleProgress = commands["myprogress"];
