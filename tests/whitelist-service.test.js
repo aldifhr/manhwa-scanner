@@ -173,3 +173,24 @@ test("resolveWhitelistQuery finds matches with minor typos (fuzzy)", () => {
   assert.equal(result2.status, "matched");
   assert.equal(result2.item.title, "Nano Machine");
 });
+
+test("addWhitelistEntry prevents fuzzy title duplicates", async () => {
+  const mockWhitelist = [
+    { title: "Nano Machine", sources: [{ source: "ikiru" }] },
+  ];
+
+  const { addWhitelistEntry } = await import("../lib/services/whitelist.js");
+  
+  const result = await addWhitelistEntry({
+    title: "Nanomachin", // Slight variation
+    source: "ikiru"
+  }, {
+    loadWhitelistFn: async () => mockWhitelist,
+    redisClient: { 
+      set: async () => "OK",
+      mget: async () => []
+    }
+  });
+
+  assert.equal(result.status, "exists");
+});

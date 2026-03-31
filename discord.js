@@ -127,65 +127,66 @@ const commands = [
     },
   ],
 },
-{
-  name: "resync24h",
-  description: "Scan ulang update <24 jam dan kirim yang kelewat (owner only)",
-  default_member_permissions: "0",
-  options: [
-    {
-      name: "dry_run",
-      description: "Hanya simulasi hitung, tanpa kirim notifikasi",
-      type: 5,
-      required: false,
-    },
-    {
-      name: "max_send",
-      description: "Batas maksimal chapter yang dikirim (default: 30)",
-      type: 4,
-      required: false,
-      min_value: 1,
-      max_value: 200,
-    },
-  ],
-},
+  {
+    name: "resync24h",
+    description: "Scan ulang update <24 jam dan kirim yang kelewat (owner only)",
+    default_member_permissions: "0",
+    options: [
+      {
+        name: "dry_run",
+        description: "Hanya simulasi hitung, tanpa kirim notifikasi",
+        type: 5,
+        required: false,
+      },
+      {
+        name: "max_send",
+        description: "Batas maksimal chapter yang dikirim (default: 30)",
+        type: 4,
+        required: false,
+        min_value: 1,
+        max_value: 200,
+      },
+    ],
+  },
   {
     name: "health",
     description: "Lihat kesehatan & statistik bot",
     default_member_permissions: MANAGE_GUILD_PERMISSION,
   },
   {
-    name: "permission",
-    description: "Kelola akses /add untuk user tertentu (owner only)",
-    default_member_permissions: "0",
+    name: "search",
+    description: "Cari manga di whitelist menggunakan judul atau URL",
     options: [
       {
-        name: "add",
-        description: "Berikan akses /add ke seorang user",
-        type: 1,
-        options: [{
-          name: "user_id",
-          description: "Discord User ID yang ingin diberi akses",
-          type: 3,
-          required: true,
-        }],
-      },
-      {
-        name: "remove",
-        description: "Cabut akses /add dari seorang user",
-        type: 1,
-        options: [{
-          name: "user_id",
-          description: "Discord User ID yang ingin dicabut aksesnya",
-          type: 3,
-          required: true,
-        }],
-      },
-      {
-        name: "list",
-        description: "Lihat semua user yang punya akses /add dinamis",
-        type: 1,
+        name: "query",
+        description: "Judul atau URL manga",
+        type: 3,
+        required: true,
       },
     ],
+  },
+  {
+    name: "permission",
+    description: "Kelola izin akses command /add (Admin only)",
+    options: [
+      {
+        type: 3,
+        name: "action",
+        description: "Tambah atau hapus izin",
+        required: true,
+        choices: [
+          { name: "Add User", value: "add" },
+          { name: "Remove User", value: "remove" },
+          { name: "List Allowed", value: "list" }
+        ]
+      },
+      {
+        type: 6, // USER
+        name: "user",
+        description: "User yang ingin dikelola",
+        required: false
+      }
+    ]
   },
 ];
 
