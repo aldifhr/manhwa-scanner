@@ -1,5 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+
+// Prevent Upstash Redis crash during import
+process.env.UPSTASH_REDIS_REST_URL = "https://mock-redis.upstash.io";
+process.env.UPSTASH_REDIS_REST_TOKEN = "mock-token";
+
 import {
   findWhitelistEntryIndex,
   markWhitelistEntry,
@@ -22,7 +27,7 @@ test("formatMarkedTitle appends label when mark exists", () => {
   // Now item has mark or sources
   assert.equal(
     formatMarkedTitle({ title: "Solo Leveling", mark: "end_season" }),
-    "Solo Leveling [End Season]",
+    "Solo Leveling [Selesai Season]",
   );
   assert.equal(
     formatMarkedTitle({ title: "Solo Leveling", mark: null }),
@@ -163,14 +168,16 @@ test("resolveWhitelistQuery finds matches with minor typos (fuzzy)", () => {
     { title: "Nano Machine", sources: [] },
   ];
 
-  // "Solo Levling" (missing 'e')
+// "Solo Levling" (missing 'e')
   const result = resolveWhitelistQuery(items, "Solo Levling");
   assert.equal(result.status, "matched");
+  assert.equal(result.suggested, true);
   assert.equal(result.item.title, "Solo Leveling");
 
   // "Nanomachin" (missing 'e', no space)
   const result2 = resolveWhitelistQuery(items, "Nanomachin");
   assert.equal(result2.status, "matched");
+  assert.equal(result2.suggested, true);
   assert.equal(result2.item.title, "Nano Machine");
 });
 

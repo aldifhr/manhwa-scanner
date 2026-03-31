@@ -20,7 +20,7 @@ test("formatMarkedTitle appends label for valid mark on item", () => {
   );
   assert.equal(
     formatMarkedTitle({ title: "One Piece", mark: "end" }),
-    "One Piece [End]",
+    "One Piece [Tamat]",
   );
 });
 
@@ -29,7 +29,7 @@ test("formatMarkedTitle reads mark from first source if item.mark is absent", ()
     title: "Bleach",
     sources: [{ source: "ikiru", mark: "end_season" }],
   };
-  assert.equal(formatMarkedTitle(item), "Bleach [End Season]");
+  assert.equal(formatMarkedTitle(item), "Bleach [Selesai Season]");
 });
 
 test("formatMarkedTitle ignores invalid mark values", () => {
