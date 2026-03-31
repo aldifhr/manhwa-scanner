@@ -6,7 +6,6 @@ import {
   getCssVar,
   logFailedCount,
   logSentCount,
-  markLabel,
   parseDateSafe,
   sourceBadgeClass,
   sourceDisplayName,
