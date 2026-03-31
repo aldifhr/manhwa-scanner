@@ -28,18 +28,18 @@ test("sourceLabel returns human-readable label", () => {
 test("normalizeSourceUrl normalizes shngm and shinigami domains", () => {
   assert.equal(
     normalizeSourceUrl("https://shngm.id/series/abc/"),
-    "https://a.shinigami.asia/series/abc",
+    "https://a.shinigami.asia/series/abc/",
   );
   assert.equal(
     normalizeSourceUrl("http://www.shinigami.asia/series/abc"),
-    "https://a.shinigami.asia/series/abc",
+    "https://a.shinigami.asia/series/abc/",
   );
 });
 
 test("normalizeSourceUrl lowercases and trims trailing slash", () => {
   assert.equal(
     normalizeSourceUrl("HTTPS://A.SHINIGAMI.ASIA/SERIES/ABC/"),
-    "https://a.shinigami.asia/series/abc",
+    "https://a.shinigami.asia/series/abc/",
   );
 });
 

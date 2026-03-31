@@ -24,8 +24,8 @@ test("buildScrapeOptions keeps manual and cron scrape preferences aligned", () =
       shinigami_mirror: ["Wind Breaker"],
     },
     preferredSecondaryUrls: {
-      shinigami_project: ["https://a.shinigami.asia/series/lookism"],
-      shinigami_mirror: ["https://a.shinigami.asia/series/wind-breaker"],
+      shinigami_project: ["https://a.shinigami.asia/series/lookism/"],
+      shinigami_mirror: ["https://a.shinigami.asia/series/wind-breaker/"],
     },
   });
 });

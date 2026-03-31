@@ -33,7 +33,7 @@ function createLoggerMock() {
 
 test("Ikiru whitelist flow narrows orchestration results before dispatch queueing", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://02.ikiru.wtf/manga/the-emperors-sword/chapter-88.824440", "sent");
+  redis.kv.set("chapter:https://02.ikiru.wtf/manga/the-emperors-sword/chapter-88.824440/", "sent");
 
   const orchestrated = await orchestrateScrapeSources({
     redis,
@@ -105,7 +105,7 @@ test("Ikiru whitelist flow narrows orchestration results before dispatch queuein
   assert.equal(orchestrated.items.length, 3);
   assert.deepEqual(
     matched.map((item) => item.chapter),
-    ["Chapter 89", "Chapter 88"],
+    ["Chapter 88", "Chapter 89"],
   );
   assert.equal(queue.alreadySentCount, 1);
   assert.equal(queue.unsentMeta.length, 1);

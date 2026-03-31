@@ -21,7 +21,7 @@ test("shouldPrioritizeSecondaryTitle matches exact normalized titles only", () =
 test("shouldPrioritizeSecondaryEntry can fall back to canonical manga url", () => {
   const preferred = {
     titleKeys: new Set(["lookism"]),
-    urlKeys: new Set(["https://a.shinigami.asia/series/lookism"]),
+    urlKeys: new Set(["https://a.shinigami.asia/series/lookism/"]),
   };
 
   assert.equal(
@@ -38,7 +38,7 @@ test("shouldPrioritizeSecondaryEntry can fall back to canonical manga url", () =
     shouldPrioritizeSecondaryEntry(
       {
         title: "Lookism Season 2",
-        mangaUrl: "https://a.shinigami.asia/series/other-series",
+        mangaUrl: "https://a.shinigami.asia/series/other-series/",
       },
       preferred,
     ),

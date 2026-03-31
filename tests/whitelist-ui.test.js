@@ -75,6 +75,6 @@ test("buildAddExistsMessage formats correctly", () => {
     source: "ikiru",
   });
   assert.ok(msg.includes("One Piece"));
-  assert.ok(msg.includes("already exists"));
+  assert.ok(msg.includes("sudah ada"));
   assert.ok(msg.includes("Ikiru"));
 });

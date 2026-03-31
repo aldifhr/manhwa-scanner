@@ -9,5 +9,11 @@
     "api/interactive.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron-check-links",
+      "schedule": "0 0 1,15 * *"
+    }
+  ]
 }

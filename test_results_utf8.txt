@@ -1,0 +1,326 @@
+﻿Γ£ö validateDashboardPassword compares with DASHBOARD_PASSWORD (1.3536ms)
+Γ£ö validateDashboardPassword supports typo env fallback (0.1584ms)
+Γ£ö createDashboardSessionToken + isDashboardSessionAuthorized (1.0197ms)
+Γ£ö isDashboardSessionAuthorized rejects tampered token (0.2517ms)
+Γ£ö isCronAuthorized accepts bearer token (0.2077ms)
+Γ£ö isMonitorAuthorized accepts dashboard session for dashboard endpoints (1.2081ms)
+Γ£ö isCronAuthorized only accepts dashboard session when explicitly enabled (0.2895ms)
+Γ£ö dashboard login failures are throttled per client (0.8532ms)
+Γ£ö dashboard login throttle increments atomically across concurrent failures (1.019ms)
+Γ£ö session cookie headers include security attributes (0.3911ms)
+Γ£ö shouldReuseCachedCookie rejects missing timestamp (1.4149ms)
+Γ£ö shouldReuseCachedCookie accepts recently refreshed cookie (0.4421ms)
+Γ£ö shouldReuseCachedCookie expires stale cookie (0.1355ms)
+Γ£ö shouldBackoffCookieRefresh only during active cooldown (0.1559ms)
+Γ£ö classifyErrorType recognizes common buckets (1.691ms)
+Γ£ö normalizeCronLogEntry fills default fields (8.1384ms)
+Γ£ö buildCronErrorLog derives code and type (0.3216ms)
+Γ£ö appendCronLogThrottled skips repeated info logs within throttle window (1.1737ms)
+Γ£ö appendCronLog keeps sent summaries out of raw list but aggregates daily stats (1.9574ms)
+Γ£ö appendCronDailyStats aggregates failed delivery counts (0.5049ms)
+Γ£ö readCronDailyStats returns compact monthly summaries (0.6164ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö runCronJob includes per-step timing metrics in success status (10.0015ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö shouldRunChannelValidation returns true for missing timestamp (0.6679ms)
+Γ£ö shouldRunChannelValidation returns false before refresh window (0.1164ms)
+Γ£ö shouldRunChannelValidation returns true after refresh window (0.1131ms)
+Γ£ö dispatchChapters sends new chapter and writes recent entries plus daily stats (62.5185ms)
+Γ£û dispatchChapters skips invalid or already-sent chapters (268.4278ms)
+Γ£ö dispatchChapters releases lock if all channels fail (256.3522ms)
+Γ£ö dispatchChapters runs onDispatchSuccess extra tasks (109.5058ms)
+Γ£ö dispatchChapters writes one summary log for multiple sent chapters (248.4358ms)
+Γ£ö dispatchChapters preserves chapter order even when later sends finish faster (372.4586ms)
+Γ£ö dispatchChapters invalidates dashboard caches after write (107.9783ms)
+Γ£û prepareDispatchQueue reports invalid, already sent, and over-limit counts (0.4657ms)
+Γ£û prepareDispatchQueue ignores stale pending claims but blocks fresh pending claims (0.3132ms)
+Γ£û dispatchChapters promotes successful pending claim to sent state (122.9991ms)
+Γ£û dispatchChapters reclaims stale pending claim before sending (108.1607ms)
+Γ£ö prepareDispatchQueue blocks same title and chapter already sent from another source (0.3569ms)
+Γ£ö dispatchChapters dedupes same chapter across sources and prefers earliest update (124.5056ms)
+Γ£û dispatchChapters persists sent state before moving to the next chapter (233.8694ms)
+Γ£ö normalizeTitleKey removes punctuation and normalizes spaces (2.0274ms)
+Γ£ö isSameNormalizedTitle matches punctuation variants only (0.194ms)
+Γ£ö getChapterNumber extracts numeric chapter (0.2761ms)
+Γ£ö createWhitelistMatcher matches by normalized url in sources (0.8895ms)
+Γ£ö createWhitelistMatcher matches exact normalized title if url missing (0.1379ms)
+Γ£ö createWhitelistMatcher rejects partial title matches if url missing (0.1266ms)
+Γ£ö createWhitelistMatcher rejects source mismatch (0.0986ms)
+Γ£ö normalizeSource normalizes known aliases (0.7825ms)
+Γ£ö normalizeSource defaults unknown source to ikiru (0.1451ms)
+Γ£ö sourceLabel returns human-readable label (0.1469ms)
+Γ£ö normalizeSourceUrl normalizes shngm and shinigami domains (0.7453ms)
+Γ£ö normalizeSourceUrl lowercases and trims trailing slash (0.1344ms)
+Γ£ö inferSourceFromUrl detects canonical source from url (0.4169ms)
+Γ£ö normalizeMarkReason returns key for valid reasons (0.8653ms)
+Γ£ö normalizeMarkReason handles mixed casing and spacing (0.1239ms)
+Γ£ö normalizeMarkReason returns null for clear/none/unknown (0.1227ms)
+Γ£ö MARK_REASON_LABELS is frozen and contains expected keys (0.1526ms)
+Γ£ö normalizeWhitelist returns empty array for non-array input (0.6827ms)
+Γ£ö normalizeWhitelist skips items without title (0.1739ms)
+Γ£ö normalizeWhitelist normalizes sources correctly (0.3689ms)
+Γ£ö normalizeWhitelist deduplicates by normalized title key (0.2523ms)
+Γ£ö normalizeWhitelist does not add duplicate source entries during merge (0.2269ms)
+Γ£ö normalizeWhitelist handles items with no sources array (0.2675ms)
+Γ£ö normalizeWhitelist normalizes mark reasons in sources (0.1757ms)
+Γ£ö writeCronStatus writes last-run payload and refreshes status cache without invalidation (1.005ms)
+Γ£ö isGuildAdmin accepts administrator permission (1.4445ms)
+Γ£ö isGuildAdmin accepts manage guild permission (7.1883ms)
+Γ£ö isGuildAdmin rejects regular member permissions (0.1777ms)
+Γ£ö isAddAllowedUser accepts configured allowlist IDs (0.3318ms)
+Γ£ö ensureAddAllowedResponse rejects users outside add allowlist (2.1695ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö sortRecentItems uses sentOrder to stabilize same-batch ordering (1.3406ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö channel store reads from hash without legacy scan (1.773ms)
+Γ£ö channel store migrates legacy guild keys into hash (0.3968ms)
+Γ£ö channel store falls back to legacy key for single guild and hydrates hash (0.1732ms)
+Γ£ö channel store delete removes hash and legacy entries (0.2629ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö resync chapter ordering should stay ascending within one title (1.5537ms)
+Γ£ö resync chapter ordering should preserve title groups while sorting within each title (0.1614ms)
+Γ£û buildScrapeOptions keeps manual and cron scrape preferences aligned (4.234ms)
+Γ£û Ikiru whitelist flow narrows orchestration results before dispatch queueing (5.0789ms)
+Γ£ö collectIkiruRecentChaptersFromMangaPage reads full series chapter list within 24h (8.2449ms)
+Γ£ö collectIkiruRecentChaptersFromMangaPage respects seen chapter keys (2.8881ms)
+Γ£ö collectIkiruRecentChaptersFromAjaxHtml reads multiple fresh chapters from chapter_list response (1.3795ms)
+Γ£ö shouldBreakIkiruLatestScan stops after consecutive stale pages (0.1217ms)
+Γ£ö shouldPrioritizeSecondaryTitle defaults to true when no preferred set (0.5287ms)
+Γ£ö shouldPrioritizeSecondaryTitle matches exact normalized titles only (0.1907ms)
+Γ£ö shouldPrioritizeSecondaryEntry can fall back to canonical manga url (0.4392ms)
+Γ£ö defaultSourceHealth returns healthy baseline (1.863ms)
+Γ£ö sanitizeSourceHealth normalizes invalid values (0.165ms)
+Γ£ö applySourceOutcome marks source degraded after threshold (0.9905ms)
+Γ£ö applySourceOutcome resets health on success (0.1337ms)
+Γ£ö isSourceInCooldown checks disabledUntil (0.1567ms)
+Γ£ö buildNextSourceHealthMap applies outcomes for each source (0.2065ms)
+Γ£ö getDisabledSources returns sources currently in cooldown (0.7057ms)
+Γ£ö loadSourceHealthMap and saveSourceHealthMap use redis keys correctly (0.4462ms)
+Γ£ö status cache encodes null with a sentinel (0.7537ms)
+Γ£ö status cache leaves non-null payloads unchanged (0.348ms)
+Γ£ö status cache hit detection treats nullish values as misses (1.2351ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö normalizeMarkReason accepts supported values (1.6083ms)
+Γ£ö formatMarkedTitle appends label when mark exists (0.2174ms)
+Γ£ö findWhitelistEntryIndex respects nested sources (1.1011ms)
+Γ£ö resolveWhitelistQuery handles consolidated titles (0.3075ms)
+Γ£ö resolveWhitelistQuery keeps numeric remove behavior stable (0.2882ms)
+Γ£ö resolveWhitelistSource aligns source with canonical url (0.359ms)
+Γ£ö removeWhitelistEntry handles nested items (8.7355ms)
+Γ£ö markWhitelistEntry marks all sources (0.5531ms)
+[Upstash Redis] The 'url' property is missing or undefined in your Redis config.
+[Upstash Redis] The 'token' property is missing or undefined in your Redis config.
+Γ£ö formatMarkedTitle returns plain title when no mark (1.1305ms)
+Γ£ö formatMarkedTitle appends label for valid mark on item (0.1871ms)
+Γ£ö formatMarkedTitle reads mark from first source if item.mark is absent (0.1482ms)
+Γ£ö formatMarkedTitle ignores invalid mark values (0.1285ms)
+Γ£ö formatMarkedTitle handles empty/undefined input (0.6464ms)
+Γ£ö buildAddSuccessMessage formats correctly (0.2415ms)
+Γ£ö buildAddSuccessMessage handles shinigami source (0.184ms)
+Γ£û buildAddExistsMessage formats correctly (18.5719ms)
+Γä╣ tests 112
+Γä╣ suites 0
+Γä╣ pass 103
+Γä╣ fail 9
+Γä╣ cancelled 0
+Γä╣ skipped 0
+Γä╣ todo 0
+Γä╣ duration_ms 2166.4024
+
+Γ£û failing tests:
+
+test at tests\dispatch.test.js:79:1
+Γ£û dispatchChapters skips invalid or already-sent chapters (268.4278ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/dispatch.test.js:102:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\dispatch.test.js:257:1
+Γ£û prepareDispatchQueue reports invalid, already sent, and over-limit counts (0.4657ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/dispatch.test.js:283:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\dispatch.test.js:291:1
+Γ£û prepareDispatchQueue ignores stale pending claims but blocks fresh pending claims (0.3132ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/dispatch.test.js:322:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\dispatch.test.js:327:1
+Γ£û dispatchChapters promotes successful pending claim to sent state (122.9991ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   claimedAt: '2026-01-01T00:00:00.000Z',
+  -   sentAt: '2026-01-01T00:00:00.000Z',
+  -   status: 'sent'
+  - }
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/dispatch.test.js:346:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { status: 'sent', claimedAt: '2026-01-01T00:00:00.000Z', sentAt: '2026-01-01T00:00:00.000Z' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests\dispatch.test.js:353:1
+Γ£û dispatchChapters reclaims stale pending claim before sending (108.1607ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   claimedAt: '2026-01-01T00:00:00.000Z',
+  +   status: 'pending'
+  -   claimedAt: '2026-01-01T00:10:01.000Z',
+  -   sentAt: '2026-01-01T00:10:01.000Z',
+  -   status: 'sent'
+    }
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/dispatch.test.js:377:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'pending', claimedAt: '2026-01-01T00:00:00.000Z' },
+    expected: { status: 'sent', claimedAt: '2026-01-01T00:10:01.000Z', sentAt: '2026-01-01T00:10:01.000Z' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests\dispatch.test.js:450:1
+Γ£û dispatchChapters persists sent state before moving to the next chapter (233.8694ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/dispatch.test.js:484:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\scrape-preferences.test.js:5:1
+Γ£û buildScrapeOptions keeps manual and cron scrape preferences aligned (4.234ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      preferredIkiruTitles: [
+        'Nano Machine'
+      ],
+      preferredSecondaryTitles: {
+  ...
+        shinigami_mirror: [
+  +       'https://a.shinigami.asia/series/wind-breaker/'
+  -       'https://a.shinigami.asia/series/wind-breaker'
+        ],
+        shinigami_project: [
+  +       'https://a.shinigami.asia/series/lookism/'
+  -       'https://a.shinigami.asia/series/lookism'
+        ]
+      }
+    }
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/scrape-preferences.test.js:20:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { preferredIkiruTitles: [ 'Nano Machine' ], preferredSecondaryTitles: { shinigami_project: [Array], shinigami_mirror: [Array] }, preferredSecondaryUrls: { shinigami_project: [Array], shinigami_mirror: [Array] } },
+    expected: { preferredIkiruTitles: [ 'Nano Machine' ], preferredSecondaryTitles: { shinigami_project: [Array], shinigami_mirror: [Array] }, preferredSecondaryUrls: { shinigami_project: [Array], shinigami_mirror: [Array] } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests\scraper-dispatch.integration.test.js:34:1
+Γ£û Ikiru whitelist flow narrows orchestration results before dispatch queueing (5.0789ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/scraper-dispatch.integration.test.js:110:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\whitelist-ui.test.js:72:1
+Γ£û buildAddExistsMessage formats correctly (18.5719ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(msg.includes("already exists"))
+  
+      at TestContext.<anonymous> (file:///D:/ikiru-bot/tests/whitelist-ui.test.js:78:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+

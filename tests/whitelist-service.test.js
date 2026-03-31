@@ -41,7 +41,7 @@ test("findWhitelistEntryIndex respects nested sources", () => {
     { 
       title: "Solo Leveling", 
       sources: [
-        { source: "shinigami_project", url: "https://a.shinigami.asia/series/abc" }
+        { source: "shinigami_project", url: "https://a.shinigami.asia/series/abc/" }
       ]
     },
   ];
@@ -107,14 +107,14 @@ test("resolveWhitelistSource aligns source with canonical url", () => {
   );
   assert.equal(
     resolveWhitelistSource({
-      url: "https://a.shinigami.asia/series/abc",
+      url: "https://a.shinigami.asia/series/abc/",
       source: "ikiru",
     }),
     "shinigami_project",
   );
   assert.equal(
     resolveWhitelistSource({
-      url: "https://a.shinigami.asia/series/abc",
+      url: "https://a.shinigami.asia/series/abc/",
       source: "shinigami_mirror",
     }),
     "shinigami_mirror",
@@ -155,4 +155,21 @@ test("markWhitelistEntry marks all sources", async () => {
   assert.equal(result.status, "updated");
   assert.equal(savedItems[0].sources[0].mark, "hiatus");
   assert.equal(savedItems[0].sources[1].mark, "hiatus");
+});
+
+test("resolveWhitelistQuery finds matches with minor typos (fuzzy)", () => {
+  const items = [
+    { title: "Solo Leveling", sources: [] },
+    { title: "Nano Machine", sources: [] },
+  ];
+
+  // "Solo Levling" (missing 'e')
+  const result = resolveWhitelistQuery(items, "Solo Levling");
+  assert.equal(result.status, "matched");
+  assert.equal(result.item.title, "Solo Leveling");
+
+  // "Nanomachin" (missing 'e', no space)
+  const result2 = resolveWhitelistQuery(items, "Nanomachin");
+  assert.equal(result2.status, "matched");
+  assert.equal(result2.item.title, "Nano Machine");
 });

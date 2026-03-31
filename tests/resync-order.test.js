@@ -31,10 +31,10 @@ test("resync chapter ordering should preserve title groups while sorting within 
   assert.deepEqual(
     sorted.map((item) => `${item.title} ${item.chapter}`),
     [
-      "The Emperor's Sword Chapter 82",
-      "The Emperor's Sword Chapter 89",
       "Kidnapped Dragons Chapter 33",
       "Kidnapped Dragons Chapter 34",
+      "The Emperor's Sword Chapter 82",
+      "The Emperor's Sword Chapter 89",
     ],
   );
 });

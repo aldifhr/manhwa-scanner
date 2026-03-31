@@ -55,7 +55,7 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
       {
         title: "A",
         chapter: "Chapter 1",
-        url: "https://a.shinigami.asia/chapter/1",
+        url: "https://a.shinigami.asia/chapter/1/",
         source: "shinigami_project",
       },
     ],
@@ -78,7 +78,7 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
 
 test("dispatchChapters skips invalid or already-sent chapters", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2", "sent");
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2/", "sent");
 
   const out = await dispatchChapters({
     redis,
@@ -87,7 +87,7 @@ test("dispatchChapters skips invalid or already-sent chapters", async () => {
       {
         title: "Already",
         chapter: "Chapter 2",
-        url: "https://a.shinigami.asia/chapter/2",
+        url: "https://a.shinigami.asia/chapter/2/",
         source: "shinigami_project",
       },
     ],
@@ -113,7 +113,7 @@ test("dispatchChapters releases lock if all channels fail", async () => {
       {
         title: "Fail",
         chapter: "Chapter 3",
-        url: "https://a.shinigami.asia/chapter/3",
+        url: "https://a.shinigami.asia/chapter/3/",
         source: "shinigami_project",
       },
     ],
@@ -129,7 +129,7 @@ test("dispatchChapters releases lock if all channels fail", async () => {
 
   assert.equal(out.sent, 0);
   assert.equal(out.failed, 2);
-  assert.equal(redis.kv.has("chapter:https://a.shinigami.asia/chapter/3"), false);
+  assert.equal(redis.kv.has("chapter:https://a.shinigami.asia/chapter/3/"), false);
   assert.deepEqual(failedChannels.sort(), ["1001", "1002"]);
 });
 
@@ -143,7 +143,7 @@ test("dispatchChapters runs onDispatchSuccess extra tasks", async () => {
       {
         title: "Task",
         chapter: "Chapter 4",
-        url: "https://a.shinigami.asia/chapter/4",
+        url: "https://a.shinigami.asia/chapter/4/",
         source: "shinigami_project",
       },
     ],
@@ -167,13 +167,13 @@ test("dispatchChapters writes one summary log for multiple sent chapters", async
       {
         title: "A",
         chapter: "Chapter 1",
-        url: "https://a.shinigami.asia/chapter/10",
+        url: "https://a.shinigami.asia/chapter/10/",
         source: "shinigami_project",
       },
       {
         title: "B",
         chapter: "Chapter 2",
-        url: "https://a.shinigami.asia/chapter/11",
+        url: "https://a.shinigami.asia/chapter/11/",
         source: "shinigami_project",
       },
     ],
@@ -199,19 +199,19 @@ test("dispatchChapters preserves chapter order even when later sends finish fast
       {
         title: "Series",
         chapter: "Chapter 82",
-        url: "https://a.shinigami.asia/chapter/82",
+        url: "https://a.shinigami.asia/chapter/82/",
         source: "shinigami_project",
       },
       {
         title: "Series",
         chapter: "Chapter 87",
-        url: "https://a.shinigami.asia/chapter/87",
+        url: "https://a.shinigami.asia/chapter/87/",
         source: "shinigami_project",
       },
       {
         title: "Series",
         chapter: "Chapter 89",
-        url: "https://a.shinigami.asia/chapter/89",
+        url: "https://a.shinigami.asia/chapter/89/",
         source: "shinigami_project",
       },
     ],
@@ -240,7 +240,7 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
       {
         title: "Cache",
         chapter: "Chapter 7",
-        url: "https://a.shinigami.asia/chapter/77",
+        url: "https://a.shinigami.asia/chapter/77/",
         source: "shinigami_project",
       },
     ],
@@ -256,26 +256,26 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
 
 test("prepareDispatchQueue reports invalid, already sent, and over-limit counts", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2", "sent");
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2/", "sent");
 
   const out = await prepareDispatchQueue(redis, [
     { title: "No Url", chapter: "Chapter 1", url: "", source: "ikiru" },
     {
       title: "Already",
       chapter: "Chapter 2",
-      url: "https://a.shinigami.asia/chapter/2",
+      url: "https://a.shinigami.asia/chapter/2/",
       source: "shinigami_project",
     },
     {
       title: "Queued",
       chapter: "Chapter 3",
-      url: "https://a.shinigami.asia/chapter/3",
+      url: "https://a.shinigami.asia/chapter/3/",
       source: "shinigami_project",
     },
     {
       title: "Over",
       chapter: "Chapter 4",
-      url: "https://a.shinigami.asia/chapter/4",
+      url: "https://a.shinigami.asia/chapter/4/",
       source: "shinigami_project",
     },
   ], 1);
@@ -290,11 +290,11 @@ test("prepareDispatchQueue reports invalid, already sent, and over-limit counts"
 
 test("prepareDispatchQueue ignores stale pending claims but blocks fresh pending claims", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2", {
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2/", {
     status: "pending",
     claimedAt: "2026-01-01T00:00:00.000Z",
   });
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/3", {
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/3/", {
     status: "pending",
     claimedAt: new Date().toISOString(),
   });
@@ -305,13 +305,13 @@ test("prepareDispatchQueue ignores stale pending claims but blocks fresh pending
       {
         title: "Stale Pending",
         chapter: "Chapter 2",
-        url: "https://a.shinigami.asia/chapter/2",
+        url: "https://a.shinigami.asia/chapter/2/",
         source: "shinigami_project",
       },
       {
         title: "Fresh Pending",
         chapter: "Chapter 3",
-        url: "https://a.shinigami.asia/chapter/3",
+        url: "https://a.shinigami.asia/chapter/3/",
         source: "shinigami_project",
       },
     ],
@@ -333,7 +333,7 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
       {
         title: "Promote",
         chapter: "Chapter 5",
-        url: "https://a.shinigami.asia/chapter/5",
+        url: "https://a.shinigami.asia/chapter/5/",
         source: "shinigami_project",
       },
     ],
@@ -343,7 +343,7 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
   });
 
   assert.equal(out.sent, 1);
-  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/5"), {
+  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/5/"), {
     status: "sent",
     claimedAt: "2026-01-01T00:00:00.000Z",
     sentAt: "2026-01-01T00:00:00.000Z",
@@ -352,7 +352,7 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
 
 test("dispatchChapters reclaims stale pending claim before sending", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/6", {
+  redis.kv.set("chapter:https://a.shinigami.asia/chapter/6/", {
     status: "pending",
     claimedAt: "2026-01-01T00:00:00.000Z",
   });
@@ -363,7 +363,7 @@ test("dispatchChapters reclaims stale pending claim before sending", async () =>
       {
         title: "Reclaim",
         chapter: "Chapter 6",
-        url: "https://a.shinigami.asia/chapter/6",
+        url: "https://a.shinigami.asia/chapter/6/",
         source: "shinigami_project",
       },
     ],
@@ -374,7 +374,7 @@ test("dispatchChapters reclaims stale pending claim before sending", async () =>
   });
 
   assert.equal(out.sent, 1);
-  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/6"), {
+  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/6/"), {
     status: "sent",
     claimedAt: "2026-01-01T00:10:01.000Z",
     sentAt: "2026-01-01T00:10:01.000Z",
@@ -449,7 +449,7 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
 
 test("dispatchChapters persists sent state before moving to the next chapter", async () => {
   const redis = createRedisMock();
-  const firstKey = "chapter:https://a.shinigami.asia/chapter/200";
+  const firstKey = "chapter:https://a.shinigami.asia/chapter/200/";
 
   const out = await dispatchChapters({
     redis,
@@ -457,13 +457,13 @@ test("dispatchChapters persists sent state before moving to the next chapter", a
       {
         title: "First",
         chapter: "Chapter 1",
-        url: "https://a.shinigami.asia/chapter/200",
+        url: "https://a.shinigami.asia/chapter/200/",
         source: "shinigami_project",
       },
       {
         title: "Second",
         chapter: "Chapter 2",
-        url: "https://a.shinigami.asia/chapter/201",
+        url: "https://a.shinigami.asia/chapter/201/",
         source: "shinigami_project",
       },
     ],
