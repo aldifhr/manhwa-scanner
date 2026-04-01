@@ -5,14 +5,22 @@ import {
   getChapterNumber,
   isSameNormalizedTitle,
   normalizeTitleKey,
+  compactTitleKey,
 } from "../lib/domain.js";
 
-test("normalizeTitleKey removes punctuation and normalizes spaces", () => {
+test("compactTitleKey removes all spaces and punctuation for strict deduplication", () => {
+  assert.equal(compactTitleKey("Full-Time Awakening"), "fulltimeawakening");
+  assert.equal(compactTitleKey("Full Time Awakening"), "fulltimeawakening");
+  assert.equal(compactTitleKey("FullTimeAwakening"), "fulltimeawakening");
+});
+
+test("normalizeTitleKey removes punctuation but preserves internal spaces", () => {
   assert.equal(normalizeTitleKey("  Solo-Leveling!!!  "), "solo leveling");
   assert.equal(normalizeTitleKey("A   B   C"), "a b c");
 });
 
-test("isSameNormalizedTitle matches punctuation variants only", () => {
+test("isSameNormalizedTitle matches across punctuation variants using compact keys", () => {
+  assert.equal(isSameNormalizedTitle("Full-Time Awakening", "Full Time Awakening"), true);
   assert.equal(isSameNormalizedTitle("Solo-Leveling", "Solo Leveling"), true);
   assert.equal(isSameNormalizedTitle("The Beginning After The End", "The Beginning After The End S2"), false);
 });
