@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const MANAGE_GUILD_PERMISSION = "32";
+const MANAGE_GUILD_PERMISSION = "32"; // Manage Guild
 
 if (!process.env.DISCORD_BOT_TOKEN || !process.env.DISCORD_APPLICATION_ID) {
   console.error("❌ Please set DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID in .env");
@@ -11,45 +11,135 @@ if (!process.env.DISCORD_BOT_TOKEN || !process.env.DISCORD_APPLICATION_ID) {
 
 const commands = [
   {
-    name:        "ping",
-    description: "Cek status bot dan Redis",
+    name: "ping",
+    description: "Cek status bot dan koneksi",
   },
   {
-    name:        "check",
-    description: "Cek chapter baru sekarang tanpa nunggu cron",
+    name: "status",
+    description: "Dashboard status: Laporan kesehatan, statistik, dan manajemen izin",
     default_member_permissions: MANAGE_GUILD_PERMISSION,
+    options: [
+      {
+        name: "report",
+        description: "Tampilkan laporan status bot lengkap",
+        type: 1,
+      },
+      {
+        name: "perm_add",
+        description: "Berikan izin akses /add ke user tertentu (Owner Only)",
+        type: 1,
+        options: [
+          {
+            name: "user_id",
+            description: "ID User yang ingin diberikan akses",
+            type: 3,
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "perm_remove",
+        description: "Cabut izin akses /add dari user tertentu (Owner Only)",
+        type: 1,
+        options: [
+          {
+            name: "user_id",
+            description: "ID User yang ingin dicabut aksesnya",
+            type: 3,
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "perm_list",
+        description: "Lihat daftar user yang memiliki akses khusus /add",
+        type: 1,
+      },
+    ],
   },
   {
-    name:        "remove",
-    description: "Remove manga from whitelist (by title or number)",
+    name: "sync",
+    description: "Sinkronisasi manual whitelist dengan sumber manga",
     default_member_permissions: MANAGE_GUILD_PERMISSION,
-    options: [{
-      name:        "query",
-      description: "Manga title or number from /list",
-      type:        3,
-      required:    true,
-    }],
+    options: [
+      {
+        name: "mode",
+        description: "Pilih mode sinkronisasi (Quick: cek rilis baru, Deep: resync metadata)",
+        type: 3,
+        required: true,
+        choices: [
+          { name: "Quick Check", value: "quick" },
+          { name: "Deep Resync (Owner Only)", value: "deep" },
+        ],
+      },
+      {
+        name: "dry_run",
+        description: "Simulasi sinkronisasi tanpa mengirim notifikasi (hanya mode Deep)",
+        type: 5,
+        required: false,
+      },
+      {
+        name: "max_send",
+        description: "Batas maksimal chapter yang dikirim (hanya mode Deep, default: 30)",
+        type: 4,
+        required: false,
+        min_value: 1,
+        max_value: 200,
+      },
+    ],
+  },
+  {
+    name: "add",
+    description: "Tambah manga ke whitelist",
+    options: [
+      {
+        name: "title",
+        description: "Judul manga untuk dicari",
+        type: 3,
+        required: false,
+        autocomplete: true,
+      },
+      {
+        name: "url",
+        description: "URL langsung halaman series (Ikiru/Shinigami)",
+        type: 3,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "remove",
+    description: "Hapus manga dari whitelist",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
+    options: [
+      {
+        name: "query",
+        description: "Judul, nomor manga, atau ketik 'all' untuk hapus semua (Owner Only)",
+        type: 3,
+        required: true,
+      },
+    ],
   },
   {
     name: "list",
-    description: "Lihat daftar manga di whitelist (search & filter available)",
+    description: "Lihat daftar manga di whitelist",
     options: [
       {
         name: "page",
-        description: "Halaman ke berapa (default: 1)",
+        description: "Halaman (default: 1)",
         type: 4,
         required: false,
         min_value: 1,
       },
       {
         name: "search",
-        description: "Cari judul manga (misal: Lookism)",
+        description: "Cari judul manga tertentu",
         type: 3,
         required: false,
       },
       {
         name: "status",
-        description: "Filter berdasarkan status manga",
+        description: "Filter berdasarkan status",
         type: 3,
         required: false,
         choices: [
@@ -62,145 +152,93 @@ const commands = [
   },
   {
     name: "myprogress",
-    description: "Lihat history baca / progress manga kamu",
-  },
-  {
-    name:        "mark",
-    description: "Kasih mark status ke manga di whitelist",
-    default_member_permissions: MANAGE_GUILD_PERMISSION,
-    options: [{
-      name:        "query",
-      description: "Judul manga atau nomor dari /list",
-      type:        3,
-      required:    true,
-    }, {
-      name:        "reason",
-      description: "Status mark yang mau dipasang",
-      type:        3,
-      required:    true,
-      choices: [
-        { name: "Hiatus", value: "hiatus" },
-        { name: "End Season", value: "end_season" },
-        { name: "End", value: "end" },
-        { name: "Clear", value: "clear" },
-      ],
-    }],
-  },
-  {
-    name:        "clear",
-    description: "Clear semua whitelist (owner only)",
-    default_member_permissions: "0",
-  },
-  {
-    name:        "status",
-    description: "Show bot status dan notification channel",
-    default_member_permissions: MANAGE_GUILD_PERMISSION,
-  },
-  {
-    name:        "setchannel",
-    description: "Set notification channel untuk manga updates",
-    default_member_permissions: MANAGE_GUILD_PERMISSION,
-    options: [{
-      name:         "channel",
-      description:  "Channel to send notifications",
-      type:         7,
-      required:     true,
-      channel_types: [0],
-    }],
-  },
-{
-  name: "add",
-  description: "Tambah manga ke whitelist",
-  options: [
-    {
-      name: "title",
-      description: "Judul manga untuk dicari (isi salah satu: title atau url)",
-      type: 3,
-      required: false,
-      autocomplete: true,
-    },
-    {
-      name: "url",
-      description: "URL langsung halaman series (Ikiru / Shinigami) — lebih akurat dari pencarian",
-      type: 3,
-      required: false,
-    },
-  ],
-},
-  {
-    name: "resync24h",
-    description: "Scan ulang update <24 jam dan kirim yang kelewat (owner only)",
-    default_member_permissions: "0",
+    description: "Lihat atau kelola history baca manga kamu",
     options: [
       {
-        name: "dry_run",
-        description: "Hanya simulasi hitung, tanpa kirim notifikasi",
-        type: 5,
-        required: false,
+        name: "list",
+        description: "Tampilkan progres baca kamu",
+        type: 1,
+        options: [
+          {
+            name: "page",
+            description: "Halaman progres",
+            type: 4,
+            required: false,
+            min_value: 1,
+          },
+        ],
       },
       {
-        name: "max_send",
-        description: "Batas maksimal chapter yang dikirim (default: 30)",
-        type: 4,
-        required: false,
-        min_value: 1,
-        max_value: 200,
+        name: "clear",
+        description: "Hapus judul tertentu dari riwayat progres baca kamu",
+        type: 1,
+        options: [
+          {
+            name: "judul",
+            description: "Judul manga yang ingin dihapus dari progres",
+            type: 3,
+            required: true,
+          },
+        ],
       },
     ],
   },
   {
-    name: "health",
-    description: "Lihat kesehatan & statistik bot",
+    name: "mark",
+    description: "Pasang penanda status pada manga di whitelist",
     default_member_permissions: MANAGE_GUILD_PERMISSION,
-  },
-  {
-    name: "search",
-    description: "Cari manga di whitelist menggunakan judul atau URL",
     options: [
       {
         name: "query",
-        description: "Judul atau URL manga",
+        description: "Judul manga atau nomor urut",
         type: 3,
         required: true,
+      },
+      {
+        name: "reason",
+        description: "Pilih status baru",
+        type: 3,
+        required: true,
+        choices: [
+          { name: "Hiatus", value: "hiatus" },
+          { name: "End Season", value: "end_season" },
+          { name: "End", value: "end" },
+          { name: "Clear Status", value: "clear" },
+        ],
       },
     ],
   },
   {
-    name: "permission",
-    description: "Kelola izin akses command /add (Admin only)",
+    name: "setchannel",
+    description: "Set channel notifikasi manga updates",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
     options: [
       {
-        type: 3,
-        name: "action",
-        description: "Tambah atau hapus izin",
+        name: "channel",
+        description: "Channel tujuan notifikasi",
+        type: 7,
         required: true,
-        choices: [
-          { name: "Add User", value: "add" },
-          { name: "Remove User", value: "remove" },
-          { name: "List Allowed", value: "list" }
-        ]
+        channel_types: [0],
       },
-      {
-        type: 6, // USER
-        name: "user",
-        description: "User yang ingin dikelola",
-        required: false
-      }
-    ]
+    ],
+  },
+  {
+    name: "random",
+    description: "Dapatkan rekomendasi manhwa/manhua acak",
   },
 ];
 
 async function registerCommands() {
   try {
-    console.log("📝 Registering Discord slash commands...\n");
+    console.log("📝 Updating consolidated Discord slash commands...\n");
 
     const response = await fetch(
       `https://discord.com/api/v10/applications/${process.env.DISCORD_APPLICATION_ID}/commands`,
       {
-        method:  "PUT",
+        method: "PUT",
         headers: {
-          "Authorization": `Bot ${process.env.DISCORD_BOT_TOKEN}`,
-          "Content-Type":  "application/json",
+          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(commands),
       }
@@ -208,8 +246,8 @@ async function registerCommands() {
 
     if (response.ok) {
       const data = await response.json();
-      console.log("✅ Commands registered successfully!");
-      console.log(`\n📋 Registered ${data.length} commands:`);
+      console.log("✅ Commands updated successfully!");
+      console.log(`\n📋 Final Consolidated Commands (${data.length}):`);
       data.forEach((cmd) => {
         console.log(`  /${cmd.name} — ${cmd.description}`);
       });

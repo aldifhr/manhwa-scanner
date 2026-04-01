@@ -123,30 +123,30 @@ export function createDashboardRenderer({ state, $, esc }) {
     const canvas = $("chartSourceHealth");
     if (!canvas || !window.Chart) return;
 
-    let ikiru = 0;
-    let project = 0;
-    let mirror = 0;
+    const sourceCounts = {};
     for (const item of state.recentItems) {
       const source = String(item?.source || "ikiru").toLowerCase();
-      if (source === "shinigami_project") project += 1;
-      else if (source === "shinigami_mirror") mirror += 1;
-      else ikiru += 1;
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
     }
+
+    const labels = Object.keys(sourceCounts).map(s => sourceDisplayName(s));
+    const data = Object.values(sourceCounts);
+    const backgroundColors = Object.keys(sourceCounts).map(s => {
+      if (s === "shinigami_project") return getCssVar("--amber", "#b06b17");
+      if (s === "shinigami_mirror") return getCssVar("--accent-2", "#1b9aaa");
+      return getCssVar("--green", "#1b8f5a");
+    });
 
     if (state.sourceChart) state.sourceChart.destroy();
     state.sourceChart = new window.Chart(canvas, {
       type: "bar",
       data: {
-        labels: ["Ikiru", "Project", "Mirror"],
+        labels,
         datasets: [
           {
             label: "updates",
-            data: [ikiru, project, mirror],
-            backgroundColor: [
-              getCssVar("--green", "#1b8f5a"),
-              getCssVar("--amber", "#b06b17"),
-              getCssVar("--accent-2", "#1b9aaa"),
-            ],
+            data,
+            backgroundColor: backgroundColors,
             borderRadius: 8,
           },
         ],
@@ -331,10 +331,22 @@ export function createDashboardRenderer({ state, $, esc }) {
         
         const isRead = sources.some(s => s.mark === "read");
 
+        // Logic for marks (Hiatus, End, etc.)
+        const marks = [...new Set(sources.map(s => s.mark).filter(m => m && m !== "read"))];
+        const marksHtml = marks.length > 0 
+          ? marks.map(m => `<span class="badge" style="margin-left:6px; opacity:.7">${esc(m)}</span>`).join("")
+          : "";
+
+        // Logic for source badges
+        const uniqueSources = [...new Set(sources.map(s => s.source || "ikiru"))];
+        const badgesHtml = uniqueSources.map(s => 
+          `<span class="source-badge ${sourceBadgeClass(s)}" style="margin-right:4px">${esc(sourceName(s))}</span>`
+        ).join("");
+
         return `<li class="manga-item">
           <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
           <span class="manga-item-title">${highlight(title, query)}${marksHtml}</span>
-          ${badgesHtml}
+          <div style="display:flex; align-items:center;">${badgesHtml}</div>
           <button class="btn-mini ${isRead ? "active-red" : "active-green"}" onclick="toggleMarkReadByIndex(${originalIndex})">${isRead ? "sudah ✓" : "mark"}</button>
           <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
           <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
