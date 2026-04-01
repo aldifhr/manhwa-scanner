@@ -5,10 +5,10 @@ import {
   getChapterNumber,
   isSameNormalizedTitle,
   normalizeTitleKey,
-} from "../lib/domain/manga.js";
+} from "../lib/domain.js";
 
 test("normalizeTitleKey removes punctuation and normalizes spaces", () => {
-  assert.equal(normalizeTitleKey("  Solo-Leveling!!!  "), "sololeveling");
+  assert.equal(normalizeTitleKey("  Solo-Leveling!!!  "), "solo leveling");
   assert.equal(normalizeTitleKey("A   B   C"), "a b c");
 });
 

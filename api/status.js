@@ -1,5 +1,5 @@
 import { redis } from "../lib/redis.js";
-import { logApiHit } from "../lib/requestLog.js";
+import { logApiHit } from "../lib/logger.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import {
   readStatusCache,

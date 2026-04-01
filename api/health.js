@@ -1,6 +1,6 @@
 import { isCronAuthorized } from "../lib/auth.js";
-import { performHealthCheck } from "../lib/services/healthCheck.js";
-import { logApiHit, logApiOk, logApiError } from "../lib/requestLog.js";
+import { performFullHealthCheck } from "../lib/services/health.js";
+import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
 import { getAllGuildChannels } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 

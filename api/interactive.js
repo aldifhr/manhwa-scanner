@@ -10,15 +10,15 @@ import {
   buildAddAutocompleteChoices,
   resolveAddResultValue,
 } from "../lib/commands/add.js";
-import { logApiError, logApiHit, logApiOk } from "../lib/requestLog.js";
-import { normalizeSource } from "../lib/domain/source.js";
+import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
+import { normalizeSource } from "../lib/domain.js";
 import { isAddAllowedUser } from "../lib/permissions.js";
 import { addWhitelistEntry } from "../lib/services/whitelist.js";
 import {
   buildAddExistsMessage,
   buildAddSuccessMessage,
   buildWhitelistListResponse,
-} from "../lib/services/whitelistUi.js";
+} from "../lib/services/whitelist.js";
 
 export const config = { api: { bodyParser: false } };
 

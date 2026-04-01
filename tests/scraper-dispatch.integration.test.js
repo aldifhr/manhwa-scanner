@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { orchestrateScrapeSources } from "../lib/scrapers/orchestrator.js";
-import { createWhitelistMatcher } from "../lib/domain/manga.js";
+import { createWhitelistMatcher } from "../lib/domain.js";
 import { prepareDispatchQueue } from "../lib/services/dispatch.js";
 
 function createRedisMock() {

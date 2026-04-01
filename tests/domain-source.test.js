@@ -5,7 +5,7 @@ import {
   normalizeSource,
   normalizeSourceUrl,
   sourceLabel,
-} from "../lib/domain/source.js";
+} from "../lib/domain.js";
 
 test("normalizeSource normalizes known aliases", () => {
   assert.equal(normalizeSource("mirror"), "shinigami_mirror");

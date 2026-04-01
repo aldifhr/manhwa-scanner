@@ -300,7 +300,7 @@ async function submitPassword() {
   if (!password) return;
 
   try {
-    const response = await fetch(`${API_BASE}/api/login`, {
+    const response = await fetch(`${API_BASE}/api/auth?action=login`, {
       method: "POST",
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
@@ -327,7 +327,7 @@ async function logoutDashboard() {
   if (state.heavyAbortController) state.heavyAbortController.abort();
   if (state.loadAbortController) state.loadAbortController.abort();
   try {
-    await fetch(`${API_BASE}/api/logout`, { method: "POST", cache: "no-store" });
+    await fetch(`${API_BASE}/api/auth?action=logout`, { method: "POST", cache: "no-store" });
   } catch {
     // noop
   }
@@ -342,7 +342,7 @@ async function logoutDashboard() {
 
 async function bootstrapAuth() {
   try {
-    const response = await fetch(`${API_BASE}/api/auth-status`, { method: "GET", cache: "no-store" });
+    const response = await fetch(`${API_BASE}/api/auth?action=status`, { method: "GET", cache: "no-store" });
     const data = await response.json();
     state.isAuthenticated = Boolean(data?.authenticated);
   } catch {
@@ -379,7 +379,7 @@ async function loadLightData() {
   try {
     const [statusResult, recentResult] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
-      apiFetch("/api/recent", controller.signal),
+      apiFetch("/api/history?action=recent", controller.signal),
     ]);
 
     if (state.lightAbortController !== controller) return;
@@ -418,7 +418,7 @@ async function loadHeavyData() {
   try {
     const [whitelistResult, logsResult] = await Promise.allSettled([
       apiFetch("/api/whitelist", controller.signal),
-      apiFetch("/api/logs", controller.signal),
+      apiFetch("/api/history?action=logs", controller.signal),
     ]);
 
     if (state.heavyAbortController !== controller) return;
@@ -471,8 +471,8 @@ async function loadAll() {
     const [statusResult, whitelistResult, recentResult, logsResult] = await Promise.allSettled([
       apiFetch("/api/status", controller.signal),
       apiFetch("/api/whitelist", controller.signal),
-      apiFetch("/api/recent", controller.signal),
-      apiFetch("/api/logs", controller.signal),
+      apiFetch("/api/history?action=recent", controller.signal),
+      apiFetch("/api/history?action=logs", controller.signal),
     ]);
 
     if (state.loadAbortController !== controller) return;

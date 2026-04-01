@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { saveWhitelist } from "../lib/redis.js";
-import { normalizeWhitelist } from "../lib/domain/whitelist.js";
+import { normalizeWhitelist } from "../lib/domain.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

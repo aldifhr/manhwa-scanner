@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sortRecentItems } from "../api/recent.js";
+import { sortRecentItems } from "../api/history.js";
 
 test("sortRecentItems uses sentOrder to stabilize same-batch ordering", () => {
   const sentAt = "2026-03-12T12:00:00.000Z";

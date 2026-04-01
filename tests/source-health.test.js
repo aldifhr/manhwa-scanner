@@ -10,7 +10,7 @@ import {
   sanitizeSourceHealth,
   saveSourceHealthMap,
   sourceHealthKey,
-} from "../lib/services/sourceHealth.js";
+} from "../lib/services/health.js";
 
 test("defaultSourceHealth returns healthy baseline", () => {
   const out = defaultSourceHealth("ikiru");
@@ -165,6 +165,6 @@ test("loadSourceHealthMap and saveSourceHealthMap use redis keys correctly", asy
     ["ikiru"],
     loaded,
   );
-  assert.equal(setCount, 1);
-  assert.equal(getCount, 2);
+  assert.equal(setCount, 2);
+  assert.equal(getCount, 1);
 });

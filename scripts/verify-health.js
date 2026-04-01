@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { performHealthCheck } from "../lib/services/healthCheck.js";
+import { performFullHealthCheck } from "../lib/services/health.js";
 import { redis } from "../lib/redis.js";
 import fs from "fs";
 import path from "path";
@@ -15,7 +15,7 @@ async function verify() {
   try {
     // 1. Run Health Check
     console.log("--- Testing performHealthCheck ---");
-    const broken = await performHealthCheck();
+    const broken = await performFullHealthCheck();
     console.log(`Found ${broken.length} broken links.`);
     
     // 2. Read stats from Redis

@@ -3,16 +3,13 @@
     "api/cron.js": {
       "maxDuration": 300
     },
-    "api/health.js": {
-      "maxDuration": 300
-    },
     "api/interactive.js": {
       "maxDuration": 60
     }
   },
   "crons": [
     {
-      "path": "/api/cron-check-links",
+      "path": "/api/cron?action=health",
       "schedule": "0 0 1,15 * *"
     }
   ]

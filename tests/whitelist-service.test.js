@@ -1,19 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-// Prevent Upstash Redis crash during import
 process.env.UPSTASH_REDIS_REST_URL = "https://mock-redis.upstash.io";
 process.env.UPSTASH_REDIS_REST_TOKEN = "mock-token";
 
-import {
+const {
   findWhitelistEntryIndex,
   markWhitelistEntry,
   removeWhitelistEntry,
   resolveWhitelistQuery,
   resolveWhitelistSource,
-} from "../lib/services/whitelist.js";
-import { formatMarkedTitle } from "../lib/services/whitelistUi.js";
-import { normalizeMarkReason } from "../lib/domain/whitelist.js";
+  formatMarkedTitle,
+  addWhitelistEntry, // Import here to avoid multiple dynamic imports everywhere
+} = await import("../lib/services/whitelist.js");
+const { normalizeMarkReason } = await import("../lib/domain.js");
 
 test("normalizeMarkReason accepts supported values", () => {
   assert.equal(normalizeMarkReason("hiatus"), "hiatus");
@@ -185,17 +185,17 @@ test("addWhitelistEntry prevents fuzzy title duplicates", async () => {
   const mockWhitelist = [
     { title: "Nano Machine", sources: [{ source: "ikiru" }] },
   ];
-
-  const { addWhitelistEntry } = await import("../lib/services/whitelist.js");
   
   const result = await addWhitelistEntry({
     title: "Nanomachin", // Slight variation
     source: "ikiru"
   }, {
     loadWhitelistFn: async () => mockWhitelist,
+    saveWhitelistFn: async () => {}, // Mock to prevent hitting real Redis
     redisClient: { 
       set: async () => "OK",
-      mget: async () => []
+      mget: async () => [],
+      del: async () => 0
     }
   });
 

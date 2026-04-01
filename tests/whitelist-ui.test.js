@@ -4,7 +4,7 @@ import {
   formatMarkedTitle,
   buildAddSuccessMessage,
   buildAddExistsMessage,
-} from "../lib/services/whitelistUi.js";
+} from "../lib/services/whitelist.js";
 
 // --- formatMarkedTitle ---
 

@@ -11,10 +11,6 @@ if (!process.env.DISCORD_BOT_TOKEN || !process.env.DISCORD_APPLICATION_ID) {
 
 const commands = [
   {
-    name: "ping",
-    description: "Cek status bot dan koneksi",
-  },
-  {
     name: "status",
     description: "Dashboard status: Laporan kesehatan, statistik, dan manajemen izin",
     default_member_permissions: MANAGE_GUILD_PERMISSION,

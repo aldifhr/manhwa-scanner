@@ -27,32 +27,26 @@ Discord bot for manga update notifications. Tracks releases from multiple manga 
 ```
 ikiru-bot/
 ├── api/                    # Vercel serverless API routes
-│   ├── auth-status.js     # Admin auth check
-│   ├── cron.js            # Triggered by Vercel Cron (every 30s)
+│   ├── cron.js            # Triggered by Vercel Cron (inc. health check)
+│   ├── history.js         # API for recent updates and logs
 │   ├── interactive.js     # Discord interaction handler
-│   ├── login.js           # Admin login
-│   ├── logout.js          # Admin logout
-│   ├── logs.js            # Cron run logs
-│   ├── recent.js          # Recent updates API
 │   ├── status.js          # Bot/source health status
 │   └── whitelist.js       # Whitelist management
 ├── lib/                   # Core business logic
 │   ├── auth.js            # Admin authentication
 │   ├── cacheKeys.js       # Redis key schemas
 │   ├── commands/          # Discord slash commands
-│   ├── consts.js         # Constants
+│   ├── config.js         # Unified Configuration
 │   ├── cookie.js          # Cookie management for scraping
 │   ├── cronLogs.js       # Cron execution logging
 │   ├── cronRuntime.js    # Cron health tracking
 │   ├── discord.js         # Discord client wrapper
-│   ├── domain/           # Domain/manga source models
+│   ├── domain.js         # Unified Domain Models
 │   ├── httpClient.js     # HTTP client with retry
-│   ├── logger.js         # Structured logging
+│   ├── logger.js         # Structured logging (inc. API logging)
 │   ├── monitorStore.js   # Manga monitor state
 │   ├── permissions.js     # Admin permission checks
 │   ├── redis.js          # Upstash Redis client
-│   ├── requestLog.js     # HTTP request logging
-│   ├── runtimeConfig.js  # Runtime configuration
 │   ├── scraper.js        # Main scraper
 │   ├── scrapers/         # Source-specific scrapers
 │   ├── services/         # Business services

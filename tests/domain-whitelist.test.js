@@ -4,7 +4,7 @@ import {
   MARK_REASON_LABELS,
   normalizeMarkReason,
   normalizeWhitelist,
-} from "../lib/domain/whitelist.js";
+} from "../lib/domain.js";
 
 // --- normalizeMarkReason ---
 
@@ -34,8 +34,8 @@ test("normalizeMarkReason returns null for clear/none/unknown", () => {
 test("MARK_REASON_LABELS is frozen and contains expected keys", () => {
   assert.ok(Object.isFrozen(MARK_REASON_LABELS));
   assert.equal(MARK_REASON_LABELS.hiatus, "Hiatus");
-  assert.equal(MARK_REASON_LABELS.end_season, "End Season");
-  assert.equal(MARK_REASON_LABELS.end, "End");
+  assert.equal(MARK_REASON_LABELS.end_season, "Selesai Season");
+  assert.equal(MARK_REASON_LABELS.end, "Tamat");
 });
 
 // --- normalizeWhitelist ---

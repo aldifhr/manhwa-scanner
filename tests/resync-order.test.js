@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sortResyncMatchedChapters } from "../lib/commands/resync24h.js";
+import { sortMatchedChapters as sortResyncMatchedChapters } from "../lib/commands/sync.js";
 
 test("resync chapter ordering should stay ascending within one title", () => {
   const matched = [
