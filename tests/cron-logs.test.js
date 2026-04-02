@@ -93,7 +93,7 @@ test("appendCronLogThrottled skips repeated info logs within throttle window", a
   assert.equal((redis.lists.get("cron:logs") || []).length, 1);
 });
 
-test("appendCronLog keeps sent summaries out of raw list but aggregates daily stats", async () => {
+test("appendCronLog keeps sent summaries in raw list and aggregates daily stats", async () => {
   const redis = createRedisMock();
   const written = await appendCronLog(redis, {
     time: "2026-03-20T10:00:00.000Z",
@@ -105,8 +105,8 @@ test("appendCronLog keeps sent summaries out of raw list but aggregates daily st
     message: "Cron sent 3 chapter(s)",
   });
 
-  assert.equal(written, false);
-  assert.equal((redis.lists.get("cron:logs") || []).length, 0);
+  assert.equal(written, true);
+  assert.equal((redis.lists.get("cron:logs") || []).length, 1);
   assert.deepEqual(redis.kv.get(cronDailyStatsKey("2026-03-20T10:00:00.000Z")), {
     events_total: 1,
     "tag:sent": 1,

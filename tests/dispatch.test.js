@@ -75,7 +75,7 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
   assert.equal(out.failed, 0);
   assert.deepEqual(sent, ["A:1001"]);
   assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
-  assert.equal((redis.lists.get("cron:logs") || []).length, 0);
+  assert.equal((redis.lists.get("cron:logs") || []).length, 1);
   const statsEntry = [...redis.kv.entries()].find(([key]) => key.startsWith("cron:stats:"));
   assert.equal(statsEntry?.[1]?.chapters_sent, 1);
 });
@@ -188,7 +188,7 @@ test("dispatchChapters writes one summary log for multiple sent chapters", async
 
   const logs = redis.lists.get("cron:logs") || [];
   assert.equal(out.sent, 2);
-  assert.equal(logs.length, 0);
+  assert.equal(logs.length, 1);
   const statsEntry = [...redis.kv.entries()].find(([key]) => key.startsWith("cron:stats:"));
   assert.equal(statsEntry?.[1]?.chapters_sent, 2);
 });
