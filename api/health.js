@@ -15,11 +15,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const brokenLinks = await performHealthCheck();
+    const brokenLinks = await performFullHealthCheck();
+    const recommendations = await redis.get("health:recommendations") || [];
     
     if (brokenLinks.length > 0) {
       const guildChannels = await getAllGuildChannels();
-      const msg = `⚠️ **Daily Health Audit**\nFound **${brokenLinks.length}** broken links in your whitelist.\nUse \`/health\` for details.`;
+      let msg = `⚠️ **Daily Health Audit**\nFound **${brokenLinks.length}** broken links in your whitelist.`;
+      
+      if (recommendations.length > 0) {
+        msg += `\n\n💡 **Action Needed**: Found **${recommendations.length}** links with persistent failures. Consider removing them.`;
+      }
+      
+      msg += `\n\nUse \`/health\` or check the Dashboard for details.`;
       
       for (const channelId of Object.values(guildChannels)) {
         await sendDiscordEmbed({ 
@@ -30,11 +37,12 @@ export default async function handler(req, res) {
       }
     }
 
-    logApiOk(reqLogger, { status: 200, brokenCount: brokenLinks.length });
+    logApiOk(reqLogger, { status: 200, brokenCount: brokenLinks.length, recommendations: recommendations.length });
     return res.status(200).json({ 
       ok: true, 
       brokenCount: brokenLinks.length,
       brokenLinks: brokenLinks,
+      recommendations: recommendations,
       timestamp: new Date().toISOString()
     });
   } catch (err) {

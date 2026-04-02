@@ -246,6 +246,35 @@ async function deleteMangaByIndex(index) {
   }
 }
 
+async function deleteMangaByTitle(title) {
+  if (!title) return;
+  const ok = await openDeleteConfirm(title);
+  if (!ok) return;
+
+  state.isProcessing = true;
+  try {
+    const response = await fetch(`${API_BASE}/api/whitelist`, {
+      method: "DELETE",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      showAlert(data.error || "Gagal menghapus");
+      return;
+    }
+    renderWhitelist(data);
+    showToast("Manga berhasil dihapus", "success");
+    // Also refresh status to update recommendations
+    await loadLightData();
+  } catch (err) {
+    showAlert(`Gagal: ${err.message}`);
+  } finally {
+    state.isProcessing = false;
+  }
+}
+
 function checkAuth() {
   if (!state.isAuthenticated) {
     $("modalOverlay")?.classList.add("show");
@@ -616,6 +645,7 @@ Object.assign(window, {
   copyUrl,
   copyWhitelistUrlByIndex,
   deleteMangaByIndex,
+  deleteMangaByTitle,
   loadAll,
   logoutDashboard,
   renderTrendChart,

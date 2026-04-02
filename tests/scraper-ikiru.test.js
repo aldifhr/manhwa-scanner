@@ -4,8 +4,6 @@ import * as cheerio from "cheerio";
 import {
   collectIkiruRecentChaptersFromAjaxHtml,
   collectIkiruRecentChaptersFromMangaPage,
-} from "../lib/scraper.js";
-import {
   shouldBreakIkiruLatestScan,
 } from "../lib/scrapers/ikiru.js";
 

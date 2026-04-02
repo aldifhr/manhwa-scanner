@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   shouldPrioritizeSecondaryEntry,
   shouldPrioritizeSecondaryTitle,
-} from "../lib/scraper.js";
+} from "../lib/scrapers/shared.js";
 
 test("shouldPrioritizeSecondaryTitle defaults to true when no preferred set", () => {
   assert.equal(shouldPrioritizeSecondaryTitle("Nano Machine", null), true);

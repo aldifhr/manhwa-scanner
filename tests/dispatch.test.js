@@ -1,3 +1,7 @@
+process.env.SECONDARY_PUBLIC_BASE = "https://a.shinigami.asia";
+process.env.SHINIGAMI_BASE_URL = "https://a.shinigami.asia";
+process.env.IKIRU_BASE_URL = "https://02.ikiru.wtf";
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import {

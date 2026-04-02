@@ -436,11 +436,42 @@ export function createDashboardRenderer({ state, $, esc }) {
     renderTrendChart();
   }
 
+  function renderRecommendations(statusData) {
+    const panel = $("recommendationsPanel");
+    const list = $("recommendationList");
+    const countEl = $("recommendationCount");
+    const items = statusData?.recommendations || [];
+
+    if (!items.length) {
+      if (panel) panel.style.display = "none";
+      return;
+    }
+
+    if (panel) panel.style.display = "block";
+    if (countEl) countEl.textContent = items.length;
+
+    list.innerHTML = items
+      .map((item) => {
+        const reasonLabel = item.reason === "persistent_failure" ? "Mati Total" : "Stale/Lama";
+        return `<li class="manga-item">
+          <div class="manga-info">
+            <div class="manga-item-title">${esc(item.title)}</div>
+            <div class="manga-item-sub">${esc(item.url)}</div>
+          </div>
+          <span class="status-pill invalid">${reasonLabel}</span>
+          <span class="badge">${item.consecutiveFailures}x gagal</span>
+          <button class="btn-delete" onclick="deleteMangaByTitle('${esc(item.title).replace(/'/g, "\\'")}')">hapus</button>
+        </li>`;
+      })
+      .join("");
+  }
+
   function renderSummaryPanels() {
     renderStatsExtended(state.latestStatusData);
     renderOverview(state.latestStatusData, state.latestWhitelistData, state.latestRecentData);
     renderLastCronResult(state.latestStatusData, false);
     renderSourceHealth(state.latestStatusData);
+    renderRecommendations(state.latestStatusData);
   }
 
   return {

@@ -71,6 +71,20 @@
 
     <main class="layout">
       <div class="alert" id="alertBox" style="display: none"></div>
+      
+      <section class="panel" id="recommendationsPanel" style="display: none">
+        <div class="panel-title panel-title-warn">health recommendations</div>
+        <div class="card card-warn">
+          <div class="card-header">
+            <span class="card-title">Link mati terdeteksi</span>
+            <span class="badge badge-warn" id="recommendationCount">0</span>
+          </div>
+          <p class="card-desc">Saran penghapusan untuk link yang gagal diakses berturut-turut.</p>
+          <ul class="manga-list" id="recommendationList">
+            <li class="empty">semua link sehat.</li>
+          </ul>
+        </div>
+      </section>
 
       <section class="hero">
         <div class="hero-card" id="lastCronBar">

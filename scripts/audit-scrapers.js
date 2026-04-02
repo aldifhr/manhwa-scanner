@@ -1,5 +1,7 @@
 import "dotenv/config";
-import { searchIkiru, searchShngm, scrapeMangaUpdates } from "../lib/scraper.js";
+import { searchIkiru } from "../lib/scrapers/ikiru.js";
+import { searchShngm } from "../lib/scrapers/secondary.js";
+import { scrapeMangaUpdates } from "../lib/scrapers/orchestrator.js";
 import { redis } from "../lib/redis.js";
 
 async function audit() {
