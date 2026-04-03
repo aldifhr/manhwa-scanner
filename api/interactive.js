@@ -264,16 +264,6 @@ export default async function handler(req, res) {
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interactionData;
 
-    if (name === "list") {
-      const opts = interactionData.options || [];
-      const page = parseInt(opts.find(o => o.name === "page")?.value, 10) || 1;
-      const search = opts.find(o => o.name === "search")?.value || null;
-      const filter = opts.find(o => o.name === "status")?.value || null;
-
-      res.json({ type: 5, data: { flags: 64 } });
-      return waitUntil(handleListResponse(payload, page, reqLogger, "list_command", { search, filter }));
-    }
-
     const handle = commands[name];
 
     if (!handle) {
