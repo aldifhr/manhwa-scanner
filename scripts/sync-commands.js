@@ -22,10 +22,6 @@ const url = `https://discord.com/api/v10/applications/${appId}/commands`;
 
 const commands = [
   {
-    name: "ping",
-    description: "Cek apakah bot sedang aktif",
-  },
-  {
     name: "status",
     description: "Lihat status whitelist saat ini",
     options: [
