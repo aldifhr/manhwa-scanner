@@ -261,6 +261,35 @@ const commands = [
       },
     ],
   },
+  {
+    name: "pref",
+    description: "Atur preferensi notifikasi kamu",
+    options: [
+      {
+        name: "ping",
+        description: "Atur mode mention (ping) untuk update manga",
+        type: 1,
+        options: [
+          {
+            name: "mode",
+            description: "Pilih mode notifikasi",
+            type: 3,
+            required: false,
+            choices: [
+              { name: "Semua Update (Default)", value: "all" },
+              { name: "Hanya Followed Manga", value: "follows" },
+              { name: "Mati (Tidak ada ping)", value: "none" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: "clear",
+    description: "Hapus seluruh isi whitelist (Owner Only)",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
+  },
 ];
 
 async function registerCommands() {
