@@ -82,6 +82,12 @@ const commands = [
         min_value: 1,
         max_value: 200,
       },
+      {
+        name: "broadcast",
+        description: "Kirim notifikasi ke channel publik (broadcast)?",
+        type: 5,
+        required: false,
+      },
     ],
   },
   {
