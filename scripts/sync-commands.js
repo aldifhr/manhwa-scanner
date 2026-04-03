@@ -198,6 +198,38 @@ const commands = [
         ]
       }
     ]
+  },
+  {
+    name: "follow",
+    description: "Lihat atau kelola manga yang kamu ikuti untuk notifikasi",
+    options: [
+      {
+        type: 1, // SUB_COMMAND
+        name: "list",
+        description: "Lihat daftar manga yang kamu ikuti",
+        options: [
+          {
+            type: 4, // INTEGER
+            name: "page",
+            description: "Halaman ke-berapa",
+            required: false
+          }
+        ]
+      },
+      {
+        type: 1, // SUB_COMMAND
+        name: "remove",
+        description: "Berhenti mengikuti update manga",
+        options: [
+          {
+            type: 3, // STRING
+            name: "judul",
+            description: "Judul manga yang ingin di-unfollow",
+            required: true
+          }
+        ]
+      }
+    ]
   }
 ];
 

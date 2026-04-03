@@ -220,6 +220,16 @@ export default async function handler(req, res) {
         return waitUntil(handleProgress(payload, [{ name: "page", value: page }], res, redis));
       }
     }
+    if (custom_id.startsWith("follow:list:")) {
+      const parts = custom_id.split(":");
+      const page = parseInt(parts[2], 10) || 1;
+
+      res.json({ type: 6 });
+      const handleFollow = commands["follow"];
+      if (handleFollow) {
+        return waitUntil(handleFollow(payload, [{ name: "button", value: custom_id }], res, redis));
+      }
+    }
 
     if (custom_id.startsWith("read:") || custom_id.startsWith("unread:")) {
       const handleProgress = commands["myprogress"];
