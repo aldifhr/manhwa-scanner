@@ -178,6 +178,30 @@ const commands = [
         required: false
       }
     ]
+  },
+  {
+    name: "pref",
+    description: "Atur preferensi notifikasi (ping/tag)",
+    options: [
+      {
+        type: 1, // SUB_COMMAND
+        name: "ping",
+        description: "Pengaturan notifikasi tag",
+        options: [
+          {
+            type: 3, // STRING
+            name: "mode",
+            description: "Pilih mode notifikasi",
+            required: false,
+            choices: [
+              { name: "🔔 Semua Update (Tag All)", value: "all" },
+              { name: "⭐ Hanya Follow (Tag Follows)", value: "follows" },
+              { name: "🔕 Nonaktif (No Tag)", value: "none" }
+            ]
+          }
+        ]
+      }
+    ]
   }
 ];
 

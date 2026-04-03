@@ -228,6 +228,35 @@ export default async function handler(req, res) {
       }
     }
 
+    if (custom_id.startsWith("follow_toggle:")) {
+      const userId = payload.member?.user?.id ?? payload.user?.id;
+      const title = custom_id.split(":")[1];
+      
+      const { isUserFollowing, followManga, unfollowManga } = await import("../lib/services/notifications.js");
+      
+      try {
+        const following = await isUserFollowing(userId, title);
+        if (following) {
+          await unfollowManga(userId, title);
+          return res.json({
+            type: 4,
+            data: { content: `✅ Kamu berhenti mengikuti update **${title}**.`, flags: 64 },
+          });
+        } else {
+          await followManga(userId, title);
+          return res.json({
+            type: 4,
+            data: { content: `🔔 Kamu sekarang mengikuti update **${title}**! Kamu akan di-tag jika ada chapter baru.`, flags: 64 },
+          });
+        }
+      } catch (err) {
+        return res.json({
+          type: 4,
+          data: { content: `❌ Gagal memproses: ${err.message}`, flags: 64 },
+        });
+      }
+    }
+
     logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
     return res.status(400).json({ error: "Unknown component" });
   }
