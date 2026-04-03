@@ -222,6 +222,45 @@ const commands = [
     name: "random",
     description: "Dapatkan rekomendasi manhwa/manhua acak",
   },
+  {
+    name: "check",
+    description: "Cek chapter terbaru dari whitelist secara manual (Quick Sync)",
+  },
+  {
+    name: "health",
+    description: "Cek status kesehatan scraper/situs sumber",
+  },
+  {
+    name: "resync24h",
+    description: "Sync ulang chapter yang rilis dalam 24 jam terakhir (Deep Sync)",
+    default_member_permissions: MANAGE_GUILD_PERMISSION,
+    options: [
+      {
+        type: 4, // INTEGER
+        name: "max_send",
+        description: "Maksimal chapter yang dikirim (default 100)",
+        required: false,
+      },
+      {
+        type: 5, // BOOLEAN
+        name: "dry_run",
+        description: "Cek jumlah yang akan dikirim tanpa benar-benar mengirim",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "search",
+    description: "Cari manga di whitelist",
+    options: [
+      {
+        type: 3, // STRING
+        name: "query",
+        description: "Judul atau URL manga",
+        required: true,
+      },
+    ],
+  },
 ];
 
 async function registerCommands() {
