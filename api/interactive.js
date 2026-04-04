@@ -240,31 +240,25 @@ export default async function handler(req, res) {
 
     if (custom_id.startsWith("follow_toggle:")) {
       const userId = payload.member?.user?.id ?? payload.user?.id;
-      const title = custom_id.split(":")[1];
+      const title = custom_id.slice("follow_toggle:".length);
       
-      const { isUserFollowing, followManga, unfollowManga } = await import("../lib/services/notifications.js");
-      
-      try {
-        const following = await isUserFollowing(userId, title);
-        if (following) {
-          await unfollowManga(userId, title);
-          return res.json({
-            type: 4,
-            data: { content: `✅ Kamu berhenti mengikuti update **${title}**.`, flags: 64 },
-          });
-        } else {
-          await followManga(userId, title);
-          return res.json({
-            type: 4,
-            data: { content: `🔔 Kamu sekarang mengikuti update **${title}**! Kamu akan di-tag jika ada chapter baru.`, flags: 64 },
-          });
+      res.json({ type: 5, data: { flags: 64 } });
+
+      return waitUntil((async () => {
+        try {
+          const { isUserFollowing, followManga, unfollowManga } = await import("../lib/services/notifications.js");
+          const following = await isUserFollowing(userId, title);
+          if (following) {
+            await unfollowManga(userId, title);
+            return editInteractionResponse(payload, `✅ Kamu berhenti mengikuti update **${title}**.`);
+          } else {
+            await followManga(userId, title);
+            return editInteractionResponse(payload, `🔔 Kamu sekarang mengikuti update **${title}**! Kamu akan di-tag jika ada chapter baru.`);
+          }
+        } catch (err) {
+          return editInteractionResponse(payload, `❌ Gagal memproses: ${err.message}`);
         }
-      } catch (err) {
-        return res.json({
-          type: 4,
-          data: { content: `❌ Gagal memproses: ${err.message}`, flags: 64 },
-        });
-      }
+      })());
     }
 
     logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
