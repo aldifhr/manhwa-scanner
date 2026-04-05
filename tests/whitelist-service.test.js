@@ -136,7 +136,7 @@ test("removeWhitelistEntry handles nested items", async () => {
       saveCalls += 1;
       assert.equal(items.length, 0);
     },
-    redisClient: { del: async () => 0 },
+    redisClient: { del: async () => 0, hdel: async () => 0, hgetall: async () => ({}), hset: async () => 1 },
   });
 
   assert.equal(result.status, "removed");
@@ -195,7 +195,10 @@ test("addWhitelistEntry prevents fuzzy title duplicates", async () => {
     redisClient: { 
       set: async () => "OK",
       mget: async () => [],
-      del: async () => 0
+      del: async () => 0,
+      hdel: async () => 0,
+      hgetall: async () => ({}),
+      hset: async () => 1
     }
   });
 

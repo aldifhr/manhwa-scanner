@@ -66,6 +66,29 @@ function createRedisMock() {
     async expire() {
       return 1;
     },
+    async hset(key, fieldOrPayload, maybeValue) {
+      let current = kv.get(key) || {};
+      if (typeof fieldOrPayload === "object") {
+        current = { ...current, ...fieldOrPayload };
+      } else {
+        current[fieldOrPayload] = maybeValue;
+      }
+      kv.set(key, current);
+      return 1;
+    },
+    async hget(key, field) {
+      const current = kv.get(key) || {};
+      return current[field] ?? null;
+    },
+    async hgetall(key) {
+      return kv.get(key) || {};
+    },
+    async hdel(key, ...fields) {
+      const current = kv.get(key) || {};
+      for (const f of fields) delete current[f];
+      kv.set(key, current);
+      return fields.length;
+    },
   };
 }
 
@@ -107,7 +130,9 @@ test("appendCronLog keeps sent summaries in raw list and aggregates daily stats"
 
   assert.equal(written, true);
   assert.equal((redis.lists.get("cron:logs") || []).length, 1);
-  assert.deepEqual(redis.kv.get(cronDailyStatsKey("2026-03-20T10:00:00.000Z")), {
+  const statsMap = redis.kv.get("cron:daily_stats") || {};
+  const stats = typeof statsMap["2026-03-20"] === "string" ? JSON.parse(statsMap["2026-03-20"]) : statsMap["2026-03-20"];
+  assert.deepEqual(stats, {
     events_total: 1,
     "tag:sent": 1,
     "code:dispatch_sent": 1,
@@ -130,7 +155,9 @@ test("appendCronDailyStats aggregates failed delivery counts", async () => {
     message: "Cron sent 2 chapter(s) | failed=1",
   });
 
-  assert.deepEqual(redis.kv.get(cronDailyStatsKey("2026-03-20T11:00:00.000Z")), {
+  const statsMap = redis.kv.get("cron:daily_stats") || {};
+  const stats = typeof statsMap["2026-03-20"] === "string" ? JSON.parse(statsMap["2026-03-20"]) : statsMap["2026-03-20"];
+  assert.deepEqual(stats, {
     events_total: 1,
     "tag:partial": 1,
     "code:dispatch_partial": 1,
@@ -144,8 +171,10 @@ test("appendCronDailyStats aggregates failed delivery counts", async () => {
 test("readCronDailyStats returns compact monthly summaries", async () => {
   const { readCronDailyStats } = await import("../lib/cronLogs.js");
   const redis = createRedisMock();
-  redis.kv.set("cron:stats:2026-03-19", { events_total: 2, "tag:sent": 1, chapters_sent: 4 });
-  redis.kv.set("cron:stats:2026-03-20", { events_total: 1, "type:short_circuit": 1 });
+  redis.kv.set("cron:daily_stats", {
+    "2026-03-19": { events_total: 2, "tag:sent": 1, chapters_sent: 4 },
+    "2026-03-20": { events_total: 1, "type:short_circuit": 1 }
+  });
 
   const out = await readCronDailyStats(redis, 2, new Date("2026-03-20T12:00:00.000Z"));
 

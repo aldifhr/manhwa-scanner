@@ -45,6 +45,40 @@ function createRedisMock() {
     async expire() {
       return 1;
     },
+    async hset(key, fieldOrPayload, maybeValue) {
+      let current = kv.get(key) || {};
+      if (typeof fieldOrPayload === "object") {
+        current = { ...current, ...fieldOrPayload };
+      } else {
+        current[fieldOrPayload] = maybeValue;
+      }
+      kv.set(key, current);
+      return 1;
+    },
+    async hmget(key, ...fields) {
+      const current = kv.get(key) || {};
+      return fields.map((f) => (Object.hasOwn(current, f) ? current[f] : null));
+    },
+    async hgetall(key) {
+      return kv.get(key) || {};
+    },
+    async hsetnx(key, field, value) {
+      const current = kv.get(key) || {};
+      if (Object.hasOwn(current, field)) return 0;
+      current[field] = value;
+      kv.set(key, current);
+      return 1;
+    },
+    async hget(key, field) {
+      const current = kv.get(key) || {};
+      return Object.hasOwn(current, field) ? current[field] : null;
+    },
+    async hdel(key, ...fields) {
+      const current = kv.get(key) || {};
+      for (const f of fields) delete current[f];
+      kv.set(key, current);
+      return fields.length;
+    },
   };
 
   return api;
@@ -67,6 +101,7 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
     sendEmbed: async (item, channelId) => {
       sent.push(`${item.title}:${channelId}`);
     },
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -76,8 +111,10 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
   assert.deepEqual(sent, ["A:1001"]);
   assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
   assert.equal((redis.lists.get("cron:logs") || []).length, 1);
-  const statsEntry = [...redis.kv.entries()].find(([key]) => key.startsWith("cron:stats:"));
-  assert.equal(statsEntry?.[1]?.chapters_sent, 1);
+  const statsMap = redis.kv.get("cron:daily_stats") || {};
+  const statsStr = statsMap["2026-01-01"];
+  const stats = typeof statsStr === "string" ? JSON.parse(statsStr) : statsStr;
+  assert.equal(stats?.chapters_sent, 1);
 });
 
 test("dispatchChapters skips invalid or already-sent chapters", async () => {
@@ -99,6 +136,7 @@ test("dispatchChapters skips invalid or already-sent chapters", async () => {
     sendEmbed: async () => {
       throw new Error("should not be called");
     },
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -128,6 +166,7 @@ test("dispatchChapters releases lock if all channels fail", async () => {
     onChannelError: async (_err, channelId) => {
       failedChannels.push(channelId);
     },
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -183,14 +222,17 @@ test("dispatchChapters writes one summary log for multiple sent chapters", async
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
   const logs = redis.lists.get("cron:logs") || [];
   assert.equal(out.sent, 2);
   assert.equal(logs.length, 1);
-  const statsEntry = [...redis.kv.entries()].find(([key]) => key.startsWith("cron:stats:"));
-  assert.equal(statsEntry?.[1]?.chapters_sent, 2);
+  const statsMap = redis.kv.get("cron:daily_stats") || {};
+  const statsStr = statsMap["2026-01-01"];
+  const stats = typeof statsStr === "string" ? JSON.parse(statsStr) : statsStr;
+  assert.equal(stats?.chapters_sent, 2);
 });
 
 test("dispatchChapters preserves chapter order even when later sends finish faster", async () => {
@@ -226,6 +268,7 @@ test("dispatchChapters preserves chapter order even when later sends finish fast
       await new Promise((resolve) => setTimeout(resolve, wait));
       sent.push(item.chapter);
     },
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -250,6 +293,7 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -343,6 +387,7 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -373,6 +418,7 @@ test("dispatchChapters reclaims stale pending claim before sending", async () =>
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:10:01.000Z",
     pendingClaimTtl: 60,
   });
@@ -429,6 +475,7 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
     sendEmbed: async (item) => {
       sent.push({ title: item.title, source: item.source, chapter: item.chapter });
     },
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T05:00:00.000Z",
   });
 
@@ -482,6 +529,7 @@ test("dispatchChapters persists sent state before moving to the next chapter", a
         assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
       }
     },
+    getSubscribersFn: async () => [],
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 

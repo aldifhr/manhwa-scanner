@@ -133,6 +133,21 @@ test("loadSourceHealthMap and saveSourceHealthMap use redis keys correctly", asy
       store.set(key, value);
       return "OK";
     },
+    async hset(key, fieldOrPayload, maybeValue) {
+      setCount += 1;
+      let current = store.get(key) || {};
+      if (typeof fieldOrPayload === "object") {
+        current = { ...current, ...fieldOrPayload };
+      } else {
+        current[fieldOrPayload] = maybeValue;
+      }
+      store.set(key, current);
+      return 1;
+    },
+    async hgetall(key) {
+      getCount += 1;
+      return store.get(key) || {};
+    },
   };
 
   await saveSourceHealthMap(
