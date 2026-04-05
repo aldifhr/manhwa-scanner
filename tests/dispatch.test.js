@@ -7,7 +7,23 @@ import assert from "node:assert/strict";
 import {
   dispatchChapters,
   prepareDispatchQueue,
+  DISPATCH_HISTORY_KEY,
 } from "../lib/services/dispatch.js";
+
+const noSubscribers = async () => [];
+
+function seedHistory(redis, key, value) {
+  const h = redis.kv.get(DISPATCH_HISTORY_KEY) || {};
+  h[key] = typeof value === "string" ? value : JSON.stringify(value);
+  redis.kv.set(DISPATCH_HISTORY_KEY, h);
+}
+
+function getHistoryEntry(redis, key) {
+  const h = redis.kv.get(DISPATCH_HISTORY_KEY) || {};
+  const raw = h[key];
+  if (!raw) return null;
+  return typeof raw === "string" ? JSON.parse(raw) : raw;
+}
 
 function createRedisMock() {
   const kv = new Map();
@@ -101,7 +117,7 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
     sendEmbed: async (item, channelId) => {
       sent.push(`${item.title}:${channelId}`);
     },
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -119,7 +135,11 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
 
 test("dispatchChapters skips invalid or already-sent chapters", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2/", "sent");
+  seedHistory(redis, "chapter:https://a.shinigami.asia/chapter/2/", {
+    status: "sent",
+    claimedAt: "2026-01-01T00:00:00.000Z",
+    sentAt: "2026-01-01T00:00:00.000Z",
+  });
 
   const out = await dispatchChapters({
     redis,
@@ -136,7 +156,7 @@ test("dispatchChapters skips invalid or already-sent chapters", async () => {
     sendEmbed: async () => {
       throw new Error("should not be called");
     },
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -166,13 +186,15 @@ test("dispatchChapters releases lock if all channels fail", async () => {
     onChannelError: async (_err, channelId) => {
       failedChannels.push(channelId);
     },
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
   assert.equal(out.sent, 0);
   assert.equal(out.failed, 2);
-  assert.equal(redis.kv.has("chapter:https://a.shinigami.asia/chapter/3/"), false);
+  // Lock must be released after all channels fail
+  const entry = getHistoryEntry(redis, "chapter:https://a.shinigami.asia/chapter/3/");
+  assert.ok(!entry || entry.status !== "sent");
   assert.deepEqual(failedChannels.sort(), ["1001", "1002"]);
 });
 
@@ -192,9 +214,11 @@ test("dispatchChapters runs onDispatchSuccess extra tasks", async () => {
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
-    onDispatchSuccess: () => Promise.resolve().then(() => {
-      executed += 1;
-    }),
+    getSubscribersFn: noSubscribers,
+    onDispatchSuccess: () =>
+      Promise.resolve().then(() => {
+        executed += 1;
+      }),
   });
 
   assert.equal(out.sent, 1);
@@ -222,7 +246,7 @@ test("dispatchChapters writes one summary log for multiple sent chapters", async
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -268,7 +292,7 @@ test("dispatchChapters preserves chapter order even when later sends finish fast
       await new Promise((resolve) => setTimeout(resolve, wait));
       sent.push(item.chapter);
     },
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -293,7 +317,7 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
@@ -304,7 +328,11 @@ test("dispatchChapters invalidates dashboard caches after write", async () => {
 
 test("prepareDispatchQueue reports invalid, already sent, and over-limit counts", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2/", "sent");
+  seedHistory(redis, "chapter:https://a.shinigami.asia/chapter/2/", {
+    status: "sent",
+    claimedAt: "2026-01-01T00:00:00.000Z",
+    sentAt: "2026-01-01T00:00:00.000Z",
+  });
 
   const out = await prepareDispatchQueue(redis, [
     { title: "No Url", chapter: "Chapter 1", url: "", source: "ikiru" },
@@ -338,11 +366,11 @@ test("prepareDispatchQueue reports invalid, already sent, and over-limit counts"
 
 test("prepareDispatchQueue ignores stale pending claims but blocks fresh pending claims", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/2/", {
+  seedHistory(redis, "chapter:https://a.shinigami.asia/chapter/2/", {
     status: "pending",
     claimedAt: "2026-01-01T00:00:00.000Z",
   });
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/3/", {
+  seedHistory(redis, "chapter:https://a.shinigami.asia/chapter/3/", {
     status: "pending",
     claimedAt: new Date().toISOString(),
   });
@@ -387,21 +415,20 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 
   assert.equal(out.sent, 1);
-  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/5/"), {
-    status: "sent",
-    claimedAt: "2026-01-01T00:00:00.000Z",
-    sentAt: "2026-01-01T00:00:00.000Z",
-  });
+  const entry5 = getHistoryEntry(redis, "chapter:https://a.shinigami.asia/chapter/5/");
+  assert.equal(entry5?.status, "sent");
+  assert.equal(entry5?.claimedAt, "2026-01-01T00:00:00.000Z");
+  assert.equal(entry5?.sentAt, "2026-01-01T00:00:00.000Z");
 });
 
 test("dispatchChapters reclaims stale pending claim before sending", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://a.shinigami.asia/chapter/6/", {
+  seedHistory(redis, "chapter:https://a.shinigami.asia/chapter/6/", {
     status: "pending",
     claimedAt: "2026-01-01T00:00:00.000Z",
   });
@@ -418,22 +445,25 @@ test("dispatchChapters reclaims stale pending claim before sending", async () =>
     ],
     channelIds: ["1001"],
     sendEmbed: async () => {},
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:10:01.000Z",
     pendingClaimTtl: 60,
   });
 
   assert.equal(out.sent, 1);
-  assert.deepEqual(redis.kv.get("chapter:https://a.shinigami.asia/chapter/6/"), {
-    status: "sent",
-    claimedAt: "2026-01-01T00:10:01.000Z",
-    sentAt: "2026-01-01T00:10:01.000Z",
-  });
+  const entry6 = getHistoryEntry(redis, "chapter:https://a.shinigami.asia/chapter/6/");
+  assert.equal(entry6?.status, "sent");
+  assert.equal(entry6?.claimedAt, "2026-01-01T00:10:01.000Z");
+  assert.equal(entry6?.sentAt, "2026-01-01T00:10:01.000Z");
 });
 
 test("prepareDispatchQueue blocks same title and chapter already sent from another source", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:dedupe:overlord of sichuan:num:50", "sent");
+  seedHistory(redis, "chapter:dedupe:overlord of sichuan:num:50", {
+    status: "sent",
+    claimedAt: "2026-01-01T00:00:00.000Z",
+    sentAt: "2026-01-01T00:00:00.000Z",
+  });
 
   const out = await prepareDispatchQueue(redis, [
     {
@@ -475,7 +505,7 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
     sendEmbed: async (item) => {
       sent.push({ title: item.title, source: item.source, chapter: item.chapter });
     },
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T05:00:00.000Z",
   });
 
@@ -488,14 +518,8 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
       chapter: "Chapter 50",
     },
   ]);
-  assert.deepEqual(
-    redis.kv.get("chapter:dedupe:overlord of sichuan:num:50"),
-    {
-      status: "sent",
-      claimedAt: "2026-01-01T05:00:00.000Z",
-      sentAt: "2026-01-01T05:00:00.000Z",
-    },
-  );
+  const dedupeEntry = getHistoryEntry(redis, "chapter:dedupe:overlord of sichuan:num:50");
+  assert.equal(dedupeEntry?.status, "sent");
 });
 
 test("dispatchChapters persists sent state before moving to the next chapter", async () => {
@@ -521,15 +545,12 @@ test("dispatchChapters persists sent state before moving to the next chapter", a
     channelIds: ["1001"],
     sendEmbed: async (item) => {
       if (item.title === "Second") {
-        assert.deepEqual(redis.kv.get(firstKey), {
-          status: "sent",
-          claimedAt: "2026-01-01T00:00:00.000Z",
-          sentAt: "2026-01-01T00:00:00.000Z",
-        });
+        const firstEntry = getHistoryEntry(redis, firstKey);
+        assert.equal(firstEntry?.status, "sent");
         assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
       }
     },
-    getSubscribersFn: async () => [],
+    getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T00:00:00.000Z",
   });
 

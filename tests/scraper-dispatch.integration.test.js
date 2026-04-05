@@ -6,9 +6,16 @@ import { prepareDispatchQueue } from "../lib/services/dispatch.js";
 
 function createRedisMock() {
   const kv = new Map();
+  const hashes = new Map(); // key -> Map(field -> value)
+
+  function getHash(key) {
+    if (!hashes.has(key)) hashes.set(key, new Map());
+    return hashes.get(key);
+  }
 
   return {
     kv,
+    hashes,
     async mget(...keys) {
       return keys.map((key) => (kv.has(key) ? kv.get(key) : null));
     },
@@ -18,6 +25,30 @@ function createRedisMock() {
     async set(key, value) {
       kv.set(key, value);
       return "OK";
+    },
+    async hmget(key, ...fields) {
+      const hash = getHash(key);
+      return fields.map((f) => hash.get(f) ?? null);
+    },
+    async hget(key, field) {
+      return getHash(key).get(field) ?? null;
+    },
+    async hset(key, obj) {
+      const hash = getHash(key);
+      for (const [f, v] of Object.entries(obj)) hash.set(f, v);
+      return Object.keys(obj).length;
+    },
+    async hsetnx(key, field, value) {
+      const hash = getHash(key);
+      if (hash.has(field)) return 0;
+      hash.set(field, value);
+      return 1;
+    },
+    async hdel(key, ...fields) {
+      const hash = getHash(key);
+      let deleted = 0;
+      for (const f of fields) { if (hash.delete(f)) deleted++; }
+      return deleted;
     },
   };
 }
@@ -33,7 +64,12 @@ function createLoggerMock() {
 
 test("Ikiru whitelist flow narrows orchestration results before dispatch queueing", async () => {
   const redis = createRedisMock();
-  redis.kv.set("chapter:https://02.ikiru.wtf/manga/the-emperors-sword/chapter-88.824440/", "sent");
+  // Seed chapter-88 as already sent in the dispatch:history hash (current format).
+  // Key format: "chapter:" + normalizeSourceUrl(url) → keeps scheme + trailing slash.
+  const sentPayload = JSON.stringify({ status: "sent", claimedAt: new Date().toISOString(), sentAt: new Date().toISOString(), expiresAt: Date.now() + 86400000 });
+  await redis.hset("dispatch:history", {
+    "chapter:https://02.ikiru.wtf/manga/the-emperors-sword/chapter-88.824440/": sentPayload,
+  });
 
   const orchestrated = await orchestrateScrapeSources({
     redis,
