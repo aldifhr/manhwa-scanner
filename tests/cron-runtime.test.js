@@ -166,7 +166,11 @@ test("runCronJob includes per-step timing metrics in success status", async () =
     result.body.timingMetrics.totalMs >= result.body.timingMetrics.dispatchMs,
   );
 
-  const savedStatus = await redis.get("cron:last_run");
+  const savedStatusRaw = await redis.get("cron:last_run");
+  const savedStatus =
+    typeof savedStatusRaw === "string"
+      ? JSON.parse(savedStatusRaw)
+      : savedStatusRaw;
   assert.ok(savedStatus?.timingMetrics);
   assert.equal(
     savedStatus.timingMetrics.totalMs,
