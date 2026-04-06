@@ -3,15 +3,14 @@ import { performFullHealthCheck } from "../lib/services/health.js";
 import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
 import { redis, getAllGuildChannels } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
+import { HEALTH_CHECK_MAX_DURATION_SEC } from "../lib/config.js";
 
-export const config = { maxDuration: 300 }; // 5 minutes for deep health check
+export const config = { maxDuration: HEALTH_CHECK_MAX_DURATION_SEC };
 
-// Standard API response helpers
 function createSuccessResponse(data) {
   return {
     success: true,
     data,
-    timestamp: new Date().toISOString(),
   };
 }
 

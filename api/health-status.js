@@ -3,8 +3,11 @@ import { SOURCE_KEYS } from "../lib/services/health.js";
 import { readCronStatusWithHealth } from "../lib/cronRuntime.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
 import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
+import {
+  HEALTH_CACHE_TTL_MS,
+  UPTIME_CALCULATION_TIERS,
+} from "../lib/config.js";
 
-// Helper to get guild count from Redis
 async function getGuildCount(redisClient) {
   try {
     const count = await redisClient.get("discord:guilds:count");
@@ -17,28 +20,31 @@ async function getGuildCount(redisClient) {
 
 export const config = { maxDuration: 30 };
 
-// Simple in-memory cache with 1-minute TTL
 let cache = { data: null, timestamp: 0, expiresAt: 0 };
-const CACHE_TTL_MS = 60000; // 1 minute
+const CACHE_TTL_MS = HEALTH_CACHE_TTL_MS;
+
+function calculateUptime(failures) {
+  if (failures === 0) return UPTIME_CALCULATION_TIERS.PERFECT.value;
+  if (failures === 1) return UPTIME_CALCULATION_TIERS.EXCELLENT.value;
+  if (failures === 2) return UPTIME_CALCULATION_TIERS.GOOD.value;
+  return UPTIME_CALCULATION_TIERS.DEGRADED.value;
+}
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("health-status", req);
 
   try {
-    // Check cache first
     const now = Date.now();
     if (cache.data && now < cache.expiresAt) {
       logApiOk(reqLogger, { status: 200, cached: true });
       return res.status(200).json(cache.data);
     }
 
-    // Get source health data, cron logs, and guild count
     const sourceHealth = await loadSourceHealthSnapshot(redis, SOURCE_KEYS);
     const cronStatus = await readCronStatusWithHealth(redis);
     const dailyStats = await readCronDailyStats(redis, 90);
     const guildCount = await getGuildCount(redis);
 
-    // Format data for status page
     const networks = [
       {
         name: "Manga Sources",
@@ -47,7 +53,6 @@ export default async function handler(req, res) {
           const health = sourceHealth[source] || {};
           const failures = health.consecutiveFailures || 0;
 
-          // Determine status based on consecutive failures if health.status is not set
           let status = health.status;
           if (!status || status === "unknown") {
             if (failures >= 3) {
@@ -62,37 +67,19 @@ export default async function handler(req, res) {
           const isHealthy = status === "healthy";
           const isDegraded = status === "degraded";
 
-          // Calculate uptime percentage (simplified)
-          const uptime =
-            failures === 0
-              ? "100.0%"
-              : failures === 1
-                ? "99.9%"
-                : failures === 2
-                  ? "99.5%"
-                  : "98.0%";
+          const uptime = calculateUptime(failures);
+          const ping =
+            health.responseTime || (isHealthy ? 30 : isDegraded ? 75 : 150);
 
-          // Response time simulation based on health
-          const ping = isHealthy
-            ? Math.floor(Math.random() * 50 + 10)
-            : isDegraded
-              ? Math.floor(Math.random() * 100 + 50)
-              : Math.floor(Math.random() * 200 + 100);
-
-          // Build incidents array from real cron logs data
           const incidents = [];
           const degraded = [];
 
-          // Map daily stats to bar segments (0 = today, 89 = 90 days ago)
           dailyStats.forEach((stat, index) => {
             const dayIndex = 89 - index; // Convert to bar index (0 = 90 days ago, 89 = today)
 
-            // Check for failed logs or delivery failures
             if (stat.failedLogs > 0 || stat.deliveryFailed > 0) {
               incidents.push(dayIndex);
-            }
-            // Check for partial logs or short circuits (degraded)
-            else if (stat.partialLogs > 0 || stat.shortCircuits > 0) {
+            } else if (stat.partialLogs > 0 || stat.shortCircuits > 0) {
               degraded.push(dayIndex);
             }
           });
@@ -121,19 +108,19 @@ export default async function handler(req, res) {
         services: [
           {
             name: "Discord API",
-            uptime: "99.9%",
+            uptime: calculateUptime(1),
             ping: 45,
             incidents: [],
           },
           {
             name: "Redis Database",
-            uptime: "100.0%",
+            uptime: calculateUptime(0),
             ping: 5,
             incidents: [],
           },
           {
             name: "Cron Scheduler",
-            uptime: cronStatus?.outcome === "ok" ? "100.0%" : "99.0%",
+            uptime: calculateUptime(cronStatus?.failed > 0 ? 1 : 0),
             ping: 120,
             incidents: cronStatus?.failed > 0 ? [0] : [],
           },
@@ -141,7 +128,6 @@ export default async function handler(req, res) {
       },
     ];
 
-    // Calculate overall system status
     const hasDegraded = networks.some((n) =>
       n.services.some(
         (s) => s.status === "degraded" || s.consecutiveFailures > 0,
@@ -183,7 +169,6 @@ export default async function handler(req, res) {
         : null,
     };
 
-    // Update cache
     cache = {
       data: payload,
       timestamp: now,

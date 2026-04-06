@@ -9,38 +9,47 @@ import { logApiHit } from "../lib/logger.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { RECENT_API_CACHE_KEY, LOGS_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
-
-const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 180);
-const LOGS_CACHE_SEC = Number(process.env.LOGS_CACHE_SEC || 300);
+import { RECENT_CACHE_SEC, LOGS_CACHE_SEC } from "../lib/config.js";
+import { getTimestampMs, isValidDate } from "../lib/dateUtils.js";
 
 export function sortRecentItems(items = []) {
-  return [...items].sort((a, b) => {
-    const ta = new Date(a?.sentAt).getTime();
-    const tb = new Date(b?.sentAt).getTime();
-    if (!isNaN(ta) && !isNaN(tb) && tb !== ta) return tb - ta;
-
-    const oa = Number.isFinite(Number(a?.sentOrder))
-      ? Number(a.sentOrder)
+  const withSortKey = items.map((item) => {
+    const sentAtTime = getTimestampMs(item?.sentAt);
+    const sortOrder = Number.isFinite(Number(item?.sentOrder))
+      ? Number(item.sentOrder)
       : Number.MAX_SAFE_INTEGER;
-    const ob = Number.isFinite(Number(b?.sentOrder))
-      ? Number(b.sentOrder)
-      : Number.MAX_SAFE_INTEGER;
-    if (oa !== ob) return oa - ob;
-
-    return (
-      String(a?.title || "").localeCompare(String(b?.title || "")) ||
-      String(a?.chapter || "").localeCompare(
-        String(b?.chapter || ""),
-        undefined,
-        { numeric: true },
-      )
-    );
+    return { item, sentAtTime, sortOrder };
   });
+
+  return withSortKey
+    .sort((a, b) => {
+      if (
+        !isNaN(a.sentAtTime) &&
+        !isNaN(b.sentAtTime) &&
+        b.sentAtTime !== a.sentAtTime
+      ) {
+        return b.sentAtTime - a.sentAtTime;
+      }
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      return (
+        String(a.item?.title || "").localeCompare(
+          String(b.item?.title || ""),
+        ) ||
+        String(a.item?.chapter || "").localeCompare(
+          String(b.item?.chapter || ""),
+          undefined,
+          { numeric: true },
+        )
+      );
+    })
+    .map(({ item }) => item);
 }
 
 async function handleRecent(req, res) {
   const prepared = prepareAuthorizedGet(req, res, {
-    defaultCacheTtl: 180,
+    defaultCacheTtl: RECENT_CACHE_SEC,
     rawCacheTtl: RECENT_CACHE_SEC,
     maxAgeCap: 60,
   });
@@ -54,8 +63,7 @@ async function handleRecent(req, res) {
     const raw = await readRecentChapters(redis, 0, 49);
     const items = sortRecentItems(
       raw
-        .filter((item) => item && item.sentAt)
-        .filter((item) => !isNaN(new Date(item.sentAt).getTime()))
+        .filter((item) => item?.sentAt && isValidDate(item?.sentAt))
         .map((item) => ({
           ...item,
           sentOrder: Number.isFinite(Number(item?.sentOrder))
@@ -75,7 +83,7 @@ async function handleRecent(req, res) {
 
 async function handleLogs(req, res) {
   const prepared = prepareAuthorizedGet(req, res, {
-    defaultCacheTtl: 300,
+    defaultCacheTtl: LOGS_CACHE_SEC,
     rawCacheTtl: LOGS_CACHE_SEC,
     maxAgeCap: 60,
   });
@@ -86,8 +94,9 @@ async function handleLogs(req, res) {
     const cached = await readObjectCache(redis, LOGS_API_CACHE_KEY);
     if (cached) return res.status(200).json(cached);
 
-    const raw = await readCronLogs(redis, 0, 49);
+    const raw = await readCronLogs(redis, 0, 199);
     const dailyStats = await readCronDailyStats(redis, 30);
+
     const payload = {
       logs: raw.filter(Boolean).map((log) => ({
         time: log?.time || null,
@@ -100,7 +109,7 @@ async function handleLogs(req, res) {
         failed: Number.isFinite(Number(log?.failed))
           ? Number(log.failed)
           : null,
-        message: log?.message || "-",
+        message: String(log?.message || "").trim() || "Unknown log",
       })),
       dailyStats,
     };
@@ -114,11 +123,19 @@ async function handleLogs(req, res) {
 }
 
 export default async function handler(req, res) {
-  const action = req.query.action;
-  void logApiHit(`history-${action}`, req);
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  if (action === "recent") return handleRecent(req, res);
-  if (action === "logs") return handleLogs(req, res);
+  const endpoint = req.query.endpoint || "recent";
 
-  return res.status(400).json({ error: "Unknown action" });
+  if (endpoint === "recent") {
+    return handleRecent(req, res);
+  }
+
+  if (endpoint === "logs") {
+    return handleLogs(req, res);
+  }
+
+  return res.status(400).json({ error: "Unknown endpoint" });
 }

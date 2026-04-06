@@ -1,19 +1,15 @@
-import {
-  redis,
-  readStatusCache,
-  writeStatusCache,
-} from "../lib/redis.js";
+import { redis, readStatusCache, writeStatusCache } from "../lib/redis.js";
 import { logApiHit } from "../lib/logger.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { readCronStatusWithHealth } from "../lib/cronRuntime.js";
 
-const STATUS_CACHE_SEC = Number(process.env.STATUS_CACHE_SEC || 60);
+import { STATUS_CACHE_SEC } from "../lib/config.js";
 
 export default async function handler(req, res) {
   logApiHit("status", req);
 
   const prepared = prepareAuthorizedGet(req, res, {
-    defaultCacheTtl: 60,
+    defaultCacheTtl: STATUS_CACHE_SEC,
     rawCacheTtl: STATUS_CACHE_SEC,
     maxAgeCap: 30,
   });

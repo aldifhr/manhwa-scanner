@@ -1,16 +1,10 @@
 {
   "functions": {
     "api/cron.js": {
-      "maxDuration": 300
+      "maxDuration": 30
     },
     "api/interactive.js": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron?action=health",
-      "schedule": "0 0 1,15 * *"
-    }
-  ]
+  }
 }

@@ -3,14 +3,19 @@ import { SOURCE_KEYS } from "../lib/services/health.js";
 import { loadSourceHealthSnapshot } from "../lib/redis.js";
 import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
 import { isMonitorAuthorized } from "../lib/auth.js";
+import { INCIDENT_CACHE_TTL } from "../lib/config.js";
+import {
+  getTimestampMs,
+  getCutoffTime,
+  isValidDate,
+  sortByDateDesc,
+} from "../lib/dateUtils.js";
 
 export const config = { maxDuration: 30 };
 
 const DISCORD_NOTIFICATION_FAILURES_KEY = "discord:notification_failures";
 const INCIDENT_CACHE_KEY = "cache:api:incidents:v1";
-const INCIDENT_CACHE_TTL = 300; // 5 minutes
 
-// Helper to safely parse JSON
 function safeParse(data, defaultValue = null) {
   if (!data) return defaultValue;
   if (typeof data === "object") return data;
@@ -22,13 +27,12 @@ function safeParse(data, defaultValue = null) {
   }
 }
 
-// Fetch cron incidents (errors/failures)
 async function fetchCronIncidents(redisClient, daysBack = 30) {
   try {
     const logs = await readCronLogs(redisClient, 0, 199);
     if (!logs || !Array.isArray(logs)) return [];
 
-    const cutoffTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const cutoffTime = getCutoffTime(daysBack);
     const incidents = [];
 
     for (const log of logs) {
@@ -36,9 +40,8 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
         const entry = typeof log === "string" ? JSON.parse(log) : log;
         const timestamp = entry.timestamp || entry.createdAt;
 
-        if (!timestamp || new Date(timestamp).getTime() < cutoffTime) continue;
+        if (!timestamp || getTimestampMs(timestamp) < cutoffTime) continue;
 
-        // Only include errors/failures
         const isError =
           entry.level === "error" ||
           entry.tag === "failed" ||
@@ -49,15 +52,22 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
 
         if (!isError) continue;
 
-        const severity = entry.deliveryFailed > 0 ? "critical" :
-                        entry.shortCircuits > 0 ? "high" : "medium";
+        const severity =
+          entry.deliveryFailed > 0
+            ? "critical"
+            : entry.shortCircuits > 0
+              ? "high"
+              : "medium";
 
         incidents.push({
           id: `cron-${entry.timestamp || Date.now()}`,
           type: "cron_failure",
           severity: severity,
           title: entry.title || "Cron Job Failure",
-          message: entry.message || entry.summary || `Failed: ${entry.chaptersFailed || 0} chapters`,
+          message:
+            entry.message ||
+            entry.summary ||
+            `Failed: ${entry.chaptersFailed || 0} chapters`,
           timestamp: timestamp,
           duration: entry.duration || null,
           resolved: true, // Past errors are considered resolved
@@ -82,31 +92,43 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
   }
 }
 
-// Fetch health check incidents
 async function fetchHealthIncidents(redisClient, daysBack = 30) {
   try {
-    const sourceHealth = await loadSourceHealthSnapshot(redisClient, SOURCE_KEYS);
+    const sourceHealth = await loadSourceHealthSnapshot(
+      redisClient,
+      SOURCE_KEYS,
+    );
     const incidents = [];
-    const cutoffTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const cutoffTime = getCutoffTime(daysBack);
 
     for (const [source, health] of Object.entries(sourceHealth)) {
       if (!health) continue;
 
-      // Only include if there are failures
-      if ((health.consecutiveFailures || 0) === 0 && health.status !== "unhealthy") continue;
+      if (
+        (health.consecutiveFailures || 0) === 0 &&
+        health.status !== "unhealthy"
+      )
+        continue;
 
       const lastCheckedAt = health.lastCheckedAt;
-      if (!lastCheckedAt || new Date(lastCheckedAt).getTime() < cutoffTime) continue;
+      if (!lastCheckedAt || getTimestampMs(lastCheckedAt) < cutoffTime)
+        continue;
 
-      const severity = health.consecutiveFailures > 5 ? "critical" :
-                      health.consecutiveFailures > 3 ? "high" : "medium";
+      const severity =
+        health.consecutiveFailures > 5
+          ? "critical"
+          : health.consecutiveFailures > 3
+            ? "high"
+            : "medium";
 
       incidents.push({
         id: `health-${source}-${lastCheckedAt}`,
         type: "health_failure",
         severity: severity,
         title: `Source Down: ${source}`,
-        message: health.lastError || `${health.consecutiveFailures} consecutive check failures`,
+        message:
+          health.lastError ||
+          `${health.consecutiveFailures} consecutive check failures`,
         timestamp: lastCheckedAt,
         duration: null, // Unknown duration
         resolved: health.status === "healthy", // Resolved if currently healthy
@@ -128,11 +150,14 @@ async function fetchHealthIncidents(redisClient, daysBack = 30) {
   }
 }
 
-// Fetch Discord notification incidents
 async function fetchDiscordIncidents(redisClient, daysBack = 30) {
   try {
-    const cutoffTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
-    const failures = await redisClient.lrange(DISCORD_NOTIFICATION_FAILURES_KEY, 0, 99);
+    const cutoffTime = getCutoffTime(daysBack);
+    const failures = await redisClient.lrange(
+      DISCORD_NOTIFICATION_FAILURES_KEY,
+      0,
+      99,
+    );
 
     if (!failures || !Array.isArray(failures)) return [];
 
@@ -144,7 +169,7 @@ async function fetchDiscordIncidents(redisClient, daysBack = 30) {
         if (!entry) continue;
 
         const timestamp = entry.timestamp;
-        if (!timestamp || new Date(timestamp).getTime() < cutoffTime) continue;
+        if (!timestamp || getTimestampMs(timestamp) < cutoffTime) continue;
 
         incidents.push({
           id: `discord-${entry.channelId || "unknown"}-${timestamp}`,
@@ -176,17 +201,17 @@ async function fetchDiscordIncidents(redisClient, daysBack = 30) {
   }
 }
 
-// Group incidents by date
 function groupByDate(incidents) {
   return incidents.reduce((acc, incident) => {
-    const date = new Date(incident.timestamp).toISOString().split("T")[0];
+    const timestampMs = getTimestampMs(incident.timestamp);
+    if (isNaN(timestampMs)) return acc;
+    const date = new Date(timestampMs).toISOString().split("T")[0];
     if (!acc[date]) acc[date] = [];
     acc[date].push(incident);
     return acc;
   }, {});
 }
 
-// Calculate statistics
 function calculateStats(incidents) {
   const stats = {
     total: incidents.length,
@@ -204,13 +229,11 @@ function calculateStats(incidents) {
   };
 
   for (const incident of incidents) {
-    // By type
     stats.byType[incident.type] = (stats.byType[incident.type] || 0) + 1;
 
-    // By severity
-    stats.bySeverity[incident.severity] = (stats.bySeverity[incident.severity] || 0) + 1;
+    stats.bySeverity[incident.severity] =
+      (stats.bySeverity[incident.severity] || 0) + 1;
 
-    // By status
     if (incident.resolved) {
       stats.byStatus.resolved++;
     } else {
@@ -251,44 +274,59 @@ export default async function handler(req, res) {
     const daysBack = Math.min(90, Math.max(1, Number(req.query.days) || 30));
     const includeResolved = req.query.resolved !== "false";
 
-    // Fetch all incidents in parallel
-    const [cronIncidents, healthIncidents, discordIncidents] = await Promise.all([
-      fetchCronIncidents(redis, daysBack),
-      fetchHealthIncidents(redis, daysBack),
-      fetchDiscordIncidents(redis, daysBack),
-    ]);
+    const [cronIncidents, healthIncidents, discordIncidents] =
+      await Promise.all([
+        fetchCronIncidents(redis, daysBack),
+        fetchHealthIncidents(redis, daysBack),
+        fetchDiscordIncidents(redis, daysBack),
+      ]);
 
-    // Combine and sort (newest first)
-    let allIncidents = [...cronIncidents, ...healthIncidents, ...discordIncidents]
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    // Pre-compute timestamps and combine operations for efficiency
+    const allIncidents = [];
+    const groupedByDate = {};
+    let last24hCount = 0;
+    const cutoff24h = getCutoffTime(0, 24);
 
-    // Filter if needed
-    if (!includeResolved) {
-      allIncidents = allIncidents.filter((i) => !i.resolved);
+    // Process all incidents in a single pass
+    for (const incidents of [
+      cronIncidents,
+      healthIncidents,
+      discordIncidents,
+    ]) {
+      for (const incident of incidents) {
+        if (includeResolved || !incident.resolved) {
+          // Pre-compute timestamp for sorting and filtering
+          incident._timestampMs = getTimestampMs(incident.timestamp);
+          allIncidents.push(incident);
+
+          // Group by date
+          const date = new Date(incident.timestamp).toISOString().split("T")[0];
+          if (!groupedByDate[date]) groupedByDate[date] = [];
+          groupedByDate[date].push(incident);
+
+          // Count last 24h
+          if (incident._timestampMs > cutoff24h) {
+            last24hCount++;
+          }
+        }
+      }
     }
 
-    // Group by date for timeline view
-    const groupedByDate = groupByDate(allIncidents);
+    // Sort once using pre-computed timestamps
+    allIncidents.sort((a, b) => b._timestampMs - a._timestampMs);
 
-    // Get unique dates sorted (newest first)
+    // Clean up temporary property
+    allIncidents.forEach((i) => delete i._timestampMs);
+
     const dates = Object.keys(groupedByDate).sort().reverse();
-
-    // Calculate statistics
     const stats = calculateStats(allIncidents);
-
-    // Recent vs older
-    const now = new Date();
-    const last24h = allIncidents.filter((i) => {
-      const incidentTime = new Date(i.timestamp).getTime();
-      return now.getTime() - incidentTime < 24 * 60 * 60 * 1000;
-    });
 
     const response = {
       success: true,
       data: {
         daysBack: daysBack,
         totalCount: allIncidents.length,
-        recent24h: last24h.length,
+        recent24h: last24hCount,
         ongoingCount: stats.byStatus.ongoing,
         stats: stats,
         timeline: dates.map((date) => ({
@@ -310,7 +348,7 @@ export default async function handler(req, res) {
     logApiOk(reqLogger, {
       status: 200,
       totalIncidents: allIncidents.length,
-      recent24h: last24h.length,
+      recent24h: last24hCount,
       ongoing: stats.byStatus.ongoing,
     });
 

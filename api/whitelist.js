@@ -10,7 +10,7 @@ import {
 } from "../lib/services/whitelist.js";
 import { buildWhitelistListResponse } from "../lib/services/whitelist.js";
 
-const WHITELIST_CACHE_SEC = Number(process.env.WHITELIST_CACHE_SEC || 300);
+import { WHITELIST_CACHE_SEC } from "../lib/config.js";
 
 // Allowed domains for URL validation
 const ALLOWED_DOMAINS = [
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
   const cacheTtl =
     Number.isFinite(WHITELIST_CACHE_SEC) && WHITELIST_CACHE_SEC > 0
       ? Math.floor(WHITELIST_CACHE_SEC)
-      : 180;
+      : WHITELIST_CACHE_SEC;
   res.setHeader(
     "Cache-Control",
     `private, max-age=${Math.min(cacheTtl, 60)}, stale-while-revalidate=${cacheTtl}`,

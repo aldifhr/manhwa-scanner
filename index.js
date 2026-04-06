@@ -1,9 +1,11 @@
 import "dotenv/config";
 import express from "express";
+import compression from "compression";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import { getLogger } from "./lib/logger.js";
+import { rateLimitMiddleware } from "./lib/rateLimiter.js";
 
 const log = getLogger({ module: "express-dev" });
 
@@ -17,6 +19,23 @@ const PORT = process.env.PORT || 3000;
 // Added request size limits to prevent DoS attacks
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Rate limiting middleware
+app.use(rateLimitMiddleware.standard);
+
+// Compression middleware - reduces response size by 70%
+app.use(
+  compression({
+    level: 6, // Balanced between compression ratio and speed
+    filter: (req, res) => {
+      // Don't compress if client doesn't accept it
+      if (req.headers["x-no-compression"]) return false;
+      // Don't compress images/videos (already compressed)
+      if (req.path.match(/\.(jpg|jpeg|png|gif|webp|mp4|webm)$/)) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // Serve static files from the 'public' directory (matches Vercel's behavior)
 app.use(express.static(path.join(__dirname, "public")));

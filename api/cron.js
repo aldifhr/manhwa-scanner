@@ -1,18 +1,19 @@
 import { isCronAuthorized } from "../lib/auth.js";
 import { buildCronErrorLog, appendCronLog } from "../lib/cronLogs.js";
 import { runCronJob, shouldRunChannelValidation } from "../lib/cronRuntime.js";
-import { getLogger } from "../lib/logger.js";
+import { loggers } from "../lib/logger.js";
 import { redis, getAllGuildChannels, writeCronStatus } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 
-export const config = { maxDuration: 300 }; // 5 minutes max
-const logger = getLogger({ scope: "cron" });
+import { CRON_MAX_DURATION_SEC } from "../lib/config.js";
+
+export const config = { maxDuration: CRON_MAX_DURATION_SEC };
+const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
 
-// Standard API response helpers
 function createSuccessResponse(data) {
   return {
     success: true,
@@ -41,7 +42,6 @@ async function handleUpdateCron(req, res, reqLogger) {
     const result = await runCronJob({ redisClient: redis, logger });
     logApiOk(reqLogger, { status: result.statusCode, ...result.logMeta });
 
-    // Standardize response format while preserving all original fields
     const standardizedBody = {
       success: result.body?.ok === true,
       data: {
@@ -75,7 +75,9 @@ async function handleUpdateCron(req, res, reqLogger) {
       shortCircuitReason: "fatal_error",
       error: err?.message || "Internal error",
     };
-    await writeCronStatus(redis, statusPayload).catch(() => {});
+    await writeCronStatus(redis, statusPayload).catch((err) => {
+      console.error("[cron] Failed to write status:", err.message);
+    });
     await appendCronLog(
       redis,
       buildCronErrorLog(err, {
@@ -83,7 +85,9 @@ async function handleUpdateCron(req, res, reqLogger) {
         type: "runtime_error",
         source: "cron",
       }),
-    ).catch(() => {});
+    ).catch((err) => {
+      console.error("[cron] Failed to append cron log:", err.message);
+    });
     logApiError(reqLogger, err, { status: 500 });
     return res
       .status(500)

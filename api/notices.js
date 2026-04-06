@@ -3,19 +3,22 @@ import { SOURCE_KEYS } from "../lib/services/health.js";
 import { readCronLogs } from "../lib/redis.js";
 import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
 import { isMonitorAuthorized } from "../lib/auth.js";
+import {
+  getTimestampMs,
+  getCutoffTime,
+  sortByDateDesc,
+} from "../lib/dateUtils.js";
 
 export const config = { maxDuration: 30 };
 
-// Redis key for Discord notification failures
 const DISCORD_NOTIFICATION_FAILURES_KEY = "discord:notification_failures";
 
-// Helper to fetch cron error logs from last 7 days
 async function fetchCronErrorLogs(redisClient, daysBack = 7) {
   try {
     const logs = await readCronLogs(redisClient, 0, 99);
     if (!logs || !Array.isArray(logs)) return [];
 
-    const cutoffTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const cutoffTime = getCutoffTime(daysBack);
     const errors = [];
 
     for (const log of logs) {
@@ -23,10 +26,8 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
         const entry = typeof log === "string" ? JSON.parse(log) : log;
         const timestamp = entry.timestamp || entry.createdAt;
 
-        // Skip if older than cutoff
-        if (timestamp && new Date(timestamp).getTime() < cutoffTime) continue;
+        if (timestamp && getTimestampMs(timestamp) < cutoffTime) continue;
 
-        // Only include failed/error logs
         if (
           entry.level === "error" ||
           entry.tag === "failed" ||
@@ -54,7 +55,6 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
           });
         }
       } catch (parseErr) {
-        // Skip invalid log entries
         continue;
       }
     }
@@ -66,7 +66,6 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
   }
 }
 
-// Helper to fetch health check failures
 async function fetchHealthCheckFailures(redisClient, daysBack = 7) {
   try {
     const sourceHealth = await loadSourceHealthSnapshot(
@@ -74,19 +73,16 @@ async function fetchHealthCheckFailures(redisClient, daysBack = 7) {
       SOURCE_KEYS,
     );
     const failures = [];
-    const cutoffTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const cutoffTime = getCutoffTime(daysBack);
 
     for (const [source, health] of Object.entries(sourceHealth)) {
-      // Skip if health data is null/undefined
       if (!health) continue;
 
-      // Check for unhealthy status or consecutive failures
       if (health.status === "unhealthy" || health.consecutiveFailures > 0) {
         const lastError = health.lastError;
         const lastCheckedAt = health.lastCheckedAt;
 
-        // Skip if older than cutoff
-        if (lastCheckedAt && new Date(lastCheckedAt).getTime() < cutoffTime)
+        if (lastCheckedAt && getTimestampMs(lastCheckedAt) < cutoffTime)
           continue;
 
         failures.push({
@@ -115,13 +111,11 @@ async function fetchHealthCheckFailures(redisClient, daysBack = 7) {
   }
 }
 
-// Helper to fetch Discord notification failures
 async function fetchDiscordNotificationFailures(redisClient, daysBack = 7) {
   try {
-    const cutoffTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const cutoffTime = getCutoffTime(daysBack);
     const failures = [];
 
-    // Fetch recent notification failures from Redis list
     const recentFailures = await redisClient.lrange(
       DISCORD_NOTIFICATION_FAILURES_KEY,
       0,
@@ -136,8 +130,7 @@ async function fetchDiscordNotificationFailures(redisClient, daysBack = 7) {
           typeof failure === "string" ? JSON.parse(failure) : failure;
         const timestamp = entry.timestamp;
 
-        // Skip if older than cutoff
-        if (timestamp && new Date(timestamp).getTime() < cutoffTime) continue;
+        if (timestamp && getTimestampMs(timestamp) < cutoffTime) continue;
 
         failures.push({
           id: `discord-${entry.channelId || "unknown"}-${timestamp || Date.now()}`,
@@ -166,7 +159,6 @@ async function fetchDiscordNotificationFailures(redisClient, daysBack = 7) {
   }
 }
 
-// Helper to determine overall status
 function determineStatus(notices) {
   if (notices.length === 0) return "healthy";
 
@@ -178,11 +170,9 @@ function determineStatus(notices) {
   return "healthy";
 }
 
-// Main handler
 export default async function handler(req, res) {
   const reqLogger = logApiHit("notices", req);
 
-  // Check authorization
   if (!isMonitorAuthorized(req)) {
     logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
     return res.status(401).json({
@@ -207,31 +197,39 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get days parameter (default 7)
     const daysBack = Math.min(30, Math.max(1, Number(req.query.days) || 7));
 
-    // Fetch all types of notices in parallel
     const [cronErrors, healthFailures, discordFailures] = await Promise.all([
       fetchCronErrorLogs(redis, daysBack),
       fetchHealthCheckFailures(redis, daysBack),
       fetchDiscordNotificationFailures(redis, daysBack),
     ]);
 
-    // Combine and sort by timestamp (newest first)
-    const allNotices = [...cronErrors, ...healthFailures, ...discordFailures]
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      )
-      .slice(0, 50); // Limit to 50 most recent
+    // Sort notices by date descending and prepare for grouping
+    const sortedNotices = sortByDateDesc(
+      [...cronErrors, ...healthFailures, ...discordFailures],
+      "timestamp",
+    ).slice(0, 50);
 
-    // Group by date for easier display
+    // Pre-compute timestamps and dates for grouping
+    const allNotices = sortedNotices.map((notice) => ({
+      ...notice,
+      _timestampMs: getTimestampMs(notice.timestamp),
+      _date: notice.timestamp.split("T")[0],
+    }));
+
+    // Group by date using pre-computed _date
     const groupedByDate = allNotices.reduce((acc, notice) => {
-      const date = new Date(notice.timestamp).toISOString().split("T")[0];
-      if (!acc[date]) acc[date] = [];
-      acc[date].push(notice);
+      if (!acc[notice._date]) acc[notice._date] = [];
+      acc[notice._date].push(notice);
       return acc;
     }, {});
+
+    // Clean up temporary properties
+    allNotices.forEach((notice) => {
+      delete notice._timestampMs;
+      delete notice._date;
+    });
 
     const status = determineStatus(allNotices);
     const hasNotices = allNotices.length > 0;

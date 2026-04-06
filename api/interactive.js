@@ -19,6 +19,7 @@ import {
   buildAddSuccessMessage,
   buildWhitelistListResponse,
 } from "../lib/services/whitelist.js";
+import { discordInteractionSchema, safeParse } from "../lib/validation.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -125,6 +126,22 @@ export default async function handler(req, res) {
       logApiError(reqLogger, err, { status: 400, reason: "invalid_json" });
       return res.status(400).json({ error: "Invalid JSON body" });
     }
+
+    const validation = safeParse(discordInteractionSchema, payload);
+    if (!validation.success) {
+      logApiOk(reqLogger, {
+        status: 400,
+        reason: "invalid_payload",
+        errors: validation.errors,
+      });
+      return res
+        .status(400)
+        .json({
+          error: "Invalid interaction payload",
+          details: validation.errors,
+        });
+    }
+
     const { type, data: interactionData } = payload;
 
     if (type === 1) {
