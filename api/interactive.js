@@ -340,25 +340,46 @@ export default async function handler(req, res) {
                 console.log("[follow_toggle] Unfollowing manga...");
                 await unfollowManga(userId, title);
                 console.log("[follow_toggle] Unfollow success");
-                return editInteractionResponse(
-                  payload,
-                  `🔕 **Unfollowed**\n\nKamu berhenti mengikuti **${title}**.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-follow'}.\n\nKlik "🔔 Follow Updates" lagi untuk mengikuti kembali.`,
-                );
+                try {
+                  return await editInteractionResponse(
+                    payload,
+                    `🔕 **Unfollowed**\n\nKamu berhenti mengikuti **${title}**.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-follow'}.\n\nKlik "🔔 Follow Updates" lagi untuk mengikuti kembali.`,
+                  );
+                } catch (editErr) {
+                  console.warn(
+                    `[follow_toggle] Failed to edit response (token expired?): ${editErr.message}`,
+                  );
+                  return; // Silent fail - action already succeeded
+                }
               } else {
                 console.log("[follow_toggle] Following manga...");
                 await followManga(userId, title);
                 console.log("[follow_toggle] Follow success");
-                return editInteractionResponse(
-                  payload,
-                  `🔔 **Now Following**\n\nKamu mengikuti **${title}**!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔔 Follow Updates" lagi untuk berhenti mengikuti.`,
-                );
+                try {
+                  return await editInteractionResponse(
+                    payload,
+                    `🔔 **Now Following**\n\nKamu mengikuti **${title}**!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔔 Follow Updates" lagi untuk berhenti mengikuti.`,
+                  );
+                } catch (editErr) {
+                  console.warn(
+                    `[follow_toggle] Failed to edit response (token expired?): ${editErr.message}`,
+                  );
+                  return; // Silent fail - action already succeeded
+                }
               }
             } catch (err) {
               console.error(`[follow_toggle] Error: ${err.message}`, err.stack);
-              return editInteractionResponse(
-                payload,
-                `❌ Gagal memproses: ${err.message}`,
-              );
+              try {
+                return await editInteractionResponse(
+                  payload,
+                  `❌ Gagal memproses: ${err.message}`,
+                );
+              } catch (editErr) {
+                console.warn(
+                  `[follow_toggle] Failed to edit error response: ${editErr.message}`,
+                );
+                return; // Silent fail
+              }
             }
           })(),
         );
