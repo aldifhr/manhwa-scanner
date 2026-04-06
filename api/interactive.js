@@ -292,20 +292,26 @@ export default async function handler(req, res) {
         return waitUntil(
           (async () => {
             try {
-              const { isUserFollowing, followManga, unfollowManga } =
-                await import("../lib/services/notifications.js");
+              const {
+                isUserFollowing,
+                followManga,
+                unfollowManga,
+                getUserNotifyMode,
+              } = await import("../lib/services/notifications.js");
               const following = await isUserFollowing(userId, title);
+              const notifyMode = await getUserNotifyMode(userId);
+
               if (following) {
                 await unfollowManga(userId, title);
                 return editInteractionResponse(
                   payload,
-                  `✅ Kamu berhenti mengikuti update **${title}**.`,
+                  `🔕 **Unfollowed**\n\nKamu berhenti mengikuti **${title}**.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-follow'}.\n\nKlik "🔔 Follow Updates" lagi untuk mengikuti kembali.`,
                 );
               } else {
                 await followManga(userId, title);
                 return editInteractionResponse(
                   payload,
-                  `🔔 Kamu sekarang mengikuti update **${title}**! Kamu akan di-tag jika ada chapter baru.`,
+                  `🔔 **Now Following**\n\nKamu mengikuti **${title}**!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔔 Follow Updates" lagi untuk berhenti mengikuti.`,
                 );
               }
             } catch (err) {
