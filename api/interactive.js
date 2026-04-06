@@ -134,12 +134,10 @@ export default async function handler(req, res) {
         reason: "invalid_payload",
         errors: validation.errors,
       });
-      return res
-        .status(400)
-        .json({
-          error: "Invalid interaction payload",
-          details: validation.errors,
-        });
+      return res.status(400).json({
+        error: "Invalid interaction payload",
+        details: validation.errors,
+      });
     }
 
     const { type, data: interactionData } = payload;
@@ -304,34 +302,59 @@ export default async function handler(req, res) {
         const userId = payload.member?.user?.id ?? payload.user?.id;
         const title = custom_id.slice("follow_toggle:".length);
 
+        console.log(
+          `[follow_toggle] Button clicked - userId: ${userId?.slice(-6)}, title: ${title}`,
+        );
+
+        if (!userId) {
+          console.error("[follow_toggle] Error: No userId found in payload");
+          return res.json({
+            type: 4,
+            data: { content: "❌ Error: Could not identify user.", flags: 64 },
+          });
+        }
+
         res.json({ type: 5, data: { flags: 64 } });
 
         return waitUntil(
           (async () => {
             try {
+              console.log("[follow_toggle] Importing notifications module...");
               const {
                 isUserFollowing,
                 followManga,
                 unfollowManga,
                 getUserNotifyMode,
               } = await import("../lib/services/notifications.js");
+
+              console.log("[follow_toggle] Checking if user is following...");
               const following = await isUserFollowing(userId, title);
+              console.log(
+                `[follow_toggle] User following status: ${following}`,
+              );
+
               const notifyMode = await getUserNotifyMode(userId);
+              console.log(`[follow_toggle] Notify mode: ${notifyMode}`);
 
               if (following) {
+                console.log("[follow_toggle] Unfollowing manga...");
                 await unfollowManga(userId, title);
+                console.log("[follow_toggle] Unfollow success");
                 return editInteractionResponse(
                   payload,
                   `🔕 **Unfollowed**\n\nKamu berhenti mengikuti **${title}**.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-follow'}.\n\nKlik "🔔 Follow Updates" lagi untuk mengikuti kembali.`,
                 );
               } else {
+                console.log("[follow_toggle] Following manga...");
                 await followManga(userId, title);
+                console.log("[follow_toggle] Follow success");
                 return editInteractionResponse(
                   payload,
                   `🔔 **Now Following**\n\nKamu mengikuti **${title}**!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔔 Follow Updates" lagi untuk berhenti mengikuti.`,
                 );
               }
             } catch (err) {
+              console.error(`[follow_toggle] Error: ${err.message}`, err.stack);
               return editInteractionResponse(
                 payload,
                 `❌ Gagal memproses: ${err.message}`,
