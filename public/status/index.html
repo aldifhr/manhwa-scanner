@@ -1256,10 +1256,14 @@
             const API_ENDPOINT = "/api/health-status";
             const REFRESH_INTERVAL = 60000; // 60 seconds
             const DAYS_TO_SHOW = 90;
+            const NOTICES_API_ENDPOINT = "/api/notices";
 
             // State
             let refreshTimer = null;
             let currentData = null;
+            let noticesData = null;
+            let noticesTimer = null;
+            const NOTICES_REFRESH_INTERVAL = 300000; // 5 minutes
 
             // Icons
             const ICONS = {
@@ -1290,9 +1294,130 @@
             }
 
             // Modal functions
+            async function fetchNotices() {
+                try {
+                    const response = await fetch("/api/notices?days=7");
+                    if (!response.ok)
+                        throw new Error(`HTTP ${response.status}`);
+
+                    const result = await response.json();
+                    if (result.success) {
+                        noticesData = result.data;
+                        renderNotices();
+                        return result.data;
+                    }
+                    return null;
+                } catch (error) {
+                    console.error("Failed to fetch notices:", error);
+                    return null;
+                }
+            }
+
+            function renderNotices() {
+                const noticeContent = document.querySelector(".notice-content");
+                const noticeItem = document.querySelector(".notice-item");
+
+                if (!noticesData || !noticesData.hasNotices) {
+                    // Show healthy state
+                    if (noticeItem) {
+                        noticeItem.innerHTML = `
+                            <div class="notice-icon">✓</div>
+                            <span class="notice-message">No notices reported for the past 7 days</span>
+                        `;
+                    }
+                    return;
+                }
+
+                // Get the most recent notice
+                const recentNotice = noticesData.notices[0];
+                const severityColor =
+                    recentNotice.severity === "high"
+                        ? "var(--red)"
+                        : "var(--yellow)";
+                const icon = recentNotice.severity === "high" ? "!" : "⚠";
+
+                if (noticeItem) {
+                    noticeItem.innerHTML = `
+                        <div class="notice-icon" style="background: ${severityColor}; color: white; font-weight: bold;">${icon}</div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span class="notice-message" style="font-weight: 500; color: var(--text-primary);">${recentNotice.title}</span>
+                            <span style="font-size: 12px; color: var(--text-muted);">${recentNotice.message}</span>
+                        </div>
+                    `;
+                }
+
+                // Update notice count badge if exists
+                const badge = document.querySelector(".notices-count-badge");
+                if (badge) {
+                    badge.textContent = noticesData.totalCount;
+                    badge.style.display =
+                        noticesData.totalCount > 0 ? "inline-flex" : "none";
+                }
+            }
+
+            function renderNoticeHistory() {
+                const modalContent =
+                    document.getElementById("noticeModalContent");
+                if (!modalContent || !noticesData) return;
+
+                if (!noticesData.hasNotices) {
+                    modalContent.innerHTML = `
+                        <div class="notice-history-empty">
+                            <div class="notice-history-icon" style="background: var(--green); color: white; font-size: 24px; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">✓</div>
+                            <p style="margin: 0 0 8px; font-size: 16px; font-weight: 500; color: var(--text-primary);">No notices reported</p>
+                            <span style="font-size: 14px; color: var(--text-secondary);">Everything is running smoothly</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html =
+                    '<ul class="notice-list" style="list-style: none; margin: 0; padding: 0;">';
+
+                noticesData.notices.forEach((notice) => {
+                    const date = new Date(notice.timestamp).toLocaleDateString(
+                        "id-ID",
+                        {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        },
+                    );
+
+                    const severityColor =
+                        notice.severity === "high"
+                            ? "var(--red)"
+                            : "var(--yellow)";
+                    const severityLabel =
+                        notice.severity === "high" ? "Critical" : "Warning";
+
+                    html += `
+                        <li class="notice-history-item" style="display: flex; gap: 16px; padding: 16px; border-bottom: 1px solid var(--border-color);">
+                            <div class="notice-history-date" style="flex-shrink: 0; width: 80px; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">
+                                ${date}
+                            </div>
+                            <div class="notice-history-content" style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                    <span style="background: ${severityColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;">${severityLabel}</span>
+                                    <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary);">${notice.title}</h3>
+                                </div>
+                                <p style="margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">${notice.message}</p>
+                                <span style="font-size: 11px; color: var(--text-muted); text-transform: capitalize;">Source: ${notice.source} • Type: ${notice.type.replace(/_/g, " ")}</span>
+                            </div>
+                        </li>
+                    `;
+                });
+
+                html += "</ul>";
+                modalContent.innerHTML = html;
+            }
+
             function openNoticeModal() {
                 const modal = document.getElementById("noticeModal");
                 if (modal) {
+                    renderNoticeHistory();
                     modal.classList.add("show");
                     document.body.style.overflow = "hidden";
                 }
@@ -1346,6 +1471,14 @@
                 setupTooltip();
                 loadStatus();
                 startAutoRefresh();
+
+                // Fetch notices on load
+                fetchNotices();
+                // Auto-refresh notices every 5 minutes
+                noticesTimer = setInterval(
+                    fetchNotices,
+                    NOTICES_REFRESH_INTERVAL,
+                );
 
                 // Setup notice history link to open modal
                 const noticeHistoryLink = document.querySelector(
