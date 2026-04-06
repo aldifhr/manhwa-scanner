@@ -96,11 +96,15 @@ export default async function handler(req, res) {
 
           dailyStats.forEach((stat, index) => {
             const dayIndex = 89 - index; // Convert to bar index (0 = 90 days ago, 89 = today)
+            // Calculate actual date for this day index
+            const date = new Date();
+            date.setDate(date.getDate() - (89 - dayIndex));
+            const dateStr = date.toISOString().split("T")[0];
 
             if (stat.failedLogs > 0 || stat.deliveryFailed > 0) {
-              incidents.push(dayIndex);
+              incidents.push(dateStr);
             } else if (stat.partialLogs > 0 || stat.shortCircuits > 0) {
-              degraded.push(dayIndex);
+              degraded.push(dateStr);
             }
           });
 
