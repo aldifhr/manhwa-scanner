@@ -302,12 +302,7 @@ export default async function handler(req, res) {
         const userId = payload.member?.user?.id ?? payload.user?.id;
         const title = custom_id.slice("follow_toggle:".length);
 
-        console.log(
-          `[follow_toggle] Button clicked - userId: ${userId?.slice(-6)}, title: ${title}`,
-        );
-
         if (!userId) {
-          console.error("[follow_toggle] Error: No userId found in payload");
           return res.json({
             type: 4,
             data: { content: "❌ Error: Could not identify user.", flags: 64 },
@@ -319,7 +314,6 @@ export default async function handler(req, res) {
         return waitUntil(
           (async () => {
             try {
-              console.log("[follow_toggle] Importing notifications module...");
               const {
                 isUserFollowing,
                 followManga,
@@ -327,19 +321,11 @@ export default async function handler(req, res) {
                 getUserNotifyMode,
               } = await import("../lib/services/notifications.js");
 
-              console.log("[follow_toggle] Checking if user is following...");
               const following = await isUserFollowing(userId, title);
-              console.log(
-                `[follow_toggle] User following status: ${following}`,
-              );
-
               const notifyMode = await getUserNotifyMode(userId);
-              console.log(`[follow_toggle] Notify mode: ${notifyMode}`);
 
               if (following) {
-                console.log("[follow_toggle] Unfollowing manga...");
                 await unfollowManga(userId, title);
-                console.log("[follow_toggle] Unfollow success");
                 try {
                   return await editInteractionResponse(
                     payload,
@@ -352,9 +338,7 @@ export default async function handler(req, res) {
                   return; // Silent fail - action already succeeded
                 }
               } else {
-                console.log("[follow_toggle] Following manga...");
                 await followManga(userId, title);
-                console.log("[follow_toggle] Follow success");
                 try {
                   return await editInteractionResponse(
                     payload,
@@ -368,7 +352,7 @@ export default async function handler(req, res) {
                 }
               }
             } catch (err) {
-              console.error(`[follow_toggle] Error: ${err.message}`, err.stack);
+              console.error("[follow_toggle] Error:", err);
               try {
                 return await editInteractionResponse(
                   payload,
