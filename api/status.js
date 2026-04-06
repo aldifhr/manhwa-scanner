@@ -1,4 +1,4 @@
-import { redis, readStatusCache, writeStatusCache } from "../lib/redis.js";
+import { readStatusCache, redis, writeStatusCache } from "../lib/redis.js";
 import { logApiHit } from "../lib/logger.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { readCronStatusWithHealth } from "../lib/cronRuntime.js";

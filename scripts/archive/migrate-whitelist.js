@@ -23,13 +23,13 @@ async function migrate() {
       const sourceData = {
         url: item.url || null,
         source: item.source,
-        mark: item.mark || null
+        mark: item.mark || null,
       };
 
       if (!merged.has(title)) {
         merged.set(title, {
           title: title,
-          sources: [sourceData]
+          sources: [sourceData],
         });
       } else {
         const existing = merged.get(title);

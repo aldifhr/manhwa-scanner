@@ -11,18 +11,18 @@ const WHITELIST_PATH = path.resolve(__dirname, "../whitelist.json");
 
 async function verify() {
   console.log("🚀 Starting verification...");
-  
+
   try {
     // 1. Run Health Check
     console.log("--- Testing performHealthCheck ---");
     const broken = await performFullHealthCheck();
     console.log(`Found ${broken.length} broken links.`);
-    
+
     // 2. Read stats from Redis
     console.log("\n--- Testing Redis State ---");
     const lastCheck = await redis.get("health:last-check");
     console.log(`Last check stored: ${lastCheck}`);
-    
+
     const cachedBroken = await redis.get("health:broken-links");
     console.log(`Cached broken count: ${cachedBroken?.length || 0}`);
 

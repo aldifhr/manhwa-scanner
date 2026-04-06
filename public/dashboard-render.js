@@ -1,7 +1,7 @@
 import {
   bucketKeyForDate,
-  countSentLast24h,
   cooldownText,
+  countSentLast24h,
   fmt,
   getCssVar,
   logFailedCount,
@@ -204,7 +204,7 @@ export function createDashboardRenderer({ state, $, esc }) {
   function skeleton(ul, n = 4) {
     ul.innerHTML = Array.from(
       { length: n },
-      () => `<li style="padding:10px 12px"><div class="skel"></div></li>`,
+      () => "<li style=\"padding:10px 12px\"><div class=\"skel\"></div></li>",
     ).join("");
   }
 
@@ -212,7 +212,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     ul.innerHTML = Array.from(
       { length: n },
       () =>
-        `<li style="padding:10px 12px"><div class="skel" style="width:70%"></div></li>`,
+        "<li style=\"padding:10px 12px\"><div class=\"skel\" style=\"width:70%\"></div></li>",
     ).join("");
   }
 
@@ -254,7 +254,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     $("statFailed").textContent = data.failed ?? "-";
     $("statDuration").textContent = data.duration ? `${data.duration}s` : "-";
     dot.className =
-      "logo-dot" + (Number(data.failed || 0) > 0 ? " offline" : "");
+      `logo-dot${Number(data.failed || 0) > 0 ? " offline" : ""}`;
     renderLiveHeader(statusData);
   }
 
@@ -429,11 +429,11 @@ export function createDashboardRenderer({ state, $, esc }) {
         const marksHtml =
           marks.length > 0
             ? marks
-                .map(
-                  (m) =>
-                    `<span class="badge" style="margin-left:6px; opacity:.7">${esc(m)}</span>`,
-                )
-                .join("")
+              .map(
+                (m) =>
+                  `<span class="badge" style="margin-left:6px; opacity:.7">${esc(m)}</span>`,
+              )
+              .join("")
             : "";
 
         // Logic for source badges

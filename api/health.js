@@ -1,7 +1,7 @@
 import { isCronAuthorized } from "../lib/auth.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
-import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
-import { redis, getAllGuildChannels } from "../lib/redis.js";
+import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
+import { getAllGuildChannels, redis } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 import { HEALTH_CHECK_MAX_DURATION_SEC } from "../lib/config.js";
 
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         msg += `\n\n💡 **Action Needed**: Found **${recommendations.length}** links with persistent failures. Consider removing them.`;
       }
 
-      msg += `\n\nUse \`/health\` or check the Dashboard for details.`;
+      msg += "\n\nUse `/health` or check the Dashboard for details.";
 
       for (const channelId of Object.values(guildChannels)) {
         await sendDiscordEmbed(

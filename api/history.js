@@ -1,15 +1,15 @@
 import {
-  redis,
   readCronLogs,
   readObjectCache,
   readRecentChapters,
+  redis,
   writeObjectCache,
 } from "../lib/redis.js";
 import { logApiHit } from "../lib/logger.js";
 import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
-import { RECENT_API_CACHE_KEY, LOGS_API_CACHE_KEY } from "../lib/cacheKeys.js";
+import { LOGS_API_CACHE_KEY, RECENT_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
-import { RECENT_CACHE_SEC, LOGS_CACHE_SEC } from "../lib/config.js";
+import { LOGS_CACHE_SEC, RECENT_CACHE_SEC } from "../lib/config.js";
 import { getTimestampMs, isValidDate } from "../lib/dateUtils.js";
 
 export function sortRecentItems(items = []) {

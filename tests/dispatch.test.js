@@ -5,9 +5,9 @@ process.env.IKIRU_BASE_URL = "https://02.ikiru.wtf";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DISPATCH_HISTORY_KEY,
   dispatchChapters,
   prepareDispatchQueue,
-  DISPATCH_HISTORY_KEY,
 } from "../lib/services/dispatch.js";
 
 const noSubscribers = async () => [];

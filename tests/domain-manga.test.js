@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  compactTitleKey,
   createWhitelistMatcher,
   getChapterNumber,
   isSameNormalizedTitle,
   normalizeTitleKey,
-  compactTitleKey,
 } from "../lib/domain.js";
 
 test("compactTitleKey removes all spaces and punctuation for strict deduplication", () => {
@@ -39,8 +39,8 @@ test("createWhitelistMatcher matches by normalized url in sources", () => {
         {
           url: "https://a.shinigami.asia/series/abc/",
           source: "shinigami_project",
-        }
-      ]
+        },
+      ],
     },
   ]);
 

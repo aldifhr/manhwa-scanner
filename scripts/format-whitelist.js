@@ -29,7 +29,7 @@ async function formatWhitelist() {
 
     // 1. Normalize and Deduplicate into Multi-Source structure
     // normalizeWhitelist can handle both legacy flat arrays and new nested arrays.
-    let normalized = normalizeWhitelist(data);
+    const normalized = normalizeWhitelist(data);
 
     // 2. Sort alphabetically by title
     normalized.sort((a, b) => {

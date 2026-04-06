@@ -37,17 +37,17 @@ test("formatMarkedTitle appends label when mark exists", () => {
 
 test("findWhitelistEntryIndex respects nested sources", () => {
   const items = [
-    { 
-      title: "Nano Machine", 
+    {
+      title: "Nano Machine",
       sources: [
-        { source: "ikiru", url: "https://02.ikiru.wtf/manga/nano-machine/" }
-      ]
+        { source: "ikiru", url: "https://02.ikiru.wtf/manga/nano-machine/" },
+      ],
     },
-    { 
-      title: "Solo Leveling", 
+    {
+      title: "Solo Leveling",
       sources: [
-        { source: "shinigami_project", url: "https://a.shinigami.asia/series/abc/" }
-      ]
+        { source: "shinigami_project", url: "https://a.shinigami.asia/series/abc/" },
+      ],
     },
   ];
 
@@ -69,18 +69,18 @@ test("findWhitelistEntryIndex respects nested sources", () => {
 
 test("resolveWhitelistQuery handles consolidated titles", () => {
   const items = [
-    { 
-      title: "Solo Leveling", 
+    {
+      title: "Solo Leveling",
       sources: [
         { source: "ikiru", url: "https://ikiru.example/solo" },
-        { source: "shinigami_project", url: "https://shinigami.example/solo" }
-      ]
+        { source: "shinigami_project", url: "https://shinigami.example/solo" },
+      ],
     },
-    { 
-      title: "Nano Machine", 
+    {
+      title: "Nano Machine",
       sources: [
-        { source: "ikiru", url: "https://ikiru.example/nano" }
-      ]
+        { source: "ikiru", url: "https://ikiru.example/nano" },
+      ],
     },
   ];
 
@@ -168,7 +168,7 @@ test("resolveWhitelistQuery finds matches with minor typos (fuzzy)", () => {
     { title: "Nano Machine", sources: [] },
   ];
 
-// "Solo Levling" (missing 'e')
+  // "Solo Levling" (missing 'e')
   const result = resolveWhitelistQuery(items, "Solo Levling");
   assert.equal(result.status, "matched");
   assert.equal(result.suggested, true);
@@ -185,21 +185,21 @@ test("addWhitelistEntry prevents fuzzy title duplicates", async () => {
   const mockWhitelist = [
     { title: "Nano Machine", sources: [{ source: "ikiru" }] },
   ];
-  
+
   const result = await addWhitelistEntry({
     title: "Nanomachin", // Slight variation
-    source: "ikiru"
+    source: "ikiru",
   }, {
     loadWhitelistFn: async () => mockWhitelist,
     saveWhitelistFn: async () => {}, // Mock to prevent hitting real Redis
-    redisClient: { 
+    redisClient: {
       set: async () => "OK",
       mget: async () => [],
       del: async () => 0,
       hdel: async () => 0,
       hgetall: async () => ({}),
-      hset: async () => 1
-    }
+      hset: async () => 1,
+    },
   });
 
   assert.equal(result.status, "exists");

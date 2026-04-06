@@ -1,15 +1,15 @@
 import { isCronAuthorized } from "../lib/auth.js";
-import { buildCronErrorLog, appendCronLog } from "../lib/cronLogs.js";
+import { appendCronLog, buildCronErrorLog } from "../lib/cronLogs.js";
 import { runCronJob, shouldRunChannelValidation } from "../lib/cronRuntime.js";
 import { loggers } from "../lib/logger.js";
-import { redis, getAllGuildChannels, writeCronStatus } from "../lib/redis.js";
+import { getAllGuildChannels, redis, writeCronStatus } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 
-import { CRON_MAX_DURATION_SEC } from "../lib/config.js";
-
-export const config = { maxDuration: CRON_MAX_DURATION_SEC };
+// Use literal value for Vercel compatibility
+// CRON_MAX_DURATION_SEC is 300 (5 min) by default, but FastCron free tier is 30s
+export const config = { maxDuration: 30 };
 const logger = loggers.cron;
 
 export { shouldRunChannelValidation };

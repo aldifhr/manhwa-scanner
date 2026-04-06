@@ -51,10 +51,10 @@ filesToUpdate.forEach((relPath) => {
 
   content = content.replace(
     /from\s+['"](\.\.?\/)+domain\/(manga|source|whitelist)\.js['"]/g,
-    (match, p1) => {
+    (match, p1) =>
       // If it was ../../domain/manga.js, it should become ../../domain.js
-      return `from "${p1}domain.js"`;
-    },
+      `from "${p1}domain.js"`
+    ,
   );
 
   fs.writeFileSync(fullPath, content);

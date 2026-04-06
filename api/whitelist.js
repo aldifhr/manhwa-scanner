@@ -4,9 +4,9 @@ import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { WHITELIST_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import {
   addWhitelistEntry,
+  markWhitelistEntry,
   removeWhitelistEntry,
   removeWhitelistEntryIdentity,
-  markWhitelistEntry,
 } from "../lib/services/whitelist.js";
 import { buildWhitelistListResponse } from "../lib/services/whitelist.js";
 
@@ -246,10 +246,10 @@ export default async function handler(req, res) {
       const result =
         source || url
           ? await removeWhitelistEntryIdentity({
-              title: title.trim(),
-              source,
-              url,
-            })
+            title: title.trim(),
+            source,
+            url,
+          })
           : await removeWhitelistEntry(title.trim());
       if (result.status === "ambiguous") {
         logApiOk(reqLogger, {

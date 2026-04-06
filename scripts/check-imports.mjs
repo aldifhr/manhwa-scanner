@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { readdirSync, readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 
@@ -42,7 +42,7 @@ const errors = [];
 
 async function checkAll() {
   for (const f of allFiles) {
-    const rel = f.replace(root + "\\", "").replace(/\\/g, "/");
+    const rel = f.replace(`${root}\\`, "").replace(/\\/g, "/");
     try {
       await import(`file:///${f.replace(/\\/g, "/")}`);
       console.log(`✔ ${rel}`);

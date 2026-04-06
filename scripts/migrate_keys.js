@@ -25,14 +25,14 @@ async function runMigration() {
         if (userId && titleKey) {
           const hashKey = `user:progress_data:${userId}`;
           const indexKey = `user:progress_list:${userId}`;
-          
+
           await Promise.all([
             redis.hset(hashKey, { [titleKey]: val }),
-            redis.zadd(indexKey, { 
-                score: val.timestamp ? new Date(val.timestamp).getTime() : Date.now(), 
-                member: titleKey 
+            redis.zadd(indexKey, {
+              score: val.timestamp ? new Date(val.timestamp).getTime() : Date.now(),
+              member: titleKey,
             }),
-            redis.del(key)
+            redis.del(key),
           ]);
           progressCount++;
         }
@@ -52,7 +52,7 @@ async function runMigration() {
     if (keys.length > 0) {
       const values = await redis.mget(...keys);
       const hashUpdates = {};
-      
+
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         const val = values[i];
@@ -61,11 +61,11 @@ async function runMigration() {
         const titleKey = key.replace("manga:last_update:", "");
         hashUpdates[titleKey] = val;
       }
-      
+
       if (Object.keys(hashUpdates).length > 0) {
-          await redis.hset("manga:last_updates", hashUpdates);
-          await redis.del(...keys);
-          mangaCount += Object.keys(hashUpdates).length;
+        await redis.hset("manga:last_updates", hashUpdates);
+        await redis.del(...keys);
+        mangaCount += Object.keys(hashUpdates).length;
       }
     }
   } while (cursor !== "0");

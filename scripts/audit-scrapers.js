@@ -7,7 +7,7 @@ import { redis } from "../lib/redis.js";
 async function audit() {
   console.log("🔍 Starting Scraper Audit...");
   console.log(`📡 Redis URL: ${process.env.UPSTASH_REDIS_REST_URL ? "SET" : "MISSING"}`);
-  console.log(`📡 Redis Token: ${process.env.UPSTASH_REDIS_REST_TOKEN ? "SET (Length: " + process.env.UPSTASH_REDIS_REST_TOKEN.length + ")" : "MISSING"}`);
+  console.log(`📡 Redis Token: ${process.env.UPSTASH_REDIS_REST_TOKEN ? `SET (Length: ${process.env.UPSTASH_REDIS_REST_TOKEN.length})` : "MISSING"}`);
   console.log(`📡 Ikiru Base: ${process.env.IKIRU_BASE_URL || "DEFAULT"}`);
   console.log("");
 

@@ -6,10 +6,10 @@ async function test() {
   console.log("Running enhanced health check...");
   const broken = await performFullHealthCheck();
   console.log(`Found ${broken.length} broken links.`);
-  
+
   const recommendations = await redis.get("health:recommendations");
   console.log("Recommendations:", JSON.stringify(recommendations, null, 2));
-  
+
   // Clean up
   console.log("Done.");
   process.exit(0);

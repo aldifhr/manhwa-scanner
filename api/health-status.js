@@ -1,8 +1,8 @@
-import { redis, loadSourceHealthSnapshot } from "../lib/redis.js";
+import { loadSourceHealthSnapshot, redis } from "../lib/redis.js";
 import { SOURCE_KEYS } from "../lib/services/health.js";
 import { readCronStatusWithHealth } from "../lib/cronRuntime.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
-import { logApiHit, logApiOk, logApiError } from "../lib/logger.js";
+import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import {
   HEALTH_CACHE_TTL_MS,
   UPTIME_CALCULATION_TIERS,
@@ -157,15 +157,15 @@ export default async function handler(req, res) {
       guildCount: guildCount,
       cronStatus: cronStatus
         ? {
-            lastRun: cronStatus.lastRun || null,
-            sent: cronStatus.sent || 0,
-            skipped: cronStatus.skipped || 0,
-            failed: cronStatus.failed || 0,
-            duration: cronStatus.duration
-              ? `${Math.round(cronStatus.duration / 1000)}s`
-              : "-",
-            outcome: cronStatus.outcome || "unknown",
-          }
+          lastRun: cronStatus.lastRun || null,
+          sent: cronStatus.sent || 0,
+          skipped: cronStatus.skipped || 0,
+          failed: cronStatus.failed || 0,
+          duration: cronStatus.duration
+            ? `${Math.round(cronStatus.duration / 1000)}s`
+            : "-",
+          outcome: cronStatus.outcome || "unknown",
+        }
         : null,
     };
 

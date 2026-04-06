@@ -1,13 +1,13 @@
 import {
   clearDashboardLoginThrottle,
   createDashboardSessionToken,
-  getSessionCookieHeader,
   getClearSessionCookieHeader,
+  getSessionCookieHeader,
   isDashboardPasswordConfigured,
+  isDashboardSessionAuthorized,
   readDashboardLoginThrottle,
   registerDashboardLoginFailure,
   validateDashboardPassword,
-  isDashboardSessionAuthorized,
 } from "../lib/auth.js";
 import { redis } from "../lib/redis.js";
 
@@ -91,7 +91,7 @@ function handleStatus(req, res) {
 
 export default async function handler(req, res) {
   const action = req.query.action || "status";
-  
+
   if (action === "login") return handleLogin(req, res);
   if (action === "logout") return handleLogout(req, res);
   if (action === "status") return handleStatus(req, res);
