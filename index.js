@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import compression from "compression";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -42,6 +43,17 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Correlation ID middleware for request tracing
+app.use((req, res, next) => {
+  const correlationId =
+    req.headers["x-correlation-id"] ||
+    req.headers["x-request-id"] ||
+    crypto.randomUUID();
+  req.correlationId = correlationId;
+  res.setHeader("x-correlation-id", correlationId);
+  next();
+});
 
 // Middleware for parsing JSON and urlencoded bodies, which Vercel does automatically
 // Added request size limits to prevent DoS attacks
@@ -242,6 +254,16 @@ async function startServer() {
     );
     log.info("═══════════════════════════════════════");
   });
+}
+
+// Start cache warming service (if not in test mode)
+if (
+  process.env.NODE_ENV !== "test" &&
+  process.env.DISABLE_CACHE_WARMING !== "true"
+) {
+  const { startCacheWarming } = await import("./lib/cacheWarming.js");
+  startCacheWarming();
+  console.log("🔥 Cache warming service started");
 }
 
 startServer();
