@@ -39,9 +39,25 @@ export default async function handler(req, res) {
     // Check Redis cache first
     const cached = await redis.get(HEALTH_STATUS_CACHE_KEY);
     if (cached) {
-      const parsed = JSON.parse(cached);
-      logApiOk(reqLogger, { status: 200, cached: true });
-      return res.status(200).json({ ...parsed, cached: true });
+      let parsed;
+      if (typeof cached === "object") {
+        // Already parsed by Redis client
+        parsed = cached;
+      } else if (typeof cached === "string" && cached.startsWith("{")) {
+        // Valid JSON string
+        parsed = JSON.parse(cached);
+      } else {
+        // Invalid cache data, skip cache
+        console.warn(
+          "[health-status] Invalid cache data:",
+          String(cached).slice(0, 100),
+        );
+        parsed = null;
+      }
+      if (parsed) {
+        logApiOk(reqLogger, { status: 200, cached: true });
+        return res.status(200).json({ ...parsed, cached: true });
+      }
     }
 
     const sourceHealth = await loadSourceHealthSnapshot(redis, SOURCE_KEYS);
