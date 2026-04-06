@@ -959,6 +959,7 @@
                 padding: 0;
             }
 
+            /* Notice History List */
             .notice-history-item {
                 display: flex;
                 gap: 16px;
@@ -1248,6 +1249,7 @@
                         <span>All systems operational</span>
                     </div>
                 </div>
+                <div class="incident-timeline" id="incidentTimeline"></div>
             </div>
         </div>
 
@@ -1257,12 +1259,14 @@
             const REFRESH_INTERVAL = 60000; // 60 seconds
             const DAYS_TO_SHOW = 90;
             const NOTICES_API_ENDPOINT = "/api/notices";
+            const INCIDENTS_API_ENDPOINT = "/api/incidents";
 
             // State
             let refreshTimer = null;
             let currentData = null;
             let noticesData = null;
             let noticesTimer = null;
+            let incidentsData = null;
             const NOTICES_REFRESH_INTERVAL = 300000; // 5 minutes
 
             // Icons
@@ -1447,6 +1451,7 @@
             function openIncidentModal() {
                 const modal = document.getElementById("incidentModal");
                 if (modal) {
+                    renderIncidentTimeline();
                     modal.classList.add("show");
                     document.body.style.overflow = "hidden";
                 }
@@ -1480,6 +1485,9 @@
                     NOTICES_REFRESH_INTERVAL,
                 );
 
+                // Fetch incidents on load
+                fetchIncidents();
+
                 // Setup notice history link to open modal
                 const noticeHistoryLink = document.querySelector(
                     ".notice-history-link",
@@ -1491,6 +1499,123 @@
                     };
                 }
             });
+
+            // Fetch incidents data
+            async function fetchIncidents() {
+                try {
+                    const response = await fetch("/api/incidents?days=30");
+                    if (!response.ok)
+                        throw new Error(`HTTP ${response.status}`);
+
+                    const result = await response.json();
+                    if (result.success) {
+                        incidentsData = result.data;
+                        return result.data;
+                    }
+                    return null;
+                } catch (error) {
+                    console.error("Failed to fetch incidents:", error);
+                    return null;
+                }
+            }
+
+            // Render incident timeline in modal
+            function renderIncidentTimeline() {
+                const timeline = document.getElementById("incidentTimeline");
+                const modalContent = document.getElementById(
+                    "incidentModalContent",
+                );
+
+                if (!timeline || !incidentsData) return;
+
+                if (incidentsData.totalCount === 0) {
+                    timeline.innerHTML = "";
+                    modalContent.innerHTML = `
+                        <div class="notice-history-empty">
+                            <div class="notice-history-icon" style="background: var(--green); color: white; font-size: 24px; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">✓</div>
+                            <p style="margin: 0 0 8px; font-size: 16px; font-weight: 500; color: var(--text-primary);">No incidents reported</p>
+                            <span style="font-size: 14px; color: var(--text-secondary);">All systems operational for the past 30 days</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Show stats
+                const stats = incidentsData.stats;
+                let html = `
+                    <div class="incident-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; padding: 16px; background: color-mix(in srgb, var(--bg-card) 95%, var(--bg)); border-radius: 8px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${incidentsData.totalCount}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Total Incidents</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: ${incidentsData.ongoingCount > 0 ? "var(--red)" : "var(--green)"};">${incidentsData.ongoingCount}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Ongoing</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">${incidentsData.recent24h}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Last 24h</div>
+                        </div>
+                    </div>
+                `;
+
+                // Render timeline
+                html += '<div class="timeline">';
+                incidentsData.timeline.forEach((day, index) => {
+                    const isToday =
+                        new Date().toISOString().split("T")[0] === day.date;
+                    const dateLabel = isToday ? "Today" : day.displayDate;
+
+                    html += `
+                        <div class="timeline-day" style="margin-bottom: 24px;">
+                            <div class="timeline-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+                                <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">${dateLabel}</span>
+                                <span style="font-size: 11px; color: var(--text-muted); background: color-mix(in srgb, var(--bg-hover) 90%, transparent); padding: 2px 8px; border-radius: 12px;">${day.incidentCount} incidents</span>
+                            </div>
+                            <div class="timeline-incidents" style="display: flex; flex-direction: column; gap: 12px;">
+                    `;
+
+                    day.incidents.forEach((incident) => {
+                        const severityColor =
+                            incident.severity === "critical"
+                                ? "var(--red)"
+                                : incident.severity === "high"
+                                  ? "var(--amber)"
+                                  : "var(--yellow)";
+                        const statusIcon = incident.resolved ? "✓" : "○";
+                        const statusColor = incident.resolved
+                            ? "var(--green)"
+                            : severityColor;
+                        const typeLabel = incident.type.replace(/_/g, " ");
+
+                        html += `
+                            <div class="incident-card" style="display: flex; gap: 12px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; border-left: 3px solid ${severityColor};">
+                                <div class="incident-status" style="flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: ${statusColor}; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">${statusIcon}</div>
+                                <div class="incident-content" style="flex: 1; min-width: 0;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                        <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: ${severityColor}; background: color-mix(in srgb, ${severityColor} 15%, transparent); padding: 2px 6px; border-radius: 4px;">${incident.severity}</span>
+                                        <span style="font-size: 11px; color: var(--text-muted); text-transform: capitalize;">${typeLabel}</span>
+                                    </div>
+                                    <h4 style="margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text-primary);">${incident.title}</h4>
+                                    <p style="margin: 0 0 8px; font-size: 12px; color: var(--text-secondary); line-height: 1.4;">${incident.message}</p>
+                                    <div style="display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--text-muted);">
+                                        <span>Source: ${incident.source}</span>
+                                        <span>Time: ${new Date(incident.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+                                        ${incident.resolved ? `<span style="color: var(--green);">Resolved</span>` : `<span style="color: ${severityColor};">Ongoing</span>`}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += "</div></div>";
+                });
+                html += "</div>";
+
+                // Hide empty state, show timeline
+                modalContent.style.display = "none";
+                timeline.innerHTML = html;
+            }
 
             // Auto refresh
             function startAutoRefresh() {
