@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="id" data-theme="dark">
+    <head></head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title></title>Status Page</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            *,</style>
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --bg: #1a1a1a;
+                --nav-bg: #2a2a2a;
+                --nav-border: #333;
+                --card-bg: #242424;
+                --card-border: #333;
+                --text-primary: #f0f0f0;
+                --text-secondary: #888;
+                --text-muted: #555;
+                --green: #22c55e;
+                --green-dark: #4ade80;
+                --bar-green: #22c55e;
+                --bar-red: #ef4444;
+                --bar-yellow: #f59e0b;
+                --bar-empty: #3a3a3a;
+                --border: #333;
+                --shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+                --skeleton: #2e2e2e;
+                --hover-bg: #2e2e2e;
+                --toggle-bg: #3a3a3a;
+                --amber-dark: #fbbf24;
+                --bg-secondary: #1f1f1f;
+            }
+
+            [data-theme="light"] {
+                --bg: #f3f4f6;
+                --nav-bg: #2a2a2a;
+                --nav-border: #1a1a1a;
+                --card-bg: #ffffff;
+                --card-border: #e5e7eb;
+                --text-primary: #111111;
+                --text-secondary: #555555;
+                --text-muted: #aaaaaa;
+                --green: #22c55e;
+                --green-dark: #16a34a;
+                --bar-green: #22c55e;
+                --bar-red: #ef4444;
+                --bar-yellow: #f59e0b;
+                --bar-empty: #d1d5db;
+                --border: #e5e7eb;
+                --shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+                --skeleton: #e5e7eb;
+                --hover-bg: #f9fafb;
+                --toggle-bg: #e5e7eb;
+                --amber-dark: #d97706;
+                --bg-secondary: #f9fafb;
+            }
+
+            body {
+                font-family: "IBM Plex Sans", sans-serif;
+                background: var(--bg);
+                color: var(--text-primary);
+                line-height: 1.6;
+                min-height: 100vh;
+                transition: background 0.3s ease, color 0.3s ease;
+            }
+
+            /* ── NAV ── */
+            nav {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                background: var(--nav-bg);
+                border-bottom: 1px solid var(--nav-border);
+                padding: 0.75rem 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .brand {
+                font-weight: 600;
+                font-size: 1.1rem;
+                letter-spacing: -0.3px;
+            }
+
+            .nav-right {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .nav-toolbar {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                background: var(--card-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.4rem 0.75rem;
+            }
+
+            .theme-toggle {
+                background: var(--toggle-bg);
+                border: 1px solid var(--border);
+                color: var(--text-primary);
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+
+            .theme-toggle:hover {
+                background: var(--hover-bg);
+                transform: scale(1.05);
+            }
+
+            .nav-link {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 0.9rem;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+            }
+
+            .nav-link:hover {
+                color: var(--text-primary);
+                background: var(--hover-bg);
+            }
+
+            /* ── TOAST NOTIFICATIONS ── */
+            .toast-container {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .toast {
+                background: var(--card-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 12px 16px;
+                box-shadow: var(--shadow);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 280px;
+                animation: toastSlide 0.3s ease;
+            }
+
+            @keyframes toastSlide {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            .toast.success {
+                border-left: 3px solid var(--green);
+            }
+
+            .toast.error {
+                border-left: 3px solid var(--bar-red);
+            }
+
+            .toast.info {
+                border-left: 3px solid var(--bar-yellow);
+            }
+
+            .toast-icon {
+                font-size: 1.2rem;
+            }
+
+            .toast-message {
+                font-size: 0.9rem;
+                color: var(--text-primary);
+            }
+
+            /* ── STICKY LEGEND ── */
+            .sticky-legend {
+                position: sticky;
+                top: 60px;
+                z-index: 50;
+                background: var(--bg);
+                border-bottom: 1px solid var(--border);
+                padding: 0.5rem 1.5rem;
+                display: flex;
+                gap: 1.5rem;
+                overflow-x: auto;
+            }
+
+            [data-theme="light"] .sticky-legend {
+                background: var(--bg);
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                white-space: nowrap;
+            }
+
+            .legend-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 2px;
+            }
+
+            .legend-dot.lg-green {
+                background: var(--bar-green);
+            }
+            .legend-dot.lg-yellow {
+                background: var(--bar-yellow);
+            }
+            .legend-dot.lg-red {
+                background: var(--bar-red);
+            }
+            .legend-dot.lg-empty {
+                background: var(--bar-empty);
+            }
+
+            .legend-item span {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            /* ── LAYOUT ── */
+            main {
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 1.5rem;
+            }
+
+            /* ── CRON STATUS CARD ── */
+            .cron-status-card {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 1rem 1.25rem;
+                margin-bottom: 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .cron-status-left {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .cron-status-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: var(--green);
+            }
+
+            .cron-status-title {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .cron-status-time {
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+            }
+
+            .cron-metrics {
+                display: flex;
+                gap: 1.5rem;
+                flex-wrap: wrap;
+            }
+
+            .cron-metric-label {
+                font-size: 0.75rem;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .cron-metric-value {
+                font-size: 1rem;
+                font-weight: 600;
+            }
+
+            .cron-metric-value.sent {
+                color: var(--green-dark);
+            }
+            .cron-metric-value.skipped {
+                color: var(--amber-dark);
+            }
+            .cron-metric-value.failed {
+                color: var(--bar-red);
+            }
+
+            /* ── STATUS BANNER ── */
+            .status-banner {
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 12px;
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+                transition: border-color 0.3s ease;
+            }
+
+            .banner-top {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .status-banner .dot {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: var(--green);
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.5;
+                }
+            }
+
+            .status-banner .dot::after {
+                content: "";
+                display: block;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: var(--green);
+                animation: pulse-ring 2s infinite;
+            }
+
+            @keyframes pulse-ring {
+                0% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                100% {
+                    transform: scale(2);
+                    opacity: 0;
+                }
+            }
+
+            .banner-title {
+                font-size: 1.25rem;
+                font-weight: 600;
+                letter-spacing: -0.3px;
+            }
+
+            .banner-uptime {
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+                margin-bottom: 1rem;
+            }
+
+            .banner-uptime strong {
+                color: var(--text-primary);
+            }
+
+            .status-banner.status-healthy {
+                border-color: var(--green);
+                background: linear-gradient(
+                    135deg,
+                    var(--card-bg) 0%,
+                    rgba(34, 197, 94, 0.05) 100%
+                );
+            }
+
+            .status-banner.status-warning {
+                border-color: var(--bar-yellow);
+                background: linear-gradient(
+                    135deg,
+                    var(--card-bg) 0%,
+                    rgba(245, 158, 11, 0.05) 100%
+                );
+            }
+
+            .status-banner.status-degraded {
+                border-color: var(--bar-red);
+                background: linear-gradient(
+                    135deg,
+                    var(--card-bg) 0%,
+                    rgba(239, 68, 68, 0.05) 100%
+                );
+            }
+
+            .status-banner .dot-healthy {
+                background: var(--green);
+            }
+            .status-banner .dot-healthy::after {
+                background: var(--green);
+            }
+
+            .status-banner .dot-warning {
+                background: var(--bar-yellow);
+            }
+            .status-banner .dot-warning::after {
+                background: var(--bar-yellow);
+            }
+
+            .status-banner .dot-degraded {
+                background: var(--bar-red);
+            }
+            .status-banner .dot-degraded::after {
+                background: var(--bar-red);
+            }
+
+            .uptime-progress-wrap {
+                background: var(--bar-empty);
+                height: 6px;
+                border-radius: 3px;
+                overflow: hidden;
+                margin-bottom: 0.75rem;
+            }
+
+            .uptime-progress-bar {
+                height: 100%;
+                background: linear-gradient(
+                    90deg,
+                    var(--green) 0%,
+                    var(--green-dark) 100%
+                );
+                border-radius: 3px;
+                transition: width 0.5s ease;
+                width: 99.98%;
+            }
+
+            /* Live timestamp + refresh indicator */
+            .ts-row {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.8rem;
+                color: var(--text-muted);
+                font-family: "IBM Plex Mono", monospace;
+            }
+
+            #live-ts {
+                font-size: 0.8rem;
+                color: var(--text-muted);
+            }
+
+            .refresh-ring {
+                width: 10px;
+                height: 10px;
+                border: 2px solid var(--green);
+                border-top-color: transparent;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            .refresh-ring.paused {
+                animation: none;
+                border-color: var(--text-muted);
+                border-top-color: var(--text-muted);
+            }
+
+            /* ── TOOLBAR BUTTONS ── */
+            .toolbar-btn {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.85rem;
+                font-weight: 500;
+                color: var(--text-secondary);
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .toolbar-btn:hover {
+                background: var(--hover-bg);
+                color: var(--text-primary);
+            }
+
+            .toolbar-btn.active {
+                background: var(--green);
+                color: white;
+                border-color: var(--green);
+            }
+
+            .guild-badge {
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                padding: 0.4rem 0.8rem;
+                border-radius: 8px;
+            }
+
+            /* ── SEARCH ── */
+            .search-wrap {
+                position: relative;
+                margin-bottom: 1.5rem;
+            }
+
+            .search-icon {
+                position: absolute;
+                left: 1rem;
+                top: 50%;
+                transform: translateY(-50%);
+                color: var(--text-muted);
+                pointer-events: none;
+            }
+
+            #searchInput {
+                width: 100%;
+                padding: 0.875rem 1rem 0.875rem 2.75rem;
+                font-size: 0.95rem;
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 10px;
+                color: var(--text-primary);
+                outline: none;
+                transition: all 0.2s ease;
+            }
+
+            #searchInput::placeholder {
+                color: var(--text-muted);
+            }
+
+            #searchInput:focus {
+                border-color: var(--green);
+                box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+            }
+
+            .search-clear {
+                position: absolute;
+                right: 1rem;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 1.25rem;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+            }
+
+            .search-clear:hover {
+                background: var(--hover-bg);
+                color: var(--text-primary);
+            }
+
+            /* ── NETWORKS ── */
+            .network-card {
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 12px;
+                margin-bottom: 1rem;
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }
+
+            .network-card.hidden {
+                display: none;
+            }
+
+            .network-header {
+                padding: 1.25rem 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+
+            .network-header:hover {
+                background: var(--hover-bg);
+            }
+
+            .network-card.open .network-header {
+                background: var(--hover-bg);
+            }
+
+            .network-left {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            /* Base status dot class */
+            .status-dot {
+                background: var(--green);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .status-dot::after {
+                content: "✓";
+                color: white;
+                font-weight: 700;
+            }
+
+            /* Size variants */
+            .network-dot {
+                width: 16px;
+                height: 16px;
+            }
+
+            .network-dot::after {
+                font-size: 9px;
+            }
+
+            .service-dot {
+                width: 14px;
+                height: 14px;
+            }
+
+            .service-dot::after {
+                font-size: 8px;
+            }
+
+            /* Status colors (shared) */
+            .status-dot.status-healthy,
+            .network-dot.status-healthy,
+            .service-dot.status-healthy {
+                background: var(--green);
+            }
+
+            .status-dot.status-degraded,
+            .network-dot.status-degraded,
+            .service-dot.status-degraded {
+                background: var(--bar-yellow);
+            }
+
+            .status-dot.status-failed,
+            .network-dot.status-failed,
+            .service-dot.status-failed,
+            .service-dot.status-error {
+                background: var(--bar-red);
+            }
+
+            /* Checkmark content (shared) */
+            .status-dot.status-healthy::after,
+            .status-dot.status-degraded::after,
+            .network-dot.status-healthy::after,
+            .network-dot.status-degraded::after,
+            .network-dot.status-failed::after,
+            .network-dot.status-unknown::after,
+            .service-dot.status-healthy::after,
+            .service-dot.status-degraded::after,
+            .service-dot.status-unknown::after {
+                content: "✓";
+            }
+
+            /* X mark for failed states */
+            .status-dot.status-failed::after,
+            .network-dot.status-failed::after,
+            .service-dot.status-failed::after,
+            .service-dot.status-error::after {
+                content: "✕";
+                font-size: 7px;
+            }
+
+            .network-name {
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .network-right {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+
+            .uptime-label {
+                font-size: 0.82rem;
+                font-weight: 500;
+                color: var(--green-dark);
+            }
+
+            .chevron {
+                width: 18px;
+                height: 18px;
+                color: #777;
+                transition: transform 0.25s ease;
+                flex-shrink: 0;
+            }
+
+            .network-card.open .chevron {
+                transform: rotate(180deg);
+            }
+
+            /* ── SERVICES ── */
+            .services-container {
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.4s ease;
+            }
+
+            .network-card.open .services-container {
+                max-height: 3000px;
+            }
+
+            .service-row {
+                padding: 1rem 1.6rem;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .service-row:last-child {
+                border-bottom: none;
+            }
+
+            .service-row.search-hidden {
+                display: none;
+            }
+
+            .service-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.5rem;
+            }
+
+            .service-left {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            /* Note: .service-dot styles now consolidated with base .status-dot class above */
+
+            .service-name {
+                font-size: 0.9rem;
+                color: var(--text-primary);
+            }
+
+            .service-right {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+
+            .service-uptime {
+                font-size:

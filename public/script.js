@@ -1,8 +1,5 @@
 import { createDashboardRenderer } from "./dashboard-render.js";
-import {
-  fmt,
-  msToSecondsLabel,
-} from "./dashboard-utils.js";
+import { fmt, msToSecondsLabel } from "./dashboard-utils.js";
 
 const API_BASE = "";
 const DEFAULT_POLL_MS = 120_000;
@@ -17,7 +14,10 @@ const $ = (id) => {
   return elementCache.get(id);
 };
 const esc = (value) =>
-  String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 const state = {
   isAuthenticated: false,
@@ -114,7 +114,8 @@ function openDeleteConfirm(title) {
 function resolveDeleteConfirm(accepted) {
   const overlay = $("deleteConfirmOverlay");
   if (overlay) overlay.classList.remove("show");
-  if (state.pendingDeleteResolver) state.pendingDeleteResolver(Boolean(accepted));
+  if (state.pendingDeleteResolver)
+    state.pendingDeleteResolver(Boolean(accepted));
   state.pendingDeleteResolver = null;
 }
 
@@ -180,9 +181,10 @@ function copyWhitelistUrlByIndex(index) {
     copyUrl("");
     return;
   }
-  const targetUrl = Array.isArray(item.sources) && item.sources.length > 0
-    ? (item.sources.find(s => s.url)?.url || item.sources[0].url)
-    : item.url;
+  const targetUrl =
+    Array.isArray(item.sources) && item.sources.length > 0
+      ? item.sources.find((s) => s.url)?.url || item.sources[0].url
+      : item.url;
   copyUrl(targetUrl || "");
 }
 
@@ -191,7 +193,7 @@ async function toggleMarkReadByIndex(index) {
   if (!item) return;
 
   const title = typeof item === "string" ? item : item.title;
-  const isRead = (item.sources || []).some(s => s.mark === "read");
+  const isRead = (item.sources || []).some((s) => s.mark === "read");
   const nextMark = isRead ? null : "read";
 
   state.isProcessing = true;
@@ -208,7 +210,10 @@ async function toggleMarkReadByIndex(index) {
       return;
     }
     renderWhitelist(data);
-    showToast(nextMark === "read" ? "Ditandai sudah baca" : "Status baca dihapus", "success");
+    showToast(
+      nextMark === "read" ? "Ditandai sudah baca" : "Status baca dihapus",
+      "success",
+    );
   } catch (err) {
     showAlert(`Gagal: ${err.message}`);
   } finally {
@@ -294,19 +299,26 @@ async function runCronNow() {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/cron`, { method: "GET", cache: "no-store" });
-    const data = await response.json();
+    const response = await fetch(`${API_BASE}/api/cron`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const responseData = await response.json();
     if (!response.ok) {
-      showAlert(data.error || "Cron gagal dijalankan");
+      showAlert(responseData.error?.message || "Cron gagal dijalankan");
       return;
     }
-    showAlert(`Cron selesai: sent ${data.sent ?? 0}, skipped ${data.skipped ?? 0}, failed ${data.failed ?? 0}`);
+    // Handle both new format (responseData.data) and old format (direct properties)
+    const resultData = responseData.data || responseData;
+    showAlert(
+      `Cron selesai: sent ${resultData.sent ?? 0}, skipped ${resultData.skipped ?? 0}, failed ${resultData.failed ?? 0}`,
+    );
     renderLastCronResult(
       {
-        sent: data.sent,
-        skipped: data.skipped,
-        failed: data.failed,
-        duration: data.duration,
+        sent: resultData.sent,
+        skipped: resultData.skipped,
+        failed: resultData.failed,
+        duration: resultData.duration,
         timestamp: new Date().toISOString(),
       },
       true,
@@ -356,7 +368,10 @@ async function logoutDashboard() {
   if (state.heavyAbortController) state.heavyAbortController.abort();
   if (state.loadAbortController) state.loadAbortController.abort();
   try {
-    await fetch(`${API_BASE}/api/auth?action=logout`, { method: "POST", cache: "no-store" });
+    await fetch(`${API_BASE}/api/auth?action=logout`, {
+      method: "POST",
+      cache: "no-store",
+    });
   } catch {
     // noop
   }
@@ -371,7 +386,10 @@ async function logoutDashboard() {
 
 async function bootstrapAuth() {
   try {
-    const response = await fetch(`${API_BASE}/api/auth?action=status`, { method: "GET", cache: "no-store" });
+    const response = await fetch(`${API_BASE}/api/auth?action=status`, {
+      method: "GET",
+      cache: "no-store",
+    });
     const data = await response.json();
     state.isAuthenticated = Boolean(data?.authenticated);
   } catch {
@@ -388,7 +406,10 @@ async function bootstrapAuth() {
 }
 
 async function apiFetch(path, signal) {
-  const response = await fetch(`${API_BASE}${path}`, { cache: "no-store", signal });
+  const response = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    signal,
+  });
   if (response.status === 401) {
     state.isAuthenticated = false;
     $("modalOverlay")?.classList.add("show");
@@ -417,7 +438,10 @@ async function loadLightData() {
     if (statusResult.status === "fulfilled") {
       state.latestStatusData = statusResult.value;
       renderSummaryPanels();
-    } else if (statusResult.reason?.name !== "AbortError" && !state.latestStatusData) {
+    } else if (
+      statusResult.reason?.name !== "AbortError" &&
+      !state.latestStatusData
+    ) {
       renderSummaryPanels();
     }
 
@@ -425,7 +449,10 @@ async function loadLightData() {
       state.latestRecentData = recentResult.value;
       renderRecent(state.latestRecentData);
       renderSummaryPanels();
-    } else if (recentResult.reason?.name !== "AbortError" && !state.latestRecentData) {
+    } else if (
+      recentResult.reason?.name !== "AbortError" &&
+      !state.latestRecentData
+    ) {
       renderErr($("recentList"), "Gagal muat recent data");
     }
 
@@ -433,7 +460,8 @@ async function loadLightData() {
     if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
     state.lastLightLoadAt = Date.now();
   } finally {
-    if (state.lightAbortController === controller) state.lightAbortController = null;
+    if (state.lightAbortController === controller)
+      state.lightAbortController = null;
   }
 }
 
@@ -457,7 +485,10 @@ async function loadHeavyData() {
       state.latestWhitelistData = whitelistResult.value;
       renderWhitelist(state.latestWhitelistData);
       renderSummaryPanels();
-    } else if (whitelistResult.reason?.name !== "AbortError" && !state.latestWhitelistData) {
+    } else if (
+      whitelistResult.reason?.name !== "AbortError" &&
+      !state.latestWhitelistData
+    ) {
       renderErr($("mangaList"), "Gagal muat whitelist");
     }
 
@@ -471,7 +502,8 @@ async function loadHeavyData() {
     if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
     state.lastHeavyLoadAt = Date.now();
   } finally {
-    if (state.heavyAbortController === controller) state.heavyAbortController = null;
+    if (state.heavyAbortController === controller)
+      state.heavyAbortController = null;
   }
 }
 
@@ -497,20 +529,25 @@ async function loadAll() {
   skeleton($("sourceHealthList"), 3);
 
   try {
-    const [statusResult, whitelistResult, recentResult, logsResult] = await Promise.allSettled([
-      apiFetch("/api/status", controller.signal),
-      apiFetch("/api/whitelist", controller.signal),
-      apiFetch("/api/history?action=recent", controller.signal),
-      apiFetch("/api/history?action=logs", controller.signal),
-    ]);
+    const [statusResult, whitelistResult, recentResult, logsResult] =
+      await Promise.allSettled([
+        apiFetch("/api/status", controller.signal),
+        apiFetch("/api/whitelist", controller.signal),
+        apiFetch("/api/history?action=recent", controller.signal),
+        apiFetch("/api/history?action=logs", controller.signal),
+      ]);
 
     if (state.loadAbortController !== controller) return;
     if (!state.isAuthenticated) return;
 
-    const statusData = statusResult.status === "fulfilled" ? statusResult.value : null;
-    const whitelistData = whitelistResult.status === "fulfilled" ? whitelistResult.value : null;
-    const recentData = recentResult.status === "fulfilled" ? recentResult.value : null;
-    const logsData = logsResult.status === "fulfilled" ? logsResult.value : null;
+    const statusData =
+      statusResult.status === "fulfilled" ? statusResult.value : null;
+    const whitelistData =
+      whitelistResult.status === "fulfilled" ? whitelistResult.value : null;
+    const recentData =
+      recentResult.status === "fulfilled" ? recentResult.value : null;
+    const logsData =
+      logsResult.status === "fulfilled" ? logsResult.value : null;
 
     state.latestStatusData = statusData;
     state.latestWhitelistData = whitelistData;
@@ -526,8 +563,14 @@ async function loadAll() {
     if (logsData) renderLogs(logsData);
     else renderErr($("logList"), "Gagal muat logs");
 
-    const anyFailed = [statusResult, whitelistResult, recentResult, logsResult].some(
-      (result) => result.status === "rejected" && result.reason?.name !== "AbortError",
+    const anyFailed = [
+      statusResult,
+      whitelistResult,
+      recentResult,
+      logsResult,
+    ].some(
+      (result) =>
+        result.status === "rejected" && result.reason?.name !== "AbortError",
     );
     if (anyFailed && state.isAuthenticated) {
       showAlert("Beberapa endpoint gagal dimuat. Coba refresh lagi.");
@@ -539,7 +582,8 @@ async function loadAll() {
     renderTrendChart();
     renderSourceChart();
   } finally {
-    if (state.loadAbortController === controller) state.loadAbortController = null;
+    if (state.loadAbortController === controller)
+      state.loadAbortController = null;
     if (btn) {
       btn.disabled = false;
       btn.textContent = "refresh";
@@ -564,20 +608,23 @@ function updateAutoRefreshUI() {
   const select = $("pollInterval");
   const pollInfo = $("pollInfo");
   if (select) select.value = String(state.pollMs);
-  if (btn) btn.textContent = state.autoRefreshEnabled ? "auto: on" : "auto: off";
+  if (btn)
+    btn.textContent = state.autoRefreshEnabled ? "auto: on" : "auto: off";
   if (!pollInfo) return;
   if (!state.autoRefreshEnabled) {
     pollInfo.textContent = "light: off | heavy: off";
     return;
   }
   const hiddenSuffix = document.hidden ? " | bg: hemat" : "";
-  pollInfo.textContent =
-    `light: ${msToSecondsLabel(currentLightPollMs())} | heavy: ${msToSecondsLabel(currentHeavyPollMs())}${hiddenSuffix}`;
+  pollInfo.textContent = `light: ${msToSecondsLabel(currentLightPollMs())} | heavy: ${msToSecondsLabel(currentHeavyPollMs())}${hiddenSuffix}`;
 }
 
 function toggleAutoRefresh() {
   state.autoRefreshEnabled = !state.autoRefreshEnabled;
-  localStorage.setItem("ikiru_auto_refresh", state.autoRefreshEnabled ? "on" : "off");
+  localStorage.setItem(
+    "ikiru_auto_refresh",
+    state.autoRefreshEnabled ? "on" : "off",
+  );
   updateAutoRefreshUI();
   startPoll();
 }
@@ -610,8 +657,12 @@ function toggleTheme() {
 $("passwordInput")?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") submitPassword();
 });
-$("deleteCancelBtn")?.addEventListener("click", () => resolveDeleteConfirm(false));
-$("deleteConfirmBtn")?.addEventListener("click", () => resolveDeleteConfirm(true));
+$("deleteCancelBtn")?.addEventListener("click", () =>
+  resolveDeleteConfirm(false),
+);
+$("deleteConfirmBtn")?.addEventListener("click", () =>
+  resolveDeleteConfirm(true),
+);
 $("deleteConfirmOverlay")?.addEventListener("click", (event) => {
   if (event.target === $("deleteConfirmOverlay")) resolveDeleteConfirm(false);
 });
@@ -622,7 +673,10 @@ window.addEventListener("focus", () => {
   if (now - state.lastFocusRefreshAt < FOCUS_REFRESH_COOLDOWN_MS) return;
   state.lastFocusRefreshAt = now;
 
-  if (now - state.lastLightLoadAt > Math.min(currentLightPollMs(), FOCUS_REFRESH_COOLDOWN_MS)) {
+  if (
+    now - state.lastLightLoadAt >
+    Math.min(currentLightPollMs(), FOCUS_REFRESH_COOLDOWN_MS)
+  ) {
     loadLightData();
   }
   if (now - state.lastHeavyLoadAt > currentHeavyPollMs()) {

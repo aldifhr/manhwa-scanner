@@ -8,7 +8,7 @@
     "lint:fix": "eslint . --fix",
     "check": "npm run lint && npm test",
     "test": "node --test tests/*.test.js",
-    "dev": "npm run lint",
+    "dev": "node index.js",
     "dev:vercel": "vercel dev --yes --listen 3000",
     "prepare": "husky"
   },
@@ -24,6 +24,7 @@
     "cheerio": "^1.2.0",
     "discord-interactions": "^4.4.0",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
     "p-limit": "^7.3.0",
     "pino": "^10.3.1"
   },

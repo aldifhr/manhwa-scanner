@@ -47,7 +47,9 @@ function createRedisMock() {
     async hdel(key, ...fields) {
       const hash = getHash(key);
       let deleted = 0;
-      for (const f of fields) { if (hash.delete(f)) deleted++; }
+      for (const f of fields) {
+        if (hash.delete(f)) deleted++;
+      }
       return deleted;
     },
   };
@@ -66,15 +68,23 @@ test("Ikiru whitelist flow narrows orchestration results before dispatch queuein
   const redis = createRedisMock();
   // Seed chapter-88 as already sent in the dispatch:history hash (current format).
   // Key format: "chapter:" + normalizeSourceUrl(url) → keeps scheme + trailing slash.
-  const sentPayload = JSON.stringify({ status: "sent", claimedAt: new Date().toISOString(), sentAt: new Date().toISOString(), expiresAt: Date.now() + 86400000 });
+  const sentPayload = JSON.stringify({
+    status: "sent",
+    claimedAt: new Date().toISOString(),
+    sentAt: new Date().toISOString(),
+    expiresAt: Date.now() + 86400000,
+  });
   await redis.hset("dispatch:history", {
-    "chapter:https://02.ikiru.wtf/manga/the-emperors-sword/chapter-88.824440/": sentPayload,
+    "chapter:https://02.ikiru.wtf/manga/the-emperors-sword/chapter-88.824440/":
+      sentPayload,
   });
 
   const orchestrated = await orchestrateScrapeSources({
     redis,
     options: {
       preferredIkiruTitles: ["The Emperor's Sword"],
+      deduplicate: false,
+      incremental: false,
     },
     getCookie: async () => "cookie",
     scrapeIkiruUpdatesWithMeta: async () => ({
@@ -131,8 +141,8 @@ test("Ikiru whitelist flow narrows orchestration results before dispatch queuein
         {
           source: "ikiru",
           url: "https://02.ikiru.wtf/manga/the-emperors-sword/",
-        }
-      ]
+        },
+      ],
     },
   ];
   const matched = orchestrated.items.filter(createWhitelistMatcher(whitelist));

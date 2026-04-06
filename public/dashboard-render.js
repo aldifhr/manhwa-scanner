@@ -66,7 +66,9 @@ export function createDashboardRenderer({ state, $, esc }) {
       for (const log of state.logsItems) {
         const d = parseDateSafe(log?.time);
         if (!d) continue;
-        const idx = buckets.findIndex((bucket) => bucket.key === bucketKeyForDate(d));
+        const idx = buckets.findIndex(
+          (bucket) => bucket.key === bucketKeyForDate(d),
+        );
         if (idx === -1) continue;
         sent[idx] += logSentCount(log);
         if (log.tag === "skipped") skipped[idx] += 1;
@@ -103,17 +105,47 @@ export function createDashboardRenderer({ state, $, esc }) {
       data: {
         labels: buckets.map((bucket) => bucket.label),
         datasets: [
-          { label: "sent", data: sent, borderColor: getCssVar("--green", "#1b8f5a"), backgroundColor: "transparent", tension: 0.25 },
-          { label: "skipped", data: skipped, borderColor: getCssVar("--amber", "#b06b17"), backgroundColor: "transparent", tension: 0.25 },
-          { label: "failed", data: failed, borderColor: getCssVar("--red", "#c0392b"), backgroundColor: "transparent", tension: 0.25 },
+          {
+            label: "sent",
+            data: sent,
+            borderColor: getCssVar("--green", "#1b8f5a"),
+            backgroundColor: "transparent",
+            tension: 0.25,
+          },
+          {
+            label: "skipped",
+            data: skipped,
+            borderColor: getCssVar("--amber", "#b06b17"),
+            backgroundColor: "transparent",
+            tension: 0.25,
+          },
+          {
+            label: "failed",
+            data: failed,
+            borderColor: getCssVar("--red", "#c0392b"),
+            backgroundColor: "transparent",
+            tension: 0.25,
+          },
         ],
       },
       options: {
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: getCssVar("--muted", "#777") } } },
+        plugins: {
+          legend: { labels: { color: getCssVar("--muted", "#777") } },
+        },
         scales: {
-          x: { ticks: { color: getCssVar("--muted", "#777"), maxTicksLimit: range === "7d" ? 7 : 8 }, grid: { color: "transparent" } },
-          y: { ticks: { color: getCssVar("--muted", "#777"), precision: 0 }, grid: { color: "rgba(120,120,120,.12)" }, beginAtZero: true },
+          x: {
+            ticks: {
+              color: getCssVar("--muted", "#777"),
+              maxTicksLimit: range === "7d" ? 7 : 8,
+            },
+            grid: { color: "transparent" },
+          },
+          y: {
+            ticks: { color: getCssVar("--muted", "#777"), precision: 0 },
+            grid: { color: "rgba(120,120,120,.12)" },
+            beginAtZero: true,
+          },
         },
       },
     });
@@ -129,9 +161,9 @@ export function createDashboardRenderer({ state, $, esc }) {
       sourceCounts[source] = (sourceCounts[source] || 0) + 1;
     }
 
-    const labels = Object.keys(sourceCounts).map(s => sourceDisplayName(s));
+    const labels = Object.keys(sourceCounts).map((s) => sourceDisplayName(s));
     const data = Object.values(sourceCounts);
-    const backgroundColors = Object.keys(sourceCounts).map(s => {
+    const backgroundColors = Object.keys(sourceCounts).map((s) => {
       if (s === "shinigami_project") return getCssVar("--amber", "#b06b17");
       if (s === "shinigami_mirror") return getCssVar("--accent-2", "#1b9aaa");
       return getCssVar("--green", "#1b8f5a");
@@ -155,46 +187,74 @@ export function createDashboardRenderer({ state, $, esc }) {
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: getCssVar("--muted", "#777") }, grid: { color: "transparent" } },
-          y: { beginAtZero: true, ticks: { color: getCssVar("--muted", "#777"), precision: 0 }, grid: { color: "rgba(120,120,120,.12)" } },
+          x: {
+            ticks: { color: getCssVar("--muted", "#777") },
+            grid: { color: "transparent" },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: getCssVar("--muted", "#777"), precision: 0 },
+            grid: { color: "rgba(120,120,120,.12)" },
+          },
         },
       },
     });
   }
 
   function skeleton(ul, n = 4) {
-    ul.innerHTML = Array.from({ length: n }, () => `<li style="padding:10px 12px"><div class="skel"></div></li>`).join("");
+    ul.innerHTML = Array.from(
+      { length: n },
+      () => `<li style="padding:10px 12px"><div class="skel"></div></li>`,
+    ).join("");
   }
 
   function skeletonRecent(ul, n = 4) {
-    ul.innerHTML = Array.from({ length: n }, () => `<li style="padding:10px 12px"><div class="skel" style="width:70%"></div></li>`).join("");
+    ul.innerHTML = Array.from(
+      { length: n },
+      () =>
+        `<li style="padding:10px 12px"><div class="skel" style="width:70%"></div></li>`,
+    ).join("");
   }
 
   function renderErr(ul, msg) {
     ul.innerHTML = `<li class="empty">${esc(msg)} <button class="btn-mini" onclick="loadAll()">retry</button></li>`;
   }
 
+  // Helper to normalize API response for backward compatibility
+  function normalizeStatusData(statusData) {
+    if (!statusData) return null;
+    // New format: { success: true, data: { sent, skipped, ... }, timestamp }
+    // Old format: { sent, skipped, ... }
+    return statusData.data || statusData;
+  }
+
   function renderLiveHeader(statusData) {
-    $("liveSent").textContent = `S:${statusData?.sent ?? "-"}`;
-    $("liveSkipped").textContent = `K:${statusData?.skipped ?? "-"}`;
-    $("liveFailed").textContent = `F:${statusData?.failed ?? "-"}`;
-    $("liveGuilds").textContent = `G:${statusData?.guilds ?? "-"}`;
-    $("liveDuration").textContent = `D:${statusData?.duration ? `${statusData.duration}s` : "-"}`;
+    const data = normalizeStatusData(statusData);
+    $("liveSent").textContent = `S:${data?.sent ?? "-"}`;
+    $("liveSkipped").textContent = `K:${data?.skipped ?? "-"}`;
+    $("liveFailed").textContent = `F:${data?.failed ?? "-"}`;
+    $("liveGuilds").textContent = `G:${data?.guilds ?? "-"}`;
+    $("liveDuration").textContent =
+      `D:${data?.duration ? `${data.duration}s` : "-"}`;
   }
 
   function renderStatsExtended(statusData) {
     const dot = $("statusDot");
-    if (!statusData) {
-      ["statSent", "statSkipped", "statFailed", "statDuration"].forEach((id) => ($(id).textContent = "-"));
+    const data = normalizeStatusData(statusData);
+    if (!data) {
+      ["statSent", "statSkipped", "statFailed", "statDuration"].forEach(
+        (id) => ($(id).textContent = "-"),
+      );
       dot.className = "logo-dot offline";
       renderLiveHeader(null);
       return;
     }
-    $("statSent").textContent = statusData.sent ?? "-";
-    $("statSkipped").textContent = statusData.skipped ?? "-";
-    $("statFailed").textContent = statusData.failed ?? "-";
-    $("statDuration").textContent = statusData.duration ? `${statusData.duration}s` : "-";
-    dot.className = "logo-dot" + (Number(statusData.failed || 0) > 0 ? " offline" : "");
+    $("statSent").textContent = data.sent ?? "-";
+    $("statSkipped").textContent = data.skipped ?? "-";
+    $("statFailed").textContent = data.failed ?? "-";
+    $("statDuration").textContent = data.duration ? `${data.duration}s` : "-";
+    dot.className =
+      "logo-dot" + (Number(data.failed || 0) > 0 ? " offline" : "");
     renderLiveHeader(statusData);
   }
 
@@ -203,8 +263,9 @@ export function createDashboardRenderer({ state, $, esc }) {
     const lastRunEl = $("overviewLastRun");
     const whitelistEl = $("overviewWhitelist");
     const sent24hEl = $("overviewSent24h");
+    const data = normalizeStatusData(statusData);
 
-    if (!statusData) {
+    if (!data) {
       healthEl.textContent = "-";
       lastRunEl.textContent = "-";
       whitelistEl.textContent = "-";
@@ -213,21 +274,31 @@ export function createDashboardRenderer({ state, $, esc }) {
       return;
     }
 
-    const sourceHealthEntries = Object.values(statusData.sourceHealth || {});
-    const hasUnknownSource = sourceHealthEntries.some((entry) => !entry || typeof entry !== "object");
-    const degraded = Number(statusData.failed ?? 0) > 0 ||
+    const sourceHealthEntries = Object.values(data.sourceHealth || {});
+    const hasUnknownSource = sourceHealthEntries.some(
+      (entry) => !entry || typeof entry !== "object",
+    );
+    const degraded =
+      Number(data.failed ?? 0) > 0 ||
       sourceHealthEntries.some((entry) => entry?.status === "degraded");
-    healthEl.textContent = degraded ? "DEGRADED" : hasUnknownSource ? "UNKNOWN" : "HEALTHY";
+    healthEl.textContent = degraded
+      ? "DEGRADED"
+      : hasUnknownSource
+        ? "UNKNOWN"
+        : "HEALTHY";
     healthEl.className = `stat-value ${degraded ? "amber" : hasUnknownSource ? "amber" : "green"}`;
 
-    lastRunEl.textContent = statusData.timestamp ? timeAgo(statusData.timestamp) : "-";
-    whitelistEl.textContent = Array.isArray(whitelistData?.items) ? whitelistData.items.length : "-";
+    lastRunEl.textContent = data.timestamp ? timeAgo(data.timestamp) : "-";
+    whitelistEl.textContent = Array.isArray(whitelistData?.items)
+      ? whitelistData.items.length
+      : "-";
     sent24hEl.textContent = countSentLast24h(recentData?.items);
   }
 
   function renderLastCronResult(statusData, fromManual = false) {
     const bar = $("lastCronBar");
-    if (!statusData) {
+    const data = normalizeStatusData(statusData);
+    if (!data) {
       $("lastCronSent").textContent = "sent: -";
       $("lastCronSkipped").textContent = "skipped: -";
       $("lastCronFailed").textContent = "failed: -";
@@ -238,21 +309,24 @@ export function createDashboardRenderer({ state, $, esc }) {
       return;
     }
 
-    const stateText = statusData.shortCircuitReason
-      ? statusData.shortCircuitReason.replace(/_/g, " ")
-      : statusData.outcome || "ok";
-    $("lastCronSent").textContent = `sent: ${statusData.sent ?? 0}`;
-    $("lastCronSkipped").textContent = `skipped: ${statusData.skipped ?? 0}`;
-    $("lastCronFailed").textContent = `failed: ${statusData.failed ?? 0}`;
-    $("lastCronDuration").textContent = `duration: ${statusData.duration ? `${statusData.duration}s` : "-"}`;
+    const stateText = data.shortCircuitReason
+      ? data.shortCircuitReason.replace(/_/g, " ")
+      : data.outcome || "ok";
+    $("lastCronSent").textContent = `sent: ${data.sent ?? 0}`;
+    $("lastCronSkipped").textContent = `skipped: ${data.skipped ?? 0}`;
+    $("lastCronFailed").textContent = `failed: ${data.failed ?? 0}`;
+    $("lastCronDuration").textContent =
+      `duration: ${data.duration ? `${data.duration}s` : "-"}`;
     $("lastCronOutcome").textContent = `state: ${stateText}`;
-    $("lastCronTime").textContent = `${fromManual ? "manual" : "otomatis"} - ${statusData.timestamp ? timeAgo(statusData.timestamp) : "baru saja"}`;
+    $("lastCronTime").textContent =
+      `${fromManual ? "manual" : "otomatis"} - ${data.timestamp ? timeAgo(data.timestamp) : "baru saja"}`;
     bar.className = "hero-card";
   }
 
   function renderSourceHealth(statusData) {
     const list = $("sourceHealthList");
-    const entries = Object.entries(statusData?.sourceHealth || {});
+    const data = normalizeStatusData(statusData);
+    const entries = Object.entries(data?.sourceHealth || {});
     $("sourceHealthCount").textContent = entries.length;
 
     if (!entries.length) {
@@ -282,16 +356,24 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function applyWhitelistFilter() {
     const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
-    const sourceFilter = ($("inputWhitelistSource")?.value ?? "").trim().toLowerCase();
+    const sourceFilter = ($("inputWhitelistSource")?.value ?? "")
+      .trim()
+      .toLowerCase();
     const list = $("mangaList");
 
     const entries = state.whitelistItems.map((item, originalIndex) => {
       const title = typeof item === "string" ? item : item.title;
       let sources = [];
-      if (typeof item === "object" && Array.isArray(item.sources) && item.sources.length > 0) {
+      if (
+        typeof item === "object" &&
+        Array.isArray(item.sources) &&
+        item.sources.length > 0
+      ) {
         sources = item.sources;
       } else if (typeof item === "object") {
-        sources = [{ url: item.url, source: item.source || "ikiru", mark: item.mark }];
+        sources = [
+          { url: item.url, source: item.source || "ikiru", mark: item.mark },
+        ];
       } else {
         sources = [{ url: null, source: "ikiru" }];
       }
@@ -313,7 +395,13 @@ export function createDashboardRenderer({ state, $, esc }) {
 
     const filtered = entries.filter((entry) => {
       if (query && !entry.titleLower.includes(query)) return false;
-      if (sourceFilter && !entry.sources.some(s => String(s.source || "ikiru").toLowerCase() === sourceFilter)) return false;
+      if (
+        sourceFilter &&
+        !entry.sources.some(
+          (s) => String(s.source || "ikiru").toLowerCase() === sourceFilter,
+        )
+      )
+        return false;
       return true;
     });
 
@@ -327,21 +415,37 @@ export function createDashboardRenderer({ state, $, esc }) {
     list.innerHTML = filtered
       .map((entry, index) => {
         const { title, sources, originalIndex } = entry;
-        const displayIndex = state.whitelistSortOrder === "default" ? originalIndex : index;
-        
-        const isRead = sources.some(s => s.mark === "read");
+        const displayIndex =
+          state.whitelistSortOrder === "default" ? originalIndex : index;
+
+        const isRead = sources.some((s) => s.mark === "read");
 
         // Logic for marks (Hiatus, End, etc.)
-        const marks = [...new Set(sources.map(s => s.mark).filter(m => m && m !== "read"))];
-        const marksHtml = marks.length > 0 
-          ? marks.map(m => `<span class="badge" style="margin-left:6px; opacity:.7">${esc(m)}</span>`).join("")
-          : "";
+        const marks = [
+          ...new Set(
+            sources.map((s) => s.mark).filter((m) => m && m !== "read"),
+          ),
+        ];
+        const marksHtml =
+          marks.length > 0
+            ? marks
+                .map(
+                  (m) =>
+                    `<span class="badge" style="margin-left:6px; opacity:.7">${esc(m)}</span>`,
+                )
+                .join("")
+            : "";
 
         // Logic for source badges
-        const uniqueSources = [...new Set(sources.map(s => s.source || "ikiru"))];
-        const badgesHtml = uniqueSources.map(s => 
-          `<span class="source-badge ${sourceBadgeClass(s)}" style="margin-right:4px">${esc(sourceName(s))}</span>`
-        ).join("");
+        const uniqueSources = [
+          ...new Set(sources.map((s) => s.source || "ikiru")),
+        ];
+        const badgesHtml = uniqueSources
+          .map(
+            (s) =>
+              `<span class="source-badge ${sourceBadgeClass(s)}" style="margin-right:4px">${esc(sourceName(s))}</span>`,
+          )
+          .join("");
 
         return `<li class="manga-item">
           <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
@@ -452,7 +556,8 @@ export function createDashboardRenderer({ state, $, esc }) {
 
     list.innerHTML = items
       .map((item) => {
-        const reasonLabel = item.reason === "persistent_failure" ? "Mati Total" : "Stale/Lama";
+        const reasonLabel =
+          item.reason === "persistent_failure" ? "Mati Total" : "Stale/Lama";
         return `<li class="manga-item">
           <div class="manga-info">
             <div class="manga-item-title">${esc(item.title)}</div>
@@ -468,7 +573,11 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function renderSummaryPanels() {
     renderStatsExtended(state.latestStatusData);
-    renderOverview(state.latestStatusData, state.latestWhitelistData, state.latestRecentData);
+    renderOverview(
+      state.latestStatusData,
+      state.latestWhitelistData,
+      state.latestRecentData,
+    );
     renderLastCronResult(state.latestStatusData, false);
     renderSourceHealth(state.latestStatusData);
     renderRecommendations(state.latestStatusData);

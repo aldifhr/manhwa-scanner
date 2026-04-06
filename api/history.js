@@ -10,7 +10,6 @@ import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
 import { RECENT_API_CACHE_KEY, LOGS_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
 
-
 const RECENT_CACHE_SEC = Number(process.env.RECENT_CACHE_SEC || 180);
 const LOGS_CACHE_SEC = Number(process.env.LOGS_CACHE_SEC || 300);
 
@@ -20,18 +19,26 @@ export function sortRecentItems(items = []) {
     const tb = new Date(b?.sentAt).getTime();
     if (!isNaN(ta) && !isNaN(tb) && tb !== ta) return tb - ta;
 
-    const oa = Number.isFinite(Number(a?.sentOrder)) ? Number(a.sentOrder) : Number.MAX_SAFE_INTEGER;
-    const ob = Number.isFinite(Number(b?.sentOrder)) ? Number(b.sentOrder) : Number.MAX_SAFE_INTEGER;
+    const oa = Number.isFinite(Number(a?.sentOrder))
+      ? Number(a.sentOrder)
+      : Number.MAX_SAFE_INTEGER;
+    const ob = Number.isFinite(Number(b?.sentOrder))
+      ? Number(b.sentOrder)
+      : Number.MAX_SAFE_INTEGER;
     if (oa !== ob) return oa - ob;
 
     return (
       String(a?.title || "").localeCompare(String(b?.title || "")) ||
-      String(a?.chapter || "").localeCompare(String(b?.chapter || ""), undefined, { numeric: true })
+      String(a?.chapter || "").localeCompare(
+        String(b?.chapter || ""),
+        undefined,
+        { numeric: true },
+      )
     );
   });
 }
 
-async function handleRecent(req, res, reqLogger) {
+async function handleRecent(req, res) {
   const prepared = prepareAuthorizedGet(req, res, {
     defaultCacheTtl: 180,
     rawCacheTtl: RECENT_CACHE_SEC,
@@ -51,8 +58,10 @@ async function handleRecent(req, res, reqLogger) {
         .filter((item) => !isNaN(new Date(item.sentAt).getTime()))
         .map((item) => ({
           ...item,
-          sentOrder: Number.isFinite(Number(item?.sentOrder)) ? Number(item.sentOrder) : null,
-        }))
+          sentOrder: Number.isFinite(Number(item?.sentOrder))
+            ? Number(item.sentOrder)
+            : null,
+        })),
     ).slice(0, 20);
 
     const payload = { items };
@@ -64,7 +73,7 @@ async function handleRecent(req, res, reqLogger) {
   }
 }
 
-async function handleLogs(req, res, reqLogger) {
+async function handleLogs(req, res) {
   const prepared = prepareAuthorizedGet(req, res, {
     defaultCacheTtl: 300,
     rawCacheTtl: LOGS_CACHE_SEC,
@@ -80,19 +89,19 @@ async function handleLogs(req, res, reqLogger) {
     const raw = await readCronLogs(redis, 0, 49);
     const dailyStats = await readCronDailyStats(redis, 30);
     const payload = {
-      logs: raw
-        .filter(Boolean)
-        .map((log) => ({
-          time: log?.time || null,
-          tag: log?.tag || "info",
-          code: log?.code || null,
-          type: log?.type || null,
-          source: log?.source || null,
-          title: log?.title || null,
-          count: Number.isFinite(Number(log?.count)) ? Number(log.count) : null,
-          failed: Number.isFinite(Number(log?.failed)) ? Number(log.failed) : null,
-          message: log?.message || "-",
-        })),
+      logs: raw.filter(Boolean).map((log) => ({
+        time: log?.time || null,
+        tag: log?.tag || "info",
+        code: log?.code || null,
+        type: log?.type || null,
+        source: log?.source || null,
+        title: log?.title || null,
+        count: Number.isFinite(Number(log?.count)) ? Number(log.count) : null,
+        failed: Number.isFinite(Number(log?.failed))
+          ? Number(log.failed)
+          : null,
+        message: log?.message || "-",
+      })),
       dailyStats,
     };
 
@@ -106,10 +115,10 @@ async function handleLogs(req, res, reqLogger) {
 
 export default async function handler(req, res) {
   const action = req.query.action;
-  const reqLogger = logApiHit(`history-${action}`, req);
+  void logApiHit(`history-${action}`, req);
 
-  if (action === "recent") return handleRecent(req, res, reqLogger);
-  if (action === "logs") return handleLogs(req, res, reqLogger);
+  if (action === "recent") return handleRecent(req, res);
+  if (action === "logs") return handleLogs(req, res);
 
   return res.status(400).json({ error: "Unknown action" });
 }

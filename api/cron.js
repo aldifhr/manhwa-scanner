@@ -12,22 +12,89 @@ const logger = getLogger({ scope: "cron" });
 
 export { shouldRunChannelValidation };
 
+// Standard API response helpers
+function createSuccessResponse(data) {
+  return {
+    success: true,
+    data,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function createErrorResponse(code, message, details = null) {
+  const response = {
+    success: false,
+    error: {
+      code,
+      message,
+    },
+    timestamp: new Date().toISOString(),
+  };
+  if (details) {
+    response.error.details = details;
+  }
+  return response;
+}
+
 async function handleUpdateCron(req, res, reqLogger) {
   try {
     const result = await runCronJob({ redisClient: redis, logger });
     logApiOk(reqLogger, { status: result.statusCode, ...result.logMeta });
-    return res.status(result.statusCode).json(result.body);
+
+    // Standardize response format while preserving all original fields
+    const standardizedBody = {
+      success: result.body?.ok === true,
+      data: {
+        sent: result.body?.sent ?? 0,
+        skipped: result.body?.skipped ?? 0,
+        failed: result.body?.failed ?? 0,
+        duration: result.body?.duration,
+        guilds: result.body?.guilds,
+        outcome: result.body?.outcome,
+        shortCircuitReason: result.body?.shortCircuitReason,
+        sourceHealth: result.body?.sourceHealth,
+        scrapeMetrics: result.body?.scrapeMetrics,
+        timingMetrics: result.body?.timingMetrics,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    return res.status(result.statusCode).json(standardizedBody);
   } catch (err) {
     logger.error({ err: err.message }, "fatal");
     const statusPayload = {
-      sent: 0, skipped: 0, failed: 1, duration: null, guilds: 0,
-      timestamp: new Date().toISOString(), sourceHealth: {}, scrapeMetrics: null,
-      outcome: "fatal_error", shortCircuitReason: "fatal_error", error: err?.message || "Internal error",
+      sent: 0,
+      skipped: 0,
+      failed: 1,
+      duration: null,
+      guilds: 0,
+      timestamp: new Date().toISOString(),
+      sourceHealth: {},
+      scrapeMetrics: null,
+      outcome: "fatal_error",
+      shortCircuitReason: "fatal_error",
+      error: err?.message || "Internal error",
     };
     await writeCronStatus(redis, statusPayload).catch(() => {});
-    await appendCronLog(redis, buildCronErrorLog(err, { code: "cron_fatal", type: "runtime_error", source: "cron" })).catch(() => {});
+    await appendCronLog(
+      redis,
+      buildCronErrorLog(err, {
+        code: "cron_fatal",
+        type: "runtime_error",
+        source: "cron",
+      }),
+    ).catch(() => {});
     logApiError(reqLogger, err, { status: 500 });
-    return res.status(500).json({ error: "Internal error" });
+    return res
+      .status(500)
+      .json(
+        createErrorResponse(
+          "CRON_FATAL",
+          process.env.NODE_ENV === "production"
+            ? "Internal error"
+            : err.message,
+        ),
+      );
   }
 }
 
@@ -45,30 +112,56 @@ async function handleHealthCron(req, res, reqLogger) {
       const channelIds = Object.values(guildChannels || {}).filter(Boolean);
 
       if (channelIds.length > 0) {
-        const deadListStr = deadLinks.slice(0, 15).map(d => `• **${d.title}** (${d.source}): ${d.url}`).join("\n");
-        const suffix = deadLinks.length > 15 ? `\n...dan ${deadLinks.length - 15} lainnya.` : "";
+        const deadListStr = deadLinks
+          .slice(0, 15)
+          .map((d) => `• **${d.title}** (${d.source}): ${d.url}`)
+          .join("\n");
+        const suffix =
+          deadLinks.length > 15
+            ? `\n...dan ${deadLinks.length - 15} lainnya.`
+            : "";
         const embed = {
           title: "⚠️ Laporan Link Mati (Bi-Weekly)",
           description: `Ditemukan **${deadLinks.length}** link yang tidak aktif di whitelist.\n\n${deadListStr}${suffix}`,
           color: 0xe74c3c,
           footer: { text: "Hapus link mati menggunakan /remove <Judul>." },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
 
         await Promise.all(
-          channelIds.map(channelId =>
-            sendDiscordEmbed(channelId, embed).catch(err => logger.warn({ channelId, err: err.message }, "Failed to send dead link alert"))
-          )
+          channelIds.map((channelId) =>
+            sendDiscordEmbed(channelId, embed).catch((err) =>
+              logger.warn(
+                { channelId, err: err.message },
+                "Failed to send dead link alert",
+              ),
+            ),
+          ),
         );
       }
     }
 
     logApiOk(reqLogger, { status: 200, dead: deadLinks.length });
-    return res.status(200).json({ ok: true, dead: deadLinks.length, duration: `${duration}s` });
+    return res.status(200).json(
+      createSuccessResponse({
+        deadLinks: deadLinks.length,
+        duration: `${duration}s`,
+        checkedAt: new Date().toISOString(),
+      }),
+    );
   } catch (err) {
     logger.error({ err: err.message }, "Scheduled link check failed");
     logApiError(reqLogger, err, { status: 500 });
-    return res.status(500).json({ error: err.message });
+    return res
+      .status(500)
+      .json(
+        createErrorResponse(
+          "HEALTH_CHECK_FAILED",
+          process.env.NODE_ENV === "production"
+            ? "Internal error"
+            : err.message,
+        ),
+      );
   }
 }
 
@@ -77,12 +170,16 @@ export default async function handler(req, res) {
 
   if (!["GET", "POST"].includes(req.method)) {
     logApiOk(reqLogger, { status: 405, reason: "method_not_allowed" });
-    return res.status(405).json({ error: "Method not allowed" });
+    return res
+      .status(405)
+      .json(createErrorResponse("METHOD_NOT_ALLOWED", "Method not allowed"));
   }
 
   if (!isCronAuthorized(req)) {
     logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
-    return res.status(401).json({ error: "Unauthorized" });
+    return res
+      .status(401)
+      .json(createErrorResponse("UNAUTHORIZED", "Unauthorized"));
   }
 
   const action = req.query.action || "update";

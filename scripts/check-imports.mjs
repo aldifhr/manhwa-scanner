@@ -1,6 +1,6 @@
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-import { readdirSync, statSync, readFileSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 
@@ -8,7 +8,11 @@ function getAllJsFiles(dir) {
   const results = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = resolve(dir, entry.name);
-    if (entry.isDirectory() && entry.name !== "node_modules" && entry.name !== "archive") {
+    if (
+      entry.isDirectory() &&
+      entry.name !== "node_modules" &&
+      entry.name !== "archive"
+    ) {
       results.push(...getAllJsFiles(full));
     } else if (entry.isFile() && entry.name.endsWith(".js")) {
       results.push(full);
@@ -27,7 +31,7 @@ function hasImports(filePath) {
   }
 }
 
-const dirs = ["lib", "api", "scripts"].map(d => resolve(root, d));
+const dirs = ["lib", "api", "scripts"].map((d) => resolve(root, d));
 const allFiles = dirs.flatMap(getAllJsFiles).filter(hasImports);
 
 console.log(`\nChecking ${allFiles.length} files with imports...\n`);

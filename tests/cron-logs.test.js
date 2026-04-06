@@ -5,13 +5,18 @@ import {
   appendCronLog,
   buildCronErrorLog,
   classifyErrorType,
-  cronDailyStatsKey,
   normalizeCronLogEntry,
 } from "../lib/cronLogs.js";
 
 test("classifyErrorType recognizes common buckets", () => {
-  assert.equal(classifyErrorType("Request failed with status code 403"), "discord_403");
-  assert.equal(classifyErrorType("socket timeout while scraping"), "source_timeout");
+  assert.equal(
+    classifyErrorType("Request failed with status code 403"),
+    "discord_403",
+  );
+  assert.equal(
+    classifyErrorType("socket timeout while scraping"),
+    "source_timeout",
+  );
   assert.equal(classifyErrorType("selector parse failed"), "source_parse");
   assert.equal(classifyErrorType("redis unavailable"), "redis_error");
 });
@@ -96,20 +101,28 @@ test("appendCronLogThrottled skips repeated info logs within throttle window", a
   const { appendCronLogThrottled } = await import("../lib/cronLogs.js");
   const redis = createRedisMock();
 
-  const first = await appendCronLogThrottled(redis, {
-    tag: "info",
-    code: "no_new_chapters",
-    type: "short_circuit",
-    source: "cron",
-    message: "Cron found no new chapters.",
-  }, 1800);
-  const second = await appendCronLogThrottled(redis, {
-    tag: "info",
-    code: "no_new_chapters",
-    type: "short_circuit",
-    source: "cron",
-    message: "Cron found no new chapters.",
-  }, 1800);
+  const first = await appendCronLogThrottled(
+    redis,
+    {
+      tag: "info",
+      code: "no_new_chapters",
+      type: "short_circuit",
+      source: "cron",
+      message: "Cron found no new chapters.",
+    },
+    1800,
+  );
+  const second = await appendCronLogThrottled(
+    redis,
+    {
+      tag: "info",
+      code: "no_new_chapters",
+      type: "short_circuit",
+      source: "cron",
+      message: "Cron found no new chapters.",
+    },
+    1800,
+  );
 
   assert.equal(first, true);
   assert.equal(second, false);
@@ -131,7 +144,10 @@ test("appendCronLog keeps sent summaries in raw list and aggregates daily stats"
   assert.equal(written, true);
   assert.equal((redis.lists.get("cron:logs") || []).length, 1);
   const statsMap = redis.kv.get("cron:daily_stats") || {};
-  const stats = typeof statsMap["2026-03-20"] === "string" ? JSON.parse(statsMap["2026-03-20"]) : statsMap["2026-03-20"];
+  const stats =
+    typeof statsMap["2026-03-20"] === "string"
+      ? JSON.parse(statsMap["2026-03-20"])
+      : statsMap["2026-03-20"];
   assert.deepEqual(stats, {
     events_total: 1,
     "tag:sent": 1,
@@ -156,7 +172,10 @@ test("appendCronDailyStats aggregates failed delivery counts", async () => {
   });
 
   const statsMap = redis.kv.get("cron:daily_stats") || {};
-  const stats = typeof statsMap["2026-03-20"] === "string" ? JSON.parse(statsMap["2026-03-20"]) : statsMap["2026-03-20"];
+  const stats =
+    typeof statsMap["2026-03-20"] === "string"
+      ? JSON.parse(statsMap["2026-03-20"])
+      : statsMap["2026-03-20"];
   assert.deepEqual(stats, {
     events_total: 1,
     "tag:partial": 1,
@@ -173,10 +192,14 @@ test("readCronDailyStats returns compact monthly summaries", async () => {
   const redis = createRedisMock();
   redis.kv.set("cron:daily_stats", {
     "2026-03-19": { events_total: 2, "tag:sent": 1, chapters_sent: 4 },
-    "2026-03-20": { events_total: 1, "type:short_circuit": 1 }
+    "2026-03-20": { events_total: 1, "type:short_circuit": 1 },
   });
 
-  const out = await readCronDailyStats(redis, 2, new Date("2026-03-20T12:00:00.000Z"));
+  const out = await readCronDailyStats(
+    redis,
+    2,
+    new Date("2026-03-20T12:00:00.000Z"),
+  );
 
   assert.deepEqual(out, [
     {

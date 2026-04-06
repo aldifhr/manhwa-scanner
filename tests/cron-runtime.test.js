@@ -5,6 +5,7 @@ import { runCronJob } from "../lib/cronRuntime.js";
 function createRedisMock() {
   const kv = new Map();
   const lists = new Map();
+  const hashes = new Map();
 
   return {
     async get(key) {
@@ -17,6 +18,7 @@ function createRedisMock() {
     async del(key) {
       kv.delete(key);
       lists.delete(key);
+      hashes.delete(key);
       return 1;
     },
     async mget(...keys) {
@@ -39,6 +41,48 @@ function createRedisMock() {
     },
     async expire() {
       return 1;
+    },
+    async hgetall(key) {
+      const hash = hashes.get(key);
+      if (!hash) return {};
+      return Object.fromEntries(hash);
+    },
+    async hset(key, fieldValues) {
+      if (!hashes.has(key)) {
+        hashes.set(key, new Map());
+      }
+      const hash = hashes.get(key);
+      for (const [field, value] of Object.entries(fieldValues)) {
+        hash.set(
+          field,
+          typeof value === "string" ? value : JSON.stringify(value),
+        );
+      }
+      return 1;
+    },
+    async hget(key, field) {
+      const hash = hashes.get(key);
+      if (!hash) return null;
+      return hash.get(field) || null;
+    },
+    async hmget(key, ...fields) {
+      const hash = hashes.get(key);
+      if (!hash) return fields.map(() => null);
+      return fields.map((f) => hash.get(f) || null);
+    },
+    async hsetnx(key, field, value) {
+      if (!hashes.has(key)) {
+        hashes.set(key, new Map());
+      }
+      const hash = hashes.get(key);
+      if (hash.has(field)) {
+        return 0; // Field already exists
+      }
+      hash.set(
+        field,
+        typeof value === "string" ? value : JSON.stringify(value),
+      );
+      return 1; // Field was set
     },
   };
 }
@@ -65,8 +109,8 @@ test("runCronJob includes per-step timing metrics in success status", async () =
           {
             source: "shinigami_mirror",
             url: "https://a.shinigami.asia/series/lookism",
-          }
-        ]
+          },
+        ],
       },
     ],
     getAllGuildChannelsFn: async () => ({
@@ -84,9 +128,24 @@ test("runCronJob includes per-step timing metrics in success status", async () =
         },
       ],
       sourceStates: {
-        ikiru: { status: "skipped", count: 0, error: "no whitelist titles", metrics: null },
-        shinigami_project: { status: "skipped", count: 0, error: "no whitelist titles", metrics: null },
-        shinigami_mirror: { status: "ok", count: 1, error: null, metrics: { detailAttempts: 0 } },
+        ikiru: {
+          status: "skipped",
+          count: 0,
+          error: "no whitelist titles",
+          metrics: null,
+        },
+        shinigami_project: {
+          status: "skipped",
+          count: 0,
+          error: "no whitelist titles",
+          metrics: null,
+        },
+        shinigami_mirror: {
+          status: "ok",
+          count: 1,
+          error: null,
+          metrics: { detailAttempts: 0 },
+        },
       },
     }),
     sendEmbed: async () => true,
@@ -103,9 +162,14 @@ test("runCronJob includes per-step timing metrics in success status", async () =
   assert.equal(typeof result.body.timingMetrics.matchFilterMs, "number");
   assert.equal(typeof result.body.timingMetrics.dispatchMs, "number");
   assert.equal(typeof result.body.timingMetrics.totalMs, "number");
-  assert.ok(result.body.timingMetrics.totalMs >= result.body.timingMetrics.dispatchMs);
+  assert.ok(
+    result.body.timingMetrics.totalMs >= result.body.timingMetrics.dispatchMs,
+  );
 
   const savedStatus = await redis.get("cron:last_run");
   assert.ok(savedStatus?.timingMetrics);
-  assert.equal(savedStatus.timingMetrics.totalMs, result.body.timingMetrics.totalMs);
+  assert.equal(
+    savedStatus.timingMetrics.totalMs,
+    result.body.timingMetrics.totalMs,
+  );
 });

@@ -1,239 +1,384 @@
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ikiru Bot Control</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="./script.js"></script>
-  </head>
-  <body>
-    <div class="toast-container" id="toastContainer"></div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Ikiru Bot Control</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="./styles.css" />
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script type="module" src="./script.js"></script>
+    </head>
+    <body>
+        <div class="toast-container" id="toastContainer"></div>
 
-    <div class="modal-overlay" id="modalOverlay">
-      <div class="modal">
-        <h2>Ikiru Bot Monitor</h2>
-        <p>Masukkan password dashboard untuk akses monitor.</p>
-        <input type="password" id="passwordInput" placeholder="Password..." autocomplete="off" />
-        <button type="button" class="btn-primary" onclick="submitPassword()">Masuk</button>
-      </div>
-    </div>
-
-    <div class="modal-overlay" id="deleteConfirmOverlay">
-      <div class="modal">
-        <h2>Hapus Manga</h2>
-        <p id="deleteConfirmText">Yakin ingin menghapus manga ini?</p>
-        <div style="display:flex; gap:8px;">
-          <button type="button" class="btn-soft" id="deleteCancelBtn" style="flex:1;">Batal</button>
-          <button type="button" class="btn-primary" id="deleteConfirmBtn" style="flex:1;">Hapus</button>
-        </div>
-      </div>
-    </div>
-
-    <header class="topbar">
-      <div class="brand">
-        <div class="logo-dot" id="statusDot"></div>
-        <div>
-          <div class="brand-title">Ikiru Monitor</div>
-          <div class="brand-sub">Discord Update Operations</div>
-        </div>
-      </div>
-
-      <div class="toolbar">
-        <div class="live-kpi">
-          <span id="liveSent">S:-</span>
-          <span id="liveSkipped">K:-</span>
-          <span id="liveFailed">F:-</span>
-          <span id="liveGuilds">G:-</span>
-          <span id="liveDuration">D:-</span>
-        </div>
-        <span class="last-updated" id="lastUpdated">-</span>
-        <span class="poll-indicator" id="pollInfo">light: - | heavy: -</span>
-          <select id="pollInterval" class="poll-select" onchange="setPollInterval()">
-            <option value="60000">60s</option>
-            <option value="120000">120s</option>
-            <option value="300000">300s</option>
-          </select>
-        <button type="button" class="btn-soft" id="btnAutoRefresh" onclick="toggleAutoRefresh()">auto: on</button>
-        <button type="button" class="btn-strong" id="btnRunCron" onclick="runCronNow()">jalankan cron</button>
-        <button type="button" class="btn-soft" id="btnTheme" onclick="toggleTheme()">mode</button>
-        <button type="button" class="btn-soft" id="btnRefresh" onclick="loadAll()">refresh</button>
-        <button type="button" class="btn-soft" id="btnLogout" onclick="logoutDashboard()">logout</button>
-      </div>
-    </header>
-
-    <main class="layout">
-      <div class="alert" id="alertBox" style="display: none"></div>
-      
-      <section class="panel" id="recommendationsPanel" style="display: none">
-        <div class="panel-title panel-title-warn">health recommendations</div>
-        <div class="card card-warn">
-          <div class="card-header">
-            <span class="card-title">Link mati terdeteksi</span>
-            <span class="badge badge-warn" id="recommendationCount">0</span>
-          </div>
-          <p class="card-desc">Saran penghapusan untuk link yang gagal diakses berturut-turut.</p>
-          <ul class="manga-list" id="recommendationList">
-            <li class="empty">semua link sehat.</li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="hero">
-        <div class="hero-card" id="lastCronBar">
-          <div class="hero-head">
-            <span class="hero-title">Last Cron Result</span>
-            <span class="hero-time" id="lastCronTime">-</span>
-          </div>
-          <div class="hero-metrics">
-            <span id="lastCronSent">sent: -</span>
-            <span id="lastCronSkipped">skipped: -</span>
-            <span id="lastCronFailed">failed: -</span>
-            <span id="lastCronDuration">duration: -</span>
-            <span id="lastCronOutcome">state: -</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title">overview</div>
-        <div class="stats-grid stats-grid-overview">
-          <div class="stat-card">
-            <div class="stat-label">Health</div>
-            <div class="stat-value" id="overviewHealth">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Terakhir dieksekusi</div>
-            <div class="stat-value" id="overviewLastRun">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Whitelist</div>
-            <div class="stat-value" id="overviewWhitelist">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Sent 24h</div>
-            <div class="stat-value" id="overviewSent24h">-</div>
-          </div>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Sent</div>
-            <div class="stat-value green" id="statSent">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Skipped</div>
-            <div class="stat-value amber" id="statSkipped">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Failed</div>
-            <div class="stat-value red" id="statFailed">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Duration</div>
-            <div class="stat-value" id="statDuration">-</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel two-col">
-        <div class="card chart-card">
-          <div class="card-header">
-            <span class="card-title">Health Distribution</span>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="chartSourceHealth"></canvas>
-          </div>
-        </div>
-        <div class="card chart-card">
-          <div class="card-header">
-            <span class="card-title">Sent/Skipped/Failed Trend</span>
-            <select id="chartRange" class="poll-select" onchange="renderTrendChart()">
-              <option value="24h">24h</option>
-              <option value="7d">7d</option>
-            </select>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="chartTrend"></canvas>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title">source health</div>
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Status scraper per source</span>
-            <span class="badge" id="sourceHealthCount">0</span>
-          </div>
-          <ul class="manga-list" id="sourceHealthList">
-            <li class="empty">memuat...</li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title">whitelist manga</div>
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Manga terpantau</span>
-            <span class="badge" id="whitelistCount">0</span>
-          </div>
-          <div class="whitelist-toolbar">
-            <input type="search" id="inputWhitelistSearch" placeholder="cari manga..." autocomplete="off" oninput="applyWhitelistFilter()" />
-            <select id="inputWhitelistSource" class="poll-select" onchange="applyWhitelistFilter()">
-              <option value="">all source</option>
-              <option value="ikiru">ikiru</option>
-              <option value="shinigami_project">project</option>
-              <option value="shinigami_mirror">mirror</option>
-            </select>
-            <div class="sort-btns">
-              <button type="button" id="sortBtn_default" class="sort-btn active" onclick="setSortOrder('default')">sort</button>
-              <button type="button" id="sortBtn_az" class="sort-btn" onclick="setSortOrder('az')">A-Z</button>
-              <button type="button" id="sortBtn_za" class="sort-btn" onclick="setSortOrder('za')">Z-A</button>
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal">
+                <h2>Ikiru Bot Monitor</h2>
+                <p>Masukkan password dashboard untuk akses monitor.</p>
+                <input
+                    type="password"
+                    id="passwordInput"
+                    placeholder="Password..."
+                    autocomplete="off"
+                />
+                <button
+                    type="button"
+                    class="btn-primary"
+                    onclick="submitPassword()"
+                >
+                    Masuk
+                </button>
             </div>
-          </div>
-          <div class="whitelist-form">
-            <input type="text" id="inputMangaTitle" placeholder="Judul manga..." autocomplete="off" onkeydown="if(event.key==='Enter') addManga()" />
-            <input type="text" id="inputMangaUrl" placeholder="URL (opsional)" autocomplete="off" onkeydown="if(event.key==='Enter') addManga()" />
-            <button type="button" class="btn-add" id="btnAddManga" onclick="addManga()">+ Tambah</button>
-          </div>
-          <ul class="manga-list" id="mangaList">
-            <li class="empty">memuat...</li>
-          </ul>
         </div>
-      </section>
 
-      <section class="panel">
-        <div class="two-col">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">recent manhwa terkirim</span>
-              <span class="badge" id="recentCount">0</span>
+        <div class="modal-overlay" id="deleteConfirmOverlay">
+            <div class="modal">
+                <h2>Hapus Manga</h2>
+                <p id="deleteConfirmText">Yakin ingin menghapus manga ini?</p>
+                <div style="display: flex; gap: 8px">
+                    <button
+                        type="button"
+                        class="btn-soft"
+                        id="deleteCancelBtn"
+                        style="flex: 1"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-primary"
+                        id="deleteConfirmBtn"
+                        style="flex: 1"
+                    >
+                        Hapus
+                    </button>
+                </div>
             </div>
-            <ul class="recent-list" id="recentList">
-              <li class="empty">memuat...</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">log aktivitas</span>
-              <span class="badge" id="logCount">0 entries</span>
-            </div>
-            <ul class="log-list" id="logList">
-              <li class="empty">memuat...</li>
-            </ul>
-          </div>
         </div>
-      </section>
-    </main>
-  </body>
+
+        <header class="topbar">
+            <div class="brand">
+                <div class="logo-dot" id="statusDot"></div>
+                <div>
+                    <div class="brand-title">Ikiru Monitor</div>
+                    <div class="brand-sub">Discord Update Operations</div>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <div class="live-kpi">
+                    <span id="liveSent">S:-</span>
+                    <span id="liveSkipped">K:-</span>
+                    <span id="liveFailed">F:-</span>
+                    <span id="liveGuilds">G:-</span>
+                    <span id="liveDuration">D:-</span>
+                </div>
+                <span class="last-updated" id="lastUpdated">-</span>
+                <span class="poll-indicator" id="pollInfo"
+                    >light: - | heavy: -</span
+                >
+                <select
+                    id="pollInterval"
+                    class="poll-select"
+                    onchange="setPollInterval()"
+                >
+                    <option value="60000">60s</option>
+                    <option value="120000">120s</option>
+                    <option value="300000">300s</option>
+                </select>
+                <button
+                    type="button"
+                    class="btn-soft"
+                    id="btnAutoRefresh"
+                    onclick="toggleAutoRefresh()"
+                >
+                    auto: on
+                </button>
+                <button
+                    type="button"
+                    class="btn-strong"
+                    id="btnRunCron"
+                    onclick="runCronNow()"
+                >
+                    jalankan cron
+                </button>
+                <button
+                    type="button"
+                    class="btn-soft"
+                    id="btnTheme"
+                    onclick="toggleTheme()"
+                >
+                    mode
+                </button>
+                <button
+                    type="button"
+                    class="btn-soft"
+                    id="btnStatus"
+                    onclick="location.href = './status/'"
+                >
+                    status
+                </button>
+                <button
+                    type="button"
+                    class="btn-soft"
+                    id="btnRefresh"
+                    onclick="loadAll()"
+                >
+                    refresh
+                </button>
+                <button
+                    type="button"
+                    class="btn-soft"
+                    id="btnLogout"
+                    onclick="logoutDashboard()"
+                >
+                    logout
+                </button>
+            </div>
+        </header>
+
+        <main class="layout">
+            <div class="alert" id="alertBox" style="display: none"></div>
+
+            <section
+                class="panel"
+                id="recommendationsPanel"
+                style="display: none"
+            >
+                <div class="panel-title panel-title-warn">
+                    health recommendations
+                </div>
+                <div class="card card-warn">
+                    <div class="card-header">
+                        <span class="card-title">Link mati terdeteksi</span>
+                        <span class="badge badge-warn" id="recommendationCount"
+                            >0</span
+                        >
+                    </div>
+                    <p class="card-desc">
+                        Saran penghapusan untuk link yang gagal diakses
+                        berturut-turut.
+                    </p>
+                    <ul class="manga-list" id="recommendationList">
+                        <li class="empty">semua link sehat.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="hero">
+                <div class="hero-card" id="lastCronBar">
+                    <div class="hero-head">
+                        <span class="hero-title">Last Cron Result</span>
+                        <span class="hero-time" id="lastCronTime">-</span>
+                    </div>
+                    <div class="hero-metrics">
+                        <span id="lastCronSent">sent: -</span>
+                        <span id="lastCronSkipped">skipped: -</span>
+                        <span id="lastCronFailed">failed: -</span>
+                        <span id="lastCronDuration">duration: -</span>
+                        <span id="lastCronOutcome">state: -</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-title">overview</div>
+                <div class="stats-grid stats-grid-overview">
+                    <div class="stat-card">
+                        <div class="stat-label">Health</div>
+                        <div class="stat-value" id="overviewHealth">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Terakhir dieksekusi</div>
+                        <div class="stat-value" id="overviewLastRun">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Whitelist</div>
+                        <div class="stat-value" id="overviewWhitelist">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Sent 24h</div>
+                        <div class="stat-value" id="overviewSent24h">-</div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Sent</div>
+                        <div class="stat-value green" id="statSent">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Skipped</div>
+                        <div class="stat-value amber" id="statSkipped">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Failed</div>
+                        <div class="stat-value red" id="statFailed">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Duration</div>
+                        <div class="stat-value" id="statDuration">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel two-col">
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <span class="card-title">Health Distribution</span>
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="chartSourceHealth"></canvas>
+                    </div>
+                </div>
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <span class="card-title"
+                            >Sent/Skipped/Failed Trend</span
+                        >
+                        <select
+                            id="chartRange"
+                            class="poll-select"
+                            onchange="renderTrendChart()"
+                        >
+                            <option value="24h">24h</option>
+                            <option value="7d">7d</option>
+                        </select>
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="chartTrend"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-title">source health</div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title"
+                            >Status scraper per source</span
+                        >
+                        <span class="badge" id="sourceHealthCount">0</span>
+                    </div>
+                    <ul class="manga-list" id="sourceHealthList">
+                        <li class="empty">memuat...</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-title">whitelist manga</div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Manga terpantau</span>
+                        <span class="badge" id="whitelistCount">0</span>
+                    </div>
+                    <div class="whitelist-toolbar">
+                        <input
+                            type="search"
+                            id="inputWhitelistSearch"
+                            placeholder="cari manga..."
+                            autocomplete="off"
+                            oninput="applyWhitelistFilter()"
+                        />
+                        <select
+                            id="inputWhitelistSource"
+                            class="poll-select"
+                            onchange="applyWhitelistFilter()"
+                        >
+                            <option value="">all source</option>
+                            <option value="ikiru">ikiru</option>
+                            <option value="shinigami_project">project</option>
+                            <option value="shinigami_mirror">mirror</option>
+                        </select>
+                        <div class="sort-btns">
+                            <button
+                                type="button"
+                                id="sortBtn_default"
+                                class="sort-btn active"
+                                onclick="setSortOrder('default')"
+                            >
+                                sort
+                            </button>
+                            <button
+                                type="button"
+                                id="sortBtn_az"
+                                class="sort-btn"
+                                onclick="setSortOrder('az')"
+                            >
+                                A-Z
+                            </button>
+                            <button
+                                type="button"
+                                id="sortBtn_za"
+                                class="sort-btn"
+                                onclick="setSortOrder('za')"
+                            >
+                                Z-A
+                            </button>
+                        </div>
+                    </div>
+                    <div class="whitelist-form">
+                        <input
+                            type="text"
+                            id="inputMangaTitle"
+                            placeholder="Judul manga..."
+                            autocomplete="off"
+                            onkeydown="if (event.key === 'Enter') addManga();"
+                        />
+                        <input
+                            type="text"
+                            id="inputMangaUrl"
+                            placeholder="URL (opsional)"
+                            autocomplete="off"
+                            onkeydown="if (event.key === 'Enter') addManga();"
+                        />
+                        <button
+                            type="button"
+                            class="btn-add"
+                            id="btnAddManga"
+                            onclick="addManga()"
+                        >
+                            + Tambah
+                        </button>
+                    </div>
+                    <ul class="manga-list" id="mangaList">
+                        <li class="empty">memuat...</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title"
+                                >recent manhwa terkirim</span
+                            >
+                            <span class="badge" id="recentCount">0</span>
+                        </div>
+                        <ul class="recent-list" id="recentList">
+                            <li class="empty">memuat...</li>
+                        </ul>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">log aktivitas</span>
+                            <span class="badge" id="logCount">0 entries</span>
+                        </div>
+                        <ul class="log-list" id="logList">
+                            <li class="empty">memuat...</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </body>
 </html>
