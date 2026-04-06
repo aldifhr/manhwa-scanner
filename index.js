@@ -256,14 +256,4 @@ async function startServer() {
   });
 }
 
-// Start cache warming service (if not in test mode)
-if (
-  process.env.NODE_ENV !== "test" &&
-  process.env.DISABLE_CACHE_WARMING !== "true"
-) {
-  const { startCacheWarming } = await import("./lib/cacheWarming.js");
-  startCacheWarming();
-  console.log("🔥 Cache warming service started");
-}
-
 startServer();

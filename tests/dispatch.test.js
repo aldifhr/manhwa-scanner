@@ -95,6 +95,32 @@ function createRedisMock() {
       kv.set(key, current);
       return fields.length;
     },
+    pipeline() {
+      const commands = [];
+      return {
+        hsetnx(key, field, value) {
+          commands.push(() => api.hsetnx(key, field, value));
+          return this;
+        },
+        hset(key, payload) {
+          commands.push(() => api.hset(key, payload));
+          return this;
+        },
+        hpexpire(key, field, ttlMs) {
+          // Mock: no-op, TTL not actually enforced in mock
+          commands.push(() => Promise.resolve(1));
+          return this;
+        },
+        hexpire(key, seconds, ...args) {
+          // Mock: no-op, TTL not actually enforced in mock
+          commands.push(() => Promise.resolve(1));
+          return this;
+        },
+        async exec() {
+          return Promise.all(commands.map((cmd) => cmd()));
+        },
+      };
+    },
   };
 
   return api;
@@ -125,7 +151,8 @@ test("dispatchChapters sends new chapter and writes recent entries plus daily st
   assert.equal(out.skipped, 0);
   assert.equal(out.failed, 0);
   assert.deepEqual(sent, ["A:1001"]);
-  assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
+  const recentChapters = redis.kv.get("recent:chapters") || {};
+  assert.equal(Object.keys(recentChapters).length, 1);
   assert.equal((redis.lists.get("cron:logs") || []).length, 1);
   const statsMap = redis.kv.get("cron:daily_stats") || {};
   const statsStr = statsMap["2026-01-01"];
@@ -193,7 +220,10 @@ test("dispatchChapters releases lock if all channels fail", async () => {
   assert.equal(out.sent, 0);
   assert.equal(out.failed, 2);
   // Lock must be released after all channels fail
-  const entry = getHistoryEntry(redis, "chapter:https://a.shinigami.asia/chapter/3/");
+  const entry = getHistoryEntry(
+    redis,
+    "chapter:https://a.shinigami.asia/chapter/3/",
+  );
   assert.ok(!entry || entry.status !== "sent");
   assert.deepEqual(failedChannels.sort(), ["1001", "1002"]);
 });
@@ -288,7 +318,12 @@ test("dispatchChapters preserves chapter order even when later sends finish fast
     channelIds: ["1001"],
     chapterConcurrency: 3,
     sendEmbed: async (item) => {
-      const wait = item.chapter === "Chapter 82" ? 30 : item.chapter === "Chapter 87" ? 5 : 0;
+      const wait =
+        item.chapter === "Chapter 82"
+          ? 30
+          : item.chapter === "Chapter 87"
+            ? 5
+            : 0;
       await new Promise((resolve) => setTimeout(resolve, wait));
       sent.push(item.chapter);
     },
@@ -334,27 +369,31 @@ test("prepareDispatchQueue reports invalid, already sent, and over-limit counts"
     sentAt: "2026-01-01T00:00:00.000Z",
   });
 
-  const out = await prepareDispatchQueue(redis, [
-    { title: "No Url", chapter: "Chapter 1", url: "", source: "ikiru" },
-    {
-      title: "Already",
-      chapter: "Chapter 2",
-      url: "https://a.shinigami.asia/chapter/2/",
-      source: "shinigami_project",
-    },
-    {
-      title: "Queued",
-      chapter: "Chapter 3",
-      url: "https://a.shinigami.asia/chapter/3/",
-      source: "shinigami_project",
-    },
-    {
-      title: "Over",
-      chapter: "Chapter 4",
-      url: "https://a.shinigami.asia/chapter/4/",
-      source: "shinigami_project",
-    },
-  ], 1);
+  const out = await prepareDispatchQueue(
+    redis,
+    [
+      { title: "No Url", chapter: "Chapter 1", url: "", source: "ikiru" },
+      {
+        title: "Already",
+        chapter: "Chapter 2",
+        url: "https://a.shinigami.asia/chapter/2/",
+        source: "shinigami_project",
+      },
+      {
+        title: "Queued",
+        chapter: "Chapter 3",
+        url: "https://a.shinigami.asia/chapter/3/",
+        source: "shinigami_project",
+      },
+      {
+        title: "Over",
+        chapter: "Chapter 4",
+        url: "https://a.shinigami.asia/chapter/4/",
+        source: "shinigami_project",
+      },
+    ],
+    1,
+  );
 
   assert.equal(out.invalidCount, 1);
   assert.equal(out.alreadySentCount, 1);
@@ -420,7 +459,10 @@ test("dispatchChapters promotes successful pending claim to sent state", async (
   });
 
   assert.equal(out.sent, 1);
-  const entry5 = getHistoryEntry(redis, "chapter:https://a.shinigami.asia/chapter/5/");
+  const entry5 = getHistoryEntry(
+    redis,
+    "chapter:https://a.shinigami.asia/chapter/5/",
+  );
   assert.equal(entry5?.status, "sent");
   assert.equal(entry5?.claimedAt, "2026-01-01T00:00:00.000Z");
   assert.equal(entry5?.sentAt, "2026-01-01T00:00:00.000Z");
@@ -451,7 +493,10 @@ test("dispatchChapters reclaims stale pending claim before sending", async () =>
   });
 
   assert.equal(out.sent, 1);
-  const entry6 = getHistoryEntry(redis, "chapter:https://a.shinigami.asia/chapter/6/");
+  const entry6 = getHistoryEntry(
+    redis,
+    "chapter:https://a.shinigami.asia/chapter/6/",
+  );
   assert.equal(entry6?.status, "sent");
   assert.equal(entry6?.claimedAt, "2026-01-01T00:10:01.000Z");
   assert.equal(entry6?.sentAt, "2026-01-01T00:10:01.000Z");
@@ -503,7 +548,11 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
     ],
     channelIds: ["1001"],
     sendEmbed: async (item) => {
-      sent.push({ title: item.title, source: item.source, chapter: item.chapter });
+      sent.push({
+        title: item.title,
+        source: item.source,
+        chapter: item.chapter,
+      });
     },
     getSubscribersFn: noSubscribers,
     nowIso: "2026-01-01T05:00:00.000Z",
@@ -518,7 +567,10 @@ test("dispatchChapters dedupes same chapter across sources and prefers earliest 
       chapter: "Chapter 50",
     },
   ]);
-  const dedupeEntry = getHistoryEntry(redis, "chapter:dedupe:overlord of sichuan:num:50");
+  const dedupeEntry = getHistoryEntry(
+    redis,
+    "chapter:dedupe:overlord of sichuan:num:50",
+  );
   assert.equal(dedupeEntry?.status, "sent");
 });
 
@@ -547,7 +599,8 @@ test("dispatchChapters persists sent state before moving to the next chapter", a
       if (item.title === "Second") {
         const firstEntry = getHistoryEntry(redis, firstKey);
         assert.equal(firstEntry?.status, "sent");
-        assert.equal((redis.lists.get("recent:chapters") || []).length, 1);
+        const recentChapters = redis.kv.get("recent:chapters") || {};
+        assert.equal(Object.keys(recentChapters).length, 1);
       }
     },
     getSubscribersFn: noSubscribers,
