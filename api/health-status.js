@@ -20,7 +20,7 @@ async function getGuildCount(redisClient) {
 
 export const config = { maxDuration: 30 };
 
-let cache = { data: null, timestamp: 0, expiresAt: 0 };
+const HEALTH_STATUS_CACHE_KEY = "api:health-status:cache";
 const CACHE_TTL_MS = HEALTH_CACHE_TTL_MS;
 
 function calculateUptime(failures) {
@@ -35,9 +35,13 @@ export default async function handler(req, res) {
 
   try {
     const now = Date.now();
-    if (cache.data && now < cache.expiresAt) {
+
+    // Check Redis cache first
+    const cached = await redis.get(HEALTH_STATUS_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
       logApiOk(reqLogger, { status: 200, cached: true });
-      return res.status(200).json(cache.data);
+      return res.status(200).json({ ...parsed, cached: true });
     }
 
     const sourceHealth = await loadSourceHealthSnapshot(redis, SOURCE_KEYS);
@@ -169,11 +173,10 @@ export default async function handler(req, res) {
         : null,
     };
 
-    cache = {
-      data: payload,
-      timestamp: now,
-      expiresAt: now + CACHE_TTL_MS,
-    };
+    // Store in Redis cache
+    await redis.set(HEALTH_STATUS_CACHE_KEY, JSON.stringify(payload), {
+      ex: Math.floor(CACHE_TTL_MS / 1000),
+    });
 
     logApiOk(reqLogger, { status: 200, cached: false });
     return res.status(200).json(payload);
