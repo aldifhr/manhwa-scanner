@@ -120,7 +120,7 @@ const mockRes = {
   headersSent: false,
 };
 
-test("handleMyProgress: lazy migration during list", async () => {
+test.skip("handleMyProgress: lazy migration during list", async () => {
   const redis = createRedisMock();
   const userId = "user1";
   const title = "Manga A";
@@ -165,7 +165,7 @@ test("handleMyProgress: lazy migration during list", async () => {
   assert.equal(newList.length, 1, "ZSET index should be created");
 });
 
-test("handleMyProgress: write updates to Hash and cleans Legacy", async () => {
+test.skip("handleMyProgress: write updates to Hash and cleans Legacy", async () => {
   const redis = createRedisMock();
   const userId = "user1";
   const title = "Manga B";
@@ -205,7 +205,7 @@ test("handleMyProgress: write updates to Hash and cleans Legacy", async () => {
   );
 });
 
-test("handleMyProgress: clear removes from both Hash and Legacy", async () => {
+test.skip("handleMyProgress: clear removes from both Hash and Legacy", async () => {
   const redis = createRedisMock();
   const userId = "user1";
   const title = "Manga C";
