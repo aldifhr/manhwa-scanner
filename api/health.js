@@ -3,9 +3,10 @@ import { performFullHealthCheck } from "../lib/services/health.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getAllGuildChannels, redis } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
-import { HEALTH_CHECK_MAX_DURATION_SEC } from "../lib/config.js";
-
-export const config = { maxDuration: HEALTH_CHECK_MAX_DURATION_SEC };
+// Inline computation for Vercel bundler compatibility
+export const config = {
+  maxDuration: Number(process.env.HEALTH_CHECK_MAX_DURATION_SEC || 300),
+};
 
 function createSuccessResponse(data) {
   return {

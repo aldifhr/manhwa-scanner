@@ -9,6 +9,34 @@ import { rateLimitMiddleware } from "./lib/rateLimiter.js";
 
 const log = getLogger({ module: "express-dev" });
 
+// Error tracking utilities
+function extractErrorContext(err, req = null) {
+  return {
+    message: err.message,
+    stack: err.stack,
+    code: err.code || err.statusCode,
+    name: err.name,
+    path: req?.path,
+    method: req?.method,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function logError(err, context = {}) {
+  const errorInfo = {
+    ...extractErrorContext(err),
+    ...context,
+  };
+
+  // Log to structured logger
+  log.error(errorInfo, err.message);
+
+  // Could be extended to send to Sentry/DataDog here
+  // Example: sentry.captureException(err, { extra: context });
+
+  return errorInfo;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -37,11 +65,61 @@ app.use(
   }),
 );
 
+// Global error tracking middleware
+app.use((req, res, next) => {
+  // Attach error tracking to request
+  req.trackError = (err, meta = {}) => {
+    logError(err, {
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+      ...meta,
+    });
+  };
+  next();
+});
+
 // Serve static files from the 'public' directory (matches Vercel's behavior)
 app.use(express.static(path.join(__dirname, "public")));
 
 // Dynamically load API routes from the 'api' directory
 const apiDir = path.join(__dirname, "api");
+
+// Global error handler
+function globalErrorHandler(err, req, res, next) {
+  const errorContext = extractErrorContext(err, req);
+
+  // Log the error with full context
+  log.error(errorContext, `Unhandled error: ${err.message}`);
+
+  // Don't leak error details in production
+  const isDev = process.env.NODE_ENV !== "production";
+
+  res.status(err.statusCode || 500).json({
+    success: false,
+    error: {
+      code: err.code || "INTERNAL_ERROR",
+      message: isDev ? err.message : "Internal server error",
+      ...(isDev && { stack: err.stack }),
+    },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// Unhandled promise rejection handler
+process.on("unhandledRejection", (reason, promise) => {
+  log.error(
+    { reason: reason?.message || reason, promise },
+    "Unhandled Promise Rejection",
+  );
+});
+
+// Uncaught exception handler
+process.on("uncaughtException", (err) => {
+  log.error(extractErrorContext(err), "Uncaught Exception");
+  // Give logger time to flush before exiting
+  setTimeout(() => process.exit(1), 1000);
+});
 
 async function loadApiRoutes() {
   if (!fs.existsSync(apiDir)) {
