@@ -6,18 +6,20 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
-const { 
-  DISCORD_TOKEN, 
-  DISCORD_BOT_TOKEN, 
-  DISCORD_APP_ID, 
-  DISCORD_APPLICATION_ID 
+const {
+  DISCORD_TOKEN,
+  DISCORD_BOT_TOKEN,
+  DISCORD_APP_ID,
+  DISCORD_APPLICATION_ID,
 } = process.env;
 
 const token = DISCORD_BOT_TOKEN || DISCORD_TOKEN;
 const appId = DISCORD_APPLICATION_ID || DISCORD_APP_ID;
 
 if (!token || !appId) {
-  console.error("Error: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are required in .env");
+  console.error(
+    "Error: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are required in .env",
+  );
   process.exit(1);
 }
 
@@ -113,10 +115,7 @@ const commands = [
       },
     ],
   },
-  {
-    name: "check",
-    description: "Cek chapter terbaru dari whitelist secara manual",
-  },
+
   {
     name: "setchannel",
     description: "Set channel ini sebagai tempat notifikasi",
@@ -125,24 +124,7 @@ const commands = [
     name: "clear",
     description: "Hapus semua isi whitelist (Owner only)",
   },
-  {
-    name: "resync24h",
-    description: "Sync ulang chapter yang rilis dalam 24 jam terakhir",
-    options: [
-      {
-        type: 4, // INTEGER
-        name: "max_send",
-        description: "Maksimal chapter yang dikirim (default 100)",
-        required: false,
-      },
-      {
-        type: 5, // BOOLEAN
-        name: "dry_run",
-        description: "Cek jumlah yang akan dikirim tanpa benar-benar mengirim",
-        required: false,
-      },
-    ],
-  },
+
   {
     name: "health",
     description: "Cek status kesehatan scraper/situs sumber",
@@ -151,10 +133,7 @@ const commands = [
     name: "myprogress",
     description: "Lihat history chapter yang sudah kamu baca/notifikasi",
   },
-  {
-    name: "readclear",
-    description: "Hapus history progress pribadimu",
-  },
+
   {
     name: "permission",
     description: "Kelola izin akses command /add (Admin only)",
@@ -167,16 +146,16 @@ const commands = [
         choices: [
           { name: "Add User", value: "add" },
           { name: "Remove User", value: "remove" },
-          { name: "List Allowed", value: "list" }
-        ]
+          { name: "List Allowed", value: "list" },
+        ],
       },
       {
         type: 6, // USER
         name: "user",
         description: "User yang ingin dikelola",
-        required: false
-      }
-    ]
+        required: false,
+      },
+    ],
   },
   {
     name: "pref",
@@ -195,12 +174,12 @@ const commands = [
             choices: [
               { name: "🔔 Semua Update (Tag All)", value: "all" },
               { name: "⭐ Hanya Follow (Tag Follows)", value: "follows" },
-              { name: "🔕 Nonaktif (No Tag)", value: "none" }
-            ]
-          }
-        ]
-      }
-    ]
+              { name: "🔕 Nonaktif (No Tag)", value: "none" },
+            ],
+          },
+        ],
+      },
+    ],
   },
   {
     name: "follow",
@@ -215,9 +194,9 @@ const commands = [
             type: 4, // INTEGER
             name: "page",
             description: "Halaman ke-berapa",
-            required: false
-          }
-        ]
+            required: false,
+          },
+        ],
       },
       {
         type: 1, // SUB_COMMAND
@@ -228,12 +207,12 @@ const commands = [
             type: 3, // STRING
             name: "judul",
             description: "Judul manga yang ingin di-unfollow",
-            required: true
-          }
-        ]
-      }
-    ]
-  }
+            required: true,
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 async function sync() {
@@ -246,7 +225,7 @@ async function sync() {
       },
     });
     console.log("Γ£ö Successfully synced commands!");
-    console.log(response.data.map(c => `/${c.name}`).join(", "));
+    console.log(response.data.map((c) => `/${c.name}`).join(", "));
   } catch (err) {
     console.error("Γ£û Sync failed:", err.response?.data || err.message);
   }

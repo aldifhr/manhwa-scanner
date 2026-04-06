@@ -25,9 +25,14 @@ app.use(express.static(path.join(__dirname, "public")));
 const apiDir = path.join(__dirname, "api");
 
 async function loadApiRoutes() {
-  if (!fs.existsSync(apiDir)) return;
+  if (!fs.existsSync(apiDir)) {
+    log.warn("API directory not found, skipping route loading");
+    return;
+  }
 
   const files = fs.readdirSync(apiDir).filter((file) => file.endsWith(".js"));
+  const loadedRoutes = [];
+  const failedRoutes = [];
 
   for (const file of files) {
     const routeName = file.replace(/\.js$/, "");
@@ -44,17 +49,40 @@ async function loadApiRoutes() {
           try {
             await handler(req, res);
           } catch (err) {
-            log.error({ err, route: routeName }, "API handler error");
+            log.error(
+              { err, route: routeName, path: req.path },
+              "API handler error",
+            );
             if (!res.headersSent) {
               res.status(500).json({ error: "Internal Server Error" });
             }
           }
         });
-        log.debug({ route: routeName }, "mounted API route");
+        loadedRoutes.push(routeName);
+      } else {
+        log.warn(
+          { file, route: routeName },
+          "API module missing default export",
+        );
       }
     } catch (err) {
-      log.error({ err, file }, "failed to load API route");
+      log.error({ err, file, route: routeName }, "Failed to load API route");
+      failedRoutes.push({ name: routeName, error: err.message });
     }
+  }
+
+  // Log summary
+  log.info(
+    {
+      loaded: loadedRoutes.length,
+      failed: failedRoutes.length,
+      routes: loadedRoutes.sort(),
+    },
+    "API routes loaded",
+  );
+
+  if (failedRoutes.length > 0) {
+    log.warn({ failedRoutes }, "Some API routes failed to load");
   }
 }
 
@@ -78,12 +106,14 @@ async function startServer() {
   app.use((err, req, res, next) => {
     log.error(
       {
-        err,
+        err: err.message,
+        stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
         path: req.path,
         method: req.method,
         requestId: req.headers["x-request-id"] || "unknown",
+        ip: req.ip || req.connection.remoteAddress,
       },
-      "unhandled error",
+      "Unhandled error",
     );
 
     if (!res.headersSent) {
@@ -102,10 +132,18 @@ async function startServer() {
   });
 
   app.listen(PORT, () => {
+    log.info("═══════════════════════════════════════");
     log.info(
-      { port: PORT, url: `http://localhost:${PORT}` },
-      "local dev server listening",
+      {
+        port: PORT,
+        env: process.env.NODE_ENV || "development",
+        apiPrefix: "/api",
+        dashboard: `http://localhost:${PORT}`,
+        status: `http://localhost:${PORT}/status/`,
+      },
+      "🚀 Server ready",
     );
+    log.info("═══════════════════════════════════════");
   });
 }
 
