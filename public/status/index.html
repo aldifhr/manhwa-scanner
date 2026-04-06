@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="id" data-theme="dark">
-    <head></head>
+    <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Status Page</title>
@@ -71,7 +71,9 @@
                 color: var(--text-primary);
                 line-height: 1.6;
                 min-height: 100vh;
-                transition: background 0.3s ease, color 0.3s ease;
+                transition:
+                    background 0.3s ease,
+                    color 0.3s ease;
             }
 
             /* ── NAV ── */
@@ -791,4 +793,20 @@
             }
 
             .service-uptime {
-                font-size:
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+            }
+        </style>
+    </head>
+    <body>
+        <nav>
+            <div class="brand">Ikiru Bot Status</div>
+        </nav>
+        <main style="padding: 2rem; max-width: 1200px; margin: 0 auto">
+            <h1 style="font-size: 1.5rem; margin-bottom: 1rem">
+                System Status
+            </h1>
+            <p style="color: var(--text-secondary)">All systems operational.</p>
+        </main>
+    </body>
+</html>
