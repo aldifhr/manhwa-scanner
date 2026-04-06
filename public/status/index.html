@@ -1,125 +1,205 @@
 <!doctype html>
-<html lang="id" data-theme="dark">
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Status Page</title>
+        <title>IKIRU BOT Status</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
             rel="stylesheet"
         />
         <style>
-            *,
-            *::before,
-            *::after {
-                box-sizing: border-box;
+            :root {
+                --bg-primary: #f3efe8;
+                --bg-secondary: #fff6e8;
+                --bg-card: #fffdfa;
+                --bg-hover: #fff9f0;
+                --border-color: #e3d6c5;
+                --border-light: #ebe0d1;
+                --text-primary: #1f1913;
+                --text-secondary: #726759;
+                --text-muted: #8a7d6d;
+                --accent: #d9730d;
+                --accent-2: #1b9aaa;
+                --green: #1b8f5a;
+                --green-dark: #147a4a;
+                --green-glow: rgba(27, 143, 90, 0.15);
+                --yellow: #b06b17;
+                --red: #c0392b;
+                --red-dark: #a93226;
+                --blue: #1b9aaa;
+                --shadow-sm: 0 1px 2px rgba(73, 50, 22, 0.06);
+                --shadow-md: 0 4px 6px -1px rgba(73, 50, 22, 0.08);
+                --shadow-lg: 0 10px 15px -3px rgba(73, 50, 22, 0.1);
+                --radius-sm: 6px;
+                --radius-md: 8px;
+                --radius-lg: 12px;
+            }
+
+            body.dark {
+                --bg-primary: #14120f;
+                --bg-secondary: #1f1a15;
+                --bg-card: #292117;
+                --bg-hover: #3d2f22;
+                --border-color: #3e3224;
+                --border-light: #4a3d2e;
+                --text-primary: #f8f2e8;
+                --text-secondary: #a8967f;
+                --text-muted: #7d6b56;
+                --accent: #ff9f1c;
+                --accent-2: #49c6d8;
+                --green: #42d392;
+                --green-dark: #35b07d;
+                --green-glow: rgba(66, 211, 146, 0.2);
+                --yellow: #ffc15e;
+                --red: #ff7b72;
+                --red-dark: #ff5750;
+                --blue: #49c6d8;
+                --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            }
+
+            * {
                 margin: 0;
                 padding: 0;
-            }
-
-            :root {
-                --bg: #1a1a1a;
-                --nav-bg: #2a2a2a;
-                --nav-border: #333;
-                --card-bg: #242424;
-                --card-border: #333;
-                --text-primary: #f0f0f0;
-                --text-secondary: #888;
-                --text-muted: #555;
-                --green: #22c55e;
-                --green-dark: #4ade80;
-                --bar-green: #22c55e;
-                --bar-red: #ef4444;
-                --bar-yellow: #f59e0b;
-                --bar-empty: #3a3a3a;
-                --border: #333;
-                --shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
-                --skeleton: #2e2e2e;
-                --hover-bg: #2e2e2e;
-                --toggle-bg: #3a3a3a;
-                --amber-dark: #fbbf24;
-                --bg-secondary: #1f1f1f;
-            }
-
-            [data-theme="light"] {
-                --bg: #f3f4f6;
-                --nav-bg: #2a2a2a;
-                --nav-border: #1a1a1a;
-                --card-bg: #ffffff;
-                --card-border: #e5e7eb;
-                --text-primary: #111111;
-                --text-secondary: #555555;
-                --text-muted: #aaaaaa;
-                --green: #22c55e;
-                --green-dark: #16a34a;
-                --bar-green: #22c55e;
-                --bar-red: #ef4444;
-                --bar-yellow: #f59e0b;
-                --bar-empty: #d1d5db;
-                --border: #e5e7eb;
-                --shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-                --skeleton: #e5e7eb;
-                --hover-bg: #f9fafb;
-                --toggle-bg: #e5e7eb;
-                --amber-dark: #d97706;
-                --bg-secondary: #f9fafb;
+                box-sizing: border-box;
             }
 
             body {
-                font-family: "IBM Plex Sans", sans-serif;
-                background: var(--bg);
+                font-family:
+                    "Inter",
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    Roboto,
+                    sans-serif;
+                background:
+                    radial-gradient(
+                        1200px 520px at -8% -10%,
+                        color-mix(in srgb, var(--accent) 18%, transparent),
+                        transparent 60%
+                    ),
+                    radial-gradient(
+                        800px 400px at 110% -18%,
+                        color-mix(in srgb, var(--accent-2) 22%, transparent),
+                        transparent 60%
+                    ),
+                    var(--bg-primary);
                 color: var(--text-primary);
-                line-height: 1.6;
+                line-height: 1.5;
                 min-height: 100vh;
-                transition:
-                    background 0.3s ease,
-                    color 0.3s ease;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
             }
 
-            /* ── NAV ── */
-            nav {
+            /* Header */
+            .header {
+                background: var(--bg-secondary);
+                border-bottom: 1px solid var(--border-color);
+                padding: 0 24px;
                 position: sticky;
                 top: 0;
                 z-index: 100;
-                background: var(--nav-bg);
-                border-bottom: 1px solid var(--nav-border);
-                padding: 0.75rem 1.5rem;
+            }
+
+            .header-content {
+                max-width: 1200px;
+                margin: 0 auto;
+                height: 64px;
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
+                justify-content: flex-end;
             }
 
             .brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .brand-logo {
+                width: 32px;
+                height: 32px;
+                background: linear-gradient(
+                    135deg,
+                    var(--green) 0%,
+                    var(--green-dark) 100%
+                );
+                border-radius: var(--radius-md);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 700;
+                font-size: 14px;
+                color: white;
+            }
+
+            .brand-name {
+                font-size: 18px;
                 font-weight: 600;
-                font-size: 1.1rem;
-                letter-spacing: -0.3px;
+                letter-spacing: -0.5px;
             }
 
-            .nav-right {
+            .header-actions {
                 display: flex;
                 align-items: center;
-                gap: 0.75rem;
+                gap: 12px;
             }
 
-            .nav-toolbar {
-                display: flex;
+            .btn {
+                padding: 8px 16px;
+                border-radius: var(--radius-md);
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                border: none;
+                display: inline-flex;
                 align-items: center;
-                gap: 0.75rem;
-                background: var(--card-bg);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: 0.4rem 0.75rem;
+                gap: 6px;
             }
 
-            .theme-toggle {
-                background: var(--toggle-bg);
-                border: 1px solid var(--border);
+            .btn-secondary {
+                background: var(--bg-card);
                 color: var(--text-primary);
+                border: 1px solid var(--border-light);
+            }
+
+            .btn-secondary:hover {
+                background: var(--bg-hover);
+                border-color: var(--text-secondary);
+            }
+
+            .btn-primary {
+                background: var(--green);
+                color: white;
+            }
+
+            .btn-primary:hover {
+                background: var(--green-dark);
+                box-shadow: 0 0 20px
+                    color-mix(in srgb, var(--green) 20%, transparent);
+            }
+
+            .btn-icon {
                 width: 36px;
                 height: 36px;
-                border-radius: 8px;
+                padding: 0;
+                justify-content: center;
+            }
+
+            /* Theme Toggle Button */
+            .theme-toggle {
+                width: 36px;
+                height: 36px;
+                border-radius: var(--radius-md);
+                border: 1px solid var(--border-light);
+                background: var(--bg-card);
+                color: var(--text-secondary);
                 cursor: pointer;
-                font-size: 1rem;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -127,365 +207,422 @@
             }
 
             .theme-toggle:hover {
-                background: var(--hover-bg);
-                transform: scale(1.05);
-            }
-
-            .nav-link {
-                color: var(--text-secondary);
-                text-decoration: none;
-                font-size: 0.9rem;
-                font-weight: 500;
-                padding: 0.5rem 1rem;
-                border-radius: 8px;
-                transition: all 0.2s ease;
-            }
-
-            .nav-link:hover {
+                border-color: var(--text-secondary);
                 color: var(--text-primary);
-                background: var(--hover-bg);
+                background: var(--bg-hover);
             }
 
-            /* ── TOAST NOTIFICATIONS ── */
-            .toast-container {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                z-index: 10000;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .toast {
-                background: var(--card-bg);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: 12px 16px;
-                box-shadow: var(--shadow);
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                min-width: 280px;
-                animation: toastSlide 0.3s ease;
-            }
-
-            @keyframes toastSlide {
-                from {
-                    transform: translateX(100%);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-            }
-
-            .toast.success {
-                border-left: 3px solid var(--green);
-            }
-
-            .toast.error {
-                border-left: 3px solid var(--bar-red);
-            }
-
-            .toast.info {
-                border-left: 3px solid var(--bar-yellow);
-            }
-
-            .toast-icon {
-                font-size: 1.2rem;
-            }
-
-            .toast-message {
-                font-size: 0.9rem;
-                color: var(--text-primary);
-            }
-
-            /* ── STICKY LEGEND ── */
-            .sticky-legend {
-                position: sticky;
-                top: 60px;
-                z-index: 50;
-                background: var(--bg);
-                border-bottom: 1px solid var(--border);
-                padding: 0.5rem 1.5rem;
-                display: flex;
-                gap: 1.5rem;
-                overflow-x: auto;
-            }
-
-            [data-theme="light"] .sticky-legend {
-                background: var(--bg);
-            }
-
-            .legend-item {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-                font-size: 0.8rem;
-                color: var(--text-secondary);
-                white-space: nowrap;
-            }
-
-            .legend-dot {
-                width: 10px;
-                height: 10px;
-                border-radius: 2px;
-            }
-
-            .legend-dot.lg-green {
-                background: var(--bar-green);
-            }
-            .legend-dot.lg-yellow {
-                background: var(--bar-yellow);
-            }
-            .legend-dot.lg-red {
-                background: var(--bar-red);
-            }
-            .legend-dot.lg-empty {
-                background: var(--bar-empty);
-            }
-
-            .legend-item span {
-                font-size: 0.75rem;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-
-            /* ── LAYOUT ── */
-            main {
-                max-width: 1000px;
+            /* Main Container */
+            .container {
+                max-width: 1200px;
                 margin: 0 auto;
-                padding: 1.5rem;
+                padding: 40px 24px;
             }
 
-            /* ── CRON STATUS CARD ── */
-            .cron-status-card {
-                background: var(--bg-secondary);
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                padding: 1rem 1.25rem;
-                margin-bottom: 1.5rem;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 1rem;
-                flex-wrap: wrap;
-            }
-
-            .cron-status-left {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            .cron-status-dot {
-                width: 10px;
-                height: 10px;
-                border-radius: 50%;
-                background: var(--green);
-            }
-
-            .cron-status-title {
-                font-size: 0.9rem;
-                font-weight: 600;
-                color: var(--text-primary);
-            }
-
-            .cron-status-time {
-                font-size: 0.8rem;
-                color: var(--text-secondary);
-            }
-
-            .cron-metrics {
-                display: flex;
-                gap: 1.5rem;
-                flex-wrap: wrap;
-            }
-
-            .cron-metric-label {
-                font-size: 0.75rem;
-                color: var(--text-secondary);
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-
-            .cron-metric-value {
-                font-size: 1rem;
-                font-weight: 600;
-            }
-
-            .cron-metric-value.sent {
-                color: var(--green-dark);
-            }
-            .cron-metric-value.skipped {
-                color: var(--amber-dark);
-            }
-            .cron-metric-value.failed {
-                color: var(--bar-red);
-            }
-
-            /* ── STATUS BANNER ── */
+            /* Status Banner */
             .status-banner {
-                background: var(--card-bg);
-                border: 1px solid var(--card-border);
-                border-radius: 12px;
-                padding: 1.5rem;
-                margin-bottom: 1.5rem;
-                transition: border-color 0.3s ease;
-            }
-
-            .banner-top {
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-lg);
+                padding: 20px 24px;
+                margin-bottom: 32px;
                 display: flex;
                 align-items: center;
-                gap: 0.75rem;
-                margin-bottom: 0.5rem;
+                gap: 16px;
+                box-shadow: var(--shadow-md);
             }
 
-            .status-banner .dot {
-                width: 12px;
-                height: 12px;
+            .status-indicator {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex: 1;
+            }
+
+            .status-dot {
+                width: 14px;
+                height: 14px;
                 border-radius: 50%;
+                position: relative;
+                flex-shrink: 0;
+            }
+
+            .status-dot::after {
+                content: "";
+                position: absolute;
+                inset: -4px;
+                border-radius: 50%;
+                animation: pulse 2s ease-in-out infinite;
+            }
+
+            .status-dot.healthy {
                 background: var(--green);
-                animation: pulse 2s infinite;
+                box-shadow: 0 0 10px var(--green);
+            }
+
+            .status-dot.healthy::after {
+                border: 2px solid var(--green);
+            }
+
+            .status-dot.warning {
+                background: var(--yellow);
+                box-shadow: 0 0 10px var(--yellow);
+            }
+
+            .status-dot.warning::after {
+                border: 2px solid var(--yellow);
+            }
+
+            .status-dot.degraded {
+                background: var(--red);
+                box-shadow: 0 0 10px var(--red);
+            }
+
+            .status-dot.degraded::after {
+                border: 2px solid var(--red);
             }
 
             @keyframes pulse {
                 0%,
                 100% {
-                    opacity: 1;
-                }
-                50% {
+                    transform: scale(1);
                     opacity: 0.5;
                 }
-            }
-
-            .status-banner .dot::after {
-                content: "";
-                display: block;
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                background: var(--green);
-                animation: pulse-ring 2s infinite;
-            }
-
-            @keyframes pulse-ring {
-                0% {
-                    transform: scale(1);
-                    opacity: 1;
-                }
-                100% {
-                    transform: scale(2);
+                50% {
+                    transform: scale(1.2);
                     opacity: 0;
                 }
             }
 
-            .banner-title {
-                font-size: 1.25rem;
+            .status-text {
+                font-size: 18px;
                 font-weight: 600;
-                letter-spacing: -0.3px;
             }
 
-            .banner-uptime {
-                font-size: 0.9rem;
+            .status-meta {
+                font-size: 14px;
                 color: var(--text-secondary);
-                margin-bottom: 1rem;
+                margin-top: 2px;
             }
 
-            .banner-uptime strong {
+            .status-uptime {
+                text-align: right;
+            }
+
+            .uptime-value {
+                font-size: 24px;
+                font-weight: 700;
+                color: var(--green);
+            }
+
+            .uptime-label {
+                font-size: 12px;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            /* Network Cards */
+            .network-card {
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-lg);
+                margin-bottom: 16px;
+                overflow: hidden;
+                box-shadow: var(--shadow-sm);
+                transition: box-shadow 0.2s ease;
+            }
+
+            .network-card:hover {
+                box-shadow: var(--shadow-md);
+            }
+
+            .network-header {
+                padding: 20px 24px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                background: var(--bg-card);
+                transition: background 0.2s ease;
+                user-select: none;
+            }
+
+            .network-header:hover {
+                background: var(--bg-hover);
+            }
+
+            .network-info {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .network-status-icon {
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .network-status-icon.healthy {
+                background: color-mix(in srgb, var(--green) 15%, transparent);
+                color: var(--green);
+            }
+
+            .network-status-icon.warning {
+                background: color-mix(in srgb, var(--yellow) 15%, transparent);
+                color: var(--yellow);
+            }
+
+            .network-status-icon.degraded {
+                background: color-mix(in srgb, var(--red) 15%, transparent);
+                color: var(--red);
+            }
+
+            .network-title {
+                font-size: 16px;
+                font-weight: 600;
+            }
+
+            .network-subtitle {
+                font-size: 13px;
+                color: var(--text-secondary);
+                margin-top: 2px;
+            }
+
+            .network-toggle {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .service-count {
+                font-size: 13px;
+                color: var(--text-muted);
+            }
+
+            .chevron {
+                width: 20px;
+                height: 20px;
+                color: var(--text-secondary);
+                transition: transform 0.3s ease;
+            }
+
+            .network-card.collapsed .chevron {
+                transform: rotate(-90deg);
+            }
+
+            /* Services Container */
+            .services-container {
+                max-height: 2000px;
+                overflow: hidden;
+                transition: max-height 0.3s ease;
+            }
+
+            .network-card.collapsed .services-container {
+                max-height: 0;
+            }
+
+            /* Service Row */
+            .service-row {
+                padding: 16px 24px;
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 24px;
+            }
+
+            .service-row:hover {
+                background: color-mix(
+                    in srgb,
+                    var(--text-primary) 3%,
+                    transparent
+                );
+            }
+
+            .service-info {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex: 1;
+                min-width: 0;
+            }
+
+            .service-icon {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                font-size: 12px;
+            }
+
+            .service-icon.healthy {
+                background: var(--green);
+                color: white;
+            }
+
+            .service-icon.degraded,
+            .service-icon.warning {
+                background: var(--yellow);
+                color: black;
+            }
+
+            .service-icon.failed {
+                background: var(--red);
+                color: white;
+            }
+
+            .service-details {
+                min-width: 0;
+            }
+
+            .service-name {
+                font-size: 14px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .service-meta {
+                font-size: 12px;
+                color: var(--text-muted);
+                margin-top: 2px;
+            }
+
+            .service-metrics {
+                display: flex;
+                align-items: center;
+                gap: 32px;
+            }
+
+            .uptime-badge {
+                text-align: right;
+            }
+
+            .uptime-percent {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--green);
+            }
+
+            .uptime-text {
+                font-size: 12px;
+                color: var(--text-muted);
+            }
+
+            /* Timeline */
+            .timeline-container {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .timeline-labels {
+                display: flex;
+                justify-content: space-between;
+                font-size: 11px;
+                color: var(--text-muted);
+            }
+
+            .timeline-bars {
+                display: flex;
+                gap: 2px;
+                height: 32px;
+                align-items: flex-end;
+            }
+
+            .timeline-bar {
+                flex: 1;
+                min-width: 3px;
+                max-width: 8px;
+                border-radius: 2px 2px 0 0;
+                transition: all 0.2s ease;
+                position: relative;
+            }
+
+            .timeline-bar.healthy {
+                background: var(--green);
+                height: 100%;
+            }
+
+            .timeline-bar.degraded {
+                background: var(--yellow);
+                height: 60%;
+            }
+
+            .timeline-bar.failed {
+                background: var(--red);
+                height: 30%;
+            }
+
+            .timeline-bar:hover {
+                filter: brightness(1.2);
+                cursor: help;
+            }
+
+            /* Footer */
+            .footer {
+                margin-top: 40px;
+                padding-top: 24px;
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 16px;
+            }
+
+            .footer-left {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .last-updated {
+                font-size: 13px;
+                color: var(--text-secondary);
+            }
+
+            .footer-links {
+                display: flex;
+                gap: 20px;
+            }
+
+            .footer-link {
+                font-size: 13px;
+                color: var(--text-secondary);
+                text-decoration: none;
+                transition: color 0.2s ease;
+            }
+
+            .footer-link:hover {
                 color: var(--text-primary);
             }
 
-            .status-banner.status-healthy {
-                border-color: var(--green);
-                background: linear-gradient(
-                    135deg,
-                    var(--card-bg) 0%,
-                    rgba(34, 197, 94, 0.05) 100%
-                );
-            }
-
-            .status-banner.status-warning {
-                border-color: var(--bar-yellow);
-                background: linear-gradient(
-                    135deg,
-                    var(--card-bg) 0%,
-                    rgba(245, 158, 11, 0.05) 100%
-                );
-            }
-
-            .status-banner.status-degraded {
-                border-color: var(--bar-red);
-                background: linear-gradient(
-                    135deg,
-                    var(--card-bg) 0%,
-                    rgba(239, 68, 68, 0.05) 100%
-                );
-            }
-
-            .status-banner .dot-healthy {
-                background: var(--green);
-            }
-            .status-banner .dot-healthy::after {
-                background: var(--green);
-            }
-
-            .status-banner .dot-warning {
-                background: var(--bar-yellow);
-            }
-            .status-banner .dot-warning::after {
-                background: var(--bar-yellow);
-            }
-
-            .status-banner .dot-degraded {
-                background: var(--bar-red);
-            }
-            .status-banner .dot-degraded::after {
-                background: var(--bar-red);
-            }
-
-            .uptime-progress-wrap {
-                background: var(--bar-empty);
-                height: 6px;
-                border-radius: 3px;
-                overflow: hidden;
-                margin-bottom: 0.75rem;
-            }
-
-            .uptime-progress-bar {
-                height: 100%;
-                background: linear-gradient(
-                    90deg,
-                    var(--green) 0%,
-                    var(--green-dark) 100%
-                );
-                border-radius: 3px;
-                transition: width 0.5s ease;
-                width: 99.98%;
-            }
-
-            /* Live timestamp + refresh indicator */
-            .ts-row {
+            /* Loading State */
+            .loading-container {
                 display: flex;
+                flex-direction: column;
                 align-items: center;
-                gap: 0.5rem;
-                font-size: 0.8rem;
-                color: var(--text-muted);
-                font-family: "IBM Plex Mono", monospace;
+                justify-content: center;
+                padding: 80px 24px;
+                gap: 16px;
             }
 
-            #live-ts {
-                font-size: 0.8rem;
-                color: var(--text-muted);
-            }
-
-            .refresh-ring {
-                width: 10px;
-                height: 10px;
-                border: 2px solid var(--green);
-                border-top-color: transparent;
+            .loading-spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid var(--border-color);
+                border-top-color: var(--green);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
             }
@@ -496,317 +633,1100 @@
                 }
             }
 
-            .refresh-ring.paused {
-                animation: none;
-                border-color: var(--text-muted);
-                border-top-color: var(--text-muted);
+            .loading-text {
+                color: var(--text-secondary);
+                font-size: 14px;
             }
 
-            /* ── TOOLBAR BUTTONS ── */
-            .toolbar-btn {
-                padding: 0.4rem 0.8rem;
-                font-size: 0.85rem;
-                font-weight: 500;
-                color: var(--text-secondary);
-                background: var(--bg-secondary);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                cursor: pointer;
-                transition: all 0.2s ease;
+            /* Error State */
+            .error-container {
+                text-align: center;
+                padding: 60px 24px;
+            }
+
+            .error-icon {
+                width: 48px;
+                height: 48px;
+                background: rgba(239, 68, 68, 0.15);
+                border-radius: 50%;
                 display: flex;
                 align-items: center;
-                gap: 4px;
+                justify-content: center;
+                margin: 0 auto 16px;
+                color: var(--red);
+                font-size: 24px;
             }
 
-            .toolbar-btn:hover {
-                background: var(--hover-bg);
-                color: var(--text-primary);
+            .error-title {
+                font-size: 18px;
+                font-weight: 600;
+                margin-bottom: 8px;
             }
 
-            .toolbar-btn.active {
-                background: var(--green);
-                color: white;
-                border-color: var(--green);
-            }
-
-            .guild-badge {
-                font-size: 0.85rem;
+            .error-message {
                 color: var(--text-secondary);
+                font-size: 14px;
+                margin-bottom: 20px;
+            }
+
+            /* Responsive */
+            @media (max-width: 768px) {
+                .header-content {
+                    height: 56px;
+                }
+
+                .brand-name {
+                    display: none;
+                }
+
+                .container {
+                    padding: 24px 16px;
+                }
+
+                .status-banner {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 12px;
+                }
+
+                .status-uptime {
+                    text-align: left;
+                    width: 100%;
+                    padding-top: 12px;
+                    border-top: 1px solid var(--border-color);
+                }
+
+                .service-row {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 16px;
+                }
+
+                .service-metrics {
+                    width: 100%;
+                    justify-content: space-between;
+                }
+
+                .timeline-bars {
+                    width: 100%;
+                }
+
+                .network-header {
+                    padding: 16px;
+                }
+
+                .service-row {
+                    padding: 16px;
+                }
+            }
+
+            /* Tooltip */
+            .tooltip {
+                position: fixed;
                 background: var(--bg-secondary);
-                border: 1px solid var(--border);
-                padding: 0.4rem 0.8rem;
-                border-radius: 8px;
-            }
-
-            /* ── SEARCH ── */
-            .search-wrap {
-                position: relative;
-                margin-bottom: 1.5rem;
-            }
-
-            .search-icon {
-                position: absolute;
-                left: 1rem;
-                top: 50%;
-                transform: translateY(-50%);
-                color: var(--text-muted);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-sm);
+                padding: 8px 12px;
+                font-size: 12px;
+                color: var(--text-primary);
                 pointer-events: none;
+                z-index: 1000;
+                opacity: 0;
+                transition: opacity 0.2s ease;
+                box-shadow: var(--shadow-lg);
+                white-space: nowrap;
             }
 
-            #searchInput {
-                width: 100%;
-                padding: 0.875rem 1rem 0.875rem 2.75rem;
-                font-size: 0.95rem;
-                background: var(--card-bg);
-                border: 1px solid var(--card-border);
-                border-radius: 10px;
-                color: var(--text-primary);
-                outline: none;
-                transition: all 0.2s ease;
+            .tooltip.visible {
+                opacity: 1;
+                visibility: visible;
             }
 
-            #searchInput::placeholder {
-                color: var(--text-muted);
-            }
-
-            #searchInput:focus {
-                border-color: var(--green);
-                box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-            }
-
-            .search-clear {
-                position: absolute;
-                right: 1rem;
-                top: 50%;
-                transform: translateY(-50%);
-                background: none;
-                border: none;
-                color: var(--text-muted);
-                cursor: pointer;
-                font-size: 1.25rem;
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 50%;
-                transition: all 0.2s ease;
-            }
-
-            .search-clear:hover {
-                background: var(--hover-bg);
-                color: var(--text-primary);
-            }
-
-            /* ── NETWORKS ── */
-            .network-card {
-                background: var(--card-bg);
-                border: 1px solid var(--card-border);
+            /* Recent Notices Section */
+            .notices-section {
+                background: color-mix(in srgb, var(--surface) 98%, var(--bg));
+                border: 1px solid var(--border);
                 border-radius: 12px;
-                margin-bottom: 1rem;
+                margin-bottom: 16px;
                 overflow: hidden;
-                transition: all 0.3s ease;
             }
 
-            .network-card.hidden {
-                display: none;
+            .notices-header {
+                padding: 16px 20px 12px;
+                border-bottom: 1px solid var(--border);
             }
 
-            .network-header {
-                padding: 1.25rem 1.5rem;
+            .notices-title {
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--muted);
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+
+            .notices-content {
+                padding: 20px;
+            }
+
+            .notice-item {
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
-                cursor: pointer;
-                transition: background 0.2s ease;
+                gap: 12px;
             }
 
-            .network-header:hover {
-                background: var(--hover-bg);
-            }
-
-            .network-card.open .network-header {
-                background: var(--hover-bg);
-            }
-
-            .network-left {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            /* Base status dot class */
-            .status-dot {
-                background: var(--green);
+            .notice-icon {
+                width: 20px;
+                height: 20px;
                 border-radius: 50%;
+                background: var(--green);
+                color: #fff;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                font-size: 11px;
+                font-weight: 700;
                 flex-shrink: 0;
             }
 
-            .status-dot::after {
-                content: "✓";
-                color: white;
-                font-weight: 700;
+            .notice-message {
+                font-size: 14px;
+                color: var(--text);
             }
 
-            /* Size variants */
-            .network-dot {
-                width: 16px;
-                height: 16px;
+            .notices-footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                border-top: 1px solid var(--border);
+                background: color-mix(in srgb, var(--surface) 95%, var(--bg));
             }
 
-            .network-dot::after {
-                font-size: 9px;
+            .notice-nav-btn {
+                width: 32px;
+                height: 32px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                background: var(--surface);
+                color: var(--muted);
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.15s ease;
             }
 
-            .service-dot {
-                width: 14px;
-                height: 14px;
+            .notice-nav-btn:hover {
+                border-color: color-mix(
+                    in srgb,
+                    var(--text) 30%,
+                    var(--border)
+                );
+                color: var(--text);
             }
 
-            .service-dot::after {
-                font-size: 8px;
+            .notice-history-link {
+                font-size: 12px;
+                color: var(--muted);
+                cursor: pointer;
+                transition: color 0.15s ease;
             }
 
-            /* Status colors (shared) */
-            .status-dot.status-healthy,
-            .network-dot.status-healthy,
-            .service-dot.status-healthy {
-                background: var(--green);
+            .notice-history-link:hover {
+                color: var(--text);
             }
 
-            .status-dot.status-degraded,
-            .network-dot.status-degraded,
-            .service-dot.status-degraded {
-                background: var(--bar-yellow);
+            @media (max-width: 768px) {
+                .notices-header {
+                    padding: 14px 16px 10px;
+                }
+
+                .notices-content {
+                    padding: 16px;
+                }
+
+                .notices-footer {
+                    padding: 10px 14px;
+                }
+
+                .notice-message {
+                    font-size: 13px;
+                }
             }
 
-            .status-dot.status-failed,
-            .network-dot.status-failed,
-            .service-dot.status-failed,
-            .service-dot.status-error {
-                background: var(--bar-red);
+            /* Modal Styles */
+            .modal-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+                align-items: center;
+                justify-content: center;
+                backdrop-filter: blur(4px);
             }
 
-            /* Checkmark content (shared) */
-            .status-dot.status-healthy::after,
-            .status-dot.status-degraded::after,
-            .network-dot.status-healthy::after,
-            .network-dot.status-degraded::after,
-            .network-dot.status-failed::after,
-            .network-dot.status-unknown::after,
-            .service-dot.status-healthy::after,
-            .service-dot.status-degraded::after,
-            .service-dot.status-unknown::after {
-                content: "✓";
+            .modal-overlay.show {
+                display: flex;
             }
 
-            /* X mark for failed states */
-            .status-dot.status-failed::after,
-            .network-dot.status-failed::after,
-            .service-dot.status-failed::after,
-            .service-dot.status-error::after {
-                content: "✕";
-                font-size: 7px;
+            .modal {
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-lg);
+                width: 90%;
+                max-width: 560px;
+                max-height: 80vh;
+                overflow: hidden;
+                box-shadow: var(--shadow-lg);
             }
 
-            .network-name {
-                font-size: 1rem;
+            .modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 20px 24px;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .modal-header h2 {
+                margin: 0;
+                font-size: 18px;
                 font-weight: 600;
                 color: var(--text-primary);
             }
 
-            .network-right {
+            .modal-close {
+                width: 32px;
+                height: 32px;
+                border: none;
+                background: transparent;
+                color: var(--text-secondary);
+                cursor: pointer;
                 display: flex;
                 align-items: center;
-                gap: 1rem;
+                justify-content: center;
+                border-radius: var(--radius-md);
+                transition: all 0.2s ease;
             }
 
-            .uptime-label {
-                font-size: 0.82rem;
-                font-weight: 500;
-                color: var(--green-dark);
-            }
-
-            .chevron {
-                width: 18px;
-                height: 18px;
-                color: #777;
-                transition: transform 0.25s ease;
-                flex-shrink: 0;
-            }
-
-            .network-card.open .chevron {
-                transform: rotate(180deg);
-            }
-
-            /* ── SERVICES ── */
-            .services-container {
-                max-height: 0;
-                overflow: hidden;
-                transition: max-height 0.4s ease;
-            }
-
-            .network-card.open .services-container {
-                max-height: 3000px;
-            }
-
-            .service-row {
-                padding: 1rem 1.6rem;
-                border-bottom: 1px solid var(--border);
-            }
-
-            .service-row:last-child {
-                border-bottom: none;
-            }
-
-            .service-row.search-hidden {
-                display: none;
-            }
-
-            .service-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 0.5rem;
-            }
-
-            .service-left {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            }
-
-            /* Note: .service-dot styles now consolidated with base .status-dot class above */
-
-            .service-name {
-                font-size: 0.9rem;
+            .modal-close:hover {
+                background: var(--bg-hover);
                 color: var(--text-primary);
             }
 
-            .service-right {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
+            .modal-content {
+                padding: 24px;
+                overflow-y: auto;
+                max-height: 60vh;
             }
 
-            .service-uptime {
-                font-size: 0.85rem;
+            .notice-history-empty {
+                text-align: center;
+                padding: 40px 20px;
+            }
+
+            .notice-history-icon {
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: var(--green);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 24px;
+                margin: 0 auto 16px;
+            }
+
+            .notice-history-empty p {
+                margin: 0 0 8px;
+                font-size: 16px;
+                font-weight: 500;
+                color: var(--text-primary);
+            }
+
+            .notice-history-empty span {
+                font-size: 14px;
                 color: var(--text-secondary);
+            }
+
+            /* Notice History List */
+            .notice-list {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+            }
+
+            .notice-history-item {
+                display: flex;
+                gap: 16px;
+                padding: 16px;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .notice-history-item:last-child {
+                border-bottom: none;
+            }
+
+            .notice-history-date {
+                flex-shrink: 0;
+                width: 80px;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+            }
+
+            .notice-history-content h3 {
+                margin: 0 0 4px;
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .notice-history-content p {
+                margin: 0;
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.5;
+            }
+
+            @media (max-width: 768px) {
+                .modal {
+                    width: 95%;
+                    max-height: 85vh;
+                }
+
+                .modal-header {
+                    padding: 16px 20px;
+                }
+
+                .modal-content {
+                    padding: 20px;
+                    max-height: 65vh;
+                }
             }
         </style>
     </head>
     <body>
-        <nav>
-            <div class="brand">Ikiru Bot Status</div>
-        </nav>
-        <main style="padding: 2rem; max-width: 1200px; margin: 0 auto">
-            <h1 style="font-size: 1.5rem; margin-bottom: 1rem">
-                System Status
-            </h1>
-            <p style="color: var(--text-secondary)">All systems operational.</p>
+        <header class="header">
+            <div class="header-content">
+                <div class="header-actions">
+                    <button
+                        class="theme-toggle"
+                        onclick="toggleTheme()"
+                        title="Toggle theme"
+                        id="themeBtn"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line
+                                x1="4.22"
+                                y1="4.22"
+                                x2="5.64"
+                                y2="5.64"
+                            ></line>
+                            <line
+                                x1="18.36"
+                                y1="18.36"
+                                x2="19.78"
+                                y2="19.78"
+                            ></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line
+                                x1="4.22"
+                                y1="19.78"
+                                x2="5.64"
+                                y2="18.36"
+                            ></line>
+                            <line
+                                x1="18.36"
+                                y1="5.64"
+                                x2="19.78"
+                                y2="4.22"
+                            ></line>
+                        </svg>
+                    </button>
+                    <button
+                        class="btn btn-secondary btn-icon"
+                        onclick="refreshStatus()"
+                        title="Refresh"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path
+                                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                            ></path>
+                        </svg>
+                    </button>
+                    <button
+                        class="btn btn-primary"
+                        onclick="subscribeUpdates()"
+                    >
+                        Get updates
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container">
+            <!-- Status Banner -->
+            <div class="status-banner" id="statusBanner">
+                <div class="status-indicator">
+                    <div class="status-dot healthy" id="statusDot"></div>
+                    <div>
+                        <div class="status-text" id="statusText">
+                            Loading...
+                        </div>
+                        <div class="status-meta" id="statusMeta">
+                            Checking system status
+                        </div>
+                    </div>
+                </div>
+                <div class="status-uptime">
+                    <div class="uptime-value" id="uptimeValue">--</div>
+                    <div class="uptime-label">Uptime</div>
+                </div>
+            </div>
+
+            <!-- Networks Container -->
+            <div id="networksContainer">
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Loading status data...</div>
+                </div>
+            </div>
+
+            <!-- Recent Notices -->
+            <div class="notices-section">
+                <div class="notices-header">
+                    <span class="notices-title">RECENT NOTICES</span>
+                </div>
+                <div class="notices-content">
+                    <div class="notice-item">
+                        <div class="notice-icon">✓</div>
+                        <span class="notice-message"
+                            >No notices reported for the past 7 days</span
+                        >
+                    </div>
+                </div>
+                <div class="notices-footer">
+                    <button
+                        class="notice-nav-btn"
+                        id="noticePrev"
+                        aria-label="Previous notices"
+                    >
+                        ←
+                    </button>
+                    <span
+                        class="notice-history-link"
+                        onclick="openNoticeModal()"
+                        >Show notice history</span
+                    >
+                    <button
+                        class="notice-nav-btn"
+                        id="noticeNext"
+                        aria-label="Next notices"
+                    >
+                        →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="footer-left">
+                    <span class="last-updated" id="lastUpdated"
+                        >Last updated: --</span
+                    >
+                </div>
+                <div class="footer-links">
+                    <a
+                        href="https://ikiru-bot.vercel.app"
+                        class="footer-link"
+                        target="_blank"
+                        >Dashboard</a
+                    >
+                    <a
+                        href="https://github.com"
+                        class="footer-link"
+                        target="_blank"
+                        >GitHub</a
+                    >
+                    <a
+                        href="#"
+                        class="footer-link"
+                        onclick="openIncidentModal()"
+                        >Incident History</a
+                    >
+                </div>
+            </footer>
         </main>
+
+        <div class="tooltip" id="tooltip"></div>
+
+        <!-- Notice History Modal -->
+        <div class="modal-overlay" id="noticeModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Notice History</h2>
+                    <button class="modal-close" onclick="closeNoticeModal()">
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-content" id="noticeModalContent">
+                    <div class="notice-history-empty">
+                        <div class="notice-history-icon">✓</div>
+                        <p>No notices reported for the past 7 days</p>
+                        <span>Everything is running smoothly</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Incident History Modal -->
+        <div class="modal-overlay" id="incidentModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Incident History</h2>
+                    <button class="modal-close" onclick="closeIncidentModal()">
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-content" id="incidentModalContent">
+                    <div class="notice-history-empty">
+                        <div class="notice-history-icon">✓</div>
+                        <p>No incidents reported</p>
+                        <span>All systems operational</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Configuration
+            const API_ENDPOINT = "/api/health-status";
+            const REFRESH_INTERVAL = 60000; // 60 seconds
+            const DAYS_TO_SHOW = 90;
+
+            // State
+            let refreshTimer = null;
+            let currentData = null;
+
+            // Icons
+            const ICONS = {
+                check: "✓",
+                x: "✕",
+                warning: "!",
+                chevron: `<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`,
+            };
+
+            // Theme functions
+            function applyTheme(isDark) {
+                document.body.classList.toggle("dark", isDark);
+                const themeBtn = document.getElementById("themeBtn");
+                if (themeBtn) {
+                    themeBtn.innerHTML = isDark
+                        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`
+                        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+                }
+            }
+
+            function toggleTheme() {
+                const isDark = !document.body.classList.contains("dark");
+                localStorage.setItem(
+                    "ikiru_status_theme",
+                    isDark ? "dark" : "light",
+                );
+                applyTheme(isDark);
+            }
+
+            // Modal functions
+            function openNoticeModal() {
+                const modal = document.getElementById("noticeModal");
+                if (modal) {
+                    modal.classList.add("show");
+                    document.body.style.overflow = "hidden";
+                }
+            }
+
+            function closeNoticeModal() {
+                const modal = document.getElementById("noticeModal");
+                if (modal) {
+                    modal.classList.remove("show");
+                    document.body.style.overflow = "";
+                }
+            }
+
+            // Close modal when clicking outside
+            document.addEventListener("click", (e) => {
+                const noticeModal = document.getElementById("noticeModal");
+                const incidentModal = document.getElementById("incidentModal");
+                if (e.target === noticeModal) {
+                    closeNoticeModal();
+                }
+                if (e.target === incidentModal) {
+                    closeIncidentModal();
+                }
+            });
+
+            // Incident Modal functions
+            function openIncidentModal() {
+                const modal = document.getElementById("incidentModal");
+                if (modal) {
+                    modal.classList.add("show");
+                    document.body.style.overflow = "hidden";
+                }
+            }
+
+            function closeIncidentModal() {
+                const modal = document.getElementById("incidentModal");
+                if (modal) {
+                    modal.classList.remove("show");
+                    document.body.style.overflow = "";
+                }
+            }
+
+            // Initialize
+            document.addEventListener("DOMContentLoaded", () => {
+                const savedTheme = localStorage.getItem("ikiru_status_theme");
+                const prefersDark = window.matchMedia(
+                    "(prefers-color-scheme: dark)",
+                ).matches;
+                const isDark = savedTheme ? savedTheme === "dark" : prefersDark;
+                applyTheme(isDark);
+                setupTooltip();
+                loadStatus();
+                startAutoRefresh();
+
+                // Setup notice history link to open modal
+                const noticeHistoryLink = document.querySelector(
+                    ".notice-history-link",
+                );
+                if (noticeHistoryLink) {
+                    noticeHistoryLink.onclick = (e) => {
+                        e.preventDefault();
+                        openNoticeModal();
+                    };
+                }
+            });
+
+            // Auto refresh
+            function startAutoRefresh() {
+                if (refreshTimer) clearInterval(refreshTimer);
+                refreshTimer = setInterval(loadStatus, REFRESH_INTERVAL);
+            }
+
+            // Fetch status data
+            async function loadStatus() {
+                try {
+                    const response = await fetch(API_ENDPOINT);
+                    if (!response.ok)
+                        throw new Error(`HTTP ${response.status}`);
+
+                    const data = await response.json();
+                    currentData = data;
+
+                    renderStatus(data);
+                    updateLastUpdated();
+                } catch (error) {
+                    console.error("Failed to load status:", error);
+                    renderError(error.message);
+                }
+            }
+
+            // Manual refresh
+            function refreshStatus() {
+                const btn = document.querySelector(".btn-icon");
+                btn.style.transform = "rotate(360deg)";
+                btn.style.transition = "transform 0.5s ease";
+
+                loadStatus().then(() => {
+                    setTimeout(() => {
+                        btn.style.transform = "";
+                        btn.style.transition = "";
+                    }, 500);
+                });
+            }
+
+            // Subscribe to updates
+            function subscribeUpdates() {
+                // Open mailto or show notification preference
+                if ("Notification" in window) {
+                    Notification.requestPermission().then((permission) => {
+                        if (permission === "granted") {
+                            showNotification(
+                                "IKIRU BOT Status",
+                                "You will receive status updates.",
+                            );
+                        } else {
+                            alert(
+                                "Browser notifications enabled! You will receive status updates.",
+                            );
+                        }
+                    });
+                } else {
+                    alert(
+                        "Get updates feature - please check our Discord or Twitter for status updates.",
+                    );
+                }
+            }
+
+            // Show notification
+            function showNotification(title, body) {
+                if (
+                    "Notification" in window &&
+                    Notification.permission === "granted"
+                ) {
+                    new Notification(title, { body, icon: "/favicon.ico" });
+                }
+            }
+
+            // Show history
+            function showHistory() {
+                alert(
+                    "Incident history feature coming soon. Check the API for detailed logs.",
+                );
+            }
+
+            // Render status
+            function renderStatus(data) {
+                const networks = data.networks || [];
+                const overallStatus = data.overallStatus || "healthy";
+                const uptime = data.uptime || "99.98%";
+
+                // Update banner
+                updateStatusBanner(overallStatus, networks, uptime);
+
+                // Render networks
+                const container = document.getElementById("networksContainer");
+                container.innerHTML = networks
+                    .map((network, index) => renderNetwork(network, index))
+                    .join("");
+            }
+
+            // Update status banner
+            function updateStatusBanner(status, networks, uptime) {
+                const dot = document.getElementById("statusDot");
+                const text = document.getElementById("statusText");
+                const meta = document.getElementById("statusMeta");
+                const uptimeValue = document.getElementById("uptimeValue");
+
+                // Calculate stats
+                const totalServices = networks.reduce(
+                    (acc, n) => acc + (n.services?.length || 0),
+                    0,
+                );
+                const failedServices = networks.reduce(
+                    (acc, n) =>
+                        acc +
+                        (n.services?.filter(
+                            (s) =>
+                                s.status === "failed" ||
+                                s.consecutiveFailures >= 3,
+                        ).length || 0),
+                    0,
+                );
+                const degradedServices = networks.reduce(
+                    (acc, n) =>
+                        acc +
+                        (n.services?.filter(
+                            (s) =>
+                                s.status === "degraded" ||
+                                (s.consecutiveFailures > 0 &&
+                                    s.consecutiveFailures < 3),
+                        ).length || 0),
+                    0,
+                );
+
+                // Set status
+                dot.className = "status-dot";
+                if (failedServices > 0) {
+                    dot.classList.add("degraded");
+                    text.textContent = "Some systems experiencing issues";
+                    meta.textContent = `${failedServices} of ${totalServices} services down`;
+                } else if (degradedServices > 0) {
+                    dot.classList.add("warning");
+                    text.textContent = "Some systems degraded";
+                    meta.textContent = `${degradedServices} of ${totalServices} services affected`;
+                } else {
+                    dot.classList.add("healthy");
+                    text.textContent = "All systems operational";
+                    meta.textContent = `All ${totalServices} services running normally`;
+                }
+
+                uptimeValue.textContent = uptime;
+            }
+
+            // Render network card
+            function renderNetwork(network, index) {
+                const isOpen = network.open !== false;
+                const services = network.services || [];
+
+                // Calculate network status
+                const hasFailed = services.some(
+                    (s) => s.status === "failed" || s.consecutiveFailures >= 3,
+                );
+                const hasDegraded = services.some(
+                    (s) =>
+                        s.status === "degraded" ||
+                        (s.consecutiveFailures > 0 &&
+                            s.consecutiveFailures < 3),
+                );
+                const networkStatus = hasFailed
+                    ? "degraded"
+                    : hasDegraded
+                      ? "warning"
+                      : "healthy";
+
+                // Get icon based on status
+                const statusIcon =
+                    networkStatus === "healthy"
+                        ? ICONS.check
+                        : networkStatus === "warning"
+                          ? ICONS.warning
+                          : ICONS.x;
+
+                return `
+                <div class="network-card ${isOpen ? "" : "collapsed"}" id="network-${index}">
+                    <div class="network-header" onclick="toggleNetwork(${index})">
+                        <div class="network-info">
+                            <div class="network-status-icon ${networkStatus}">
+                                ${statusIcon}
+                            </div>
+                            <div>
+                                <div class="network-title">${escapeHtml(network.name)}</div>
+                                <div class="network-subtitle">${services.length} services monitored</div>
+                            </div>
+                        </div>
+                        <div class="network-toggle">
+                            <span class="service-count">${services.length} services</span>
+                            ${ICONS.chevron}
+                        </div>
+                    </div>
+                    <div class="services-container">
+                        ${services.map((service) => renderService(service)).join("")}
+                    </div>
+                </div>
+            `;
+            }
+
+            // Render service row
+            function renderService(service) {
+                const status = service.status || "healthy";
+                const isHealthy =
+                    status === "healthy" && !service.consecutiveFailures;
+                const isDegraded =
+                    status === "degraded" ||
+                    (service.consecutiveFailures > 0 &&
+                        service.consecutiveFailures < 3);
+                const isFailed =
+                    status === "failed" || service.consecutiveFailures >= 3;
+
+                const statusClass = isFailed
+                    ? "failed"
+                    : isDegraded
+                      ? "degraded"
+                      : "healthy";
+                const statusIcon = isFailed
+                    ? ICONS.x
+                    : isDegraded
+                      ? ICONS.warning
+                      : ICONS.check;
+
+                // Generate timeline bars
+                const timelineBars = generateTimelineBars(service);
+
+                // Calculate response time display
+                const pingText = service.ping ? `${service.ping}ms` : "—";
+
+                return `
+                <div class="service-row">
+                    <div class="service-info">
+                        <div class="service-icon ${statusClass}">
+                            ${statusIcon}
+                        </div>
+                        <div class="service-details">
+                            <div class="service-name">${escapeHtml(service.name)}</div>
+                            <div class="service-meta">Response time: ${pingText}</div>
+                        </div>
+                    </div>
+                    <div class="service-metrics">
+                        <div class="uptime-badge">
+                            <div class="uptime-percent">${service.uptime || "100.0%"}</div>
+                            <div class="uptime-text">Uptime</div>
+                        </div>
+                        <div class="timeline-container">
+                            <div class="timeline-labels">
+                                <span>90 days ago</span>
+                                <span>Today</span>
+                            </div>
+                            <div class="timeline-bars">
+                                ${timelineBars}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }
+
+            // Generate timeline bars
+            function generateTimelineBars(service) {
+                const incidents = service.incidents || [];
+                const degraded = service.degraded || [];
+                const bars = [];
+
+                for (let i = 0; i < DAYS_TO_SHOW; i++) {
+                    let barClass = "healthy";
+                    let title = "Operational";
+
+                    // Check if this day has an incident
+                    if (incidents.includes(i)) {
+                        barClass = "failed";
+                        title = "Incident reported";
+                    } else if (degraded.includes(i)) {
+                        barClass = "degraded";
+                        title = "Degraded performance";
+                    }
+
+                    // Calculate date for this bar
+                    const date = new Date();
+                    date.setDate(date.getDate() - (DAYS_TO_SHOW - 1 - i));
+                    const dateStr = date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                    });
+
+                    bars.push(
+                        `<div class="timeline-bar ${barClass}" data-tooltip="${dateStr}: ${title}"></div>`,
+                    );
+                }
+
+                return bars.join("");
+            }
+
+            // Toggle network collapse
+            function toggleNetwork(index) {
+                const card = document.getElementById(`network-${index}`);
+                card.classList.toggle("collapsed");
+            }
+
+            // Setup tooltip
+            function setupTooltip() {
+                const tooltip = document.getElementById("tooltip");
+
+                document.addEventListener("mouseover", (e) => {
+                    const target = e.target.closest("[data-tooltip]");
+                    if (target) {
+                        tooltip.textContent = target.dataset.tooltip;
+                        tooltip.classList.add("visible");
+                    }
+                });
+
+                document.addEventListener("mouseout", (e) => {
+                    const target = e.target.closest("[data-tooltip]");
+                    if (target) {
+                        tooltip.classList.remove("visible");
+                    }
+                });
+
+                document.addEventListener("mousemove", (e) => {
+                    if (tooltip.classList.contains("visible")) {
+                        tooltip.style.left = e.clientX + 10 + "px";
+                        tooltip.style.top = e.clientY - 30 + "px";
+                    }
+                });
+            }
+
+            // Update last updated time
+            function updateLastUpdated() {
+                const now = new Date();
+                const timeStr = now.toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                });
+                document.getElementById("lastUpdated").textContent =
+                    `Last updated: ${timeStr}`;
+            }
+
+            // Render error
+            function renderError(message) {
+                const container = document.getElementById("networksContainer");
+                container.innerHTML = `
+                <div class="error-container">
+                    <div class="error-icon">!</div>
+                    <div class="error-title">Failed to load status</div>
+                    <div class="error-message">${escapeHtml(message)}</div>
+                    <button class="btn btn-primary" onclick="refreshStatus()">Try Again</button>
+                </div>
+            `;
+
+                document.getElementById("statusDot").className =
+                    "status-dot degraded";
+                document.getElementById("statusText").textContent =
+                    "Unable to check status";
+                document.getElementById("statusMeta").textContent =
+                    "Error loading data";
+            }
+
+            // Escape HTML
+            function escapeHtml(text) {
+                if (!text) return "";
+                const div = document.createElement("div");
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        </script>
     </body>
 </html>
