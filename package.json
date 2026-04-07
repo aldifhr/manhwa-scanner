@@ -33,7 +33,7 @@
   "dependencies": {
     "@upstash/redis": "^1.36.2",
     "@vercel/functions": "^3.4.3",
-    "axios": "^1.13.5",
+    "axios": "1.13.5",
     "bottleneck": "^2.19.5",
     "cheerio": "^1.2.0",
     "compression": "^1.8.1",
