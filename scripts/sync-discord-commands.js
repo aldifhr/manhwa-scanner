@@ -158,11 +158,79 @@ const commands = [
     name: "status",
     description: "📊 Lihat status bot dan statistik",
     type: 1,
+    options: [
+      {
+        name: "report",
+        description: "📋 Tampilkan laporan status bot lengkap",
+        type: 1,
+      },
+      {
+        name: "perm_add",
+        description: "➕ Berikan izin akses /add ke user tertentu (Owner Only)",
+        type: 1,
+        options: [
+          {
+            name: "user_id",
+            description: "ID User yang ingin diberikan akses",
+            type: 3,
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "perm_remove",
+        description: "➖ Cabut izin akses /add dari user tertentu (Owner Only)",
+        type: 1,
+        options: [
+          {
+            name: "user_id",
+            description: "ID User yang ingin dicabut aksesnya",
+            type: 3,
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "perm_list",
+        description: "📋 Lihat daftar user yang memiliki akses khusus /add",
+        type: 1,
+      },
+    ],
   },
   {
     name: "sync",
     description: "🔄 Sinkronisasi manual whitelist (khusus admin)",
     type: 1,
+    options: [
+      {
+        name: "mode",
+        description: "Pilih mode sinkronisasi",
+        type: 3,
+        required: true,
+        choices: [
+          { name: "Quick Check", value: "quick" },
+          { name: "Deep Resync", value: "deep" },
+        ],
+      },
+      {
+        name: "broadcast",
+        description: "Kirim notifikasi ke channel publik",
+        type: 5,
+        required: false,
+      },
+      {
+        name: "dry_run",
+        description: "Simulasi tanpa mengirim notifikasi (hanya mode Deep)",
+        type: 5,
+        required: false,
+      },
+      {
+        name: "max_send",
+        description: "Batas maksimal chapter yang dikirim (default: 30)",
+        type: 4,
+        required: false,
+      },
+    ],
   },
   {
     name: "setchannel",
@@ -253,24 +321,6 @@ const commands = [
     name: "clear",
     description: "🗑️ Hapus seluruh whitelist (⚠️ DANGER - khusus owner)",
     type: 1,
-  },
-  {
-    name: "check",
-    description: "🔍 Cek chapter terbaru dari whitelist (Quick Sync)",
-    type: 1,
-  },
-  {
-    name: "resync24h",
-    description: "🔄 Sync ulang chapter 24 jam terakhir (Deep Sync)",
-    type: 1,
-    options: [
-      {
-        name: "max_send",
-        description: "Maksimal chapter yang dikirim (default 100)",
-        type: 4, // INTEGER
-        required: false,
-      },
-    ],
   },
 ];
 
