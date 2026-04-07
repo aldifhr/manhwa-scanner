@@ -6,6 +6,14 @@ import { getAllGuildChannels, redis, writeCronStatus } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
+import { z } from "zod";
+
+// Validation schemas
+const cronQuerySchema = z.object({
+  action: z.enum(["update", "health", "links"]).default("update"),
+});
+
+const validMethods = ["GET", "POST"];
 
 // Use literal value for Vercel compatibility
 // CRON_MAX_DURATION_SEC is 300 (5 min) by default, but FastCron free tier is 30s
@@ -172,7 +180,8 @@ async function handleHealthCron(req, res, reqLogger) {
 export default async function handler(req, res) {
   const reqLogger = logApiHit("cron", req);
 
-  if (!["GET", "POST"].includes(req.method)) {
+  // Method validation
+  if (!validMethods.includes(req.method)) {
     logApiOk(reqLogger, { status: 405, reason: "method_not_allowed" });
     return res
       .status(405)
@@ -186,7 +195,20 @@ export default async function handler(req, res) {
       .json(createErrorResponse("UNAUTHORIZED", "Unauthorized"));
   }
 
-  const action = req.query.action || "update";
+  // Query parameter validation with Zod
+  const parseResult = cronQuerySchema.safeParse(req.query);
+  if (!parseResult.success) {
+    logApiOk(reqLogger, { status: 400, reason: "invalid_query", errors: parseResult.error.errors });
+    return res
+      .status(400)
+      .json(createErrorResponse(
+        "INVALID_QUERY",
+        "Invalid query parameters",
+        process.env.NODE_ENV === "development" ? parseResult.error.errors : undefined,
+      ));
+  }
+
+  const { action } = parseResult.data;
   if (action === "health" || action === "links") {
     return handleHealthCron(req, res, reqLogger);
   }
