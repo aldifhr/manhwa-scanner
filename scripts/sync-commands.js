@@ -224,10 +224,10 @@ async function sync() {
         "Content-Type": "application/json",
       },
     });
-    console.log("Γ£ö Successfully synced commands!");
+    console.log("✅ Successfully synced commands!");
     console.log(response.data.map((c) => `/${c.name}`).join(", "));
   } catch (err) {
-    console.error("Γ£û Sync failed:", err.response?.data || err.message);
+    console.error("❌ Sync failed:", err.response?.data || err.message);
   }
 }
 

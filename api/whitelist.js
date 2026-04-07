@@ -9,7 +9,7 @@ import {
   removeWhitelistEntryIdentity,
 } from "../lib/services/whitelist.js";
 import { buildWhitelistListResponse } from "../lib/services/whitelist.js";
-import { WHITELIST_CACHE_SEC, isValidDomain } from "../lib/config.js";
+import { WHITELIST_CACHE_SEC, isValidDomain, ALLOWED_DOMAINS } from "../lib/config.js";
 import {
   createErrorResponse,
   createSuccessResponse,

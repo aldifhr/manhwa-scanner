@@ -34,14 +34,10 @@ test("isAddAllowedUser accepts configured allowlist IDs", async () => {
   );
 });
 
-test("ensureAddAllowedResponse rejects users outside add allowlist", async () => {
+test("ensureAddAllowedResponse allows all users (open access policy)", async () => {
+  // Current behavior: all users are allowed to use /add
+  // Returns null meaning no restriction response needed
   assert.deepEqual(await ensureAddAllowedResponse({
     member: { user: { id: "123" } },
-  }), {
-    type: 4,
-    data: {
-      content: "Command `/add` hanya diizinkan untuk user tertentu.",
-      flags: 64,
-    },
-  });
+  }), null);
 });
