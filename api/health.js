@@ -3,32 +3,14 @@ import { performFullHealthCheck } from "../lib/services/health.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getAllGuildChannels, redis } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+} from "../lib/api/response.js";
 
 // Build-time constant for Vercel bundler compatibility
 // NOTE: Must use literal value, not imported constant (Vercel bundler limitation)
 export const config = { maxDuration: 300 };
-
-function createSuccessResponse(data) {
-  return {
-    success: true,
-    data,
-  };
-}
-
-function createErrorResponse(code, message, details = null) {
-  const response = {
-    success: false,
-    error: {
-      code,
-      message,
-    },
-    timestamp: new Date().toISOString(),
-  };
-  if (details) {
-    response.error.details = details;
-  }
-  return response;
-}
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("health", req);

@@ -9,54 +9,11 @@ import {
   removeWhitelistEntryIdentity,
 } from "../lib/services/whitelist.js";
 import { buildWhitelistListResponse } from "../lib/services/whitelist.js";
-
-import { WHITELIST_CACHE_SEC } from "../lib/config.js";
-
-// Allowed domains for URL validation
-const ALLOWED_DOMAINS = [
-  "ikiru.wtf",
-  "shinigami.asia",
-  "shngm.id",
-  "shinigami-id.com",
-  "shinigami.moe",
-  "shinigami.ink",
-  "komikcast.com",
-  "komikcast.site",
-];
-
-// Standard API response helpers
-function createSuccessResponse(data) {
-  return {
-    success: true,
-    data,
-    timestamp: new Date().toISOString(),
-  };
-}
-
-function createErrorResponse(code, message, details = null) {
-  const response = {
-    success: false,
-    error: {
-      code,
-      message,
-    },
-    timestamp: new Date().toISOString(),
-  };
-  if (details) {
-    response.error.details = details;
-  }
-  return response;
-}
-
-function isValidDomain(url) {
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    return ALLOWED_DOMAINS.some((domain) => hostname.includes(domain));
-  } catch {
-    return false;
-  }
-}
+import { WHITELIST_CACHE_SEC, isValidDomain } from "../lib/config.js";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+} from "../lib/api/response.js";
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("whitelist", req);

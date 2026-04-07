@@ -7,6 +7,10 @@ import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 import { z } from "zod";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+} from "../lib/api/response.js";
 
 // Validation schemas
 const cronQuerySchema = z.object({
@@ -21,29 +25,6 @@ export const config = { maxDuration: 30 };
 const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
-
-function createSuccessResponse(data) {
-  return {
-    success: true,
-    data,
-    timestamp: new Date().toISOString(),
-  };
-}
-
-function createErrorResponse(code, message, details = null) {
-  const response = {
-    success: false,
-    error: {
-      code,
-      message,
-    },
-    timestamp: new Date().toISOString(),
-  };
-  if (details) {
-    response.error.details = details;
-  }
-  return response;
-}
 
 async function handleUpdateCron(req, res, reqLogger) {
   try {
