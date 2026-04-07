@@ -40,7 +40,7 @@ ikiru-bot/
 │   ├── cookie.js          # Cookie management for scraping
 │   ├── cronLogs.js       # Cron execution logging
 │   ├── cronRuntime.js    # Cron health tracking
-│   ├── discord.js         # Discord client wrapper
+│   ├── discord.js         # Discord API client wrapper
 │   ├── domain.js         # Unified Domain Models
 │   ├── httpClient.js     # HTTP client with retry
 │   ├── logger.js         # Structured logging (inc. API logging)
@@ -60,7 +60,10 @@ ikiru-bot/
 ├── tests/                # Vitest unit + integration tests
 ├── whitelist.json        # Default whitelist
 ├── vercel.json           # Vercel config (cron: every 30s)
-├── discord.js            # Discord bot entry point
+├── scripts/              # Utility scripts
+│   └── sync-commands.js  # Discord bot command registration
+├── whitelist.json        # Default whitelist
+├── vercel.json           # Vercel config (cron: every 30s)
 ├── flush.js             # Manual cache flush
 └── package.json
 ```
@@ -81,7 +84,7 @@ cp .env.example .env
 #   WHITELIST_FILE (path to whitelist.json)
 
 # Run locally (requires ngrok for Discord webhooks)
-node discord.js
+node scripts/sync-commands.js
 
 # Run tests
 npm test
