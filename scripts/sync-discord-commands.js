@@ -89,7 +89,7 @@ const commands = [
     type: 1,
     options: [
       {
-        name: "input",
+        name: "query",
         description: "Judul, nomor urut, atau ketik 'all' untuk hapus semua",
         type: 3, // STRING
         required: true,
@@ -184,22 +184,21 @@ const commands = [
     type: 1,
     options: [
       {
-        name: "judul",
-        description: "Judul manga yang ingin ditandai",
+        name: "query",
+        description: "Judul manga atau nomor urut",
         type: 3, // STRING
         required: true,
       },
       {
-        name: "status",
-        description: "Status yang ingin diberikan",
+        name: "reason",
+        description: "Pilih status baru",
         type: 3, // STRING
         required: true,
         choices: [
-          { name: "On Hold", value: "onhold" },
-          { name: "Dropped", value: "dropped" },
-          { name: "Planned", value: "planned" },
-          { name: "Reading", value: "reading" },
-          { name: "Clear Mark", value: "clear" },
+          { name: "Hiatus", value: "hiatus" },
+          { name: "End Season", value: "end_season" },
+          { name: "End", value: "end" },
+          { name: "Clear Status", value: "clear" },
         ],
       },
     ],
@@ -254,6 +253,24 @@ const commands = [
     name: "clear",
     description: "🗑️ Hapus seluruh whitelist (⚠️ DANGER - khusus owner)",
     type: 1,
+  },
+  {
+    name: "check",
+    description: "🔍 Cek chapter terbaru dari whitelist (Quick Sync)",
+    type: 1,
+  },
+  {
+    name: "resync24h",
+    description: "🔄 Sync ulang chapter 24 jam terakhir (Deep Sync)",
+    type: 1,
+    options: [
+      {
+        name: "max_send",
+        description: "Maksimal chapter yang dikirim (default 100)",
+        type: 4, // INTEGER
+        required: false,
+      },
+    ],
   },
 ];
 
