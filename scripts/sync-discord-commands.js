@@ -50,25 +50,7 @@ const commands = [
       },
     ],
   },
-  {
-    name: "search",
-    description: "🔍 Cari manga di whitelist (alias dari /list)",
-    type: 1,
-    options: [
-      {
-        name: "query",
-        description: "Kata kunci pencarian",
-        type: 3, // STRING
-        required: true,
-      },
-      {
-        name: "page",
-        description: "Nomor halaman",
-        type: 4, // INTEGER
-        required: false,
-      },
-    ],
-  },
+
   {
     name: "add",
     description: "➕ Tambah manga baru ke whitelist (khusus admin)",
