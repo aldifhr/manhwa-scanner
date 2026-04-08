@@ -356,9 +356,10 @@ export default async function handler(req, res) {
           });
         }
 
+        // Use DEFERRED_UPDATE_MESSAGE (type 6) for component interactions
+        // This allows us to update the original message with the button
         res.json({
-          type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { flags: 64 },
+          type: 6, // DEFERRED_UPDATE_MESSAGE
         });
 
         // Use statically imported functions (no dynamic import)
