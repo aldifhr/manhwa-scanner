@@ -1,9 +1,8 @@
 import { isCronAuthorized } from "../lib/auth.js";
 import { appendCronLog, buildCronErrorLog } from "../lib/cronLogs.js";
 import { runCronJob, shouldRunChannelValidation } from "../lib/cronRuntime.js";
-import { loggers } from "../lib/logger.js";
+import { loggers, logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getAllGuildChannels, redis, writeCronStatus } from "../lib/redis.js";
-import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
 import { z } from "zod";
@@ -13,15 +12,16 @@ import {
 } from "../lib/api/response.js";
 
 // Validation schemas
+// "links" is alias for "health" (backward compatibility)
 const cronQuerySchema = z.object({
   action: z.enum(["update", "health", "links"]).default("update"),
 });
 
 const validMethods = ["GET", "POST"];
+const MAX_DEAD_LINKS_DISPLAY = 15;
 
-// Use literal value for Vercel compatibility
-// CRON_MAX_DURATION_SEC is 300 (5 min) by default, but FastCron free tier is 30s
-export const config = { maxDuration: 30 };
+// Use env variable for max duration, fallback to 30s (FastCron free tier)
+export const config = { maxDuration: Number(process.env.CRON_MAX_DURATION ?? 30) };
 const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
@@ -94,6 +94,7 @@ async function handleUpdateCron(req, res, reqLogger) {
 async function handleHealthCron(req, res, reqLogger) {
   const start = Date.now();
   logger.info("Starting scheduled link health check...");
+
   try {
     const deadLinks = await performFullHealthCheck();
     const duration = ((Date.now() - start) / 1000).toFixed(1);
@@ -106,12 +107,12 @@ async function handleHealthCron(req, res, reqLogger) {
 
       if (channelIds.length > 0) {
         const deadListStr = deadLinks
-          .slice(0, 15)
+          .slice(0, MAX_DEAD_LINKS_DISPLAY)
           .map((d) => `• **${d.title}** (${d.source}): ${d.url}`)
           .join("\n");
         const suffix =
-          deadLinks.length > 15
-            ? `\n...dan ${deadLinks.length - 15} lainnya.`
+          deadLinks.length > MAX_DEAD_LINKS_DISPLAY
+            ? `\n...dan ${deadLinks.length - MAX_DEAD_LINKS_DISPLAY} lainnya.`
             : "";
         const embed = {
           title: "⚠️ Laporan Link Mati (Bi-Weekly)",
@@ -144,6 +145,31 @@ async function handleHealthCron(req, res, reqLogger) {
     );
   } catch (err) {
     logger.error({ err: err.message }, "Scheduled link check failed");
+
+    // Log error to Redis (consistent with handleUpdateCron)
+    await writeCronStatus(redis, {
+      sent: 0,
+      skipped: 0,
+      failed: 1,
+      duration: null,
+      guilds: 0,
+      timestamp: new Date().toISOString(),
+      sourceHealth: {},
+      scrapeMetrics: null,
+      outcome: "fatal_error",
+      shortCircuitReason: "health_check_failed",
+      error: err?.message || "Health check failed",
+    }).catch((e) => console.error("[cron] Failed to write status:", e.message));
+
+    await appendCronLog(
+      redis,
+      buildCronErrorLog(err, {
+        code: "health_check_fatal",
+        type: "runtime_error",
+        source: "health",
+      }),
+    ).catch((e) => console.error("[cron] Failed to append cron log:", e.message));
+
     logApiError(reqLogger, err, { status: 500 });
     return res
       .status(500)
