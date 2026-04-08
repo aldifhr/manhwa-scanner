@@ -29,31 +29,6 @@ const commands = [
   {
     name: "status",
     description: "Lihat status whitelist saat ini",
-    options: [
-      {
-        type: 4, // INTEGER
-        name: "page",
-        description: "Halaman ke-berapa",
-        required: false,
-      },
-      {
-        type: 3, // STRING
-        name: "search",
-        description: "Cari judul tertentu",
-        required: false,
-      },
-      {
-        type: 3, // STRING
-        name: "filter",
-        description: "Filter berdasarkan status (hiatus, end_season, end)",
-        required: false,
-        choices: [
-          { name: "Hiatus", value: "hiatus" },
-          { name: "End Season", value: "end_season" },
-          { name: "End", value: "end" },
-        ],
-      },
-    ],
   },
   {
     name: "add",
@@ -75,18 +50,6 @@ const commands = [
         type: 3, // STRING
         name: "query",
         description: "Judul, URL, atau nomor urut di whitelist",
-        required: true,
-      },
-    ],
-  },
-  {
-    name: "search",
-    description: "Cari manga di whitelist",
-    options: [
-      {
-        type: 3, // STRING
-        name: "query",
-        description: "Judul atau URL",
         required: true,
       },
     ],
@@ -150,30 +113,6 @@ const commands = [
         name: "user",
         description: "User yang ingin dikelola",
         required: false,
-      },
-    ],
-  },
-  {
-    name: "pref",
-    description: "Atur preferensi notifikasi (ping/tag)",
-    options: [
-      {
-        type: 1, // SUB_COMMAND
-        name: "ping",
-        description: "Pengaturan notifikasi tag",
-        options: [
-          {
-            type: 3, // STRING
-            name: "mode",
-            description: "Pilih mode notifikasi",
-            required: false,
-            choices: [
-              { name: "🔔 Semua Update (Tag All)", value: "all" },
-              { name: "⭐ Hanya Follow (Tag Follows)", value: "follows" },
-              { name: "🔕 Nonaktif (No Tag)", value: "none" },
-            ],
-          },
-        ],
       },
     ],
   },
