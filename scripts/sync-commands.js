@@ -81,7 +81,16 @@ const commands = [
 
   {
     name: "setchannel",
-    description: "Set channel ini sebagai tempat notifikasi",
+    description: "Set channel untuk notifikasi manga",
+    options: [
+      {
+        type: 7, // CHANNEL
+        name: "channel",
+        description: "Pilih channel untuk notifikasi",
+        required: true,
+        channel_types: [0], // 0 = text channel only
+      },
+    ],
   },
   {
     name: "clear",
