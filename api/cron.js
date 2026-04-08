@@ -44,6 +44,7 @@ async function handleUpdateCron(req, res, reqLogger) {
         sourceHealth: result.body?.sourceHealth,
         scrapeMetrics: result.body?.scrapeMetrics,
         timingMetrics: result.body?.timingMetrics,
+        error: result.body?.error,
       },
       timestamp: new Date().toISOString(),
     };
