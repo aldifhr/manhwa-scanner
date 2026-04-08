@@ -6,7 +6,7 @@ import {
   writeObjectCache,
 } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
-import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
+import { prepareAuthorizedGet } from "../lib/api/response.js";
 import { LOGS_API_CACHE_KEY, RECENT_API_CACHE_KEY } from "../lib/cacheKeys.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
 import { LOGS_CACHE_SEC, RECENT_CACHE_SEC } from "../lib/config.js";

@@ -1,6 +1,6 @@
 import { readStatusCache, redis, writeStatusCache } from "../lib/redis.js";
 import { logApiHit } from "../lib/logger.js";
-import { prepareAuthorizedGet } from "../lib/api/getEndpoint.js";
+import { prepareAuthorizedGet } from "../lib/api/response.js";
 import { readCronStatusWithHealth } from "../lib/cronRuntime.js";
 
 import { STATUS_CACHE_SEC } from "../lib/config.js";
