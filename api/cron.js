@@ -21,7 +21,7 @@ const validMethods = ["GET", "POST"];
 const MAX_DEAD_LINKS_DISPLAY = 15;
 
 // Use env variable for max duration, fallback to 30s (FastCron free tier)
-export const config = { maxDuration: Number(process.env.CRON_MAX_DURATION ?? 30) };
+export const config = { maxDuration: 30 };
 const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
