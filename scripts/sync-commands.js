@@ -129,10 +129,6 @@ const commands = [
     name: "health",
     description: "Cek status kesehatan scraper/situs sumber",
   },
-  {
-    name: "myprogress",
-    description: "Lihat history chapter yang sudah kamu baca/notifikasi",
-  },
 
   {
     name: "permission",
