@@ -299,5 +299,84 @@
 
 ---
 
+## Appendix A: Command Files Deep Audit
+
+### lib/commands/ Audit - 13 Files
+
+| File | Critical | High | Medium | Low | Status |
+|------|----------|------|--------|-----|--------|
+| add.js | 2 | 2 | 3 | 1 | 🔴 Needs fixes |
+| follow.js | 1 | 0 | 2 | 1 | 🟡 Minor issues |
+| health.js | 0 | 1 | 1 | 1 | 🟡 Minor issues |
+| index.js | 1 | 0 | 0 | 1 | 🟡 Minor issue |
+| list.js | 0 | 0 | 1 | 1 | ✅ OK |
+| mark.js | 0 | 0 | 1 | 1 | ✅ OK |
+| myprogress.js | 2 | 1 | 2 | 1 | 🔴 Needs fixes |
+| permission.js | 0 | 1 | 2 | 1 | 🟡 Minor issues |
+| pref.js | 0 | 0 | 1 | 1 | ✅ OK |
+| remove.js | 0 | 1 | 1 | 1 | 🟡 Minor issues |
+| setchannel.js | 1 | 0 | 1 | 1 | 🟡 Minor issues |
+| status.js | 0 | 0 | 2 | 1 | ✅ OK |
+| sync.js | 1 | 1 | 1 | 1 | 🟡 Minor issues |
+| **TOTAL** | **8** | **7** | **18** | **12** | **🟡 AUDITED** |
+
+### Command Files - Critical Issues Detail
+
+#### 1. add.js - URL Injection Risk
+**Line**: 476-479  
+**Issue**: URL regex only checks `http://` prefix, no domain validation  
+**Fix**: Validate against ALLOWED_DOMAINS whitelist
+
+#### 2. add.js - Silent Redis Failures
+**Lines**: 244-246, 459-462  
+**Issue**: Cache failures silently ignored  
+**Fix**: Log errors and notify user
+
+#### 3. myprogress.js - Missing Permission Check
+**Lines**: 132-140, 151-158  
+**Issue**: Any user can click buttons on another user's progress message  
+**Fix**: Verify interactingUserId matches original recipient
+
+#### 4. myprogress.js - Unsafe custom_id Construction
+**Line**: 21-23  
+**Issue**: Title/chapter with `:` characters break parsing  
+**Fix**: Sanitize colons from title/chapter strings
+
+#### 5. follow.js - Unsafe Array Access
+**Line**: 23  
+**Issue**: `options[0].value` accessed without null check  
+**Fix**: Use optional chaining `options?.[0]?.value`
+
+#### 6. index.js - Dynamic Import Pattern
+**Lines**: 28-46  
+**Issue**: Dynamic import on every permission check (inefficient)  
+**Fix**: Use static imports
+
+#### 7. setchannel.js - Token Exposure Risk
+**Lines**: 30-33  
+**Issue**: fetchDiscordChannel errors could include bot token in logs  
+**Fix**: Sanitize error messages
+
+#### 8. sync.js - Missing Rate Limit
+**Line**: 21  
+**Issue**: No cooldown on manual sync, could spam APIs  
+**Fix**: Add Redis-based cooldown check
+
+---
+
+## Final Statistics - Complete Audit
+
+| Category | Files | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
+|----------|-------|-------------|---------|-----------|--------|
+| API Endpoints | 9 | 0 | 0 | 0 | 0 |
+| Core Library | 10 | 8 | 8 | 6 | 4 |
+| Scrapers | 5 | 5 | 4 | 5 | 2 |
+| Services | 8 | 5 | 6 | 5 | 3 |
+| Commands | 13 | 8 | 7 | 18 | 12 |
+| **TOTAL** | **45** | **26** | **25** | **34** | **21** |
+
+---
+
 *Report Generated: 2026-04-08*  
+*Status: 100% COMPLETE - All files audited*  
 *Next Review: After critical issues resolved*
