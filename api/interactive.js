@@ -4,6 +4,7 @@ import { redis } from "../lib/redis.js";
 import {
   editInteractionResponse,
   editInteractionResponseWithComponents,
+  sendEphemeralFollowUp,
 } from "../lib/discord.js";
 import commands from "../lib/commands/index.js";
 import {
@@ -372,26 +373,30 @@ export default async function handler(req, res) {
               if (following) {
                 await unfollowManga(userId, title);
                 try {
-                  return await editInteractionResponse(
+                  // Send ephemeral follow-up instead of editing the message
+                  // This keeps the original embed intact
+                  return await sendEphemeralFollowUp(
                     payload,
-                    `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.\n\nKlik "🔖 Bookmark" lagi untuk menambahkan bookmark.`,
+                    `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
                   );
                 } catch (editErr) {
                   logger.warn(
-                    `[follow_toggle] Failed to edit response (token expired?): ${editErr.message}`,
+                    `[follow_toggle] Failed to send follow-up: ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
               } else {
                 await followManga(userId, title);
                 try {
-                  return await editInteractionResponse(
+                  // Send ephemeral follow-up instead of editing the message
+                  // This keeps the original embed intact
+                  return await sendEphemeralFollowUp(
                     payload,
-                    `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔖 Bookmark" lagi untuk menghapus bookmark.`,
+                    `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
                   );
                 } catch (editErr) {
                   logger.warn(
-                    `[follow_toggle] Failed to edit response (token expired?): ${editErr.message}`,
+                    `[follow_toggle] Failed to send follow-up: ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
