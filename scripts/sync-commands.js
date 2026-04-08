@@ -213,6 +213,10 @@ const commands = [
       },
     ],
   },
+  {
+    name: "sync",
+    description: "Trigger sinkronisasi manual seperti cron job (Admin only)",
+  },
 ];
 
 async function sync() {

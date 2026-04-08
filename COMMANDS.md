@@ -47,7 +47,7 @@
 
 | Command | Options | Function | Access |
 |---------|---------|----------|--------|
-| `/sync` | `mode:<quick/deep>` `[broadcast:<true/false>]` `[dry_run:<true/false>]` `[max_send:<n>]` | Sinkronisasi manual whitelist | Admin only |
+| `/sync` | - | Trigger sinkronisasi manual seperti cron job | Admin only |
 | `/status report` | - | Lihat laporan status bot lengkap | Admin only |
 | `/status perm_add` | `user_id:<id>` | Grant akses /add ke user | Owner only |
 | `/status perm_remove` | `user_id:<id>` | Revoke akses /add dari user | Owner only |
@@ -55,10 +55,6 @@
 | `/permission` | `user:<@user>` `action:<grant/revoke>` | Kelola permission admin (alternatif) | Owner only |
 | `/health` | - | Cek kesehatan sistem bot | Admin only |
 | `/clear` | - | Hapus SELURUH whitelist (DANGER!) | Owner only |
-
-### Mode Sync:
-- `quick` - Cek chapter baru saja (cepat)
-- `deep` - Resync metadata lengkap (lambat)
 
 ---
 
@@ -85,7 +81,7 @@
 /remove query:1
 /mark query:Solo Leveling reason:hiatus
 /setchannel channel:#manga-updates
-/sync mode:quick broadcast:true
+/sync
 /status report
 
 # Owner Commands
