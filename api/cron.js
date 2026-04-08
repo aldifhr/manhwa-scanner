@@ -65,7 +65,7 @@ async function handleUpdateCron(req, res, reqLogger) {
       error: err?.message || "Internal error",
     };
     await writeCronStatus(redis, statusPayload).catch((err) => {
-      console.error("[cron] Failed to write status:", err.message);
+      logger.error("[cron] Failed to write status:", err.message);
     });
     await appendCronLog(
       redis,
@@ -75,7 +75,7 @@ async function handleUpdateCron(req, res, reqLogger) {
         source: "cron",
       }),
     ).catch((err) => {
-      console.error("[cron] Failed to append cron log:", err.message);
+      logger.error("[cron] Failed to append cron log:", err.message);
     });
     logApiError(reqLogger, err, { status: 500 });
     return res
@@ -159,7 +159,7 @@ async function handleHealthCron(req, res, reqLogger) {
       outcome: "fatal_error",
       shortCircuitReason: "health_check_failed",
       error: err?.message || "Health check failed",
-    }).catch((e) => console.error("[cron] Failed to write status:", e.message));
+    }).catch((e) => logger.error("[cron] Failed to write status:", e.message));
 
     await appendCronLog(
       redis,
@@ -168,7 +168,7 @@ async function handleHealthCron(req, res, reqLogger) {
         type: "runtime_error",
         source: "health",
       }),
-    ).catch((e) => console.error("[cron] Failed to append cron log:", e.message));
+    ).catch((e) => logger.error("[cron] Failed to append cron log:", e.message));
 
     logApiError(reqLogger, err, { status: 500 });
     return res

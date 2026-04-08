@@ -7,6 +7,7 @@ import {
 } from "../lib/redis.js";
 import { SOURCE_KEYS } from "../lib/services/health.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
+import { getLogger } from "../lib/logger.js";
 import { isMonitorAuthorized } from "../lib/auth.js";
 import { INCIDENT_CACHE_TTL } from "../lib/config.js";
 import {
@@ -22,6 +23,8 @@ import {
 
 // Named constant for 24h cutoff
 const LAST_24H_CUTOFF_DAYS = 1;
+
+const logger = getLogger({ scope: "api" });
 
 export const config = { maxDuration: 30 };
 
@@ -101,7 +104,7 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
 
     return incidents;
   } catch (err) {
-    console.error("[incidents] Error fetching cron incidents:", err);
+    logger.error("[incidents] Error fetching cron incidents:", err);
     return [];
   }
 }
@@ -162,7 +165,7 @@ async function fetchHealthIncidents(redisClient, daysBack = 30) {
 
     return incidents;
   } catch (err) {
-    console.error("[incidents] Error fetching health incidents:", err);
+    logger.error("[incidents] Error fetching health incidents:", err);
     return [];
   }
 }
@@ -213,7 +216,7 @@ async function fetchDiscordIncidents(redisClient, daysBack = 30) {
 
     return incidents;
   } catch (err) {
-    console.error("[incidents] Error fetching Discord incidents:", err);
+    logger.error("[incidents] Error fetching Discord incidents:", err);
     return [];
   }
 }

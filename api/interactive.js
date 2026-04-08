@@ -11,6 +11,7 @@ import {
   resolveAddResultValue,
 } from "../lib/commands/add.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
+import { getLogger } from "../lib/logger.js";
 import { normalizeSource } from "../lib/domain.js";
 import { isAddAllowedUser } from "../lib/permissions.js";
 import {
@@ -35,6 +36,8 @@ import {
 function getUserId(payload) {
   return payload.member?.user?.id ?? payload.user?.id;
 }
+
+const logger = getLogger({ scope: "api" });
 
 export const config = { api: { bodyParser: false } };
 
@@ -64,7 +67,7 @@ async function handleAddManga(payload, title, url = null, source = "ikiru") {
       }),
     );
   } catch (err) {
-    console.error("[handleAddManga] Error:", err);
+    logger.error("[handleAddManga] Error:", err);
     // Generic error message for user, details logged to server
     await editInteractionResponse(
       payload,
@@ -380,7 +383,7 @@ export default async function handler(req, res) {
                     `🔕 **Unfollowed**\n\nKamu berhenti mengikuti **${title}**.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-follow'}.\n\nKlik "🔔 Follow Updates" lagi untuk mengikuti kembali.`,
                   );
                 } catch (editErr) {
-                  console.warn(
+                  logger.warn(
                     `[follow_toggle] Failed to edit response (token expired?): ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
@@ -393,21 +396,21 @@ export default async function handler(req, res) {
                     `🔔 **Now Following**\n\nKamu mengikuti **${title}**!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔔 Follow Updates" lagi untuk berhenti mengikuti.`,
                   );
                 } catch (editErr) {
-                  console.warn(
+                  logger.warn(
                     `[follow_toggle] Failed to edit response (token expired?): ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
               }
             } catch (err) {
-              console.error("[follow_toggle] Error:", err);
+              logger.error("[follow_toggle] Error:", err);
               try {
                 return await editInteractionResponse(
                   payload,
                   "❌ Gagal memproses toggle. Silakan coba lagi.",
                 );
               } catch (editErr) {
-                console.warn(
+                logger.warn(
                   `[follow_toggle] Failed to edit error response: ${editErr.message}`,
                 );
                 return; // Silent fail
@@ -456,7 +459,7 @@ export default async function handler(req, res) {
         createErrorResponse("UNKNOWN_INTERACTION_TYPE", "Unknown interaction type"),
       );
   } catch (err) {
-    console.error("[interactive] Unhandled error:", err);
+    logger.error("[interactive] Unhandled error:", err);
     logApiError(reqLogger, err, { status: 500 });
     if (!res.headersSent) {
       return res

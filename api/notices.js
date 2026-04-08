@@ -5,6 +5,7 @@ import {
 } from "../lib/redis.js";
 import { SOURCE_KEYS } from "../lib/services/health.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
+import { getLogger } from "../lib/logger.js";
 import { isMonitorAuthorized } from "../lib/auth.js";
 import {
   getCutoffTime,
@@ -23,6 +24,8 @@ const NOTICES_DISPLAY_LIMIT = 50;
 const NOTICES_DEFAULT_DAYS = 30;
 const NOTICES_MAX_DAYS = 90;
 const DISCORD_FAILURES_FETCH_LIMIT = 100;
+
+const logger = getLogger({ scope: "api" });
 
 export const config = { maxDuration: 30 };
 
@@ -79,7 +82,7 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
 
     return errors;
   } catch (err) {
-    console.error("[notices] Error fetching cron logs:", err);
+    logger.error("[notices] Error fetching cron logs:", err);
     return [];
   }
 }
@@ -124,7 +127,7 @@ async function fetchHealthCheckFailures(redisClient, daysBack = 7) {
 
     return failures;
   } catch (err) {
-    console.error("[notices] Error fetching health checks:", err);
+    logger.error("[notices] Error fetching health checks:", err);
     return [];
   }
 }
@@ -173,7 +176,7 @@ async function fetchDiscordNotificationFailures(redisClient, daysBack = 7) {
 
     return failures;
   } catch (err) {
-    console.error("[notices] Error fetching Discord failures:", err);
+    logger.error("[notices] Error fetching Discord failures:", err);
     return [];
   }
 }

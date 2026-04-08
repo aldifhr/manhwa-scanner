@@ -3,6 +3,7 @@ import { SOURCE_KEYS } from "../lib/services/health.js";
 import { readCronStatusWithHealth } from "../lib/cronRuntime.js";
 import { readCronDailyStats } from "../lib/cronLogs.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
+import { getLogger } from "../lib/logger.js";
 import { HEALTH_CACHE_TTL_MS } from "../lib/config.js";
 
 // Source name mapping - cleaner than if-else chain
@@ -17,7 +18,7 @@ async function getGuildCount(redisClient) {
     const count = await redisClient.get("discord:guilds:count");
     return count ? parseInt(count, 10) : null;
   } catch (err) {
-    console.error("[health-status] Error fetching guild count:", err);
+    logger.error("[health-status] Error fetching guild count:", err);
     return null;
   }
 }
@@ -31,6 +32,8 @@ async function measureRedisPing(redisClient) {
     return null;
   }
 }
+
+const logger = getLogger({ scope: "api" });
 
 export const config = { maxDuration: 30 };
 
@@ -68,7 +71,7 @@ export default async function handler(req, res) {
         parsed = JSON.parse(cached);
       } else {
         // Invalid cache data, skip cache
-        console.warn(
+        logger.warn(
           "[health-status] Invalid cache data:",
           String(cached).slice(0, 100),
         );
@@ -234,7 +237,7 @@ export default async function handler(req, res) {
     logApiOk(reqLogger, { status: 200, cached: false });
     return res.status(200).json(payload);
   } catch (err) {
-    console.error("[health-status] Error:", err);
+    logger.error("[health-status] Error:", err);
     logApiError(reqLogger, err, { status: 500 });
     return res.status(500).json({
       error: "Internal error",
