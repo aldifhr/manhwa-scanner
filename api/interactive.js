@@ -337,6 +337,14 @@ export default async function handler(req, res) {
       }
 
       if (custom_id.startsWith("follow_toggle:")) {
+        // Debug: log token presence
+        logger.debug({
+          hasToken: !!payload.token,
+          tokenType: typeof payload.token,
+          tokenLength: payload.token?.length,
+          interactionType: payload.type,
+        }, "[follow_toggle] Payload token check");
+
         // Use helper function for consistent user ID extraction
         const userId = getUserId(payload);
         const title = custom_id.slice("follow_toggle:".length);
