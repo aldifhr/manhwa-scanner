@@ -40,6 +40,14 @@ export const config = { maxDuration: 30 };
 // Versioned cache key to avoid collision between environments
 const HEALTH_STATUS_CACHE_KEY = "api:health-status:cache:v1";
 
+// Calculate uptime string based on consecutive failures
+function calculateUptime(failures) {
+  if (!failures || failures === 0) return "100.00%";
+  if (failures === 1) return "99.90%";
+  if (failures === 2) return "99.80%";
+  return `${Math.max(0, 99 - failures).toFixed(2)}%`;
+}
+
 // Calculate actual uptime percentage from daily stats
 function calculateUptimeFromStats(dailyStats) {
   if (!dailyStats || dailyStats.length === 0) return "99.99%";
