@@ -13,13 +13,28 @@ import {
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { normalizeSource } from "../lib/domain.js";
 import { isAddAllowedUser } from "../lib/permissions.js";
-import { addWhitelistEntry } from "../lib/services/whitelist.js";
 import {
+  addWhitelistEntry,
   buildAddExistsMessage,
   buildAddSuccessMessage,
   buildWhitelistListResponse,
 } from "../lib/services/whitelist.js";
+import {
+  isUserFollowing,
+  followManga,
+  unfollowManga,
+  getUserNotifyMode,
+} from "../lib/services/notifications.js";
 import { discordInteractionSchema, safeParse } from "../lib/validation.js";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+} from "../lib/api/response.js";
+
+// Helper to get user ID from payload (consistent pattern)
+function getUserId(payload) {
+  return payload.member?.user?.id ?? payload.user?.id;
+}
 
 export const config = { api: { bodyParser: false } };
 
@@ -50,7 +65,11 @@ async function handleAddManga(payload, title, url = null, source = "ikiru") {
     );
   } catch (err) {
     console.error("[handleAddManga] Error:", err);
-    await editInteractionResponse(payload, `Error: ${err.message}`);
+    // Generic error message for user, details logged to server
+    await editInteractionResponse(
+      payload,
+      "❌ Gagal menambahkan manga. Silakan coba lagi atau hubungi admin.",
+    );
   }
 }
 
@@ -142,9 +161,10 @@ export default async function handler(req, res) {
 
     const { type, data: interactionData } = payload;
 
-    if (type === 1) {
-      logApiOk(reqLogger, { status: 200, interactionType: type });
-      return res.json({ type: 1 });
+    // Use InteractionType constants consistently
+    if (type === InteractionType.PING) {
+      logApiOk(reqLogger, { status: 200, interactionType: "PING" });
+      return res.json({ type: InteractionType.PING });
     }
 
     if (type === InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE) {
@@ -156,12 +176,18 @@ export default async function handler(req, res) {
           event: "autocomplete_ignored",
           command: name,
         });
-        return res.json({ type: 8, data: { choices: [] } });
+        return res.json({
+          type: InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE,
+          data: { choices: [] },
+        });
       }
 
       if (!(await isAddAllowedUser(payload, redis))) {
         logApiOk(reqLogger, { status: 200, event: "autocomplete_add_denied" });
-        return res.json({ type: 8, data: { choices: [] } });
+        return res.json({
+          type: InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE,
+          data: { choices: [] },
+        });
       }
 
       const choices = await buildAddAutocompleteChoices(options, redis);
@@ -171,7 +197,10 @@ export default async function handler(req, res) {
         event: "autocomplete_add",
         count: choices.length,
       });
-      return res.json({ type: 8, data: { choices } });
+      return res.json({
+        type: InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE,
+        data: { choices },
+      });
     }
 
     if (type === InteractionType.MESSAGE_COMPONENT) {
@@ -214,7 +243,10 @@ export default async function handler(req, res) {
           });
         }
 
-        res.json({ type: 5, data: { flags: 64 } });
+        res.json({
+          type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { flags: 64 },
+        });
         logApiOk(reqLogger, { status: 200, event: "add_selection_ack" });
         return waitUntil(
           handleAddManga(
@@ -228,6 +260,11 @@ export default async function handler(req, res) {
 
       if (custom_id.startsWith("list:")) {
         const parts = custom_id.split(":");
+        // Bounds check: need at least 2 parts ("list:page")
+        if (parts.length < 2) {
+          logApiOk(reqLogger, { status: 400, reason: "invalid_list_format" });
+          return res.status(400).json({ error: "Invalid list format" });
+        }
         const page = parseInt(parts[1], 10) || 1;
         const remainder = parts.slice(2).join(":");
 
@@ -244,7 +281,7 @@ export default async function handler(req, res) {
           }
         }
 
-        res.json({ type: 6 });
+        res.json({ type: InteractionType.DEFERRED_UPDATE_MESSAGE });
         return waitUntil(
           handleListResponse(payload, page, reqLogger, "list_component", {
             search: search || null,
@@ -254,9 +291,17 @@ export default async function handler(req, res) {
       }
       if (custom_id.startsWith("myprogress:")) {
         const parts = custom_id.split(":");
+        // Bounds check
+        if (parts.length < 2) {
+          logApiOk(reqLogger, {
+            status: 400,
+            reason: "invalid_progress_format",
+          });
+          return res.status(400).json({ error: "Invalid progress format" });
+        }
         const page = parseInt(parts[1], 10) || 1;
 
-        res.json({ type: 6 });
+        res.json({ type: InteractionType.DEFERRED_UPDATE_MESSAGE });
         const handleProgress = commands["myprogress"];
         if (handleProgress) {
           return waitUntil(
@@ -270,15 +315,17 @@ export default async function handler(req, res) {
         }
       }
       if (custom_id.startsWith("follow:list:")) {
-        void custom_id.split(":");
+        // Parse page from custom_id: "follow:list:page"
+        const parts = custom_id.split(":");
+        const page = parts.length >= 3 ? parseInt(parts[2], 10) || 1 : 1;
 
-        res.json({ type: 6 });
+        res.json({ type: InteractionType.DEFERRED_UPDATE_MESSAGE });
         const handleFollow = commands["follow"];
         if (handleFollow) {
           return waitUntil(
             handleFollow(
               payload,
-              [{ name: "button", value: custom_id }],
+              [{ name: "button", value: custom_id }, { name: "page", value: page }],
               res,
               redis,
             ),
@@ -289,38 +336,39 @@ export default async function handler(req, res) {
       if (custom_id.startsWith("read:") || custom_id.startsWith("unread:")) {
         const handleProgress = commands["myprogress"];
         if (handleProgress) {
-          return handleProgress(
-            payload,
-            [{ name: "button", value: custom_id }],
-            res,
-            redis,
+          // Use waitUntil to ensure Vercel doesn't kill the function
+          return waitUntil(
+            handleProgress(
+              payload,
+              [{ name: "button", value: custom_id }],
+              res,
+              redis,
+            ),
           );
         }
       }
 
       if (custom_id.startsWith("follow_toggle:")) {
-        const userId = payload.member?.user?.id ?? payload.user?.id;
+        // Use helper function for consistent user ID extraction
+        const userId = getUserId(payload);
         const title = custom_id.slice("follow_toggle:".length);
 
         if (!userId) {
           return res.json({
-            type: 4,
+            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: { content: "❌ Error: Could not identify user.", flags: 64 },
           });
         }
 
-        res.json({ type: 5, data: { flags: 64 } });
+        res.json({
+          type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { flags: 64 },
+        });
 
+        // Use statically imported functions (no dynamic import)
         return waitUntil(
           (async () => {
             try {
-              const {
-                isUserFollowing,
-                followManga,
-                unfollowManga,
-                getUserNotifyMode,
-              } = await import("../lib/services/notifications.js");
-
               const following = await isUserFollowing(userId, title);
               const notifyMode = await getUserNotifyMode(userId);
 
@@ -356,7 +404,7 @@ export default async function handler(req, res) {
               try {
                 return await editInteractionResponse(
                   payload,
-                  `❌ Gagal memproses: ${err.message}`,
+                  "❌ Gagal memproses toggle. Silakan coba lagi.",
                 );
               } catch (editErr) {
                 console.warn(
@@ -370,7 +418,9 @@ export default async function handler(req, res) {
       }
 
       logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
-      return res.status(400).json({ error: "Unknown component" });
+      return res
+        .status(400)
+        .json(createErrorResponse("UNKNOWN_COMPONENT", "Unknown component"));
     }
 
     if (type === InteractionType.APPLICATION_COMMAND) {
@@ -384,7 +434,9 @@ export default async function handler(req, res) {
           reason: "unknown_command",
           command: name,
         });
-        return res.status(400).json({ error: "Unknown command" });
+        return res
+          .status(400)
+          .json(createErrorResponse("UNKNOWN_COMMAND", "Unknown command"));
       }
 
       logApiOk(reqLogger, {
@@ -398,12 +450,18 @@ export default async function handler(req, res) {
     logApiError(reqLogger, new Error("Unknown interaction type"), {
       status: 400,
     });
-    return res.status(400).json({ error: "Unknown interaction type" });
+    return res
+      .status(400)
+      .json(
+        createErrorResponse("UNKNOWN_INTERACTION_TYPE", "Unknown interaction type"),
+      );
   } catch (err) {
     console.error("[interactive] Unhandled error:", err);
     logApiError(reqLogger, err, { status: 500 });
     if (!res.headersSent) {
-      return res.status(500).json({ error: "Internal server error" });
+      return res
+        .status(500)
+        .json(createErrorResponse("INTERNAL_ERROR", "Internal server error"));
     }
   }
 }

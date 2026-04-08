@@ -1,13 +1,28 @@
-import { loadSourceHealthSnapshot, redis } from "../lib/redis.js";
+import {
+  loadSourceHealthSnapshot,
+  redis,
+  readCronLogs,
+} from "../lib/redis.js";
 import { SOURCE_KEYS } from "../lib/services/health.js";
-import { readCronLogs } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { isMonitorAuthorized } from "../lib/auth.js";
 import {
   getCutoffTime,
   getTimestampMs,
   sortByDateDesc,
+  isValidDate,
 } from "../lib/dateUtils.js";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+} from "../lib/api/response.js";
+
+// Consistent limits with incidents.js
+const NOTICES_FETCH_LIMIT = 200;
+const NOTICES_DISPLAY_LIMIT = 50;
+const NOTICES_DEFAULT_DAYS = 30;
+const NOTICES_MAX_DAYS = 90;
+const DISCORD_FAILURES_FETCH_LIMIT = 100;
 
 export const config = { maxDuration: 30 };
 
@@ -15,13 +30,15 @@ const DISCORD_NOTIFICATION_FAILURES_KEY = "discord:notification_failures";
 
 async function fetchCronErrorLogs(redisClient, daysBack = 7) {
   try {
-    const logs = await readCronLogs(redisClient, 0, 99);
+    // Consistent with incidents.js (fetch 200)
+    const logs = await readCronLogs(redisClient, 0, NOTICES_FETCH_LIMIT - 1);
     if (!logs || !Array.isArray(logs)) return [];
 
     const cutoffTime = getCutoffTime(daysBack);
     const errors = [];
 
-    for (const log of logs) {
+    for (let index = 0; index < logs.length; index++) {
+      const log = logs[index];
       try {
         const entry = typeof log === "string" ? JSON.parse(log) : log;
         const timestamp = entry.timestamp || entry.createdAt;
@@ -35,8 +52,9 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
           entry.deliveryFailed > 0 ||
           entry.result === "failed"
         ) {
+          // Add index to prevent ID collision
           errors.push({
-            id: `cron-${entry.timestamp || Date.now()}`,
+            id: `cron-${entry.timestamp || Date.now()}-${index}`,
             type: "cron_error",
             severity: entry.deliveryFailed > 0 ? "high" : "medium",
             title: entry.title || "Cron Job Error",
@@ -116,10 +134,11 @@ async function fetchDiscordNotificationFailures(redisClient, daysBack = 7) {
     const cutoffTime = getCutoffTime(daysBack);
     const failures = [];
 
+    // Consistent with incidents.js (fetch 100)
     const recentFailures = await redisClient.lrange(
       DISCORD_NOTIFICATION_FAILURES_KEY,
       0,
-      49,
+      DISCORD_FAILURES_FETCH_LIMIT - 1,
     );
 
     if (!recentFailures || !Array.isArray(recentFailures)) return [];
@@ -173,31 +192,27 @@ function determineStatus(notices) {
 export default async function handler(req, res) {
   const reqLogger = logApiHit("notices", req);
 
-  if (!isMonitorAuthorized(req)) {
-    logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: "UNAUTHORIZED",
-        message: "Unauthorized",
-      },
-      timestamp: new Date().toISOString(),
-    });
+  // Method check first (consistent with other handlers)
+  if (req.method !== "GET") {
+    logApiOk(reqLogger, { status: 405, reason: "method_not_allowed" });
+    return res
+      .status(405)
+      .json(createErrorResponse("METHOD_NOT_ALLOWED", "Method not allowed"));
   }
 
-  if (req.method !== "GET") {
-    return res.status(405).json({
-      success: false,
-      error: {
-        code: "METHOD_NOT_ALLOWED",
-        message: "Method not allowed",
-      },
-      timestamp: new Date().toISOString(),
-    });
+  if (!isMonitorAuthorized(req)) {
+    logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
+    return res
+      .status(401)
+      .json(createErrorResponse("UNAUTHORIZED", "Unauthorized"));
   }
 
   try {
-    const daysBack = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+    // Consistent daysBack cap with incidents.js
+    const daysBack = Math.min(
+      NOTICES_MAX_DAYS,
+      Math.max(1, Number(req.query.days) || NOTICES_DEFAULT_DAYS),
+    );
 
     const [cronErrors, healthFailures, discordFailures] = await Promise.all([
       fetchCronErrorLogs(redis, daysBack),
@@ -209,47 +224,41 @@ export default async function handler(req, res) {
     const sortedNotices = sortByDateDesc(
       [...cronErrors, ...healthFailures, ...discordFailures],
       "timestamp",
-    ).slice(0, 50);
+    ).slice(0, NOTICES_DISPLAY_LIMIT);
 
-    // Pre-compute timestamps and dates for grouping
-    const allNotices = sortedNotices.map((notice) => ({
-      ...notice,
-      _timestampMs: getTimestampMs(notice.timestamp),
-      _date: notice.timestamp.split("T")[0],
-    }));
+    // Pre-compute timestamps and dates for grouping with safe null check
+    const noticesWithMeta = sortedNotices.map((notice) => {
+      const timestamp = notice.timestamp;
+      const timestampMs = isValidDate(timestamp) ? getTimestampMs(timestamp) : 0;
+      const date = timestamp && timestamp.split ? timestamp.split("T")[0] : "unknown";
+      return { notice, timestampMs, date };
+    });
 
-    // Group by date using pre-computed _date
-    const groupedByDate = allNotices.reduce((acc, notice) => {
-      if (!acc[notice._date]) acc[notice._date] = [];
-      acc[notice._date].push(notice);
+    // Group by date using pre-computed date
+    const groupedByDate = noticesWithMeta.reduce((acc, { notice, date }) => {
+      if (!acc[date]) acc[date] = [];
+      acc[date].push(notice);
       return acc;
     }, {});
 
-    // Clean up temporary properties
-    allNotices.forEach((notice) => {
-      delete notice._timestampMs;
-      delete notice._date;
-    });
+    // Extract clean notices (without temp properties)
+    const allNotices = noticesWithMeta.map(({ notice }) => notice);
 
     const status = determineStatus(allNotices);
     const hasNotices = allNotices.length > 0;
 
     const response = {
-      success: true,
-      data: {
-        hasNotices,
-        status, // 'healthy', 'warning', 'critical'
-        daysBack,
-        totalCount: allNotices.length,
-        byType: {
-          cronErrors: cronErrors.length,
-          healthFailures: healthFailures.length,
-          discordFailures: discordFailures.length,
-        },
-        notices: allNotices,
-        groupedByDate,
+      hasNotices,
+      status, // 'healthy', 'warning', 'critical'
+      daysBack,
+      totalCount: allNotices.length,
+      byType: {
+        cronErrors: cronErrors.length,
+        healthFailures: healthFailures.length,
+        discordFailures: discordFailures.length,
       },
-      timestamp: new Date().toISOString(),
+      notices: allNotices,
+      groupedByDate,
     };
 
     logApiOk(reqLogger, {
@@ -259,18 +268,18 @@ export default async function handler(req, res) {
       hasHealthFailures: healthFailures.length > 0,
     });
 
-    return res.status(200).json(response);
+    return res.status(200).json(createSuccessResponse(response));
   } catch (err) {
-    console.error("[notices] API error:", err);
-    logApiError(reqLogger, err);
-
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: "INTERNAL_ERROR",
-        message: "Failed to fetch notices",
-      },
-      timestamp: new Date().toISOString(),
-    });
+    logApiError(reqLogger, err, { status: 500 });
+    return res
+      .status(500)
+      .json(
+        createErrorResponse(
+          "NOTICES_FETCH_FAILED",
+          process.env.NODE_ENV === "production"
+            ? "Failed to fetch notices"
+            : err.message,
+        ),
+      );
   }
 }
