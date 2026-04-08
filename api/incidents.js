@@ -1,6 +1,11 @@
-import { readCronLogs, redis } from "../lib/redis.js";
+import {
+  readCronLogs,
+  redis,
+  loadSourceHealthSnapshot,
+  readObjectCache,
+  writeObjectCache,
+} from "../lib/redis.js";
 import { SOURCE_KEYS } from "../lib/services/health.js";
-import { loadSourceHealthSnapshot } from "../lib/redis.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { isMonitorAuthorized } from "../lib/auth.js";
 import { INCIDENT_CACHE_TTL } from "../lib/config.js";
@@ -10,6 +15,13 @@ import {
   isValidDate,
   sortByDateDesc,
 } from "../lib/dateUtils.js";
+import {
+  createErrorResponse,
+  createSuccessResponse,
+} from "../lib/api/response.js";
+
+// Named constant for 24h cutoff
+const LAST_24H_CUTOFF_DAYS = 1;
 
 export const config = { maxDuration: 30 };
 
@@ -35,7 +47,8 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
     const cutoffTime = getCutoffTime(daysBack);
     const incidents = [];
 
-    for (const log of logs) {
+    for (let index = 0; index < logs.length; index++) {
+      const log = logs[index];
       try {
         const entry = typeof log === "string" ? JSON.parse(log) : log;
         const timestamp = entry.timestamp || entry.createdAt;
@@ -59,8 +72,9 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
               ? "high"
               : "medium";
 
+        // Add index to prevent ID collision
         incidents.push({
-          id: `cron-${entry.timestamp || Date.now()}`,
+          id: `cron-${entry.timestamp || Date.now()}-${index}`,
           type: "cron_failure",
           severity: severity,
           title: entry.title || "Cron Job Failure",
@@ -92,6 +106,8 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
   }
 }
 
+// Note: This returns current health snapshot, not historical incidents
+// If service recovered, it won't appear here even if it failed earlier
 async function fetchHealthIncidents(redisClient, daysBack = 30) {
   try {
     const sourceHealth = await loadSourceHealthSnapshot(
@@ -104,6 +120,7 @@ async function fetchHealthIncidents(redisClient, daysBack = 30) {
     for (const [source, health] of Object.entries(sourceHealth)) {
       if (!health) continue;
 
+      // Only include currently failing sources (snapshot, not historical)
       if (
         (health.consecutiveFailures || 0) === 0 &&
         health.status !== "unhealthy"
@@ -201,17 +218,6 @@ async function fetchDiscordIncidents(redisClient, daysBack = 30) {
   }
 }
 
-function groupByDate(incidents) {
-  return incidents.reduce((acc, incident) => {
-    const timestampMs = getTimestampMs(incident.timestamp);
-    if (isNaN(timestampMs)) return acc;
-    const date = new Date(timestampMs).toISOString().split("T")[0];
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(incident);
-    return acc;
-  }, {});
-}
-
 function calculateStats(incidents) {
   const stats = {
     total: incidents.length,
@@ -247,32 +253,32 @@ function calculateStats(incidents) {
 export default async function handler(req, res) {
   const reqLogger = logApiHit("incidents", req);
 
-  if (!isMonitorAuthorized(req)) {
-    logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: "UNAUTHORIZED",
-        message: "Unauthorized",
-      },
-      timestamp: new Date().toISOString(),
-    });
+  // Method check first (consistent with other handlers)
+  if (req.method !== "GET") {
+    logApiOk(reqLogger, { status: 405, reason: "method_not_allowed" });
+    return res
+      .status(405)
+      .json(createErrorResponse("METHOD_NOT_ALLOWED", "Method not allowed"));
   }
 
-  if (req.method !== "GET") {
-    return res.status(405).json({
-      success: false,
-      error: {
-        code: "METHOD_NOT_ALLOWED",
-        message: "Method not allowed",
-      },
-      timestamp: new Date().toISOString(),
-    });
+  if (!isMonitorAuthorized(req)) {
+    logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
+    return res
+      .status(401)
+      .json(createErrorResponse("UNAUTHORIZED", "Unauthorized"));
   }
 
   try {
     const daysBack = Math.min(90, Math.max(1, Number(req.query.days) || 30));
     const includeResolved = req.query.resolved !== "false";
+
+    // Check cache first
+    const cacheKey = `${INCIDENT_CACHE_KEY}:${daysBack}:${includeResolved}`;
+    const cached = await readObjectCache(redis, cacheKey);
+    if (cached) {
+      logApiOk(reqLogger, { status: 200, cached: true });
+      return res.status(200).json(createSuccessResponse(cached));
+    }
 
     const [cronIncidents, healthIncidents, discordIncidents] =
       await Promise.all([
@@ -281,11 +287,11 @@ export default async function handler(req, res) {
         fetchDiscordIncidents(redis, daysBack),
       ]);
 
-    // Pre-compute timestamps and combine operations for efficiency
-    const allIncidents = [];
+    // Use safe wrapper approach (no mutation of original objects)
+    const wrappedIncidents = [];
     const groupedByDate = {};
     let last24hCount = 0;
-    const cutoff24h = getCutoffTime(0, 24);
+    const cutoff24h = getCutoffTime(LAST_24H_CUTOFF_DAYS);
 
     // Process all incidents in a single pass
     for (const incidents of [
@@ -295,75 +301,73 @@ export default async function handler(req, res) {
     ]) {
       for (const incident of incidents) {
         if (includeResolved || !incident.resolved) {
-          // Pre-compute timestamp for sorting and filtering
-          incident._timestampMs = getTimestampMs(incident.timestamp);
-          allIncidents.push(incident);
+          // Wrap with pre-computed timestamp (no mutation)
+          const timestampMs = getTimestampMs(incident.timestamp);
+          wrappedIncidents.push({ incident, timestampMs });
 
-          // Group by date
-          const date = new Date(incident.timestamp).toISOString().split("T")[0];
+          // Group by date using safe date parsing
+          const date = new Date(timestampMs).toISOString().split("T")[0];
           if (!groupedByDate[date]) groupedByDate[date] = [];
           groupedByDate[date].push(incident);
 
           // Count last 24h
-          if (incident._timestampMs > cutoff24h) {
+          if (timestampMs > cutoff24h) {
             last24hCount++;
           }
         }
       }
     }
 
-    // Sort once using pre-computed timestamps
-    allIncidents.sort((a, b) => b._timestampMs - a._timestampMs);
-
-    // Clean up temporary property
-    allIncidents.forEach((i) => delete i._timestampMs);
+    // Sort using wrapper, then extract original objects
+    wrappedIncidents.sort((a, b) => b.timestampMs - a.timestampMs);
+    const allIncidents = wrappedIncidents.map((w) => w.incident);
 
     const dates = Object.keys(groupedByDate).sort().reverse();
     const stats = calculateStats(allIncidents);
 
     const response = {
-      success: true,
-      data: {
-        daysBack: daysBack,
-        totalCount: allIncidents.length,
-        recent24h: last24hCount,
-        ongoingCount: stats.byStatus.ongoing,
-        stats: stats,
-        timeline: dates.map((date) => ({
-          date: date,
-          displayDate: new Date(date).toLocaleDateString("id-ID", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          }),
-          incidentCount: groupedByDate[date].length,
-          incidents: groupedByDate[date],
-        })),
-        incidents: allIncidents.slice(0, 50), // Flat list (first 50)
-      },
-      timestamp: new Date().toISOString(),
+      daysBack: daysBack,
+      totalCount: allIncidents.length,
+      recent24h: last24hCount,
+      ongoingCount: stats.byStatus.ongoing,
+      stats: stats,
+      timeline: dates.map((date) => ({
+        date: date,
+        displayDate: new Date(date).toLocaleDateString("id-ID", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        incidentCount: groupedByDate[date].length,
+        incidents: groupedByDate[date],
+      })),
+      // Note: Removed flat incidents list to avoid duplicate data with timeline
     };
+
+    // Cache the response
+    await writeObjectCache(redis, cacheKey, response, INCIDENT_CACHE_TTL);
 
     logApiOk(reqLogger, {
       status: 200,
+      cached: false,
       totalIncidents: allIncidents.length,
       recent24h: last24hCount,
       ongoing: stats.byStatus.ongoing,
     });
 
-    return res.status(200).json(response);
+    return res.status(200).json(createSuccessResponse(response));
   } catch (err) {
-    console.error("[incidents] API error:", err);
-    logApiError(reqLogger, err);
-
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: "INTERNAL_ERROR",
-        message: "Failed to fetch incidents",
-      },
-      timestamp: new Date().toISOString(),
-    });
+    logApiError(reqLogger, err, { status: 500 });
+    return res
+      .status(500)
+      .json(
+        createErrorResponse(
+          "INCIDENTS_FETCH_FAILED",
+          process.env.NODE_ENV === "production"
+            ? "Failed to fetch incidents"
+            : err.message,
+        ),
+      );
   }
 }
