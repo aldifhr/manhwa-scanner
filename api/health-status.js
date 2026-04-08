@@ -95,6 +95,14 @@ export default async function handler(req, res) {
     const sourceHealth = await loadSourceHealthSnapshot(redis, SOURCE_KEYS);
     const cronStatus = await readCronStatusWithHealth(redis);
     const dailyStats = await readCronDailyStats(redis, 90);
+
+    // Debug: log dailyStats info
+    logger.info({
+      dailyStatsCount: dailyStats?.length || 0,
+      sample: dailyStats?.[0] || null,
+      failedDays: dailyStats?.filter(s => s.failedLogs > 0 || s.deliveryFailed > 0).length || 0,
+    }, "[health-status] Daily stats loaded");
+
     const guildCount = await getGuildCount(redis);
 
     const networks = [
