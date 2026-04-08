@@ -50,14 +50,19 @@ function calculateUptime(failures) {
 
 // Calculate actual uptime percentage from daily stats
 function calculateUptimeFromStats(dailyStats) {
-  if (!dailyStats || dailyStats.length === 0) return "100.00%";
+  if (!dailyStats || dailyStats.length === 0) return "—"; // No data yet
 
   const totalDays = dailyStats.length;
   const failedDays = dailyStats.filter(
     (s) => s.failedLogs > 0 || s.deliveryFailed > 0,
   ).length;
 
-  // Real uptime calculation - no minimum floor
+  // If all days failed but we have very few days of data, might be collection issue
+  if (failedDays >= totalDays && totalDays < 3) {
+    return "—";
+  }
+
+  // Real uptime calculation
   const uptimePct = ((totalDays - failedDays) / totalDays) * 100;
   return `${uptimePct.toFixed(2)}%`;
 }
