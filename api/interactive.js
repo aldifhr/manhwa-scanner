@@ -336,21 +336,6 @@ export default async function handler(req, res) {
         }
       }
 
-      if (custom_id.startsWith("read:") || custom_id.startsWith("unread:")) {
-        const handleProgress = commands["myprogress"];
-        if (handleProgress) {
-          // Use waitUntil to ensure Vercel doesn't kill the function
-          return waitUntil(
-            handleProgress(
-              payload,
-              [{ name: "button", value: custom_id }],
-              res,
-              redis,
-            ),
-          );
-        }
-      }
-
       if (custom_id.startsWith("follow_toggle:")) {
         // Use helper function for consistent user ID extraction
         const userId = getUserId(payload);
@@ -380,7 +365,7 @@ export default async function handler(req, res) {
                 try {
                   return await editInteractionResponse(
                     payload,
-                    `🔕 **Unfollowed**\n\nKamu berhenti mengikuti **${title}**.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-follow'}.\n\nKlik "🔔 Follow Updates" lagi untuk mengikuti kembali.`,
+                    `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.\n\nKlik "🔖 Bookmark" lagi untuk menambahkan bookmark.`,
                   );
                 } catch (editErr) {
                   logger.warn(
@@ -393,7 +378,7 @@ export default async function handler(req, res) {
                 try {
                   return await editInteractionResponse(
                     payload,
-                    `🔔 **Now Following**\n\nKamu mengikuti **${title}**!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔔 Follow Updates" lagi untuk berhenti mengikuti.`,
+                    `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}\n\nKlik "🔖 Bookmark" lagi untuk menghapus bookmark.`,
                   );
                 } catch (editErr) {
                   logger.warn(
