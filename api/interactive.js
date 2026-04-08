@@ -32,6 +32,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
 } from "../lib/api/response.js";
+import { DISCORD_EPHEMERAL_FLAG } from "../lib/config.js";
 
 // Helper to get user ID from payload (consistent pattern)
 function getUserId(payload) {
@@ -214,10 +215,10 @@ export default async function handler(req, res) {
         if (!(await isAddAllowedUser(payload, redis))) {
           logApiOk(reqLogger, { status: 200, event: "add_selection_denied" });
           return res.json({
-            type: 4,
+            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
               content: "Command `/add` hanya diizinkan untuk user tertentu.",
-              flags: 64,
+              flags: DISCORD_EPHEMERAL_FLAG,
             },
           });
         }
@@ -228,8 +229,8 @@ export default async function handler(req, res) {
         if (!cached) {
           logApiOk(reqLogger, { status: 200, event: "add_session_expired" });
           return res.json({
-            type: 4,
-            data: { content: "Session expired. Run /add again.", flags: 64 },
+            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: "Session expired. Run /add again.", flags: DISCORD_EPHEMERAL_FLAG },
           });
         }
 
@@ -239,17 +240,17 @@ export default async function handler(req, res) {
             event: "add_selection_not_found",
           });
           return res.json({
-            type: 4,
+            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
               content: "Selected manga not found. Run /add again.",
-              flags: 64,
+              flags: DISCORD_EPHEMERAL_FLAG,
             },
           });
         }
 
         res.json({
           type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { flags: 64 },
+          data: { flags: DISCORD_EPHEMERAL_FLAG },
         });
         logApiOk(reqLogger, { status: 200, event: "add_selection_ack" });
         return waitUntil(
@@ -293,31 +294,6 @@ export default async function handler(req, res) {
           }),
         );
       }
-      if (custom_id.startsWith("myprogress:")) {
-        const parts = custom_id.split(":");
-        // Bounds check
-        if (parts.length < 2) {
-          logApiOk(reqLogger, {
-            status: 400,
-            reason: "invalid_progress_format",
-          });
-          return res.status(400).json({ error: "Invalid progress format" });
-        }
-        const page = parseInt(parts[1], 10) || 1;
-
-        res.json({ type: InteractionType.DEFERRED_UPDATE_MESSAGE });
-        const handleProgress = commands["myprogress"];
-        if (handleProgress) {
-          return waitUntil(
-            handleProgress(
-              payload,
-              [{ name: "page", value: page }],
-              res,
-              redis,
-            ),
-          );
-        }
-      }
       if (custom_id.startsWith("follow:list:")) {
         // Parse page from custom_id: "follow:list:page"
         const parts = custom_id.split(":");
@@ -353,14 +329,14 @@ export default async function handler(req, res) {
         if (!userId) {
           return res.json({
             type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "❌ Error: Could not identify user.", flags: 64 },
+            data: { content: "❌ Error: Could not identify user.", flags: DISCORD_EPHEMERAL_FLAG },
           });
         }
 
-        // Use DEFERRED_UPDATE_MESSAGE (type 6) for component interactions
+        // Use DEFERRED_UPDATE_MESSAGE for component interactions
         // This allows us to update the original message with the button
         res.json({
-          type: 6, // DEFERRED_UPDATE_MESSAGE
+          type: InteractionType.DEFERRED_UPDATE_MESSAGE,
         });
 
         // Use statically imported functions (no dynamic import)

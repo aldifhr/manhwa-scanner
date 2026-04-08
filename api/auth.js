@@ -14,6 +14,9 @@ import {
   createErrorResponse,
   createSuccessResponse,
 } from "../lib/api/response.js";
+import { getLogger } from "../lib/logger.js";
+
+const logger = getLogger({ scope: "api:auth" });
 
 const METHOD_MAP = { login: "POST", logout: "POST", status: "GET" };
 
@@ -28,7 +31,7 @@ async function readRawBody(req) {
   // Warn if body is empty but Content-Type suggests JSON (may be consumed by middleware)
   const contentType = req.headers?.["content-type"] || "";
   if (!result && contentType.includes("application/json")) {
-    console.warn("[auth] Raw body empty despite application/json Content-Type (possibly consumed by middleware)");
+    logger.warn("Raw body empty despite application/json Content-Type (possibly consumed by middleware)");
   }
 
   return result;
