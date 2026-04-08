@@ -50,19 +50,14 @@ function calculateUptime(failures) {
 
 // Calculate actual uptime percentage from daily stats
 function calculateUptimeFromStats(dailyStats) {
-  if (!dailyStats || dailyStats.length === 0) return "99.99%";
+  if (!dailyStats || dailyStats.length === 0) return "100.00%";
 
   const totalDays = dailyStats.length;
   const failedDays = dailyStats.filter(
     (s) => s.failedLogs > 0 || s.deliveryFailed > 0,
   ).length;
 
-  // If all days have failed logs, still show minimum uptime of 95%
-  // This handles edge cases where logging shows failures but services are operational
-  if (failedDays >= totalDays) {
-    return "95.00%";
-  }
-
+  // Real uptime calculation - no minimum floor
   const uptimePct = ((totalDays - failedDays) / totalDays) * 100;
   return `${uptimePct.toFixed(2)}%`;
 }
@@ -125,8 +120,8 @@ export default async function handler(req, res) {
           const isDegraded = status === "degraded";
 
           const uptime = calculateUptime(failures);
-          const ping =
-            health.responseTime || (isHealthy ? 30 : isDegraded ? 75 : 150);
+          // Only use real measured response time, no fake values
+          const ping = health.responseTime || null;
 
           // Calculate source-specific incidents from daily stats
           const incidents = [];
@@ -166,29 +161,31 @@ export default async function handler(req, res) {
     // Measure real Redis ping
     const redisPing = await measureRedisPing(redis);
 
-    // System Services with real measured data
+    // System Services with REAL data from actual cron runs
+    const cronUptime = calculateUptimeFromStats(dailyStats);
     const systemServices = [
       {
         name: "Discord API",
-        uptime: "99.95%",
-        ping: "measured",
+        uptime: cronUptime, // Use same uptime as cron (Discord webhook success rate)
+        responseTime: null, // Not measured separately
         incidents: [],
-        note: "Estimated - Discord API SLA",
+        note: "Based on webhook delivery success",
       },
       {
         name: "Redis Database",
-        uptime: redisPing ? "99.99%" : "unknown",
-        ping: redisPing ?? "unavailable",
+        uptime: redisPing ? cronUptime : "0.00%", // If can't ping, Redis is down
+        responseTime: redisPing, // Actual ping time in ms
         incidents: [],
-        note: redisPing ? "Measured" : "Ping failed",
+        note: redisPing ? `Ping: ${redisPing}ms` : "Connection failed",
       },
       {
         name: "Cron Scheduler",
-        uptime: calculateUptimeFromStats(dailyStats),
-        ping: "N/A",
+        uptime: cronUptime,
+        responseTime: null,
         incidents: cronStatus?.failed > 0
           ? [new Date().toISOString().split("T")[0]]
           : [],
+        note: `Last run: ${cronStatus?.timestamp ? new Date(cronStatus.timestamp).toLocaleString("id-ID") : "never"}`,
       },
     ];
 
