@@ -16,6 +16,10 @@ import {
 // "links" is alias for "health" (backward compatibility)
 const cronQuerySchema = z.object({
   action: z.enum(["update", "health", "links"]).default("update"),
+  mode: z.enum(["normal", "full", "fast"]).optional(),
+  incremental: z.enum(["0", "1", "false", "true"]).optional(),
+  deduplicate: z.enum(["0", "1", "false", "true"]).optional(),
+  fastLimit: z.string().optional(),
 });
 
 const validMethods = ["GET", "POST"];
@@ -77,7 +81,15 @@ async function writeHealthStatus(payload) {
   }
 }
 
-async function handleUpdateCron(req, res, reqLogger) {
+function parseBoolLike(value, fallback = null) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
+async function handleUpdateCron(req, res, reqLogger, query = {}) {
   const lockToken = await acquireCronExecutionLock();
   if (!lockToken) {
     logApiOk(reqLogger, { status: 409, reason: "cron_locked" });
@@ -89,8 +101,30 @@ async function handleUpdateCron(req, res, reqLogger) {
   }
 
   try {
+    const mode = String(query?.mode || "normal").toLowerCase();
+    const forceFull = mode === "full";
+    const fastMode = mode === "fast";
+    const parsedFastLimit = Number(query?.fastLimit);
+    const fastSecondaryLimit = Number.isFinite(parsedFastLimit)
+      ? Math.max(0, Math.trunc(parsedFastLimit))
+      : fastMode
+        ? 4
+        : 0;
+    const incremental =
+      parseBoolLike(query?.incremental, forceFull ? false : null) ?? undefined;
+    const deduplicate =
+      parseBoolLike(query?.deduplicate, forceFull ? false : null) ?? undefined;
+
+    const scrapeOptions = {
+      incremental,
+      deduplicate,
+      fullRefresh: forceFull,
+      force: forceFull,
+      fastSecondaryLimit,
+    };
+
     const result = await withTimeout(
-      runCronJob({ redisClient: redis, logger }),
+      runCronJob({ redisClient: redis, logger, scrapeOptions }),
       INTERNAL_TIMEOUT_MS,
     );
     logApiOk(reqLogger, { status: result.statusCode, ...result.logMeta });
@@ -100,6 +134,7 @@ async function handleUpdateCron(req, res, reqLogger) {
       data: {
         sent: result.body?.sent ?? 0,
         skipped: result.body?.skipped ?? 0,
+        skipBreakdown: result.body?.skipBreakdown ?? null,
         failed: result.body?.failed ?? 0,
         duration: result.body?.duration ?? null,
         guilds: result.body?.guilds ?? 0,
@@ -111,6 +146,7 @@ async function handleUpdateCron(req, res, reqLogger) {
         scrapeMetrics: result.body?.scrapeMetrics ?? null,
         timingMetrics: result.body?.timingMetrics ?? null,
         error: result.body?.error ?? null,
+        scrapeOptionsUsed: scrapeOptions,
       },
       timestamp: new Date().toISOString(),
     };
@@ -315,5 +351,5 @@ export default async function handler(req, res) {
   if (action === "health" || action === "links") {
     return handleHealthCron(req, res, reqLogger);
   }
-  return handleUpdateCron(req, res, reqLogger);
+  return handleUpdateCron(req, res, reqLogger, parseResult.data);
 }

@@ -241,7 +241,7 @@ async function startServer() {
   });
 
   app.listen(PORT, () => {
-    log.info("═══════════════════════════════════════");
+    log.info("========================================");
     log.info(
       {
         port: PORT,
@@ -250,10 +250,11 @@ async function startServer() {
         dashboard: `http://localhost:${PORT}`,
         status: `http://localhost:${PORT}/status/`,
       },
-      "🚀 Server ready",
+      "Server ready",
     );
-    log.info("═══════════════════════════════════════");
+    log.info("========================================");
   });
 }
 
 startServer();
+
