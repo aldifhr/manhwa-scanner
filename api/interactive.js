@@ -35,6 +35,16 @@ import {
 } from "../lib/api/response.js";
 import { DISCORD_EPHEMERAL_FLAG } from "../lib/config.js";
 
+// Timeout wrapper untuk mencegah operasi hang
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // Helper to get user ID from payload (consistent pattern)
 function getUserId(payload) {
   return payload.member?.user?.id ?? payload.user?.id;
@@ -374,17 +384,30 @@ export default async function handler(req, res) {
         return waitUntil(
           (async () => {
             try {
-              const following = await isUserFollowing(userId, title);
-              const notifyMode = await getUserNotifyMode(userId);
+              // Add timeout to prevent hanging
+              const following = await withTimeout(
+                isUserFollowing(userId, title),
+                3000,
+                "Check following status",
+              );
+              const notifyMode = await withTimeout(
+                getUserNotifyMode(userId),
+                2000,
+                "Get notify mode",
+              );
 
               if (following) {
-                await unfollowManga(userId, title);
+                await withTimeout(unfollowManga(userId, title), 3000, "Unfollow manga");
                 try {
                   // Send ephemeral follow-up instead of editing the message
                   // This keeps the original embed intact
-                  return await sendEphemeralFollowUp(
-                    payload,
-                    `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
+                  return await withTimeout(
+                    sendEphemeralFollowUp(
+                      payload,
+                      `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
+                    ),
+                    3000,
+                    "Send unfollow notification",
                   );
                 } catch (editErr) {
                   logger.warn(
@@ -393,13 +416,17 @@ export default async function handler(req, res) {
                   return; // Silent fail - action already succeeded
                 }
               } else {
-                await followManga(userId, title);
+                await withTimeout(followManga(userId, title), 3000, "Follow manga");
                 try {
                   // Send ephemeral follow-up instead of editing the message
                   // This keeps the original embed intact
-                  return await sendEphemeralFollowUp(
-                    payload,
-                    `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
+                  return await withTimeout(
+                    sendEphemeralFollowUp(
+                      payload,
+                      `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
+                    ),
+                    3000,
+                    "Send follow notification",
                   );
                 } catch (editErr) {
                   logger.warn(
@@ -412,7 +439,7 @@ export default async function handler(req, res) {
               logger.error("[follow_toggle] Error:", err);
               try {
                 return await editInteractionResponse(
-                  payload,
+                  payload.token,
                   "❌ Gagal memproses toggle. Silakan coba lagi.",
                 );
               } catch (editErr) {

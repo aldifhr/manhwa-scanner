@@ -57,7 +57,7 @@ Found **${brokenLinks.length}** broken links in your whitelist.`;
         msg += `\n\n💡 **Action Needed**: Found **${recommendations.length}** links with persistent failures. Consider removing them.`;
       }
 
-      msg += "\n\nUse `/health` or check the Dashboard for details.";
+      msg += "\n\nCheck the Dashboard for details.";
 
       const embed = {
         title: "Broken Link Alert",

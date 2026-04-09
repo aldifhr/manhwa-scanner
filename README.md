@@ -59,14 +59,9 @@ Sumber kebenaran: `scripts/sync-commands.js`
 - `/status`
 - `/add query:<judul|url>`
 - `/remove query:<judul|url|nomor>`
-- `/mark item:<judul|nomor> reason:<hiatus|end_season|end|clear>`
 - `/setchannel channel:<#channel>`
-- `/clear`
-- `/health`
-- `/permission action:<add|remove|list> [user:<@user>]`
 - `/follow list [page:<n>]`
 - `/follow unfollow title:<judul>`
-- `/sync`
 
 ## Catatan
 

@@ -56,31 +56,6 @@ const commands = [
     ],
   },
   {
-    name: "mark",
-    description: "Tandai status manga (Hiatus/End)",
-    options: [
-      {
-        type: 3, // STRING
-        name: "item",
-        description: "Judul manga atau nomor urut",
-        required: true,
-      },
-      {
-        type: 3, // STRING
-        name: "reason",
-        description: "Status baru",
-        required: true,
-        choices: [
-          { name: "Hiatus", value: "hiatus" },
-          { name: "End Season", value: "end_season" },
-          { name: "End", value: "end" },
-          { name: "Selesai/Clear", value: "clear" },
-        ],
-      },
-    ],
-  },
-
-  {
     name: "setchannel",
     description: "Set channel untuk notifikasi manga",
     options: [
@@ -90,39 +65,6 @@ const commands = [
         description: "Pilih channel untuk notifikasi",
         required: true,
         channel_types: [0], // 0 = text channel only
-      },
-    ],
-  },
-  {
-    name: "clear",
-    description: "Hapus semua isi whitelist (Owner only)",
-  },
-
-  {
-    name: "health",
-    description: "Cek status kesehatan scraper/situs sumber",
-  },
-
-  {
-    name: "permission",
-    description: "Kelola izin akses command /add (Admin only)",
-    options: [
-      {
-        type: 3,
-        name: "action",
-        description: "Tambah atau hapus izin",
-        required: true,
-        choices: [
-          { name: "Add User", value: "add" },
-          { name: "Remove User", value: "remove" },
-          { name: "List Allowed", value: "list" },
-        ],
-      },
-      {
-        type: 6, // USER
-        name: "user",
-        description: "User yang ingin dikelola",
-        required: false,
       },
     ],
   },
@@ -157,10 +99,6 @@ const commands = [
         ],
       },
     ],
-  },
-  {
-    name: "sync",
-    description: "Trigger sinkronisasi manual seperti cron job (Admin only)",
   },
 ];
 
