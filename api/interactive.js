@@ -44,6 +44,35 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
+// Send ephemeral follow-up for component interactions
+// Uses POST /interactions/{id}/{token}/callback with type 4 (channel message with source)
+async function sendComponentEphemeral(payload, content) {
+  const interactionId = payload.id;
+  const token = payload.token;
+  const url = `https://discord.com/api/v10/interactions/${interactionId}/${token}/callback`;
+
+  const safeContent = content?.length > 2000 ? `${content.substring(0, 1997)}...` : content;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+      data: {
+        content: safeContent,
+        flags: 64, // EPHEMERAL
+      },
+    }),
+  });
+
+  if (!response.ok && response.status !== 204) {
+    const text = await response.text().catch(() => "Unknown error");
+    throw new Error(`Discord API error ${response.status}: ${text}`);
+  }
+
+  return response;
+}
+
 // Helper to get user ID from payload (consistent pattern)
 function getUserId(payload) {
   return payload.member?.user?.id ?? payload.user?.id;
@@ -398,10 +427,10 @@ export default async function handler(req, res) {
               if (following) {
                 await withTimeout(unfollowManga(userId, title), 3000, "Unfollow manga");
                 try {
-                  // Edit original message with confirmation (after DEFERRED_UPDATE_MESSAGE)
+                  // Send ephemeral confirmation (embed tetap ada)
                   return await withTimeout(
-                    editInteractionResponse(
-                      payload.token,
+                    sendComponentEphemeral(
+                      payload,
                       `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
                     ),
                     8000,
@@ -409,17 +438,17 @@ export default async function handler(req, res) {
                   );
                 } catch (editErr) {
                   logger.warn(
-                    `[follow_toggle] Failed to edit confirmation: ${editErr.message}`,
+                    `[follow_toggle] Failed to send confirmation: ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
               } else {
                 await withTimeout(followManga(userId, title), 3000, "Follow manga");
                 try {
-                  // Edit original message with confirmation (after DEFERRED_UPDATE_MESSAGE)
+                  // Send ephemeral confirmation (embed tetap ada)
                   return await withTimeout(
-                    editInteractionResponse(
-                      payload.token,
+                    sendComponentEphemeral(
+                      payload,
                       `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
                     ),
                     8000,
@@ -427,7 +456,7 @@ export default async function handler(req, res) {
                   );
                 } catch (editErr) {
                   logger.warn(
-                    `[follow_toggle] Failed to edit confirmation: ${editErr.message}`,
+                    `[follow_toggle] Failed to send confirmation: ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
@@ -435,13 +464,13 @@ export default async function handler(req, res) {
             } catch (err) {
               logger.error("[follow_toggle] Error:", err);
               try {
-                return await editInteractionResponse(
-                  payload.token,
+                return await sendComponentEphemeral(
+                  payload,
                   "❌ Gagal memproses toggle. Silakan coba lagi.",
                 );
               } catch (editErr) {
                 logger.warn(
-                  `[follow_toggle] Failed to edit error response: ${editErr.message}`,
+                  `[follow_toggle] Failed to send error response: ${editErr.message}`,
                 );
                 return; // Silent fail
               }
