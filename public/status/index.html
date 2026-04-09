@@ -1258,8 +1258,8 @@
             const API_ENDPOINT = "/api/health-status?realtime=1";
             const REFRESH_INTERVAL = 60000; // 60 seconds
             const DAYS_TO_SHOW = 90;
-            const NOTICES_API_ENDPOINT = "/api/notices";
-            const INCIDENTS_API_ENDPOINT = "/api/incidents";
+            const NOTICES_API_ENDPOINT = "/api/notices?public=1";
+            const INCIDENTS_API_ENDPOINT = "/api/incidents?public=1";
 
             // State
             let refreshTimer = null;
@@ -1300,7 +1300,9 @@
             // Modal functions
             async function fetchNotices() {
                 try {
-                    const response = await fetch("/api/notices?days=7");
+                    const response = await fetch(
+                        `${NOTICES_API_ENDPOINT}&days=7`,
+                    );
                     if (!response.ok)
                         throw new Error(`HTTP ${response.status}`);
 
@@ -1503,7 +1505,9 @@
             // Fetch incidents data
             async function fetchIncidents() {
                 try {
-                    const response = await fetch("/api/incidents?days=30");
+                    const response = await fetch(
+                        `${INCIDENTS_API_ENDPOINT}&days=30`,
+                    );
                     if (!response.ok)
                         throw new Error(`HTTP ${response.status}`);
 

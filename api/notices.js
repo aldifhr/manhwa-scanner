@@ -194,6 +194,9 @@ function determineStatus(notices) {
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("notices", req);
+  const isPublicRead =
+    String(req.query?.public || "").toLowerCase() === "1" ||
+    String(req.query?.public || "").toLowerCase() === "true";
 
   // Method check first (consistent with other handlers)
   if (req.method !== "GET") {
@@ -203,7 +206,7 @@ export default async function handler(req, res) {
       .json(createErrorResponse("METHOD_NOT_ALLOWED", "Method not allowed"));
   }
 
-  if (!isMonitorAuthorized(req)) {
+  if (!isPublicRead && !isMonitorAuthorized(req)) {
     logApiOk(reqLogger, { status: 401, reason: "unauthorized" });
     return res
       .status(401)
