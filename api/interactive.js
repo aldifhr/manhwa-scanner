@@ -196,7 +196,16 @@ export default async function handler(req, res) {
         });
       }
 
-      const choices = await buildAddAutocompleteChoices(options, redis);
+      let choices = [];
+      try {
+        choices = await buildAddAutocompleteChoices(options, redis);
+      } catch (autocompleteErr) {
+        logger.warn(
+          { err: autocompleteErr?.message },
+          "[interactive] autocomplete failed; returning empty choices",
+        );
+        choices = [];
+      }
 
       logApiOk(reqLogger, {
         status: 200,

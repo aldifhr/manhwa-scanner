@@ -39,6 +39,7 @@ const commands = [
         name: "query",
         description: "Judul manga atau URL (Ikiru/Shinigami)",
         required: true,
+        autocomplete: true,
       },
     ],
   },
