@@ -406,7 +406,7 @@ export default async function handler(req, res) {
                       payload,
                       `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
                     ),
-                    3000,
+                    8000,
                     "Send unfollow notification",
                   );
                 } catch (editErr) {
@@ -425,7 +425,7 @@ export default async function handler(req, res) {
                       payload,
                       `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
                     ),
-                    3000,
+                    8000,
                     "Send follow notification",
                   );
                 } catch (editErr) {
