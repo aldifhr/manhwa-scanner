@@ -44,35 +44,6 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
-// Send ephemeral follow-up for component interactions
-// Uses POST /interactions/{id}/{token}/callback with type 4 (channel message with source)
-async function sendComponentEphemeral(payload, content) {
-  const interactionId = payload.id;
-  const token = payload.token;
-  const url = `https://discord.com/api/v10/interactions/${interactionId}/${token}/callback`;
-
-  const safeContent = content?.length > 2000 ? `${content.substring(0, 1997)}...` : content;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-      data: {
-        content: safeContent,
-        flags: 64, // EPHEMERAL
-      },
-    }),
-  });
-
-  if (!response.ok && response.status !== 204) {
-    const text = await response.text().catch(() => "Unknown error");
-    throw new Error(`Discord API error ${response.status}: ${text}`);
-  }
-
-  return response;
-}
-
 // Helper to get user ID from payload (consistent pattern)
 function getUserId(payload) {
   return payload.member?.user?.id ?? payload.user?.id;
@@ -402,81 +373,48 @@ export default async function handler(req, res) {
           });
         }
 
-        // Use DEFERRED_UPDATE_MESSAGE for component interactions
-        // This allows us to update the original message with the button
-        res.json({
-          type: InteractionType.DEFERRED_UPDATE_MESSAGE,
-        });
+        // Process bookmark toggle synchronously and respond immediately
+        try {
+          const following = await withTimeout(
+            isUserFollowing(userId, title),
+            3000,
+            "Check following status",
+          );
+          const notifyMode = await withTimeout(
+            getUserNotifyMode(userId),
+            2000,
+            "Get notify mode",
+          );
 
-        // Use statically imported functions (no dynamic import)
-        return waitUntil(
-          (async () => {
-            try {
-              // Add timeout to prevent hanging
-              const following = await withTimeout(
-                isUserFollowing(userId, title),
-                3000,
-                "Check following status",
-              );
-              const notifyMode = await withTimeout(
-                getUserNotifyMode(userId),
-                2000,
-                "Get notify mode",
-              );
-
-              if (following) {
-                await withTimeout(unfollowManga(userId, title), 3000, "Unfollow manga");
-                try {
-                  // Send ephemeral confirmation (embed tetap ada)
-                  return await withTimeout(
-                    sendComponentEphemeral(
-                      payload,
-                      `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
-                    ),
-                    8000,
-                    "Send unfollow confirmation",
-                  );
-                } catch (editErr) {
-                  logger.warn(
-                    `[follow_toggle] Failed to send confirmation: ${editErr.message}`,
-                  );
-                  return; // Silent fail - action already succeeded
-                }
-              } else {
-                await withTimeout(followManga(userId, title), 3000, "Follow manga");
-                try {
-                  // Send ephemeral confirmation (embed tetap ada)
-                  return await withTimeout(
-                    sendComponentEphemeral(
-                      payload,
-                      `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
-                    ),
-                    8000,
-                    "Send follow confirmation",
-                  );
-                } catch (editErr) {
-                  logger.warn(
-                    `[follow_toggle] Failed to send confirmation: ${editErr.message}`,
-                  );
-                  return; // Silent fail - action already succeeded
-                }
-              }
-            } catch (err) {
-              logger.error("[follow_toggle] Error:", err);
-              try {
-                return await sendComponentEphemeral(
-                  payload,
-                  "❌ Gagal memproses toggle. Silakan coba lagi.",
-                );
-              } catch (editErr) {
-                logger.warn(
-                  `[follow_toggle] Failed to send error response: ${editErr.message}`,
-                );
-                return; // Silent fail
-              }
-            }
-          })(),
-        );
+          if (following) {
+            await withTimeout(unfollowManga(userId, title), 3000, "Unfollow manga");
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: {
+                content: `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
+                flags: DISCORD_EPHEMERAL_FLAG,
+              },
+            });
+          } else {
+            await withTimeout(followManga(userId, title), 3000, "Follow manga");
+            return res.json({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: {
+                content: `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
+                flags: DISCORD_EPHEMERAL_FLAG,
+              },
+            });
+          }
+        } catch (err) {
+          logger.error("[follow_toggle] Error:", err);
+          return res.json({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: "❌ Gagal memproses bookmark. Silakan coba lagi.",
+              flags: DISCORD_EPHEMERAL_FLAG,
+            },
+          });
+        }
       }
 
       logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
