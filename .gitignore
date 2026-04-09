@@ -4,3 +4,5 @@ node_modules/
 .qoder/
 .vercel
 tmp/.kilo/
+
+.vercel
