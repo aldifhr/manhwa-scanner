@@ -161,6 +161,14 @@ export function createDashboardRenderer({ state, $, esc }) {
       sourceCounts[source] = (sourceCounts[source] || 0) + 1;
     }
 
+    // Fallback: if recent stream is empty, still show sources from health map.
+    if (Object.keys(sourceCounts).length === 0) {
+      const healthMap = state.latestStatusData?.sourceHealth || {};
+      for (const source of Object.keys(healthMap)) {
+        sourceCounts[source] = 1;
+      }
+    }
+
     const labels = Object.keys(sourceCounts).map((s) => sourceDisplayName(s));
     const data = Object.values(sourceCounts);
     const backgroundColors = Object.keys(sourceCounts).map((s) => {
