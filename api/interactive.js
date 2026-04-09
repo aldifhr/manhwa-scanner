@@ -1,4 +1,4 @@
-import { InteractionType, verifyKey } from "discord-interactions";
+import { InteractionType, InteractionResponseType, verifyKey } from "discord-interactions";
 import { waitUntil } from "@vercel/functions";
 import { redis } from "../lib/redis.js";
 import {
