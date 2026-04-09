@@ -100,6 +100,10 @@ const commands = [
       },
     ],
   },
+  {
+    name: "sync",
+    description: "Sync manual untuk cek chapter baru (admin only)",
+  },
 ];
 
 async function sync() {
