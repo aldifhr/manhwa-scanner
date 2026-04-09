@@ -7,13 +7,11 @@ import {
 } from "../lib/discord.js";
 import commands from "../lib/commands/index.js";
 import {
-  buildAddAutocompleteChoices,
-  handleAddSourcePickInteraction,
-  resolveAddResultValue,
+  buildAddAutocomplete,
+  handleAddSelection,
 } from "../lib/commands/add.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getLogger } from "../lib/logger.js";
-import { normalizeSource } from "../lib/domain.js";
 import { isAddAllowedUser } from "../lib/permissions.js";
 import {
   addWhitelistEntry,
@@ -109,25 +107,6 @@ async function handleListResponse(
   }
 }
 
-async function resolveAddSelection(interactionData) {
-  const rawValue = String(interactionData.values?.[0] || "");
-  let { cached, item, selectedSource } = await resolveAddResultValue(
-    rawValue,
-    redis,
-  );
-
-  if (!item) {
-    const parts = rawValue.split("|||");
-    const [rawSource, keyword, id] = parts;
-    cached = await redis.get(`add:results:${rawSource}:${keyword}`);
-    const results = Array.isArray(cached) ? cached : [];
-    item = results.find((r) => (r.slug ?? r.mangaUrl ?? r.url) === id);
-    selectedSource = normalizeSource(item?.source || rawSource);
-  }
-
-  return { cached, item, selectedSource };
-}
-
 export default async function handler(req, res) {
   const reqLogger = logApiHit("interactive", req);
 
@@ -207,7 +186,7 @@ export default async function handler(req, res) {
 
       let choices = [];
       try {
-        choices = await buildAddAutocompleteChoices(options, redis);
+        choices = await buildAddAutocomplete(options, redis);
       } catch (autocompleteErr) {
         logger.warn(
           { err: autocompleteErr?.message },
@@ -230,9 +209,9 @@ export default async function handler(req, res) {
     if (type === InteractionType.MESSAGE_COMPONENT) {
       const { custom_id } = interactionData;
 
-      if (custom_id === "select_add_source") {
+      if (custom_id === "add_select_result") {
         if (!(await isAddAllowedUser(payload, redis))) {
-          logApiOk(reqLogger, { status: 200, event: "add_source_selection_denied" });
+          logApiOk(reqLogger, { status: 200, event: "add_selection_denied" });
           return res.json({
             type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
@@ -243,12 +222,14 @@ export default async function handler(req, res) {
         }
 
         const rawValue = String(interactionData.values?.[0] || "");
+
         res.json({
           type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
           data: { flags: DISCORD_EPHEMERAL_FLAG },
         });
-        logApiOk(reqLogger, { status: 200, event: "add_source_selection_ack" });
-        return waitUntil(handleAddSourcePickInteraction(payload, rawValue, redis));
+
+        logApiOk(reqLogger, { status: 200, event: "add_selection_ack" });
+        return waitUntil(handleAddSelection(payload, rawValue, redis));
       }
 
       if (custom_id === "select_add_src") {
