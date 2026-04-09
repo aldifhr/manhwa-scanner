@@ -10,7 +10,7 @@
  */
 
 import dotenv from "dotenv";
-import { createClient } from "@upstash/redis";
+import { Redis } from "@upstash/redis";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -24,7 +24,7 @@ if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) {
   process.exit(1);
 }
 
-const redis = createClient({
+const redis = new Redis({
   url: UPSTASH_REDIS_REST_URL,
   token: UPSTASH_REDIS_REST_TOKEN,
 });
@@ -111,8 +111,8 @@ async function saveWhitelist(list) {
   }
 
   pipeline.del(WHITELIST_INDEX_KEY);
-  if (indexEntries.length > 0) {
-    pipeline.zadd(WHITELIST_INDEX_KEY, ...indexEntries.flatMap(e => [e.score, e.member]));
+  for (const entry of indexEntries) {
+    pipeline.zadd(WHITELIST_INDEX_KEY, entry);
   }
 
   await pipeline.exec();
@@ -189,27 +189,172 @@ async function addWhitelistEntry(title, url = null, source = "ikiru") {
   return { status: "added", whitelist };
 }
 
+// Parse title from URL slug
+function parseTitleFromUrl(url) {
+  try {
+    const pathname = new URL(url).pathname;
+    const match = pathname.match(/\/manga\/([^/]+)/);
+    if (match) {
+      return match[1]
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+    }
+  } catch {
+    // Return null on error
+  }
+  return null;
+}
+
+// Batch add from file - optimized: load once, save once
+async function batchAddFromFile(filePath) {
+  const fs = await import("fs");
+  const content = fs.readFileSync(filePath, "utf-8");
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"));
+
+  console.log(`📁 Batch mode: ${lines.length} URLs from ${filePath}\n`);
+
+  // Load whitelist once
+  let whitelist = await loadWhitelist();
+  console.log(`📊 Whitelist saat ini: ${whitelist.length} manga\n`);
+
+  let added = 0;
+  let exists = 0;
+  let failed = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const url = lines[i];
+    const title = parseTitleFromUrl(url) || `Manga ${i + 1}`;
+
+    console.log(`[${i + 1}/${lines.length}] ${title}`);
+    console.log(`   URL: ${url}`);
+
+    try {
+      const result = await addWhitelistEntryToList(whitelist, title, url, "ikiru");
+      if (result.status === "added") {
+        added++;
+        whitelist = result.whitelist; // Update local whitelist
+        console.log("   ✅ Added");
+      } else if (result.status === "exists") {
+        exists++;
+        console.log("   ⚠️  Already exists");
+      } else {
+        console.log(`   ℹ️  ${result.status}`);
+      }
+    } catch (err) {
+      failed++;
+      console.log(`   ❌ Failed: ${err.message}`);
+    }
+    console.log("");
+  }
+
+  // Save once at the end
+  if (added > 0) {
+    console.log("💾 Saving whitelist to Redis...");
+    await saveWhitelist(whitelist);
+  }
+
+  console.log("\n📊 Batch Summary:");
+  console.log(`   Added:    ${added}`);
+  console.log(`   Exists:   ${exists}`);
+  console.log(`   Failed:   ${failed}`);
+  console.log(`   Total:    ${lines.length}`);
+  console.log(`   Final whitelist size: ${whitelist.length}`);
+}
+
+// Add entry to an existing list (don't save to Redis immediately)
+async function addWhitelistEntryToList(whitelist, title, url = null, source = "ikiru") {
+  const normalizedTitle = String(title || "").trim();
+  if (!normalizedTitle) throw new Error("Title required");
+
+  const effectiveSource = normalizeSource(source);
+  const normalizedUrl = url ? normalizeSourceUrl(url) : null;
+
+  // Check if exists
+  const existingIndex = whitelist.findIndex(item => {
+    if (item.title?.toLowerCase() === normalizedTitle.toLowerCase()) return true;
+    if (normalizedUrl && item.sources?.some(s =>
+      normalizeSourceUrl(s.url || "") === normalizedUrl,
+    )) return true;
+    return false;
+  });
+
+  const titleKey = normalizeTitleKey(normalizedTitle);
+
+  // Update last_updates (fire and forget)
+  redis.hset("manga:last_updates", {
+    [titleKey]: new Date().toISOString(),
+  }).catch(() => {});
+
+  if (existingIndex !== -1) {
+    const existing = whitelist[existingIndex];
+    const hasSource = existing.sources?.some(
+      s => normalizeSource(s.source) === effectiveSource &&
+        (!normalizedUrl || normalizeSourceUrl(s.url || "") === normalizedUrl),
+    );
+
+    if (hasSource) {
+      return { status: "exists", whitelist };
+    }
+
+    // Add new source to existing
+    existing.sources = existing.sources || [];
+    existing.sources.push({
+      url: normalizedUrl,
+      source: effectiveSource,
+      mark: null,
+    });
+
+    return { status: "updated", whitelist };
+  }
+
+  // Add new entry
+  whitelist.push({
+    title: normalizedTitle,
+    sources: [{ url: normalizedUrl, source: effectiveSource, mark: null }],
+  });
+
+  return { status: "added", whitelist };
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     console.log(`
-Usage: node scripts/add-to-whitelist.js "Judul Manga" [URL] [source]
+Usage:
+  Single:  node scripts/add-to-whitelist.js "Judul Manga" [URL] [source]
+  Batch:   node scripts/add-to-whitelist.js --file <path-to-urls.txt>
 
 Arguments:
-  title    - Judul manga (wajib)
+  title    - Judul manga (single mode)
   url      - URL manga (opsional)
   source   - Sumber: ikiru atau shinigami (default: ikiru)
+  --file   - Batch mode: file dengan 1 URL per baris
 
 Examples:
   node scripts/add-to-whitelist.js "Nano Machine"
   node scripts/add-to-whitelist.js "Nano Machine" "https://ikiru.to/nano-machine" ikiru
-  node scripts/add-to-whitelist.js "Solo Leveling" "https://shinigami.id/manga/solo-leveling" shinigami
+  node scripts/add-to-whitelist.js --file scripts/batch-urls.txt
 `);
     process.exit(0);
   }
 
+  // Batch mode
+  if (args[0] === "--file") {
+    if (!args[1]) {
+      console.error("Error: --file membutuhkan path file");
+      process.exit(1);
+    }
+    await batchAddFromFile(args[1]);
+    process.exit(0);
+  }
+
+  // Single mode
   const title = args[0];
   const url = args[1] || null;
   const source = args[2] || "ikiru";
