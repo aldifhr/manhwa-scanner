@@ -446,7 +446,9 @@ async function apiFetch(path, signal) {
     throw new Error("Unauthorized");
   }
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const payload = await response.json();
+  // Normalize API shape: support both { success, data } and direct payload.
+  return payload?.data ?? payload;
 }
 
 async function loadLightData() {
