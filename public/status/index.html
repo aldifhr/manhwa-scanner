@@ -1255,7 +1255,7 @@
 
         <script>
             // Configuration
-            const API_ENDPOINT = "/api/health-status";
+            const API_ENDPOINT = "/api/health-status?realtime=1";
             const REFRESH_INTERVAL = 60000; // 60 seconds
             const DAYS_TO_SHOW = 90;
             const NOTICES_API_ENDPOINT = "/api/notices";
@@ -1626,7 +1626,7 @@
             // Fetch status data
             async function loadStatus() {
                 try {
-                    const response = await fetch(API_ENDPOINT);
+                    const response = await fetch(API_ENDPOINT, { cache: "no-store" });
                     if (!response.ok)
                         throw new Error(`HTTP ${response.status}`);
 
@@ -1886,22 +1886,23 @@
                     let barClass = "healthy";
                     let title = "Operational";
 
-                    // Check if this day has an incident
-                    if (incidents.includes(i)) {
-                        barClass = "failed";
-                        title = "Incident reported";
-                    } else if (degraded.includes(i)) {
-                        barClass = "degraded";
-                        title = "Degraded performance";
-                    }
-
                     // Calculate date for this bar
                     const date = new Date();
                     date.setDate(date.getDate() - (DAYS_TO_SHOW - 1 - i));
+                    const dateKey = date.toISOString().split("T")[0];
                     const dateStr = date.toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                     });
+
+                    // API provides incidents/degraded entries as yyyy-mm-dd dates
+                    if (incidents.includes(dateKey)) {
+                        barClass = "failed";
+                        title = "Incident reported";
+                    } else if (degraded.includes(dateKey)) {
+                        barClass = "degraded";
+                        title = "Degraded performance";
+                    }
 
                     bars.push(
                         `<div class="timeline-bar ${barClass}" data-tooltip="${dateStr}: ${title}"></div>`,
@@ -1988,3 +1989,5 @@
         </script>
     </body>
 </html>
+
+

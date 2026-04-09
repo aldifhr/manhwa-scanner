@@ -2,11 +2,13 @@ import { createDashboardRenderer } from "./dashboard-render.js";
 import { fmt, msToSecondsLabel } from "./dashboard-utils.js";
 
 const API_BASE = "";
+const STATUS_API_PATH = "/api/status?realtime=1";
+const DASHBOARD_PASSWORD_STORAGE_KEY = "ikiru_dashboard_password";
 const DEFAULT_POLL_MS = 120_000;
 const DEFAULT_HEAVY_POLL_MS = 600_000;
 const HIDDEN_TAB_MULTIPLIER = 5;
 const FOCUS_REFRESH_COOLDOWN_MS = 30_000;
-const ALLOWED_POLL_MS = [60_000, 120_000, 300_000];
+const ALLOWED_POLL_MS = [60_000, 120_000];
 
 const elementCache = new Map();
 const $ = (id) => {
@@ -300,7 +302,7 @@ async function runCronNow() {
 
   try {
     const response = await fetch(`${API_BASE}/api/cron`, {
-      method: "GET",
+      method: "POST",
       cache: "no-store",
     });
     const responseData = await response.json();
@@ -340,6 +342,21 @@ async function submitPassword() {
   const password = input?.value.trim() || "";
   if (!password) return;
 
+  const loginResult = await loginDashboard(password);
+  if (!loginResult.ok) {
+    showAlert(loginResult.message || "Login gagal");
+    return;
+  }
+
+  localStorage.setItem(DASHBOARD_PASSWORD_STORAGE_KEY, password);
+  state.isAuthenticated = true;
+  if (input) input.value = "";
+  $("modalOverlay")?.classList.remove("show");
+  await loadAll();
+  startPoll();
+}
+
+async function loginDashboard(password) {
   try {
     const response = await fetch(`${API_BASE}/api/auth?action=login`, {
       method: "POST",
@@ -349,17 +366,11 @@ async function submitPassword() {
     });
     const data = await response.json();
     if (!response.ok) {
-      showAlert(data.error || "Login gagal");
-      return;
+      return { ok: false, message: data.error || "Login gagal" };
     }
-
-    state.isAuthenticated = true;
-    if (input) input.value = "";
-    $("modalOverlay")?.classList.remove("show");
-    await loadAll();
-    startPoll();
+    return { ok: true, data };
   } catch (err) {
-    showAlert(`Login gagal: ${err.message}`);
+    return { ok: false, message: `Login gagal: ${err.message}` };
   }
 }
 
@@ -401,7 +412,26 @@ async function bootstrapAuth() {
     loadAll();
     startPoll();
   } else {
+    const savedPassword =
+      localStorage.getItem(DASHBOARD_PASSWORD_STORAGE_KEY) || "";
+    if (savedPassword) {
+      const loginResult = await loginDashboard(savedPassword);
+      if (loginResult.ok) {
+        state.isAuthenticated = true;
+        $("modalOverlay")?.classList.remove("show");
+        const input = $("passwordInput");
+        if (input) input.value = savedPassword;
+        loadAll();
+        startPoll();
+        return;
+      }
+      localStorage.removeItem(DASHBOARD_PASSWORD_STORAGE_KEY);
+    }
     $("modalOverlay")?.classList.add("show");
+    const input = $("passwordInput");
+    if (input) {
+      input.value = localStorage.getItem(DASHBOARD_PASSWORD_STORAGE_KEY) || "";
+    }
   }
 }
 
@@ -428,7 +458,7 @@ async function loadLightData() {
 
   try {
     const [statusResult, recentResult] = await Promise.allSettled([
-      apiFetch("/api/status", controller.signal),
+      apiFetch(STATUS_API_PATH, controller.signal),
       apiFetch("/api/history?action=recent", controller.signal),
     ]);
 
@@ -531,7 +561,7 @@ async function loadAll() {
   try {
     const [statusResult, whitelistResult, recentResult, logsResult] =
       await Promise.allSettled([
-        apiFetch("/api/status", controller.signal),
+        apiFetch(STATUS_API_PATH, controller.signal),
         apiFetch("/api/whitelist", controller.signal),
         apiFetch("/api/history?action=recent", controller.signal),
         apiFetch("/api/history?action=logs", controller.signal),

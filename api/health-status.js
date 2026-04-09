@@ -69,31 +69,38 @@ function calculateUptimeFromStats(dailyStats) {
 
 export default async function handler(req, res) {
   const reqLogger = logApiHit("health-status", req);
+  const realtime =
+    String(req.query?.realtime || "").toLowerCase() === "1" ||
+    String(req.query?.realtime || "").toLowerCase() === "true";
 
   try {
     const now = Date.now();
 
-    // Check Redis cache first
-    const cached = await redis.get(HEALTH_STATUS_CACHE_KEY);
-    if (cached) {
-      let parsed;
-      if (typeof cached === "object") {
-        // Already parsed by Redis client
-        parsed = cached;
-      } else if (typeof cached === "string" && cached.startsWith("{")) {
-        // Valid JSON string
-        parsed = JSON.parse(cached);
-      } else {
-        // Invalid cache data, skip cache
-        logger.warn(
-          "[health-status] Invalid cache data:",
-          String(cached).slice(0, 100),
-        );
-        parsed = null;
-      }
-      if (parsed) {
-        logApiOk(reqLogger, { status: 200, cached: true });
-        return res.status(200).json({ ...parsed, cached: true });
+    if (realtime) {
+      res.setHeader("Cache-Control", "public, no-store, max-age=0");
+    } else {
+      // Check Redis cache first
+      const cached = await redis.get(HEALTH_STATUS_CACHE_KEY);
+      if (cached) {
+        let parsed;
+        if (typeof cached === "object") {
+          // Already parsed by Redis client
+          parsed = cached;
+        } else if (typeof cached === "string" && cached.startsWith("{")) {
+          // Valid JSON string
+          parsed = JSON.parse(cached);
+        } else {
+          // Invalid cache data, skip cache
+          logger.warn(
+            "[health-status] Invalid cache data:",
+            String(cached).slice(0, 100),
+          );
+          parsed = null;
+        }
+        if (parsed) {
+          logApiOk(reqLogger, { status: 200, cached: true });
+          return res.status(200).json({ ...parsed, cached: true });
+        }
       }
     }
 
@@ -180,21 +187,21 @@ export default async function handler(req, res) {
       {
         name: "Discord API",
         uptime: cronUptime, // Use same uptime as cron (Discord webhook success rate)
-        responseTime: null, // Not measured separately
+        ping: null, // Not measured separately
         incidents: [],
         note: "Based on webhook delivery success",
       },
       {
         name: "Redis Database",
         uptime: redisPing ? cronUptime : "0.00%", // If can't ping, Redis is down
-        responseTime: redisPing, // Actual ping time in ms
+        ping: redisPing, // Actual ping time in ms
         incidents: [],
         note: redisPing ? `Ping: ${redisPing}ms` : "Connection failed",
       },
       {
         name: "Cron Scheduler",
         uptime: cronUptime,
-        responseTime: null,
+        ping: null,
         incidents: cronStatus?.failed > 0
           ? [new Date().toISOString().split("T")[0]]
           : [],
@@ -253,10 +260,12 @@ export default async function handler(req, res) {
         : null,
     };
 
-    // Store in Redis cache
-    await redis.set(HEALTH_STATUS_CACHE_KEY, JSON.stringify(payload), {
-      ex: Math.floor(HEALTH_CACHE_TTL_MS / 1000),
-    });
+    if (!realtime) {
+      // Store in Redis cache
+      await redis.set(HEALTH_STATUS_CACHE_KEY, JSON.stringify(payload), {
+        ex: Math.floor(HEALTH_CACHE_TTL_MS / 1000),
+      });
+    }
 
     logApiOk(reqLogger, { status: 200, cached: false });
     return res.status(200).json(payload);

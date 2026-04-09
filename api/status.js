@@ -9,6 +9,9 @@ const logger = getLogger({ scope: "api:status" });
 
 export default async function handler(req, res) {
   logApiHit("status", req);
+  const realtime =
+    String(req.query?.realtime || "").toLowerCase() === "1" ||
+    String(req.query?.realtime || "").toLowerCase() === "true";
 
   const prepared = prepareAuthorizedGet(req, res, {
     defaultCacheTtl: STATUS_CACHE_SEC,
@@ -19,6 +22,13 @@ export default async function handler(req, res) {
   const { cacheTtl } = prepared;
 
   try {
+    if (realtime) {
+      // Explicit real-time mode for dashboard polling.
+      res.setHeader("Cache-Control", "private, no-store, max-age=0");
+      const payload = await readCronStatusWithHealth(redis);
+      return res.json(payload);
+    }
+
     const cached = await readStatusCache(redis);
     if (cached.hit) {
       return res.json(cached.value);
