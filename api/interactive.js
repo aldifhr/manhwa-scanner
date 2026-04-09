@@ -9,6 +9,7 @@ import {
 import commands from "../lib/commands/index.js";
 import {
   buildAddAutocompleteChoices,
+  handleAddSourcePickInteraction,
   resolveAddResultValue,
 } from "../lib/commands/add.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
@@ -210,6 +211,27 @@ export default async function handler(req, res) {
 
     if (type === InteractionType.MESSAGE_COMPONENT) {
       const { custom_id } = interactionData;
+
+      if (custom_id === "select_add_source") {
+        if (!(await isAddAllowedUser(payload, redis))) {
+          logApiOk(reqLogger, { status: 200, event: "add_source_selection_denied" });
+          return res.json({
+            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: "Command `/add` hanya diizinkan untuk user tertentu.",
+              flags: DISCORD_EPHEMERAL_FLAG,
+            },
+          });
+        }
+
+        const rawValue = String(interactionData.values?.[0] || "");
+        res.json({
+          type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { flags: DISCORD_EPHEMERAL_FLAG },
+        });
+        logApiOk(reqLogger, { status: 200, event: "add_source_selection_ack" });
+        return waitUntil(handleAddSourcePickInteraction(payload, rawValue, redis));
+      }
 
       if (custom_id === "select_add_src") {
         if (!(await isAddAllowedUser(payload, redis))) {
