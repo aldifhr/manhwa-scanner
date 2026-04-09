@@ -4,7 +4,6 @@ import { redis } from "../lib/redis.js";
 import {
   editInteractionResponse,
   editInteractionResponseWithComponents,
-  sendEphemeralFollowUp,
 } from "../lib/discord.js";
 import commands from "../lib/commands/index.js";
 import {
@@ -399,38 +398,36 @@ export default async function handler(req, res) {
               if (following) {
                 await withTimeout(unfollowManga(userId, title), 3000, "Unfollow manga");
                 try {
-                  // Send ephemeral follow-up instead of editing the message
-                  // This keeps the original embed intact
+                  // Edit original message with confirmation (after DEFERRED_UPDATE_MESSAGE)
                   return await withTimeout(
-                    sendEphemeralFollowUp(
-                      payload,
+                    editInteractionResponse(
+                      payload.token,
                       `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
                     ),
                     8000,
-                    "Send unfollow notification",
+                    "Send unfollow confirmation",
                   );
                 } catch (editErr) {
                   logger.warn(
-                    `[follow_toggle] Failed to send follow-up: ${editErr.message}`,
+                    `[follow_toggle] Failed to edit confirmation: ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
               } else {
                 await withTimeout(followManga(userId, title), 3000, "Follow manga");
                 try {
-                  // Send ephemeral follow-up instead of editing the message
-                  // This keeps the original embed intact
+                  // Edit original message with confirmation (after DEFERRED_UPDATE_MESSAGE)
                   return await withTimeout(
-                    sendEphemeralFollowUp(
-                      payload,
+                    editInteractionResponse(
+                      payload.token,
                       `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
                     ),
                     8000,
-                    "Send follow notification",
+                    "Send follow confirmation",
                   );
                 } catch (editErr) {
                   logger.warn(
-                    `[follow_toggle] Failed to send follow-up: ${editErr.message}`,
+                    `[follow_toggle] Failed to edit confirmation: ${editErr.message}`,
                   );
                   return; // Silent fail - action already succeeded
                 }
