@@ -23,7 +23,9 @@ const MAX_DEAD_LINKS_DISPLAY = 15;
 const CRON_EXEC_LOCK_KEY = "cron:run:lock";
 const CRON_EXEC_LOCK_TTL_SEC = 25;
 const HEALTH_STATUS_KEY = "health:last_status";
-const INTERNAL_TIMEOUT_MS = 25_000;
+// Keep timeout close to function maxDuration (30s) to avoid false "fatal"
+// while long-running scrape/dispatch is still legitimately completing.
+const INTERNAL_TIMEOUT_MS = 28_000;
 
 // Use env variable for max duration, fallback to 30s (FastCron free tier)
 export const config = { maxDuration: 30 };
