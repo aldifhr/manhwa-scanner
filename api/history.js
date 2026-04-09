@@ -177,7 +177,7 @@ export default async function handler(req, res) {
       .json(createErrorResponse("METHOD_NOT_ALLOWED", "Method not allowed"));
   }
 
-  const endpoint = req.query.endpoint || "recent";
+  const endpoint = req.query.endpoint || req.query.action || "recent";
 
   if (endpoint === "recent") {
     return handleRecent(req, res, reqLogger);

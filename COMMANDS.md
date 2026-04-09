@@ -1,90 +1,51 @@
-# Discord Bot Commands Summary
+﻿# COMMANDS.md
 
-## 📚 Whitelist Management (7 commands)
+Dokumen ini mengikuti definisi command di `scripts/sync-commands.js`.
 
-| Command | Options | Function | Access |
-|---------|---------|----------|--------|
-| `/add` | `title:<judul>` `url:<url>` | Tambah manga ke whitelist | Semua user |
-| `/remove` | `query:<judul/nomor/all>` | Hapus manga dari whitelist | Admin only |
-| `/list` | `[page:<n>]` `[search:<keyword>]` `[filter:<status>]` | Lihat daftar manga whitelist | Semua user |
-| `/search` | `query:<keyword>` `[page:<n>]` | Cari manga di whitelist (alias /list) | Semua user |
-| `/mark` | `query:<judul>` `reason:<status>` | Tandai manga dengan status | Admin only |
-| `/follow list` | - | Lihat manga yang di-follow | Semua user |
-| `/follow unfollow` | `title:<judul>` | Berhenti follow manga | Semua user |
+## Daftar Command
 
-### Status Choices untuk /mark:
-- `hiatus` - Tandai sebagai hiatus
-- `end_season` - Tandai sebagai end season
-- `end` - Tandai sebagai tamat
-- `clear` - Hapus penanda
+| Command | Opsi | Keterangan |
+|---|---|---|
+| `/status` | - | Lihat status whitelist saat ini |
+| `/add` | `query` (required) | Tambah manga ke whitelist (judul atau URL) |
+| `/remove` | `query` (required) | Hapus manga dari whitelist (judul/URL/nomor urut) |
+| `/mark` | `item` (required), `reason` (required) | Tandai status manga |
+| `/setchannel` | `channel` (required) | Set channel notifikasi |
+| `/clear` | - | Hapus semua whitelist (owner only) |
+| `/health` | - | Cek kesehatan sumber/scraper |
+| `/permission` | `action` (required), `user` (optional) | Kelola izin `/add` |
+| `/follow list` | `page` (optional) | Lihat daftar manga yang di-follow |
+| `/follow unfollow` | `title` (required) | Berhenti follow manga tertentu |
+| `/sync` | - | Trigger sinkronisasi manual (admin only) |
 
----
+## Choice Values
 
-## 🔔 Notification & Follow (3 commands)
+### `/mark reason`
+- `hiatus`
+- `end_season`
+- `end`
+- `clear`
 
-| Command | Options | Function | Access |
-|---------|---------|----------|--------|
-| `/pref` | `[mode:<all/follows/none>]` | Atur mode notifikasi | Semua user |
-| `/setchannel` | `channel:<#channel>` | Set channel notifikasi chapter baru | Admin only |
+### `/permission action`
+- `add`
+- `remove`
+- `list`
 
-### Mode Choices untuk /pref:
-- `all` - Dapat notif semua manga
-- `follows` - Hanya manga yang di-follow
-- `none` - Tidak ada notifikasi
+## Contoh
 
----
+```text
+/add query:Solo Leveling
+/remove query:1
+/mark item:Solo Leveling reason:hiatus
+/follow list page:2
+/follow unfollow title:Solo Leveling
+/permission action:list
+```
 
-## 📖 User Progress (2 commands)
+## Sinkronisasi ke Discord
 
-| Command | Options | Function | Access |
-|---------|---------|----------|--------|
-| `/myprogress list` | `[page:<n>]` | Lihat progress baca manga | Semua user |
-| `/myprogress clear` | `judul:<manga>` | Hapus manga dari progress | Semua user |
-
----
-
-## ⚙️ Admin & System (5 commands)
-
-| Command | Options | Function | Access |
-|---------|---------|----------|--------|
-| `/sync` | - | Trigger sinkronisasi manual seperti cron job | Admin only |
-| `/status report` | - | Lihat laporan status bot lengkap | Admin only |
-| `/status perm_add` | `user_id:<id>` | Grant akses /add ke user | Owner only |
-| `/status perm_remove` | `user_id:<id>` | Revoke akses /add dari user | Owner only |
-| `/status perm_list` | - | Lihat user dengan akses /add | Admin only |
-| `/permission` | `user:<@user>` `action:<grant/revoke>` | Kelola permission admin (alternatif) | Owner only |
-| `/health` | - | Cek kesehatan sistem bot | Admin only |
-| `/clear` | - | Hapus SELURUH whitelist (DANGER!) | Owner only |
-
----
-
-## 📊 Summary
-
-- **Total Commands**: 14
-- **User Commands**: 7 (`/add`, `/list`, `/search`, `/follow`, `/myprogress`, `/pref`)
-- **Admin Commands**: 6 (`/remove`, `/mark`, `/setchannel`, `/sync`, `/status`, `/health`)
-- **Owner Commands**: 2 (`/permission`, `/clear`)
-
----
-
-## 📝 Contoh Penggunaan
+Setelah ubah definisi command, jalankan:
 
 ```bash
-# User Commands
-/add title:Solo Leveling
-/list page:1 search:Solo
-/follow list
-/myprogress list page:1
-/pref mode:follows
-
-# Admin Commands
-/remove query:1
-/mark query:Solo Leveling reason:hiatus
-/setchannel channel:#manga-updates
-/sync
-/status report
-
-# Owner Commands
-/permission user:@username action:grant
-/clear
+node scripts/sync-commands.js
 ```

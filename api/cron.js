@@ -5,6 +5,7 @@ import { loggers, logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getAllGuildChannels, redis, writeCronStatus } from "../lib/redis.js";
 import { performFullHealthCheck } from "../lib/services/health.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
+import { rateLimiters } from "../lib/rateLimiter.js";
 import { z } from "zod";
 import {
   createErrorResponse,
@@ -19,6 +20,10 @@ const cronQuerySchema = z.object({
 
 const validMethods = ["GET", "POST"];
 const MAX_DEAD_LINKS_DISPLAY = 15;
+const CRON_EXEC_LOCK_KEY = "cron:run:lock";
+const CRON_EXEC_LOCK_TTL_SEC = 25;
+const HEALTH_STATUS_KEY = "health:last_status";
+const INTERNAL_TIMEOUT_MS = 25_000;
 
 // Use env variable for max duration, fallback to 30s (FastCron free tier)
 export const config = { maxDuration: 30 };
@@ -26,9 +31,66 @@ const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
 
-async function handleUpdateCron(req, res, reqLogger) {
+function withTimeout(promise, timeoutMs = INTERNAL_TIMEOUT_MS) {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Timeout after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+async function acquireCronExecutionLock() {
+  const lockToken = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const acquired = await redis.set(CRON_EXEC_LOCK_KEY, lockToken, {
+    nx: true,
+    ex: CRON_EXEC_LOCK_TTL_SEC,
+  });
+  if (acquired !== "OK") return null;
+  return lockToken;
+}
+
+async function releaseCronExecutionLock(lockToken) {
+  if (!lockToken) return;
   try {
-    const result = await runCronJob({ redisClient: redis, logger });
+    const current = await redis.get(CRON_EXEC_LOCK_KEY);
+    if (current === lockToken) {
+      await redis.del(CRON_EXEC_LOCK_KEY);
+    }
+  } catch (err) {
+    logger.warn({ err: err.message }, "Failed releasing cron execution lock");
+  }
+}
+
+async function writeHealthStatus(payload) {
+  try {
+    await redis.set(HEALTH_STATUS_KEY, JSON.stringify(payload));
+  } catch (err) {
+    logger.error("[health] Failed to write health status:", err.message);
+  }
+}
+
+async function handleUpdateCron(req, res, reqLogger) {
+  const lockToken = await acquireCronExecutionLock();
+  if (!lockToken) {
+    logApiOk(reqLogger, { status: 409, reason: "cron_locked" });
+    return res
+      .status(409)
+      .json(
+        createErrorResponse("CRON_LOCKED", "Cron job already running"),
+      );
+  }
+
+  try {
+    const result = await withTimeout(
+      runCronJob({ redisClient: redis, logger }),
+      INTERNAL_TIMEOUT_MS,
+    );
     logApiOk(reqLogger, { status: result.statusCode, ...result.logMeta });
 
     const standardizedBody = {
@@ -89,6 +151,8 @@ async function handleUpdateCron(req, res, reqLogger) {
             : err.message,
         ),
       );
+  } finally {
+    await releaseCronExecutionLock(lockToken);
   }
 }
 
@@ -97,7 +161,10 @@ async function handleHealthCron(req, res, reqLogger) {
   logger.info("Starting scheduled link health check...");
 
   try {
-    const deadLinks = await performFullHealthCheck();
+    const deadLinks = await withTimeout(
+      performFullHealthCheck(),
+      INTERNAL_TIMEOUT_MS,
+    );
     const duration = ((Date.now() - start) / 1000).toFixed(1);
 
     logger.info({ dead: deadLinks.length, duration }, "Link check complete");
@@ -125,7 +192,7 @@ async function handleHealthCron(req, res, reqLogger) {
 
         await Promise.all(
           channelIds.map((channelId) =>
-            sendDiscordEmbed(channelId, embed).catch((err) =>
+            sendDiscordEmbed(embed, channelId).catch((err) =>
               logger.warn(
                 { channelId, err: err.message },
                 "Failed to send dead link alert",
@@ -147,20 +214,13 @@ async function handleHealthCron(req, res, reqLogger) {
   } catch (err) {
     logger.error({ err: err.message }, "Scheduled link check failed");
 
-    // Log error to Redis (consistent with handleUpdateCron)
-    await writeCronStatus(redis, {
-      sent: 0,
-      skipped: 0,
+    // Keep health status separate so it does not overwrite cron update status.
+    await writeHealthStatus({
       failed: 1,
-      duration: null,
-      guilds: 0,
       timestamp: new Date().toISOString(),
-      sourceHealth: {},
-      scrapeMetrics: null,
-      outcome: "fatal_error",
-      shortCircuitReason: "health_check_failed",
+      outcome: "health_check_failed",
       error: err?.message || "Health check failed",
-    }).catch((e) => logger.error("[cron] Failed to write status:", e.message));
+    });
 
     await appendCronLog(
       redis,
@@ -203,6 +263,30 @@ export default async function handler(req, res) {
       .json(createErrorResponse("UNAUTHORIZED", "Unauthorized"));
   }
 
+  // Per-key rate limiting for cron endpoint.
+  const auth = String(req.headers.authorization || "");
+  const ip = String(
+    req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown",
+  )
+    .split(",")[0]
+    .trim();
+  const limiterKey = auth ? `auth:${auth.slice(-16)}` : `ip:${ip}`;
+  try {
+    await rateLimiters.cron.consume(limiterKey);
+  } catch (rejRes) {
+    const retryAfter = Math.max(
+      1,
+      Math.round(Number(rejRes?.msBeforeNext || 1000) / 1000),
+    );
+    logApiOk(reqLogger, { status: 429, reason: "rate_limited", retryAfter });
+    return res.status(429).json(
+      createErrorResponse(
+        "CRON_RATE_LIMITED",
+        `Too many cron requests. Retry in ${retryAfter}s.`,
+      ),
+    );
+  }
+
   // Query parameter validation with Zod
   const parseResult = cronQuerySchema.safeParse(req.query);
   if (!parseResult.success) {
@@ -217,6 +301,13 @@ export default async function handler(req, res) {
   }
 
   const { action } = parseResult.data;
+  if (action === "update" && req.method !== "POST") {
+    logApiOk(reqLogger, { status: 405, reason: "update_requires_post" });
+    return res
+      .status(405)
+      .json(createErrorResponse("METHOD_NOT_ALLOWED", "Use POST for update"));
+  }
+
   if (action === "health" || action === "links") {
     return handleHealthCron(req, res, reqLogger);
   }

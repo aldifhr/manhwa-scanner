@@ -144,12 +144,12 @@ const commands = [
       },
       {
         type: 1, // SUB_COMMAND
-        name: "remove",
+        name: "unfollow",
         description: "Berhenti mengikuti update manga",
         options: [
           {
             type: 3, // STRING
-            name: "judul",
+            name: "title",
             description: "Judul manga yang ingin di-unfollow",
             required: true,
           },

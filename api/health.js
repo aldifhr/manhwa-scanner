@@ -68,7 +68,7 @@ Found **${brokenLinks.length}** broken links in your whitelist.`;
       // Parallel Discord alerts (consistent with cron.js)
       await Promise.all(
         Object.values(guildChannels).map((channelId) =>
-          sendDiscordEmbed(channelId, embed).catch((err) => {
+          sendDiscordEmbed(embed, channelId).catch((err) => {
             reqLogger.warn(
               { channelId, err: err.message },
               "Failed to send health alert",

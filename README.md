@@ -1,138 +1,74 @@
-# ikiru-bot 🤖
+﻿# ikiru-bot
 
-Discord bot for manga update notifications. Tracks releases from multiple manga sources, notifies subscribed users via Discord slash commands and embed messages.
+Discord bot untuk notifikasi update manga berbasis Discord Interactions + Vercel serverless.
 
-## Tech Stack
+## Stack Aktual
 
-- **Runtime**: Vercel (serverless)
-- **Bot**: discord.js v14
-- **Cache/Queue**: Upstash Redis
-- **Scraping**: Custom scraper with selector-based selectors
-- **Dashboard**: Public web dashboard (HTML + vanilla JS)
-- **Testing**: Vitest
+- Runtime: Node.js (ESM), Vercel Functions
+- Discord: `discord-interactions` (bukan `discord.js`)
+- Storage/Cache: Upstash Redis
+- Scraping: scraper internal (`lib/scrapers/*`)
+- Dashboard: static HTML/CSS/JS di `public/`
+- Testing: `node --test` (`tests/*.test.js`)
 
-## Features
+## Struktur Utama
 
-- **Slash Commands** — `/manga add`, `/manga list`, `/manga remove`, `/manga check`
-- **Auto-updates** — Cron-based scraping every 30s, notifies Discord on new chapter
-- **Multi-source** — Selector-based scraper supporting different manga sites
-- **Whitelist** — Admin-managed whitelist of allowed manga/sources
-- **Dashboard** — Public HTML dashboard showing tracked manga + last update times
-- **Auth** — Admin-only endpoints protected by `AUTH_TOKEN`
-- **Rate Limiting** — Upstash Redis for per-user/request rate limiting
-- **Health Checks** — Cron runtime + source health monitoring
+- `api/`: endpoint serverless (`interactive`, `cron`, `history`, `status`, dll)
+- `lib/`: core logic (commands, services, redis, discord wrapper, auth, rate limiter)
+- `public/`: dashboard frontend
+- `scripts/sync-commands.js`: registrasi slash command ke Discord
+- `tests/`: unit + integration tests
 
-## Project Structure
-
-```
-ikiru-bot/
-├── api/                    # Vercel serverless API routes
-│   ├── cron.js            # Triggered by Vercel Cron (inc. health check)
-│   ├── history.js         # API for recent updates and logs
-│   ├── interactive.js     # Discord interaction handler
-│   ├── status.js          # Bot/source health status
-│   └── whitelist.js       # Whitelist management
-├── lib/                   # Core business logic
-│   ├── auth.js            # Admin authentication
-│   ├── cacheKeys.js       # Redis key schemas
-│   ├── commands/          # Discord slash commands
-│   ├── config.js         # Unified Configuration
-│   ├── cookie.js          # Cookie management for scraping
-│   ├── cronLogs.js       # Cron execution logging
-│   ├── cronRuntime.js    # Cron health tracking
-│   ├── discord.js         # Discord API client wrapper
-│   ├── domain.js         # Unified Domain Models
-│   ├── httpClient.js     # HTTP client with retry
-│   ├── logger.js         # Structured logging (inc. API logging)
-│   ├── monitorStore.js   # Manga monitor state
-│   ├── permissions.js     # Admin permission checks
-│   ├── redis.js          # Upstash Redis client
-│   ├── scraper.js        # Main scraper
-│   ├── scrapers/         # Source-specific scrapers
-│   ├── services/         # Business services
-│   └── statusCache.js    # Health status cache
-├── public/               # Dashboard (no build step)
-│   ├── dashboard-render.js
-│   ├── dashboard-utils.js
-│   ├── index.html
-│   ├── script.js
-│   └── styles.css
-├── tests/                # Vitest unit + integration tests
-├── whitelist.json        # Default whitelist
-├── vercel.json           # Vercel config (cron: every 30s)
-├── scripts/              # Utility scripts
-│   └── sync-commands.js  # Discord bot command registration
-├── whitelist.json        # Default whitelist
-├── vercel.json           # Vercel config (cron: every 30s)
-├── flush.js             # Manual cache flush
-└── package.json
-```
-
-## Setup
+## Setup Lokal
 
 ```bash
 npm install
-
-# Environment variables
 cp .env.example .env
-# Fill in:
-#   DISCORD_BOT_TOKEN
-#   REDIS_REST_URL
-#   REDIS_REST_TOKEN
-#   AUTH_TOKEN
-#   ADMIN_IDS (comma-separated Discord user IDs)
-#   WHITELIST_FILE (path to whitelist.json)
-
-# Run locally (requires ngrok for Discord webhooks)
-node scripts/sync-commands.js
-
-# Run tests
-npm test
 ```
 
-## Environment Variables
+Env minimal yang umum dipakai:
+- `DISCORD_BOT_TOKEN` (atau `DISCORD_TOKEN`)
+- `DISCORD_APPLICATION_ID` (atau `DISCORD_APP_ID`)
+- `DISCORD_PUBLIC_KEY`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `CRON_SECRET` / kredensial auth dashboard sesuai kebutuhan deployment
 
-| Variable | Description |
-|----------|-------------|
-| `DISCORD_BOT_TOKEN` | Discord bot token (from Discord Developer Portal) |
-| `REDIS_REST_URL` | Upstash Redis REST URL |
-| `REDIS_REST_TOKEN` | Upstash Redis REST token |
-| `AUTH_TOKEN` | Admin auth token for dashboard |
-| `ADMIN_IDS` | Comma-separated Discord user IDs with admin access |
-| `WHITELIST_FILE` | Path to `whitelist.json` |
-| `BASE_URL` | Public URL (for Vercel deployment) |
-
-## Discord Slash Commands
-
-| Command | Description |
-|---------|-------------|
-| `/manga add <url>` | Subscribe to a manga |
-| `/manga list` | List all subscribed manga |
-| `/manga remove <url>` | Unsubscribe from a manga |
-| `/manga check <url>` | Force check for new chapters |
-
-Admin-only: `/manga flush`, `/manga reload`
-
-## Dashboard
-
-Public dashboard at `BASE_URL` shows:
-- All tracked manga
-- Last checked time per manga
-- Source health status
-- Recent update logs
-
-Admin login at `BASE_URL/admin` (requires `AUTH_TOKEN`).
-
-## Deployment
+## Menjalankan
 
 ```bash
-# Vercel (recommended)
-vercel --prod
+# Dev server lokal
+npm run dev
 
-# Discord bot must be online 24/7
-# Vercel serverless functions handle API + cron
+# Vercel local runtime
+npm run dev:vercel
+
+# Sinkronisasi slash commands ke Discord
+node scripts/sync-commands.js
+
+# Quality gate
+npm run lint
+npm test
+npm run check
 ```
 
-## License
+## Slash Commands (Aktual)
 
-MIT
+Sumber kebenaran: `scripts/sync-commands.js`
+
+- `/status`
+- `/add query:<judul|url>`
+- `/remove query:<judul|url|nomor>`
+- `/mark item:<judul|nomor> reason:<hiatus|end_season|end|clear>`
+- `/setchannel channel:<#channel>`
+- `/clear`
+- `/health`
+- `/permission action:<add|remove|list> [user:<@user>]`
+- `/follow list [page:<n>]`
+- `/follow unfollow title:<judul>`
+- `/sync`
+
+## Catatan
+
+- Jangan commit `.env` atau token lokal (`.vercel/.env.preview.local`).
+- Setelah ubah definisi command, jalankan ulang `node scripts/sync-commands.js`.
