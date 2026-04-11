@@ -25,7 +25,7 @@ const cronQuerySchema = z.object({
 const validMethods = ["GET", "POST"];
 const MAX_DEAD_LINKS_DISPLAY = 15;
 const CRON_EXEC_LOCK_KEY = "cron:run:lock";
-const CRON_EXEC_LOCK_TTL_SEC = 25;
+const CRON_EXEC_LOCK_TTL_SEC = 60;
 const HEALTH_STATUS_KEY = "health:last_status";
 // Keep timeout close to function maxDuration (30s) to avoid false "fatal"
 // while long-running scrape/dispatch is still legitimately completing.

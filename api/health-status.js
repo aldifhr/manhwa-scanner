@@ -147,11 +147,9 @@ export default async function handler(req, res) {
           const incidents = [];
           const degradedDates = [];
 
-          dailyStats.forEach((stat, index) => {
-            // Simple: index 0 = today, index 1 = yesterday, etc.
-            const date = new Date();
-            date.setDate(date.getDate() - index);
-            const dateStr = date.toISOString().split("T")[0];
+          dailyStats.forEach((stat) => {
+            const dateStr = stat.date;
+            if (!dateStr) return;
 
             if (stat.failedLogs > 0 || stat.deliveryFailed > 0) {
               incidents.push(dateStr);
@@ -233,9 +231,9 @@ export default async function handler(req, res) {
       dailyStats: dailyStats,
       cached: false,
       overallStatus: hasFailed
-        ? "degraded"
+        ? "critical"
         : hasDegradedOnly
-          ? "warning"
+          ? "degraded"
           : "healthy",
       lastUpdated: new Date().toISOString(),
       uptime: overallUptime, // Real calculated uptime, not hardcoded
@@ -253,7 +251,7 @@ export default async function handler(req, res) {
           skipped: cronStatus.skipped || 0,
           failed: cronStatus.failed || 0,
           duration: cronStatus.duration
-            ? `${Math.round(cronStatus.duration / 1000)}s`
+            ? `${Math.round(Number(cronStatus.duration))}s`
             : "-",
           outcome: cronStatus.outcome || "unknown",
         }
