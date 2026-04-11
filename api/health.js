@@ -4,6 +4,7 @@ import {
   resetSourceCooldown,
   SOURCE_KEYS,
 } from "../lib/services/health.js";
+import { migrateSubscribersToHash } from "../lib/services/notifications.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getAllGuildChannels, redis } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
@@ -59,6 +60,12 @@ export default async function handler(req, res) {
         const resetData = await resetSourceCooldown(redis, source);
         logApiOk(reqLogger, { status: 200, action: "reset_source", source });
         return res.status(200).json(createSuccessResponse({ reset: resetData }));
+      }
+
+      if (action === "migrate_redis") {
+        const results = await migrateSubscribersToHash();
+        logApiOk(reqLogger, { status: 200, action: "migrate_redis", ...results });
+        return res.status(200).json(createSuccessResponse({ migration: results }));
       }
 
       return res.status(400).json(
