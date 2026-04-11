@@ -44,7 +44,11 @@ export default async function handler(req, res) {
   try {
     // POST: action-based handler
     if (req.method === "POST") {
-      const { action, source } = req.body || {};
+      let body = req.body;
+      if (typeof body === "string") {
+        try { body = JSON.parse(body); } catch { body = {}; }
+      }
+      const { action, source } = body || {};
 
       if (action === "reset_source") {
         if (!source || !SOURCE_KEYS.includes(source)) {
