@@ -1,5 +1,9 @@
 import { isCronAuthorized } from "../lib/auth.js";
-import { performFullHealthCheck } from "../lib/services/health.js";
+import {
+  performFullHealthCheck,
+  resetSourceCooldown,
+  SOURCE_KEYS,
+} from "../lib/services/health.js";
 import { logApiError, logApiHit, logApiOk } from "../lib/logger.js";
 import { getAllGuildChannels, redis } from "../lib/redis.js";
 import { sendDiscordEmbed } from "../lib/discord.js";
@@ -38,6 +42,27 @@ export default async function handler(req, res) {
   }
 
   try {
+    // POST: action-based handler
+    if (req.method === "POST") {
+      const { action, source } = req.body || {};
+
+      if (action === "reset_source") {
+        if (!source || !SOURCE_KEYS.includes(source)) {
+          return res.status(400).json(
+            createErrorResponse("INVALID_SOURCE", `Invalid source. Valid: ${SOURCE_KEYS.join(", ")}`),
+          );
+        }
+        const resetData = await resetSourceCooldown(redis, source);
+        logApiOk(reqLogger, { status: 200, action: "reset_source", source });
+        return res.status(200).json(createSuccessResponse({ reset: resetData }));
+      }
+
+      return res.status(400).json(
+        createErrorResponse("UNKNOWN_ACTION", `Unknown action: ${action}`),
+      );
+    }
+
+    // GET: full health check
     const brokenLinks = await performFullHealthCheck();
 
     // Properly parse recommendations from Redis (JSON string)
