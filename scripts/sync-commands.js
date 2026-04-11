@@ -35,11 +35,31 @@ const commands = [
     description: "Tambah manga ke whitelist",
     options: [
       {
-        type: 3, // STRING
-        name: "query",
-        description: "Judul manga atau URL (Ikiru/Shinigami)",
-        required: true,
-        autocomplete: true,
+        type: 1, // SUB_COMMAND
+        name: "search",
+        description: "Cari manga berdasarkan judul",
+        options: [
+          {
+            type: 3, // STRING
+            name: "query",
+            description: "Judul manga yang ingin dicari",
+            required: true,
+            autocomplete: true,
+          },
+        ],
+      },
+      {
+        type: 1, // SUB_COMMAND
+        name: "url",
+        description: "Tambah manga langsung dari URL",
+        options: [
+          {
+            type: 3, // STRING
+            name: "url",
+            description: "URL manga (Ikiru/Shinigami)",
+            required: true,
+          },
+        ],
       },
     ],
   },
