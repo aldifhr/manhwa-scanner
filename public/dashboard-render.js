@@ -26,13 +26,15 @@ export function createDashboardRenderer({ state, $, esc }) {
       };
     }
 
-    const degraded = health.status === "degraded";
+    const degraded = health.status === "degraded" || health.status === "circuit_break";
     const failures = Number(health.consecutiveFailures ?? 0);
+    const inCooldown = health.disabledUntil && new Date(health.disabledUntil).getTime() > Date.now();
+
     return {
       tone: degraded ? "degraded" : "healthy",
-      label: degraded ? "degraded" : "healthy",
+      label: inCooldown ? "circuit break" : degraded ? "degraded" : "healthy",
       failures,
-      extra: degraded
+      extra: inCooldown
         ? cooldownText(health.disabledUntil) || "cooldown"
         : `ok${health.lastSuccessAt ? ` (${timeAgo(health.lastSuccessAt)})` : ""}`,
       errorText: health.lastError || null,
@@ -598,6 +600,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     renderLogs,
     renderRecent,
     renderSourceChart,
+    renderSourceHealth,
     renderSummaryPanels,
     renderTrendChart,
     renderWhitelist,

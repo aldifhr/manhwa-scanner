@@ -40,30 +40,58 @@ export const config = { maxDuration: 30 };
 // Versioned cache key to avoid collision between environments
 const HEALTH_STATUS_CACHE_KEY = "api:health-status:cache:v1";
 
-// Calculate uptime string based on consecutive failures
-function calculateUptime(failures) {
+// Fallback calculation based on current consecutive failures
+function calculateCurrentUptime(failures) {
   if (!failures || failures === 0) return "100.00%";
   if (failures === 1) return "99.90%";
   if (failures === 2) return "99.80%";
   return `${Math.max(0, 99 - failures).toFixed(2)}%`;
 }
 
-// Calculate actual uptime percentage from daily stats
-function calculateUptimeFromStats(dailyStats) {
-  if (!dailyStats || dailyStats.length === 0) return "—"; // No data yet
-
-  const totalDays = dailyStats.length;
-  const failedDays = dailyStats.filter(
-    (s) => s.failedLogs > 0 || s.deliveryFailed > 0,
-  ).length;
-
-  // If all days failed but we have very few days of data, might be collection issue
-  if (failedDays >= totalDays && totalDays < 3) {
-    return "—";
+// Calculate uptime percentage for a specific source
+function calculateSourceUptime(dailyStats, sourceKey, currentFailures) {
+  if (!dailyStats || dailyStats.length === 0) {
+    return calculateCurrentUptime(currentFailures);
   }
 
-  // Real uptime calculation
-  const uptimePct = ((totalDays - failedDays) / totalDays) * 100;
+  let totalLogs = 0;
+  let failedLogs = 0;
+
+  for (const day of dailyStats) {
+    const raw = day.raw || {};
+    const sourceHits = Number(raw[`source:${sourceKey}`] || 0);
+    const sourceFailures = Number(raw[`source:${sourceKey}:tag:failed`] || 0);
+
+    totalLogs += sourceHits;
+    failedLogs += sourceFailures;
+  }
+
+  // Fallback if no logs found for THIS specific source in history
+  if (totalLogs === 0) {
+    return calculateCurrentUptime(currentFailures);
+  }
+
+  // Ratio-based uptime: (Success / Total) * 100
+  const uptimePct = ((totalLogs - failedLogs) / totalLogs) * 100;
+  return `${uptimePct.toFixed(2)}%`;
+}
+
+// Calculate actual global uptime percentage from aggregate daily stats
+function calculateGlobalUptime(dailyStats) {
+  if (!dailyStats || dailyStats.length === 0) return "—";
+
+  let totalEvents = 0;
+  let failedEvents = 0;
+
+  for (const day of dailyStats) {
+    totalEvents += day.runs;
+    failedEvents += day.failedLogs + day.deliveryFailed;
+  }
+
+  if (totalEvents === 0) return "—";
+
+  // Real success-rate based uptime calculation
+  const uptimePct = ((totalEvents - failedEvents) / totalEvents) * 100;
   return `${uptimePct.toFixed(2)}%`;
 }
 
@@ -139,8 +167,9 @@ export default async function handler(req, res) {
           const isHealthy = status === "healthy";
           const isDegraded = status === "degraded";
 
-          const uptime = calculateUptime(failures);
-          // Only use real measured response time, no fake values
+          // Calculate real uptime from daily stats for this specific source
+          const sourceUptime = calculateSourceUptime(dailyStats, source, failures);
+
           const ping = health.responseTime || null;
 
           // Calculate source-specific incidents from daily stats
@@ -151,15 +180,16 @@ export default async function handler(req, res) {
             const dateStr = stat.date;
             if (!dateStr) return;
 
-            if (stat.failedLogs > 0 || stat.deliveryFailed > 0) {
+            const raw = stat.raw || {};
+            const sourceFailures = Number(raw[`source:${source}:tag:failed`] || 0);
+            const sourcePartial = Number(raw[`source:${source}:tag:partial`] || 0);
+
+            if (sourceFailures > 0) {
               incidents.push(dateStr);
-            } else if (stat.partialLogs > 0 || stat.shortCircuits > 0) {
+            } else if (sourcePartial > 0) {
               degradedDates.push(dateStr);
             }
           });
-
-          // Calculate real uptime from daily stats
-          const sourceUptime = calculateUptimeFromStats(dailyStats);
 
           return {
             name: SOURCE_NAMES[source] ?? "Shinigami Mirror",
@@ -180,7 +210,7 @@ export default async function handler(req, res) {
     const redisPing = await measureRedisPing(redis);
 
     // System Services with REAL data from actual cron runs
-    const cronUptime = calculateUptimeFromStats(dailyStats);
+    const cronUptime = calculateGlobalUptime(dailyStats);
     const systemServices = [
       {
         name: "Discord API",
@@ -224,7 +254,7 @@ export default async function handler(req, res) {
       }),
     );
 
-    const overallUptime = calculateUptimeFromStats(dailyStats);
+    const overallUptime = calculateGlobalUptime(dailyStats);
 
     const payload = {
       networks: networks,

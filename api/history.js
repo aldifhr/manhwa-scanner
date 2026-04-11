@@ -133,19 +133,23 @@ async function handleLogs(req, res, reqLogger) {
       logs: raw
         .filter(Boolean)
         .slice(0, LOGS_DISPLAY_LIMIT)
-        .map((log) => ({
-          time: log?.time || null,
-          tag: log?.tag || "info",
-          code: log?.code || null,
-          type: log?.type || null,
-          source: log?.source || null,
-          title: String(log?.title || "").trim() || null, // Consistent trimming
-          count: Number.isFinite(Number(log?.count)) ? Number(log.count) : null,
-          failed: Number.isFinite(Number(log?.failed))
-            ? Number(log.failed)
-            : null,
-          message: String(log?.message || "").trim() || "Unknown log",
-        })),
+        .map((log) => {
+          const timestamp = log?.timestamp || log?.time || log?.createdAt || null;
+          return {
+            timestamp: timestamp,
+            time: timestamp, // Backward compatibility alias
+            tag: log?.tag || "info",
+            code: log?.code || null,
+            type: log?.type || null,
+            source: log?.source || null,
+            title: String(log?.title || "").trim() || null,
+            count: Number.isFinite(Number(log?.count)) ? Number(log.count) : null,
+            failed: Number.isFinite(Number(log?.failed))
+              ? Number(log.failed)
+              : null,
+            message: String(log?.message || "").trim() || "Unknown log",
+          };
+        }),
       dailyStats,
       totalLogs: raw.length,
       displayedLogs: Math.min(raw.length, LOGS_DISPLAY_LIMIT),

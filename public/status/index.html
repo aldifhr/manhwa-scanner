@@ -564,6 +564,12 @@
                 height: 30%;
             }
 
+            .timeline-bar.no-data {
+                background: var(--text-muted);
+                opacity: 0.2;
+                height: 12px;
+            }
+
             .timeline-bar:hover {
                 filter: brightness(1.2);
                 cursor: help;
@@ -1704,14 +1710,22 @@
                 const networks = data.networks || [];
                 const overallStatus = data.overallStatus || "healthy";
                 const uptime = data.uptime || "99.98%";
+                const dailyStats = data.dailyStats || [];
 
                 // Update banner
                 updateStatusBanner(overallStatus, networks, uptime);
 
+                // Create a record of which dates have ANY activity logged
+                const activeDates = new Set(
+                    dailyStats.map((s) => s.date).filter(Boolean),
+                );
+
                 // Render networks
                 const container = document.getElementById("networksContainer");
                 container.innerHTML = networks
-                    .map((network, index) => renderNetwork(network, index))
+                    .map((network, index) =>
+                        renderNetwork(network, index, activeDates),
+                    )
                     .join("");
             }
 
@@ -1769,7 +1783,7 @@
             }
 
             // Render network card
-            function renderNetwork(network, index) {
+            function renderNetwork(network, index, activeDates) {
                 const isOpen = network.open !== false;
                 const services = network.services || [];
 
@@ -1815,14 +1829,14 @@
                         </div>
                     </div>
                     <div class="services-container">
-                        ${services.map((service) => renderService(service)).join("")}
+                        ${services.map((service) => renderService(service, activeDates)).join("")}
                     </div>
                 </div>
             `;
             }
 
             // Render service row
-            function renderService(service) {
+            function renderService(service, activeDates) {
                 const status = service.status || "healthy";
                 const isHealthy =
                     status === "healthy" && !service.consecutiveFailures;
@@ -1845,7 +1859,7 @@
                       : ICONS.check;
 
                 // Generate timeline bars
-                const timelineBars = generateTimelineBars(service);
+                const timelineBars = generateTimelineBars(service, activeDates);
 
                 // Calculate response time display
                 const pingText = service.ping ? `${service.ping}ms` : "—";
@@ -1881,7 +1895,7 @@
             }
 
             // Generate timeline bars
-            function generateTimelineBars(service) {
+            function generateTimelineBars(service, activeDates) {
                 const incidents = service.incidents || [];
                 const degraded = service.degraded || [];
                 const bars = [];
@@ -1899,13 +1913,19 @@
                         day: "numeric",
                     });
 
-                    // API provides incidents/degraded entries as yyyy-mm-dd dates
-                    if (incidents.includes(dateKey)) {
+                    const isActive = activeDates && activeDates.has(dateKey);
+                    const isIncident = incidents.includes(dateKey);
+                    const isDegraded = degraded.includes(dateKey);
+
+                    if (isIncident) {
                         barClass = "failed";
                         title = "Incident reported";
-                    } else if (degraded.includes(dateKey)) {
+                    } else if (isDegraded) {
                         barClass = "degraded";
                         title = "Degraded performance";
+                    } else if (!isActive) {
+                        barClass = "no-data";
+                        title = "No Data Available";
                     }
 
                     bars.push(

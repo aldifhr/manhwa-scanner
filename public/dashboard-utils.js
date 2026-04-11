@@ -104,8 +104,15 @@ export function markLabel(mark) {
 export function cooldownText(disabledUntil) {
   const target = parseDateSafe(disabledUntil);
   if (!target) return null;
-  const mins = Math.ceil((target.getTime() - Date.now()) / 60000);
-  if (mins <= 0) return "retry now";
+  const now = Date.now();
+  const diffMs = target.getTime() - now;
+  if (diffMs <= 0) return "ready";
+
+  const totalSeconds = Math.ceil(diffMs / 1000);
+  if (totalSeconds < 120) {
+    return `retry ${totalSeconds}s`;
+  }
+  const mins = Math.ceil(totalSeconds / 60);
   return `retry ${mins}m`;
 }
 

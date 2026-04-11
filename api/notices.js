@@ -44,7 +44,7 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
       const log = logs[index];
       try {
         const entry = typeof log === "string" ? JSON.parse(log) : log;
-        const timestamp = entry.timestamp || entry.createdAt;
+        const timestamp = entry.timestamp || entry.time || entry.createdAt;
 
         if (timestamp && getTimestampMs(timestamp) < cutoffTime) continue;
 
@@ -65,7 +65,7 @@ async function fetchCronErrorLogs(redisClient, daysBack = 7) {
               entry.message ||
               entry.summary ||
               `Failed: ${entry.chaptersFailed || 0} chapters`,
-            timestamp: timestamp || new Date().toISOString(),
+            timestamp: timestamp || null,
             source: entry.source || "system",
             details: {
               chaptersFailed: entry.chaptersFailed || 0,
@@ -110,10 +110,9 @@ async function fetchHealthCheckFailures(redisClient, daysBack = 7) {
           id: `health-${source}-${lastCheckedAt || Date.now()}`,
           type: "health_check_failure",
           severity: health.consecutiveFailures > 3 ? "high" : "medium",
-          title: `Source Health: ${source}`,
           message:
             lastError || `${health.consecutiveFailures} consecutive failures`,
-          timestamp: lastCheckedAt || new Date().toISOString(),
+          timestamp: lastCheckedAt || null,
           source: source,
           details: {
             consecutiveFailures: health.consecutiveFailures || 0,
@@ -160,7 +159,7 @@ async function fetchDiscordNotificationFailures(redisClient, daysBack = 7) {
           severity: "high",
           title: "Discord Notification Failed",
           message: entry.error || "Failed to send Discord notification",
-          timestamp: timestamp || new Date().toISOString(),
+          timestamp: timestamp || null,
           source: "discord",
           details: {
             channelId: entry.channelId,

@@ -25,6 +25,7 @@ const state = {
   isAuthenticated: false,
   lightPollTimer: null,
   heavyPollTimer: null,
+  healthTickTimer: null,
   pollMs: Number(localStorage.getItem("ikiru_poll_ms") || DEFAULT_POLL_MS),
   autoRefreshEnabled: localStorage.getItem("ikiru_auto_refresh") !== "off",
   isProcessing: false,
@@ -55,6 +56,7 @@ const {
   renderLogs,
   renderRecent,
   renderSourceChart,
+  renderSourceHealth,
   renderSummaryPanels,
   renderTrendChart,
   renderWhitelist,
@@ -390,6 +392,7 @@ async function logoutDashboard() {
   $("modalOverlay")?.classList.add("show");
   clearInterval(state.lightPollTimer);
   clearInterval(state.heavyPollTimer);
+  clearInterval(state.healthTickTimer);
   state.lightAbortController = null;
   state.heavyAbortController = null;
   state.loadAbortController = null;
@@ -626,13 +629,33 @@ async function loadAll() {
 function startPoll() {
   clearInterval(state.lightPollTimer);
   clearInterval(state.heavyPollTimer);
+  clearInterval(state.healthTickTimer);
   if (!state.autoRefreshEnabled) return;
+
   state.lightPollTimer = setInterval(() => {
     if (!state.isProcessing) loadLightData();
   }, currentLightPollMs());
+
   state.heavyPollTimer = setInterval(() => {
     if (!state.isProcessing) loadHeavyData();
   }, currentHeavyPollMs());
+
+  startHealthTicker();
+}
+
+function startHealthTicker() {
+  clearInterval(state.healthTickTimer);
+  state.healthTickTimer = setInterval(() => {
+    if (state.isProcessing || !state.latestStatusData) return;
+    const healthMap = state.latestStatusData.sourceHealth || {};
+    const hasCooldown = Object.values(healthMap).some((h) => {
+      const target = h?.disabledUntil ? new Date(h.disabledUntil).getTime() : 0;
+      return target > Date.now();
+    });
+    if (hasCooldown) {
+      renderSourceHealth(state.latestStatusData);
+    }
+  }, 1000);
 }
 
 function updateAutoRefreshUI() {

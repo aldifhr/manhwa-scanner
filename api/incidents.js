@@ -54,7 +54,7 @@ async function fetchCronIncidents(redisClient, daysBack = 30) {
       const log = logs[index];
       try {
         const entry = typeof log === "string" ? JSON.parse(log) : log;
-        const timestamp = entry.timestamp || entry.createdAt;
+        const timestamp = entry.timestamp || entry.time || entry.createdAt;
 
         if (!timestamp || getTimestampMs(timestamp) < cutoffTime) continue;
 

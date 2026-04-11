@@ -37,13 +37,13 @@ const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
 
-function withTimeout(promise, timeoutMs = INTERNAL_TIMEOUT_MS) {
+function withTimeout(promise, timeoutMs = INTERNAL_TIMEOUT_MS, lifecycle = null) {
   let timer = null;
   const timeoutPromise = new Promise((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`Timeout after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
+    timer = setTimeout(() => {
+      const phaseInfo = lifecycle?.currentStep ? ` during ${lifecycle.currentStep}` : "";
+      reject(new Error(`Timeout after ${timeoutMs}ms${phaseInfo}`));
+    }, timeoutMs);
   });
 
   return Promise.race([promise, timeoutPromise]).finally(() => {
@@ -123,9 +123,17 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
       fastSecondaryLimit,
     };
 
+    const lifecycle = { currentStep: "initializing" };
     const result = await withTimeout(
-      runCronJob({ redisClient: redis, logger, scrapeOptions }),
+      runCronJob({
+        redisClient: redis,
+        logger,
+        scrapeOptions,
+        lifecycle,
+        deadlineMs: INTERNAL_TIMEOUT_MS,
+      }),
       INTERNAL_TIMEOUT_MS,
+      lifecycle,
     );
     logApiOk(reqLogger, { status: result.statusCode, ...result.logMeta });
 
@@ -231,14 +239,32 @@ async function handleHealthCron(req, res, reqLogger) {
         };
 
         await Promise.all(
-          channelIds.map((channelId) =>
-            sendDiscordEmbed(embed, channelId).catch((err) =>
+          channelIds.map(async (channelId) => {
+            const res = await sendDiscordEmbed(embed, channelId);
+            if (res && (res.status === 403 || res.status === 404)) {
+              const guildChannels = await getAllGuildChannels().catch(() => ({}));
+              const guildId = Object.keys(guildChannels).find(
+                (gid) => guildChannels[gid] === channelId,
+              );
+              if (guildId) {
+                logger.warn(
+                  { guildId, channelId, status: res.status },
+                  "CLEANUP (Health): Deleting stale channel",
+                );
+                await deleteGuildChannel(guildId).catch((e) =>
+                  logger.error(
+                    { gid: guildId, err: e.message },
+                    "Failed cleanup",
+                  ),
+                );
+              }
+            } else if (!res.success) {
               logger.warn(
-                { channelId, err: err.message },
+                { channelId, err: res.error },
                 "Failed to send dead link alert",
-              ),
-            ),
-          ),
+              );
+            }
+          }),
         );
       }
     }

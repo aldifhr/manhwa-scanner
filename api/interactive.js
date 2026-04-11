@@ -232,58 +232,6 @@ export default async function handler(req, res) {
         return waitUntil(handleAddSelection(payload, rawValue, redis));
       }
 
-      if (custom_id === "select_add_src") {
-        if (!(await isAddAllowedUser(payload, redis))) {
-          logApiOk(reqLogger, { status: 200, event: "add_selection_denied" });
-          return res.json({
-            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              content: "Command `/add` hanya diizinkan untuk user tertentu.",
-              flags: DISCORD_EPHEMERAL_FLAG,
-            },
-          });
-        }
-
-        const { cached, item, selectedSource } =
-          await resolveAddSelection(interactionData);
-
-        if (!cached) {
-          logApiOk(reqLogger, { status: 200, event: "add_session_expired" });
-          return res.json({
-            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "Session expired. Run /add again.", flags: DISCORD_EPHEMERAL_FLAG },
-          });
-        }
-
-        if (!item) {
-          logApiOk(reqLogger, {
-            status: 200,
-            event: "add_selection_not_found",
-          });
-          return res.json({
-            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              content: "Selected manga not found. Run /add again.",
-              flags: DISCORD_EPHEMERAL_FLAG,
-            },
-          });
-        }
-
-        res.json({
-          type: InteractionType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { flags: DISCORD_EPHEMERAL_FLAG },
-        });
-        logApiOk(reqLogger, { status: 200, event: "add_selection_ack" });
-        return waitUntil(
-          handleAddManga(
-            payload,
-            item.title,
-            item.mangaUrl ?? item.url,
-            selectedSource,
-          ),
-        );
-      }
-
       if (custom_id.startsWith("list:")) {
         const parts = custom_id.split(":");
         // Bounds check: need at least 2 parts ("list:page")
