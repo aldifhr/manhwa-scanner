@@ -335,67 +335,62 @@ export default async function handler(req, res) {
       }
 
       if (custom_id.startsWith("follow_toggle:")) {
-        // Debug: log token presence
-        logger.debug({
-          hasToken: !!payload.token,
-          tokenType: typeof payload.token,
-          tokenLength: payload.token?.length,
-          interactionType: payload.type,
-        }, "[follow_toggle] Payload token check");
-
-        // Use helper function for consistent user ID extraction
         const userId = getUserId(payload);
         const title = custom_id.slice("follow_toggle:".length);
 
         if (!userId) {
           return res.json({
-            type: InteractionType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: "❌ Error: Could not identify user.", flags: DISCORD_EPHEMERAL_FLAG },
-          });
-        }
-
-        // Process bookmark toggle synchronously and respond immediately
-        try {
-          const following = await withTimeout(
-            isUserFollowing(userId, title),
-            3000,
-            "Check following status",
-          );
-          const notifyMode = await withTimeout(
-            getUserNotifyMode(userId),
-            2000,
-            "Get notify mode",
-          );
-
-          if (following) {
-            await withTimeout(unfollowManga(userId, title), 3000, "Unfollow manga");
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: {
-                content: `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu masih dapat notif semua manga' : '"Follows" - Hanya manga yang di-bookmark'}.`,
-                flags: DISCORD_EPHEMERAL_FLAG,
-              },
-            });
-          } else {
-            await withTimeout(followManga(userId, title), 3000, "Follow manga");
-            return res.json({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: {
-                content: `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${notifyMode === "all" ? '"All" - Kamu dapat notif semua manga' : '"Follows" - Kamu akan di-tag saat chapter baru'}`,
-                flags: DISCORD_EPHEMERAL_FLAG,
-              },
-            });
-          }
-        } catch (err) {
-          logger.error("[follow_toggle] Error:", err);
-          return res.json({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: "❌ Gagal memproses bookmark. Silakan coba lagi.",
+              content: "❌ Error: Could not identify user.",
               flags: DISCORD_EPHEMERAL_FLAG,
             },
           });
         }
+
+        // 1. Respond quickly with DEFERRED status to avoid 3s timeout
+        res.json({
+          type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { flags: DISCORD_EPHEMERAL_FLAG },
+        });
+
+        // 2. Process the actual logic in background
+        return waitUntil(
+          (async () => {
+            try {
+              // Fetch status and notify mode in parallel
+              const [following, notifyMode] = await Promise.all([
+                isUserFollowing(userId, title),
+                getUserNotifyMode(userId),
+              ]);
+
+              let finalContent = "";
+              if (following) {
+                await unfollowManga(userId, title);
+                finalContent = `🔖 **Bookmark Dihapus**\n\nBookmark untuk **${title}** telah dihapus.\n\nMode notifikasi: ${
+                  notifyMode === "all"
+                    ? '"All" - Kamu masih dapat notif semua manga'
+                    : '"Follows" - Hanya manga yang di-bookmark'
+                }.`;
+              } else {
+                await followManga(userId, title);
+                finalContent = `🔖 **Bookmark Ditambahkan**\n\n**${title}** telah ditambahkan ke bookmark!\n\nMode notifikasi: ${
+                  notifyMode === "all"
+                    ? '"All" - Kamu dapat notif semua manga'
+                    : '"Follows" - Kamu akan di-tag saat chapter baru'
+                }`;
+              }
+
+              await editInteractionResponse(payload, finalContent);
+            } catch (err) {
+              logger.error("[follow_toggle] Async error:", err);
+              await editInteractionResponse(
+                payload,
+                "❌ Gagal memproses bookmark. Silakan coba lagi.",
+              );
+            }
+          })(),
+        );
       }
 
       logApiOk(reqLogger, { status: 400, reason: "unknown_component" });
