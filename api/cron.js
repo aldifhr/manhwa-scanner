@@ -144,6 +144,7 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
         skipped: result.body?.skipped ?? 0,
         skipBreakdown: result.body?.skipBreakdown ?? null,
         failed: result.body?.failed ?? 0,
+        enqueued: result.body?.enqueued ?? 0,
         duration: result.body?.duration ?? null,
         guilds: result.body?.guilds ?? 0,
         whitelist: result.body?.whitelist ?? null,
@@ -158,6 +159,16 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
       },
       timestamp: new Date().toISOString(),
     };
+
+    // Hot-start worker trigger (fire & forget)
+    if (standardizedBody.data.enqueued > 0) {
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://${req.headers.host}`;
+      const workerUrl = `${baseUrl}/api/worker?token=${process.env.WORKER_TOKEN}`;
+
+      fetch(workerUrl).catch(err => {
+        logger.warn({ err: err.message }, "Failed to hot-start worker");
+      });
+    }
 
     return res.status(result.statusCode).json(standardizedBody);
   } catch (err) {
