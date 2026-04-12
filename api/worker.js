@@ -3,32 +3,65 @@ import { sendDiscordEmbed } from "../lib/discord.js";
 import { redis, hsetWithTTL, DISPATCH_HISTORY_KEY } from "../lib/redis.js";
 import { getLogger } from "../lib/logger.js";
 import { normalizeChapterIdentity } from "../lib/domain.js";
-import { CHAPTER_TTL_SEC, CLAIM_STATUS } from "../lib/config.js";
+import { CHAPTER_TTL_SEC, CLAIM_STATUS, CROSS_SOURCE_DEDUPE_TTL_SEC } from "../lib/config.js";
 
 const logger = getLogger({ scope: "worker" });
 const WORKER_TIMEOUT_MS = 25000; // 25s limit for Vercel
 const BATCH_SIZE = 5;
 
-async function markAsSent(chapter, nowIso) {
-  const key = normalizeChapterIdentity(chapter);
+async function markAsSent(task, nowIso) {
+  const { chapter, primaryKey, duplicateKey } = task;
   const ttlMs = CHAPTER_TTL_SEC * 1000;
+  const duplicateTtlMs = CROSS_SOURCE_DEDUPE_TTL_SEC * 1000;
 
-  await hsetWithTTL(
-    redis,
-    DISPATCH_HISTORY_KEY,
-    key,
-    JSON.stringify({
-      status: CLAIM_STATUS.SENT,
-      sentAt: nowIso,
-      expiresAt: Date.now() + ttlMs,
-    }),
-    ttlMs,
+  const statusJson = JSON.stringify({
+    status: CLAIM_STATUS.SENT,
+    sentAt: nowIso,
+    expiresAt: Date.now() + ttlMs,
+  });
+
+  const tasks = [];
+
+  if (primaryKey) {
+    tasks.push(hsetWithTTL(redis, DISPATCH_HISTORY_KEY, primaryKey, statusJson, ttlMs));
+  }
+
+  if (duplicateKey) {
+    tasks.push(
+      hsetWithTTL(
+        redis,
+        DISPATCH_HISTORY_KEY,
+        duplicateKey,
+        JSON.stringify({
+          status: CLAIM_STATUS.SENT,
+          sentAt: nowIso,
+          expiresAt: Date.now() + duplicateTtlMs,
+        }),
+        duplicateTtlMs,
+      ),
+    );
+  }
+
+  // Update recent:chapters with actual sentAt time for dashboard visibility
+  const chapterKeyPre = `${chapter.title}:${chapter.chapter}:`;
+  tasks.push(
+    (async () => {
+      try {
+        const recent = await redis.hgetall("recent:chapters");
+        const foundKey = Object.keys(recent || {}).find((k) => k.startsWith(chapterKeyPre));
+        if (foundKey) {
+          const data = JSON.parse(recent[foundKey]);
+          data.sentAt = nowIso;
+          data.status = CLAIM_STATUS.SENT;
+          await redis.hset("recent:chapters", { [foundKey]: JSON.stringify(data) });
+        }
+      } catch (err) {
+        logger.warn({ err: err.message }, "Failed to update recent:chapters in worker");
+      }
+    })(),
   );
 
-  // Also update recent:chapters with sentAt
-  const chapterKeyPre = `${chapter.title}:${chapter.chapter}:`;
-  // Since we don't know the exact enqueuedAt key, we might need a better way
-  // to sync these, but for now we'll just ensure dispatch:history is the source of truth.
+  await Promise.all(tasks);
 }
 
 export default async function handler(req, res) {
@@ -69,7 +102,7 @@ export default async function handler(req, res) {
         }
 
         if (success) {
-          await markAsSent(chapter, new Date().toISOString());
+          await markAsSent(task, new Date().toISOString());
           processedCount++;
         } else {
           failedCount++;
