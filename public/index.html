@@ -78,6 +78,7 @@
                     <span id="liveFailed">F:-</span>
                     <span id="liveGuilds">G:-</span>
                     <span id="liveDuration">D:-</span>
+                    <span id="liveQueue" title="Queue length" style="color: var(--accent-2); font-weight: bold;">Q:-</span>
                 </div>
                 <span class="last-updated" id="lastUpdated">-</span>
                 <span class="poll-indicator" id="pollInfo"
@@ -106,7 +107,7 @@
                     id="btnRunCron"
                     onclick="runCronNow()"
                 >
-                    jalankan cron
+                    Jalankan Cron
                 </button>
                 <button
                     type="button"
@@ -351,6 +352,22 @@
                     <ul class="manga-list" id="mangaList">
                         <li class="empty">memuat...</li>
                     </ul>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-title panel-title-accent">live activity feed</div>
+                <div class="card card-terminal">
+                    <div class="card-header">
+                        <span class="card-title">Bot monitoring console</span>
+                        <div class="terminal-status">
+                            <span class="status-pulse"></span>
+                            <span id="liveFeedStatus">Listening...</span>
+                        </div>
+                    </div>
+                    <div class="terminal-body" id="liveFeedBody">
+                        <div class="terminal-line empty">Menunggu aktivitas baru...</div>
+                    </div>
                 </div>
             </section>
 

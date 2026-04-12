@@ -971,3 +971,103 @@ body {
         border-radius: 12px;
     }
 }
+
+/* Terminal / Live Feed Styles */
+.panel-title-accent {
+    color: var(--accent-2);
+}
+
+.card-terminal {
+    background: #0f1115;
+    border-color: #2a2e35;
+    color: #e6edf3;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.body.dark .card-terminal {
+    background: #0d1117;
+}
+
+.terminal-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font: 500 10px var(--mono);
+}
+
+.status-pulse {
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    position: relative;
+}
+
+.status-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border: 1px solid var(--green);
+    border-radius: 50%;
+    animation: status-ring 1.5s infinite;
+}
+
+@keyframes status-ring {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(3); opacity: 0; }
+}
+
+.terminal-body {
+    padding: 12px;
+    max-height: 280px;
+    height: 240px;
+    overflow-y: auto;
+    font: 400 12px var(--mono);
+    line-height: 1.6;
+    background: #0a0c10;
+    scrollbar-color: #30363d transparent;
+    display: flex;
+    flex-direction: column;
+}
+
+.terminal-line {
+    display: flex;
+    gap: 10px;
+    padding: 2px 0;
+    animation: line-fade-in 0.3s ease-out;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+@keyframes line-fade-in {
+    from { opacity: 0; transform: translateX(-5px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.terminal-time {
+    color: #8b949e;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.terminal-msg {
+    word-break: break-word;
+}
+
+.t-info { color: #58a6ff; }
+.t-success { color: #3fb950; }
+.t-warn { color: #d29922; }
+.t-error { color: #f85149; }
+
+.terminal-body::-webkit-scrollbar {
+    width: 8px;
+}
+.terminal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.terminal-body::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 4px;
+}
+.terminal-body::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+}

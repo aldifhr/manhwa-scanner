@@ -2,7 +2,7 @@ import { createDashboardRenderer } from "./dashboard-render.js";
 import { fmt, msToSecondsLabel } from "./dashboard-utils.js";
 
 const API_BASE = "";
-const STATUS_API_PATH = "/api/status?realtime=1";
+const SNAPSHOT_API_PATH = "/api/dashboard-snapshot";
 const DASHBOARD_PASSWORD_STORAGE_KEY = "ikiru_dashboard_password";
 const DEFAULT_POLL_MS = 120_000;
 const DEFAULT_HEAVY_POLL_MS = 600_000;
@@ -462,38 +462,47 @@ async function loadLightData() {
   state.lightAbortController = controller;
 
   try {
-    const [statusResult, recentResult] = await Promise.allSettled([
-      apiFetch(STATUS_API_PATH, controller.signal),
-      apiFetch("/api/history?action=recent", controller.signal),
-    ]);
+    const snapshot = await apiFetch(SNAPSHOT_API_PATH, controller.signal);
 
     if (state.lightAbortController !== controller) return;
     if (!state.isAuthenticated) return;
 
-    if (statusResult.status === "fulfilled") {
-      state.latestStatusData = statusResult.value;
-      renderSummaryPanels();
-    } else if (
-      statusResult.reason?.name !== "AbortError" &&
-      !state.latestStatusData
-    ) {
-      renderSummaryPanels();
+    // Map snapshot to existing state properties
+    state.latestStatusData = snapshot.cronStatus || {};
+    // Inject sourceHealth and other missing fields if needed
+    state.latestStatusData.sourceHealth = snapshot.sourceHealth;
+    state.latestStatusData.recommendations = snapshot.recommendations;
+    state.latestStatusData.queueLength = snapshot.queueLength;
+    state.latestStatusData.liveEvents = snapshot.liveEvents;
+
+    state.recentItems = snapshot.recentChapters;
+
+    // Update Whitelist from snapshot
+    if (snapshot.whitelist) {
+      state.latestWhitelistData = snapshot.whitelist;
+      renderWhitelist(state.latestWhitelistData);
     }
 
-    if (recentResult.status === "fulfilled") {
-      state.latestRecentData = recentResult.value;
-      renderRecent(state.latestRecentData);
-      renderSummaryPanels();
-    } else if (
-      recentResult.reason?.name !== "AbortError" &&
-      !state.latestRecentData
-    ) {
-      renderErr($("recentList"), "Gagal muat recent data");
+    // Update logs if available in snapshot
+    if (snapshot.recentLogs) {
+      state.logsItems = snapshot.recentLogs;
     }
+
+    renderSummaryPanels();
+    renderRecent(state.latestRecentData);
+    if (snapshot.recentLogs) renderLogs({ logs: snapshot.recentLogs });
+
+    // Refresh visual analytics
+    renderTrendChart();
+    renderSourceChart();
 
     const lastUpdated = $("lastUpdated");
     if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
     state.lastLightLoadAt = Date.now();
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      console.error("Light load failed:", err);
+    }
   } finally {
     if (state.lightAbortController === controller)
       state.lightAbortController = null;
@@ -503,43 +512,9 @@ async function loadLightData() {
 async function loadHeavyData() {
   if (!checkAuth()) return;
 
-  if (state.heavyAbortController) state.heavyAbortController.abort();
-  const controller = new AbortController();
-  state.heavyAbortController = controller;
-
-  try {
-    const [whitelistResult, logsResult] = await Promise.allSettled([
-      apiFetch("/api/whitelist", controller.signal),
-      apiFetch("/api/history?action=logs", controller.signal),
-    ]);
-
-    if (state.heavyAbortController !== controller) return;
-    if (!state.isAuthenticated) return;
-
-    if (whitelistResult.status === "fulfilled") {
-      state.latestWhitelistData = whitelistResult.value;
-      renderWhitelist(state.latestWhitelistData);
-      renderSummaryPanels();
-    } else if (
-      whitelistResult.reason?.name !== "AbortError" &&
-      !state.latestWhitelistData
-    ) {
-      renderErr($("mangaList"), "Gagal muat whitelist");
-    }
-
-    if (logsResult.status === "fulfilled") {
-      renderLogs(logsResult.value);
-    } else if (logsResult.reason?.name !== "AbortError") {
-      renderErr($("logList"), "Gagal muat logs");
-    }
-
-    const lastUpdated = $("lastUpdated");
-    if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
-    state.lastHeavyLoadAt = Date.now();
-  } finally {
-    if (state.heavyAbortController === controller)
-      state.heavyAbortController = null;
-  }
+  // With consolidate snapshot, heavy data only loads additional history if needed
+  // For now, loadLightData handles everything efficiently.
+  return Promise.resolve();
 }
 
 async function loadAll() {
@@ -563,66 +538,22 @@ async function loadAll() {
   skeleton($("logList"), 6);
   skeleton($("sourceHealthList"), 3);
 
+  state.isProcessing = true;
   try {
-    const [statusResult, whitelistResult, recentResult, logsResult] =
-      await Promise.allSettled([
-        apiFetch(STATUS_API_PATH, controller.signal),
-        apiFetch("/api/whitelist", controller.signal),
-        apiFetch("/api/history?action=recent", controller.signal),
-        apiFetch("/api/history?action=logs", controller.signal),
-      ]);
-
-    if (state.loadAbortController !== controller) return;
-    if (!state.isAuthenticated) return;
-
-    const statusData =
-      statusResult.status === "fulfilled" ? statusResult.value : null;
-    const whitelistData =
-      whitelistResult.status === "fulfilled" ? whitelistResult.value : null;
-    const recentData =
-      recentResult.status === "fulfilled" ? recentResult.value : null;
-    const logsData =
-      logsResult.status === "fulfilled" ? logsResult.value : null;
-
-    state.latestStatusData = statusData;
-    state.latestWhitelistData = whitelistData;
-    state.latestRecentData = recentData;
-    renderSummaryPanels();
-
-    if (whitelistData) renderWhitelist(whitelistData);
-    else renderErr($("mangaList"), "Gagal muat whitelist");
-
-    if (recentData) renderRecent(recentData);
-    else renderErr($("recentList"), "Gagal muat recent data");
-
-    if (logsData) renderLogs(logsData);
-    else renderErr($("logList"), "Gagal muat logs");
-
-    const anyFailed = [
-      statusResult,
-      whitelistResult,
-      recentResult,
-      logsResult,
-    ].some(
-      (result) =>
-        result.status === "rejected" && result.reason?.name !== "AbortError",
-    );
-    if (anyFailed && state.isAuthenticated) {
-      showAlert("Beberapa endpoint gagal dimuat. Coba refresh lagi.");
+    await loadLightData();
+    showToast("Dashboard diperbarui", "success");
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      showAlert(`Refresh gagal: ${err.message}`);
     }
-
-    const lastUpdated = $("lastUpdated");
-    if (lastUpdated) lastUpdated.textContent = `diperbarui ${fmt(new Date())}`;
-    state.lastHeavyLoadAt = Date.now();
-    renderTrendChart();
-    renderSourceChart();
   } finally {
-    if (state.loadAbortController === controller)
-      state.loadAbortController = null;
+    state.isProcessing = false;
     if (btn) {
       btn.disabled = false;
       btn.textContent = "refresh";
     }
+    if (state.loadAbortController === controller)
+      state.loadAbortController = null;
   }
 }
 

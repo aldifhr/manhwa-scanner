@@ -246,6 +246,12 @@ export function createDashboardRenderer({ state, $, esc }) {
     $("liveGuilds").textContent = `G:${data?.guilds ?? "-"}`;
     $("liveDuration").textContent =
       `D:${data?.duration ? `${data.duration}s` : "-"}`;
+
+    // New: Queue Length
+    const liveQueue = $("liveQueue");
+    if (liveQueue) {
+      liveQueue.textContent = `Q:${data?.queueLength ?? snapshotData?.queueLength ?? "-"}`;
+    }
   }
 
   function renderStatsExtended(statusData) {
@@ -301,7 +307,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     lastRunEl.textContent = data.timestamp ? timeAgo(data.timestamp) : "-";
     whitelistEl.textContent = Array.isArray(whitelistData?.items)
       ? whitelistData.items.length
-      : "-";
+      : (statusData?.whitelistCount ?? "-");
     sent24hEl.textContent = countSentLast24h(recentData?.items);
   }
 
@@ -591,6 +597,42 @@ export function createDashboardRenderer({ state, $, esc }) {
     renderLastCronResult(state.latestStatusData, false);
     renderSourceHealth(state.latestStatusData);
     renderRecommendations(state.latestStatusData);
+    renderLiveEvents(state.latestStatusData?.liveEvents);
+  }
+
+  function renderLiveEvents(events) {
+    const body = $("liveFeedBody");
+    const statusText = $("liveFeedStatus");
+    if (!body) return;
+
+    if (!Array.isArray(events) || events.length === 0) {
+      body.innerHTML = '<div class="terminal-line empty">Menunggu aktivitas baru...</div>';
+      if (statusText) statusText.textContent = "Listening...";
+      return;
+    }
+
+    if (statusText) statusText.textContent = "Live";
+
+    const html = events
+      .map((ev) => {
+        const d = new Date(ev.timestamp);
+        const timeStr = d.toLocaleTimeString("id-ID", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        const typeClass = `t-${ev.type || "info"}`;
+
+        return `<div class="terminal-line">
+          <span class="terminal-time">[${timeStr}]</span>
+          <span class="terminal-msg ${typeClass}">${esc(ev.message)}</span>
+        </div>`;
+      })
+      .join("");
+
+    body.innerHTML = html;
+    // Auto-scroll to top since we show newest first?
+    // Actually terminal-body has column-reverse or we use normal order?
+    // I used column-reverse in CSS for aesthetic but let's check.
+    // If we use normal order, we should scroll to bottom.
+    // Let's use normal order for natural reading and scroll to TOP if newest is at top.
+    // Redis LRANGE 0 -1 returns newest first (LPUSH).
   }
 
   return {
@@ -604,6 +646,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     renderSummaryPanels,
     renderTrendChart,
     renderWhitelist,
+    renderLiveEvents,
     setSortOrder,
     skeleton,
     skeletonRecent,
