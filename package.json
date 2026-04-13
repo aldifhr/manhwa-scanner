@@ -9,6 +9,7 @@
     "check": "npm run lint && npm test",
     "test": "node --test tests/*.test.js",
     "track:fresh24h": "node scripts/track-fresh24h.js",
+    "cleanup:health": "node scripts/cleanup-health.js",
     "dev": "nodemon index.js",
     "dev:vercel": "vercel dev --yes --listen 3000",
     "prepare": "husky"
