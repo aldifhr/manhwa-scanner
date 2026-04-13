@@ -473,6 +473,7 @@ async function loadLightData() {
     state.latestStatusData.sourceHealth = snapshot.sourceHealth;
     state.latestStatusData.recommendations = snapshot.recommendations;
     state.latestStatusData.queueLength = snapshot.queueLength;
+    state.latestStatusData.queueItems = snapshot.queueItems || [];
     state.latestStatusData.liveEvents = snapshot.liveEvents;
 
     state.recentItems = snapshot.recentChapters;

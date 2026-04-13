@@ -598,6 +598,47 @@ export function createDashboardRenderer({ state, $, esc }) {
     renderSourceHealth(state.latestStatusData);
     renderRecommendations(state.latestStatusData);
     renderLiveEvents(state.latestStatusData?.liveEvents);
+    renderQueueItems(state.latestStatusData?.queueLength, state.latestStatusData?.queueItems);
+  }
+
+  function renderQueueItems(queueLength, queueItems = []) {
+    const list = $("queueList");
+    const countEl = $("queueCount");
+
+    if (!list || !countEl) return;
+
+    const count = queueLength || 0;
+
+    if (!queueItems || typeof queueItems !== "object") queueItems = [];
+    const items = Array.isArray(queueItems) ? queueItems : Object.values(queueItems);
+    countEl.textContent = `${items.length} / ${count}`;
+
+    if (items.length === 0) {
+      list.innerHTML = '<li class="empty"><span class="icon">✅</span> Tidak ada task yang tertahan. Antrean kosong.</li>';
+      return;
+    }
+
+    renderTimelineList(
+      list,
+      items,
+      (item) => {
+        const cover = item?.chapter?.cover
+          ? `<img class="recent-cover" src="${esc(item.chapter.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="recent-cover-placeholder" style="display:none">img</div>`
+          : '<div class="recent-cover-placeholder">img</div>';
+
+        const timeBadge = item?.enqueuedAt ? `<span class="source-badge" style="background:#f59e0b;color:#000;">${timeAgo(item.enqueuedAt)}</span>` : "";
+        const ch = item?.chapter?.chapter || "Unknown";
+
+        return `<div class="recent-item" style="cursor: default">
+          ${cover}
+          <div class="recent-info">
+            <div class="recent-title">${esc(item?.chapter?.title || "Unknown Task")}</div>
+            <div class="recent-chapter">${esc(ch)} - ${timeBadge}</div>
+          </div>
+        </div>`;
+      },
+      (item) => item.enqueuedAt,
+    );
   }
 
   function renderLiveEvents(events) {
