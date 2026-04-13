@@ -172,7 +172,10 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
 
     return res.status(result.statusCode).json(standardizedBody);
   } catch (err) {
-    logger.error({ err: err.message }, "fatal");
+    const isTimeout = err?.message?.includes("Timeout after");
+    logger[isTimeout ? "warn" : "error"]({ err: err.message, step: lifecycle?.currentStep }, isTimeout ? "soft_timeout" : "fatal");
+
+    const outcome = isTimeout ? "timeout" : "fatal_error";
     const statusPayload = {
       sent: 0,
       skipped: 0,
@@ -182,24 +185,38 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
       timestamp: new Date().toISOString(),
       sourceHealth: {},
       scrapeMetrics: null,
-      outcome: "fatal_error",
-      shortCircuitReason: "fatal_error",
+      outcome,
+      shortCircuitReason: isTimeout ? `timeout_${lifecycle?.currentStep || "unknown"}` : "fatal_error",
       error: err?.message || "Internal error",
     };
-    await writeCronStatus(redis, statusPayload).catch((err) => {
-      logger.error("[cron] Failed to write status:", err.message);
+
+    await writeCronStatus(redis, statusPayload).catch((writeErr) => {
+      logger.error("[cron] Failed to write status:", writeErr.message);
     });
+
     await appendCronLog(
       redis,
-      buildCronErrorLog(err, {
-        code: "cron_fatal",
+      {
+        tag: isTimeout ? "warn" : "error",
+        code: isTimeout ? "cron_timeout" : "cron_fatal",
         type: "runtime_error",
         source: "cron",
-      }),
-    ).catch((err) => {
-      logger.error("[cron] Failed to append cron log:", err.message);
+        message: err.message,
+      },
+    ).catch((logErr) => {
+      logger.error("[cron] Failed to append cron log:", logErr.message);
     });
-    logApiError(reqLogger, err, { status: 500 });
+
+    logApiError(reqLogger, err, { status: isTimeout ? 200 : 500 });
+
+    if (isTimeout) {
+      return res.status(200).json({
+        success: true,
+        data: statusPayload,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return res
       .status(500)
       .json(
