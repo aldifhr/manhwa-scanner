@@ -522,16 +522,17 @@ export function createDashboardRenderer({ state, $, esc }) {
         const cover = item.cover
           ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="recent-cover-placeholder" style="display:none">img</div>`
           : '<div class="recent-cover-placeholder">img</div>';
+        const displayTime = item.sentAt || item.enqueuedAt || item.updatedTime;
         return `<a class="recent-item" href="${item.url ? esc(item.url) : "#"}" target="_blank" rel="noopener">
           ${cover}
           <div class="recent-info">
             <div class="recent-title">${esc(item.title)}</div>
             <div class="recent-chapter">${esc(item.chapter || "-")} - <span class="source-badge ${sourceBadgeClass(item.source)}">${esc(sourceName(item.source))}</span></div>
           </div>
-          <span class="recent-time">${item.sentAt ? timeAgo(item.sentAt) : "-"}</span>
+          <span class="recent-time">${displayTime ? timeAgo(displayTime) : "-"}</span>
         </a>`;
       },
-      (item) => item.sentAt,
+      (item) => item.sentAt || item.enqueuedAt || item.updatedTime,
     );
 
     renderSourceChart();

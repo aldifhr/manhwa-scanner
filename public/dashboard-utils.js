@@ -62,7 +62,7 @@ export function countSentLast24h(items) {
   if (!Array.isArray(items)) return 0;
   const cutoff = Date.now() - 24 * 3600 * 1000;
   return items.filter((item) => {
-    const d = parseDateSafe(item?.sentAt);
+    const d = parseDateSafe(item?.sentAt || item?.enqueuedAt);
     return d && d.getTime() >= cutoff;
   }).length;
 }

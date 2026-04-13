@@ -490,7 +490,7 @@ async function loadLightData() {
     }
 
     renderSummaryPanels();
-    renderRecent(state.latestRecentData);
+    renderRecent({ items: snapshot.recentChapters });
     if (snapshot.recentLogs) renderLogs({ logs: snapshot.recentLogs });
 
     // Refresh visual analytics
