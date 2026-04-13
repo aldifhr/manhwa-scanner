@@ -259,6 +259,7 @@ async function handleHealthCron(req, res, reqLogger) {
             ? `\n...dan ${deadLinks.length - MAX_DEAD_LINKS_DISPLAY} lainnya.`
             : "";
         const embed = {
+          type: "report",
           title: "⚠️ Laporan Link Mati (Bi-Weekly)",
           description: `Ditemukan **${deadLinks.length}** link yang tidak aktif di whitelist.\n\n${deadListStr}${suffix}`,
           color: 0xe74c3c,

@@ -226,17 +226,14 @@ async function startServer() {
     );
 
     if (!res.headersSent) {
-      res.status(500).json({
-        success: false,
-        error: {
-          code: "INTERNAL_ERROR",
-          message:
-            process.env.NODE_ENV === "production"
-              ? "Internal server error"
-              : err.message,
-        },
-        timestamp: new Date().toISOString(),
-      });
+      res.status(500).json(
+        createErrorResponse(
+          "INTERNAL_ERROR",
+          process.env.NODE_ENV === "production"
+            ? "Internal server error"
+            : err.message,
+        ),
+      );
     }
   });
 

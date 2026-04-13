@@ -1,0 +1,15 @@
+HTTP/1.1 404 Not Found
+X-Powered-By: Express
+x-correlation-id: 9ced0151-9694-4c14-9171-cae49613fd07
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 89
+X-RateLimit-Reset: 1776055861
+Content-Type: application/json; charset=utf-8
+Content-Length: 116
+ETag: W/"74-LnTOpz4r0FccIlFBq7ZYz5kS9uU"
+Vary: Accept-Encoding
+Date: Mon, 13 Apr 2026 04:50:47 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"success":false,"error":{"code":"NOT_FOUND","message":"Endpoint not found"},"timestamp":"2026-04-13T04:50:47.453Z"}
