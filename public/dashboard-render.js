@@ -212,17 +212,18 @@ export function createDashboardRenderer({ state, $, esc }) {
   }
 
   function skeleton(ul, n = 4) {
+    if (!ul) return;
     ul.innerHTML = Array.from(
       { length: n },
-      () => "<li style=\"padding:10px 12px\"><div class=\"skel\"></div></li>",
+      () => "<li class=\"manga-item loading skeleton-shimmer\"></li>",
     ).join("");
   }
 
   function skeletonRecent(ul, n = 4) {
+    if (!ul) return;
     ul.innerHTML = Array.from(
       { length: n },
-      () =>
-        "<li style=\"padding:10px 12px\"><div class=\"skel\" style=\"width:70%\"></div></li>",
+      () => "<li class=\"recent-item skeleton-shimmer\" style=\"height: 64px; margin-bottom: 12px; border-radius: 12px;\"></li>",
     ).join("");
   }
 
@@ -238,22 +239,6 @@ export function createDashboardRenderer({ state, $, esc }) {
     return statusData.data || statusData;
   }
 
-  function renderLiveHeader(statusData) {
-    const data = normalizeStatusData(statusData);
-    $("liveSent").textContent = `S:${data?.sent ?? "-"}`;
-    $("liveSkipped").textContent = `K:${data?.skipped ?? "-"}`;
-    $("liveFailed").textContent = `F:${data?.failed ?? "-"}`;
-    $("liveGuilds").textContent = `G:${data?.guilds ?? "-"}`;
-    $("liveDuration").textContent =
-      `D:${data?.duration ? `${data.duration}s` : "-"}`;
-
-    // New: Queue Length
-    const liveQueue = $("liveQueue");
-    if (liveQueue) {
-      liveQueue.textContent = `Q:${data?.queueLength ?? snapshotData?.queueLength ?? "-"}`;
-    }
-  }
-
   function renderStatsExtended(statusData) {
     const dot = $("statusDot");
     const data = normalizeStatusData(statusData);
@@ -262,7 +247,6 @@ export function createDashboardRenderer({ state, $, esc }) {
         (id) => ($(id).textContent = "-"),
       );
       dot.className = "logo-dot offline";
-      renderLiveHeader(null);
       return;
     }
     $("statSent").textContent = data.sent ?? "-";
@@ -271,7 +255,6 @@ export function createDashboardRenderer({ state, $, esc }) {
     $("statDuration").textContent = data.duration ? `${data.duration}s` : "-";
     dot.className =
       `logo-dot${Number(data.failed || 0) > 0 ? " offline" : ""}`;
-    renderLiveHeader(statusData);
   }
 
   function renderOverview(statusData, whitelistData, recentData) {
@@ -358,6 +341,7 @@ export function createDashboardRenderer({ state, $, esc }) {
           <span class="manga-item-title">${esc(sourceDisplayName(source))}<br /><small style="opacity:.7">fail streak: ${status.failures}${status.errorText ? ` | ${esc(status.errorText)}` : ""}</small></span>
           <span class="status-pill ${status.tone === "degraded" ? "invalid" : status.tone === "unknown" ? "" : "active"}">${status.label}</span>
           <span class="badge">${esc(status.extra || "-")}</span>
+          <button class="btn-mini active-green" onclick="runCronNow('${esc(source)}')">Scrape</button>
         </li>`;
       })
       .join("");
@@ -372,6 +356,7 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function applyWhitelistFilter() {
     const query = ($("inputWhitelistSearch")?.value ?? "").trim().toLowerCase();
+
     const sourceFilter = ($("inputWhitelistSource")?.value ?? "")
       .trim()
       .toLowerCase();
@@ -477,7 +462,8 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function renderWhitelist(data) {
     state.latestWhitelistData = data ?? state.latestWhitelistData;
-    state.whitelistItems = data?.items ?? [];
+    // Data can be an object with .items or a direct array from snapshot
+    state.whitelistItems = Array.isArray(data) ? data : (data?.items ?? []);
     applyWhitelistFilter();
   }
 
@@ -512,12 +498,15 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function renderRecent(data) {
     const list = $("recentList");
-    state.recentItems = data?.items ?? [];
-    $("recentCount").textContent = state.recentItems.length;
+    if (data) state.recentItems = data.items ?? [];
+
+    const filteredRecent = state.recentItems;
+
+    $("recentCount").textContent = filteredRecent.length;
 
     renderTimelineList(
       list,
-      state.recentItems,
+      filteredRecent,
       (item) => {
         const cover = item.cover
           ? `<img class="recent-cover" src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="recent-cover-placeholder" style="display:none">img</div>`
@@ -539,13 +528,16 @@ export function createDashboardRenderer({ state, $, esc }) {
   }
 
   function renderLogs(data) {
-    state.logsItems = data?.logs ?? [];
+    if (data) state.logsItems = data.logs ?? [];
     const list = $("logList");
-    $("logCount").textContent = `${state.logsItems.length} entries`;
+
+    const filteredLogs = state.logsItems;
+
+    $("logCount").textContent = `${filteredLogs.length} entries`;
 
     renderTimelineList(
       list,
-      state.logsItems,
+      filteredLogs,
       (log) => `<li class="log-item">
         <span class="log-time">${fmt(new Date(log.time || Date.now()))}</span>
         <span>${esc(log.message || "-")}</span>

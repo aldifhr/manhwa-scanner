@@ -45,6 +45,7 @@ const state = {
   trendChart: null,
   sourceChart: null,
   pendingDeleteResolver: null,
+  globalSearchQuery: "",
 };
 if (!ALLOWED_POLL_MS.includes(state.pollMs)) state.pollMs = DEFAULT_POLL_MS;
 
@@ -467,6 +468,10 @@ async function loadLightData() {
     if (state.lightAbortController !== controller) return;
     if (!state.isAuthenticated) return;
 
+    if (snapshot.success === false) {
+      throw new Error(snapshot.error?.message || snapshot.error || "Gagal memuat data");
+    }
+
     // Map snapshot to existing state properties
     state.latestStatusData = snapshot.cronStatus || {};
     // Inject sourceHealth and other missing fields if needed
@@ -593,17 +598,9 @@ function startHealthTicker() {
 function updateAutoRefreshUI() {
   const btn = $("btnAutoRefresh");
   const select = $("pollInterval");
-  const pollInfo = $("pollInfo");
   if (select) select.value = String(state.pollMs);
   if (btn)
     btn.textContent = state.autoRefreshEnabled ? "auto: on" : "auto: off";
-  if (!pollInfo) return;
-  if (!state.autoRefreshEnabled) {
-    pollInfo.textContent = "light: off | heavy: off";
-    return;
-  }
-  const hiddenSuffix = document.hidden ? " | bg: hemat" : "";
-  pollInfo.textContent = `light: ${msToSecondsLabel(currentLightPollMs())} | heavy: ${msToSecondsLabel(currentHeavyPollMs())}${hiddenSuffix}`;
 }
 
 function toggleAutoRefresh() {
