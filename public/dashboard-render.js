@@ -288,10 +288,13 @@ export function createDashboardRenderer({ state, $, esc }) {
     healthEl.className = `stat-value ${degraded ? "amber" : hasUnknownSource ? "amber" : "green"}`;
 
     lastRunEl.textContent = data.timestamp ? timeAgo(data.timestamp) : "-";
-    whitelistEl.textContent = Array.isArray(whitelistData?.items)
-      ? whitelistData.items.length
-      : (statusData?.whitelistCount ?? "-");
-    sent24hEl.textContent = countSentLast24h(recentData?.items);
+
+    // Support both direct array and wrapped items object
+    const items = Array.isArray(whitelistData) ? whitelistData : (whitelistData?.items || []);
+    whitelistEl.textContent = items.length > 0 ? items.length : (statusData?.whitelistCount ?? "-");
+
+    const recentItems = Array.isArray(recentData) ? recentData : (recentData?.items || []);
+    sent24hEl.textContent = countSentLast24h(recentItems);
   }
 
   function renderLastCronResult(statusData, fromManual = false) {

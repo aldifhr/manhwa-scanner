@@ -481,13 +481,14 @@ async function loadLightData() {
     state.latestStatusData.queueItems = snapshot.queueItems || [];
     state.latestStatusData.liveEvents = snapshot.liveEvents;
 
-    state.recentItems = snapshot.recentChapters;
-
     // Update Whitelist from snapshot
     if (snapshot.whitelist) {
       state.latestWhitelistData = snapshot.whitelist;
       renderWhitelist(state.latestWhitelistData);
     }
+
+    state.latestRecentData = { items: snapshot.recentChapters || [] };
+    state.recentItems = snapshot.recentChapters || [];
 
     // Update logs if available in snapshot
     if (snapshot.recentLogs) {
