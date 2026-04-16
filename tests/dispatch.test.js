@@ -65,6 +65,17 @@ function createRedisMock() {
       lists.set(key, cur);
       return cur.length;
     },
+    async ltrim(key, start, stop) {
+      const cur = lists.get(key) || [];
+      lists.set(key, cur.slice(start, stop + 1));
+      return "OK";
+    },
+    async rpush(key, ...values) {
+      const cur = lists.get(key) || [];
+      cur.push(...values);
+      lists.set(key, cur);
+      return cur.length;
+    },
     async expire() {
       return 1;
     },
