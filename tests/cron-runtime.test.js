@@ -84,6 +84,37 @@ function createRedisMock() {
       );
       return 1; // Field was set
     },
+    async hdel(key, ...fields) {
+      if (!hashes.has(key)) return 0;
+      const hash = hashes.get(key);
+      let deleted = 0;
+      for (const field of fields) {
+        if (hash.delete(field)) deleted++;
+      }
+      return deleted;
+    },
+    pipeline() {
+      const ops = [];
+      const p = {
+        get: (k) => { ops.push(() => kv.get(k)); return p; },
+        set: (k, v) => { ops.push(() => kv.set(k, v)); return p; },
+        hget: (k, f) => { ops.push(() => hashes.get(k)?.get(f)); return p; },
+        hset: (k, o) => { ops.push(() => {
+          if (!hashes.has(k)) hashes.set(k, new Map());
+          Object.entries(o).forEach(([f, v]) => hashes.get(k).set(f, v));
+        }); return p; },
+        lpush: (key, val) => { ops.push(() => {
+          if (!lists.has(key)) lists.set(key, []);
+          lists.get(key).unshift(val);
+        }); return p; },
+        ltrim: (key, start, end) => { ops.push(() => {
+          if (lists.has(key)) lists.set(key, lists.get(key).slice(start, end + 1));
+        }); return p; },
+        expire: () => { return p; },
+        exec: async () => Promise.all(ops.map((o) => o())),
+      };
+      return p;
+    },
   };
 }
 
@@ -93,6 +124,8 @@ function createLoggerMock() {
     warn() {},
     error() {},
     debug() {},
+    fatal() {},
+    child() { return this; },
   };
 }
 

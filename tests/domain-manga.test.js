@@ -6,7 +6,10 @@ import {
   getChapterNumber,
   isSameNormalizedTitle,
   normalizeTitleKey,
+  getShinigamiPublicBase,
 } from "../lib/domain.js";
+
+const shigBase = getShinigamiPublicBase();
 
 test("compactTitleKey removes all spaces and punctuation for strict deduplication", () => {
   assert.equal(compactTitleKey("Full-Time Awakening"), "fulltimeawakening");
@@ -37,7 +40,7 @@ test("createWhitelistMatcher matches by normalized url in sources", () => {
       title: "Ignored Title",
       sources: [
         {
-          url: "https://a.shinigami.asia/series/abc/",
+          url: `${shigBase}/series/abc/`,
           source: "shinigami_project",
         },
       ],
@@ -47,7 +50,7 @@ test("createWhitelistMatcher matches by normalized url in sources", () => {
   assert.equal(
     isMatched({
       title: "Anything",
-      mangaUrl: "https://a.shinigami.asia/series/abc",
+      mangaUrl: `${shigBase}/series/abc`,
       source: "shinigami",
     }),
     true,

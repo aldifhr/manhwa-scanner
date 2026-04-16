@@ -136,7 +136,19 @@ test("removeWhitelistEntry handles nested items", async () => {
       saveCalls += 1;
       assert.equal(items.length, 0);
     },
-    redisClient: { del: async () => 0, hdel: async () => 0, hgetall: async () => ({}), hset: async () => 1 },
+    redisClient: (() => {
+      const kv = new Map();
+      return {
+        set: async (k, v) => { kv.set(k, v); return "OK"; },
+        get: async (k) => kv.get(k) ?? null,
+        del: async (k) => { kv.delete(k); return 1; },
+        hdel: async () => 0,
+        hgetall: async () => ({}),
+        hset: async () => 1,
+        hget: async (k, f) => (kv.get(k) || {})[f] ?? null,
+        hmget: async (k, ...fs) => fs.map((f) => (kv.get(k) || {})[f] ?? null),
+      };
+    })(),
   });
 
   assert.equal(result.status, "removed");
@@ -192,14 +204,19 @@ test("addWhitelistEntry prevents fuzzy title duplicates", async () => {
   }, {
     loadWhitelistFn: async () => mockWhitelist,
     saveWhitelistFn: async () => {}, // Mock to prevent hitting real Redis
-    redisClient: {
-      set: async () => "OK",
-      mget: async () => [],
-      del: async () => 0,
-      hdel: async () => 0,
-      hgetall: async () => ({}),
-      hset: async () => 1,
-    },
+    redisClient: (() => {
+      const kv = new Map();
+      return {
+        set: async (k, v) => { kv.set(k, v); return "OK"; },
+        get: async (k) => kv.get(k) ?? null,
+        del: async (k) => { kv.delete(k); return 1; },
+        hdel: async () => 0,
+        hgetall: async () => ({}),
+        hset: async () => 1,
+        hget: async (k, f) => (kv.get(k) || {})[f] ?? null,
+        hmget: async (k, ...fs) => fs.map((f) => (kv.get(k) || {})[f] ?? null),
+      };
+    })(),
   });
 
   assert.equal(result.status, "exists");

@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildScrapeOptions } from "../lib/services/scrapePreferences.js";
+import { getShinigamiPublicBase } from "../lib/domain.js";
+
+const shigBase = getShinigamiPublicBase();
 
 test("buildScrapeOptions keeps manual and cron scrape preferences aligned", () => {
   const options = buildScrapeOptions([
@@ -24,20 +27,20 @@ test("buildScrapeOptions keeps manual and cron scrape preferences aligned", () =
       shinigami_mirror: ["Wind Breaker"],
     },
     preferredSecondaryUrls: {
-      shinigami_project: ["https://a.shinigami.asia/series/lookism/"],
-      shinigami_mirror: ["https://a.shinigami.asia/series/wind-breaker/"],
+      shinigami_project: [`${shigBase}/series/lookism/`],
+      shinigami_mirror: [`${shigBase}/series/wind-breaker/`],
     },
     preferredSecondaryEntries: {
       shinigami_project: [
         {
           title: "Lookism",
-          url: "https://a.shinigami.asia/series/lookism/",
+          url: `${shigBase}/series/lookism/`,
         },
       ],
       shinigami_mirror: [
         {
           title: "Wind Breaker",
-          url: "https://a.shinigami.asia/series/wind-breaker/",
+          url: `${shigBase}/series/wind-breaker/`,
         },
       ],
     },

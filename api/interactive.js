@@ -1,4 +1,8 @@
-import { InteractionType, InteractionResponseType, verifyKey } from "discord-interactions";
+import {
+  InteractionType,
+  InteractionResponseType,
+  verifyKey,
+} from "discord-interactions";
 import { waitUntil } from "@vercel/functions";
 import { redis } from "../lib/redis.js";
 import {
@@ -25,7 +29,10 @@ import {
   unfollowManga,
   getUserNotifyMode,
 } from "../lib/services/notifications.js";
-import { discordInteractionSchema, safeParse } from "../lib/validation.js";
+import {
+  discordInteractionSchema,
+  safeParse,
+} from "../lib/types/validation.js";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -274,7 +281,10 @@ export default async function handler(req, res) {
           return waitUntil(
             handleFollow(
               payload,
-              [{ name: "button", value: custom_id }, { name: "page", value: page }],
+              [
+                { name: "button", value: custom_id },
+                { name: "page", value: page },
+              ],
               res,
               redis,
             ),
@@ -377,7 +387,10 @@ export default async function handler(req, res) {
     return res
       .status(400)
       .json(
-        createErrorResponse("UNKNOWN_INTERACTION_TYPE", "Unknown interaction type"),
+        createErrorResponse(
+          "UNKNOWN_INTERACTION_TYPE",
+          "Unknown interaction type",
+        ),
       );
   } catch (err) {
     logger.error("[interactive] Unhandled error:", err);

@@ -121,12 +121,13 @@ test("collectIkiruRecentChaptersFromAjaxHtml reads multiple fresh chapters from 
     },
   );
 
-  assert.equal(out.results.length, 3);
+  assert.equal(out.results.length, 4);
   assert.equal(out.foundOlderThan24h, true);
   assert.deepEqual(out.results.map((item) => item.chapter), [
     "Chapter 89",
     "Chapter 88",
     "Chapter 87",
+    "Chapter 86",
   ]);
 });
 

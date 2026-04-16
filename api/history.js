@@ -103,7 +103,9 @@ async function handleRecent(req, res, reqLogger) {
       .json(
         createErrorResponse(
           "RECENT_FETCH_FAILED",
-          process.env.NODE_ENV === "production" ? "Internal error" : err.message,
+          process.env.NODE_ENV === "production"
+            ? "Internal error"
+            : err.message,
         ),
       );
   }
@@ -134,7 +136,8 @@ async function handleLogs(req, res, reqLogger) {
         .filter(Boolean)
         .slice(0, LOGS_DISPLAY_LIMIT)
         .map((log) => {
-          const timestamp = log?.timestamp || log?.time || log?.createdAt || null;
+          const timestamp =
+            log?.timestamp || log?.time || log?.createdAt || null;
           return {
             timestamp: timestamp,
             time: timestamp, // Backward compatibility alias
@@ -143,7 +146,9 @@ async function handleLogs(req, res, reqLogger) {
             type: log?.type || null,
             source: log?.source || null,
             title: String(log?.title || "").trim() || null,
-            count: Number.isFinite(Number(log?.count)) ? Number(log.count) : null,
+            count: Number.isFinite(Number(log?.count))
+              ? Number(log.count)
+              : null,
             failed: Number.isFinite(Number(log?.failed))
               ? Number(log.failed)
               : null,
@@ -165,7 +170,9 @@ async function handleLogs(req, res, reqLogger) {
       .json(
         createErrorResponse(
           "LOGS_FETCH_FAILED",
-          process.env.NODE_ENV === "production" ? "Internal error" : err.message,
+          process.env.NODE_ENV === "production"
+            ? "Internal error"
+            : err.message,
         ),
       );
   }

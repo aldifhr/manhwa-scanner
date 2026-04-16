@@ -16,14 +16,20 @@ import {
 
 async function withEnv(patch, fn) {
   const prev = { ...process.env };
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined || value === null) delete process.env[key];
-    else process.env[key] = String(value);
+  const keys = Object.keys(patch);
+
+  for (const key of keys) {
+    if (patch[key] === undefined) delete process.env[key];
+    else process.env[key] = String(patch[key]);
   }
+
   try {
     return await fn();
   } finally {
-    process.env = prev;
+    for (const key of keys) {
+      if (prev[key] === undefined) delete process.env[key];
+      else process.env[key] = prev[key];
+    }
   }
 }
 
@@ -157,6 +163,7 @@ test("isMonitorAuthorized accepts dashboard session for dashboard endpoints", ()
     {
       CRON_SECRET: "cron-secret",
       DASHBOARD_SESSION_SECRET: "session-secret",
+      ALLOW_DASHBOARD_CRON: undefined,
     },
     () => {
       const token = createDashboardSessionToken();

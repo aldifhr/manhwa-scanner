@@ -11,6 +11,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
 } from "../lib/api/response.js";
+import { formatErrorMessage } from "../lib/utils.js";
 
 // Validation schemas
 // "links" is alias for "health" (backward compatibility)
@@ -27,8 +28,6 @@ const MAX_DEAD_LINKS_DISPLAY = 15;
 const CRON_EXEC_LOCK_KEY = "cron:run:lock";
 const CRON_EXEC_LOCK_TTL_SEC = 60;
 const HEALTH_STATUS_KEY = "health:last_status";
-// Keep timeout close to function maxDuration (30s) to avoid false "fatal"
-// while long-running scrape/dispatch is still legitimately completing.
 const INTERNAL_TIMEOUT_MS = 28_000;
 
 // Use env variable for max duration, fallback to 30s (FastCron free tier)
@@ -37,11 +36,17 @@ const logger = loggers.cron;
 
 export { shouldRunChannelValidation };
 
-function withTimeout(promise, timeoutMs = INTERNAL_TIMEOUT_MS, lifecycle = null) {
+function withTimeout(
+  promise,
+  timeoutMs = INTERNAL_TIMEOUT_MS,
+  lifecycle = null,
+) {
   let timer = null;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => {
-      const phaseInfo = lifecycle?.currentStep ? ` during ${lifecycle.currentStep}` : "";
+      const phaseInfo = lifecycle?.currentStep
+        ? ` during ${lifecycle.currentStep}`
+        : "";
       reject(new Error(`Timeout after ${timeoutMs}ms${phaseInfo}`));
     }, timeoutMs);
   });
@@ -95,9 +100,7 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
     logApiOk(reqLogger, { status: 409, reason: "cron_locked" });
     return res
       .status(409)
-      .json(
-        createErrorResponse("CRON_LOCKED", "Cron job already running"),
-      );
+      .json(createErrorResponse("CRON_LOCKED", "Cron job already running"));
   }
 
   try {
@@ -162,10 +165,12 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
 
     // Hot-start worker trigger (fire & forget)
     if (standardizedBody.data.enqueued > 0) {
-      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://${req.headers.host}`;
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : `http://${req.headers.host}`;
       const workerUrl = `${baseUrl}/api/worker?token=${process.env.WORKER_TOKEN}`;
 
-      fetch(workerUrl).catch(err => {
+      fetch(workerUrl).catch((err) => {
         logger.warn({ err: err.message }, "Failed to hot-start worker");
       });
     }
@@ -173,7 +178,10 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
     return res.status(result.statusCode).json(standardizedBody);
   } catch (err) {
     const isTimeout = err?.message?.includes("Timeout after");
-    logger[isTimeout ? "warn" : "error"]({ err: err.message, step: lifecycle?.currentStep }, isTimeout ? "soft_timeout" : "fatal");
+    logger[isTimeout ? "warn" : "error"](
+      { err: err.message, step: lifecycle?.currentStep },
+      isTimeout ? "soft_timeout" : "fatal",
+    );
 
     const outcome = isTimeout ? "timeout" : "fatal_error";
     const statusPayload = {
@@ -186,24 +194,23 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
       sourceHealth: {},
       scrapeMetrics: null,
       outcome,
-      shortCircuitReason: isTimeout ? `timeout_${lifecycle?.currentStep || "unknown"}` : "fatal_error",
+      shortCircuitReason: isTimeout
+        ? `timeout_${lifecycle?.currentStep || "unknown"}`
+        : "fatal_error",
       error: err?.message || "Internal error",
     };
 
     await writeCronStatus(redis, statusPayload).catch((writeErr) => {
-      logger.error("[cron] Failed to write status:", writeErr.message);
+      logger.error({ err: writeErr.message }, "Failed to write status");
     });
 
-    await appendCronLog(
-      redis,
-      {
-        tag: isTimeout ? "warn" : "error",
-        code: isTimeout ? "cron_timeout" : "cron_fatal",
-        type: "runtime_error",
-        source: "cron",
-        message: err.message,
-      },
-    ).catch((logErr) => {
+    await appendCronLog(redis, {
+      tag: isTimeout ? "warn" : "error",
+      code: isTimeout ? "cron_timeout" : "cron_fatal",
+      type: "runtime_error",
+      source: "cron",
+      message: err.message,
+    }).catch((logErr) => {
       logger.error("[cron] Failed to append cron log:", logErr.message);
     });
 
@@ -219,14 +226,7 @@ async function handleUpdateCron(req, res, reqLogger, query = {}) {
 
     return res
       .status(500)
-      .json(
-        createErrorResponse(
-          "CRON_FATAL",
-          process.env.NODE_ENV === "production"
-            ? "Internal error"
-            : err.message,
-        ),
-      );
+      .json(createErrorResponse("CRON_FATAL", formatErrorMessage(err)));
   } finally {
     await releaseCronExecutionLock(lockToken);
   }
@@ -271,7 +271,9 @@ async function handleHealthCron(req, res, reqLogger) {
           channelIds.map(async (channelId) => {
             const res = await sendDiscordEmbed(embed, channelId);
             if (res && (res.status === 403 || res.status === 404)) {
-              const guildChannels = await getAllGuildChannels().catch(() => ({}));
+              const guildChannels = await getAllGuildChannels().catch(
+                () => ({}),
+              );
               const guildId = Object.keys(guildChannels).find(
                 (gid) => guildChannels[gid] === channelId,
               );
@@ -324,18 +326,15 @@ async function handleHealthCron(req, res, reqLogger) {
         type: "runtime_error",
         source: "health",
       }),
-    ).catch((e) => logger.error("[cron] Failed to append cron log:", e.message));
+    ).catch((e) =>
+      logger.error("[cron] Failed to append cron log:", e.message),
+    );
 
     logApiError(reqLogger, err, { status: 500 });
     return res
       .status(500)
       .json(
-        createErrorResponse(
-          "HEALTH_CHECK_FAILED",
-          process.env.NODE_ENV === "production"
-            ? "Internal error"
-            : err.message,
-        ),
+        createErrorResponse("HEALTH_CHECK_FAILED", formatErrorMessage(err)),
       );
   }
 }
@@ -374,25 +373,35 @@ export default async function handler(req, res) {
       Math.round(Number(rejRes?.msBeforeNext || 1000) / 1000),
     );
     logApiOk(reqLogger, { status: 429, reason: "rate_limited", retryAfter });
-    return res.status(429).json(
-      createErrorResponse(
-        "CRON_RATE_LIMITED",
-        `Too many cron requests. Retry in ${retryAfter}s.`,
-      ),
-    );
+    return res
+      .status(429)
+      .json(
+        createErrorResponse(
+          "CRON_RATE_LIMITED",
+          `Too many cron requests. Retry in ${retryAfter}s.`,
+        ),
+      );
   }
 
   // Query parameter validation with Zod
   const parseResult = cronQuerySchema.safeParse(req.query);
   if (!parseResult.success) {
-    logApiOk(reqLogger, { status: 400, reason: "invalid_query", errors: parseResult.error.errors });
+    logApiOk(reqLogger, {
+      status: 400,
+      reason: "invalid_query",
+      errors: parseResult.error.errors,
+    });
     return res
       .status(400)
-      .json(createErrorResponse(
-        "INVALID_QUERY",
-        "Invalid query parameters",
-        process.env.NODE_ENV === "development" ? parseResult.error.errors : undefined,
-      ));
+      .json(
+        createErrorResponse(
+          "INVALID_QUERY",
+          "Invalid query parameters",
+          process.env.NODE_ENV === "development"
+            ? parseResult.error.errors
+            : undefined,
+        ),
+      );
   }
 
   const { action } = parseResult.data;
