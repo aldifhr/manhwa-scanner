@@ -1,0 +1,318 @@
+Unused files (30)
+api/auth.js                      
+api/dashboard-snapshot.js        
+api/health-status.js             
+api/incidents.js                 
+api/interactive.js               
+api/notices.js                   
+api/worker.js                    
+lib/api/errorHandler.js          
+lib/commands/add.js              
+lib/commands/follow.js           
+lib/commands/index.js            
+lib/commands/permission.js       
+lib/commands/remove.js           
+lib/commands/simpleCommands.js   
+lib/commands/status.js           
+lib/commands/sync.js             
+lib/scrapers/index.js            
+lib/services/addFromUrl.js       
+lib/services/staleChecker.js     
+lib/types/validation.js          
+public/dashboard-render.js       
+public/dashboard-utils.js        
+public/script.js                 
+scratch/dump-shinigami.js        
+scratch/load_test_bookmarks.js   
+scratch/test_live_feed.js        
+scripts/add-to-whitelist.js      
+scripts/rotate-local-secrets.js  
+scripts/sync-commands.js         
+tests/test_metadata_enrichment.js
+Unused dependencies (2)
+@vercel/functions      package.json:37:6
+rate-limiter-flexible  package.json:49:6
+Unused devDependencies (1)
+pino-pretty  package.json:59:6
+Unlisted binaries (1)
+vercel  package.json
+Unused exports (277)
+config                                           api/cron.js:36:14                       
+default                                function  api/cron.js:344:31                      
+default                                function  api/history.js:181:31                   
+ErrorPresets                                     lib/api/response.js:34:14               
+isMethodAllowed                        function  lib/api/response.js:52:17               
+methodNotAllowedResponse               function  lib/api/response.js:56:17               
+DISCORD_RESPONSE_TYPE                            lib/config.js:31:14                     
+CRON_LOG_LIST_TTL_SEC                            lib/config.js:54:14                     
+RESYNC_LOCK_TTL_SEC                              lib/config.js:57:14                     
+RESYNC_DEFAULT_MAX_SEND                          lib/config.js:58:14                     
+CACHE_TTL_SEC                                    lib/config.js:61:14                     
+STATUS_CACHE_SEC                                 lib/config.js:64:14                     
+WHITELIST_CACHE_SEC                              lib/config.js:65:14                     
+INCIDENT_CACHE_TTL                               lib/config.js:68:14                     
+MAX_CHAPTERS_PER_RUN                             lib/config.js:73:14                     
+CRON_INTERVAL_LABEL                              lib/config.js:74:14                     
+CACHE_TTL_LABEL                                  lib/config.js:75:14                     
+API_TIMEOUT_MS                                   lib/config.js:78:14                     
+CRON_MAX_DURATION_SEC                            lib/config.js:79:14                     
+HEALTH_CHECK_MAX_DURATION_SEC                    lib/config.js:87:14                     
+HEALTH_CACHE_TTL_MS                              lib/config.js:90:14                     
+UPTIME_CALCULATION_TIERS                         lib/config.js:93:14                     
+ONE_SECOND_MS                                    lib/config.js:105:14                    
+ONE_MINUTE_MS                                    lib/config.js:107:14                    
+ONE_HOUR_MS                                      lib/config.js:109:14                    
+ONE_DAY_MS                                       lib/config.js:111:14                    
+ONE_MINUTE_SEC                                   lib/config.js:114:14                    
+ONE_HOUR_SEC                                     lib/config.js:116:14                    
+ONE_DAY_SEC                                      lib/config.js:118:14                    
+DISCORD_MESSAGE_LIMIT                            lib/config.js:125:14                    
+AUTOCOMPLETE_LABEL_LIMIT                         lib/config.js:131:14                    
+REDIS_SCAN_BATCH_SIZE                            lib/config.js:133:14                    
+DEFAULT_PAGE_SIZE                                lib/config.js:135:14                    
+API_TIMEOUT_30S_MS                               lib/config.js:142:14                    
+API_TIMEOUT_5S_MS                                lib/config.js:144:14                    
+API_TIMEOUT_3S_MS                                lib/config.js:146:14                    
+API_TIMEOUT_1S_MS                                lib/config.js:148:14                    
+MAX_STALE_MS                                     lib/config.js:155:14                    
+DETAIL_THROTTLE_MS                               lib/config.js:157:14                    
+MAX_CHAPTERS_PER_RUN_LIMIT                       lib/config.js:159:14                    
+DEFAULT_RETRY_DELAY_MS                           lib/config.js:161:14                    
+SCRAPER_REQUEST_TIMEOUT_MS                       lib/config.js:163:14                    
+ALLOWED_DOMAINS                                  lib/config.js:204:14                    
+isValidDomain                          function  lib/config.js:214:17                    
+cronDailyStatsKey                      function  lib/cronLogs.js:47:17                   
+CHANNEL_VALIDATION_REFRESH_SECONDS               lib/cronRuntime.js:40:14                
+resolveChannelValidationConcurrency    function  lib/cronRuntime.js:72:17                
+buildPreferredIkiruTitles                        lib/cronRuntime.js:132:3                
+buildPreferredSecondaryEntries                   lib/cronRuntime.js:133:3                
+buildPreferredSecondaryTitles                    lib/cronRuntime.js:134:3                
+buildPreferredSecondaryUrls                      lib/cronRuntime.js:135:3                
+buildShortCircuitStatus                function  lib/cronRuntime.js:138:17               
+finalizeTimingMetrics                  function  lib/cronRuntime.js:169:17               
+readCronStatusWithHealth               function  lib/cronRuntime.js:744:23               
+getStartOfDay                          function  lib/dateUtils.js:88:17                  
+getEndOfDay                            function  lib/dateUtils.js:96:17                  
+getCutoffTime                          function  lib/dateUtils.js:105:17                 
+isValidDateResult                      function  lib/dateUtils.js:211:17                 
+batchParseTimestamps                   function  lib/dateUtils.js:219:17                 
+warnLog                                function  lib/dateUtils.js:291:17                 
+BOT_TOKEN                                        lib/discord.js:18:14                    
+statusBar                                        lib/discord.js:20:14                    
+ratingStars                                      lib/discord.js:58:14                    
+shortSynopsis                                    lib/discord.js:69:14                    
+editInteractionResponse                function  lib/discord.js:76:23                    
+editInteractionResponseWithComponents  function  lib/discord.js:155:23                   
+sendEphemeralFollowUp                  function  lib/discord.js:226:23                   
+sendDiscordEmbedsBatch                 function  lib/discord.js:522:23                   
+sendToChannels                         function  lib/discord.js:627:23                   
+getAdaptiveDelay                       function  lib/httpClient.js:64:17                 
+resetAdaptiveRateLimit                 function  lib/httpClient.js:69:17                 
+createRateLimiter                      function  lib/httpClient.js:77:17                 
+parseRetryAfterMs                      function  lib/httpClient.js:81:17                 
+httpRequest                            function  lib/httpClient.js:166:23                
+fastLog                                          lib/logger.js:101:14                    
+requestLogger                          function  lib/logger.js:110:17                    
+logError                               function  lib/logger.js:145:17                    
+logPerformance                         function  lib/logger.js:161:17                    
+sendErrorLog                           function  lib/logger.js:236:23                    
+default                                variable  lib/logger.js:259:16                    
+levels                                           lib/logger.js:262:14                    
+isOwner                                function  lib/permissions.js:7:17                 
+ensureGuildAdminResponse               function  lib/permissions.js:39:17                
+matchTitle                             function  lib/permissions.js:67:17                
+createRateLimitMiddleware              function  lib/rateLimiter.js:142:17               
+checkRateLimit                         function  lib/rateLimiter.js:219:23               
+resetRateLimit                         function  lib/rateLimiter.js:239:23               
+addPenalty                             function  lib/rateLimiter.js:251:23               
+getRateLimitInfo                       function  lib/rateLimiter.js:263:23               
+MANGA_METADATA_KEY                               lib/redis.js:89:14                      
+LIVE_EVENTS_KEY                                  lib/redis.js:90:14                      
+LIVE_EVENTS_LIMIT                                lib/redis.js:91:14                      
+getLastScrapeCheck                     function  lib/redis.js:292:23                     
+setLastScrapeCheck                     function  lib/redis.js:302:23                     
+supportsPerFieldTTL                    function  lib/redis.js:435:17                     
+cleanupOldAlphabetShards               function  lib/redis.js:497:23                     
+cleanupEmptyLastCheckHashes            function  lib/redis.js:556:23                     
+getLastCheckStats                      function  lib/redis.js:577:23                     
+migrateLastChecksToHash                function  lib/redis.js:597:23                     
+CRON_LOG_LIST_KEY                                lib/redis.js:669:14                     
+CRON_LAST_RUN_KEY                                lib/redis.js:670:14                     
+MANGA_STALE_WARNED_KEY                           lib/redis.js:676:14                     
+fetchDashboardSnapshot                 function  lib/redis.js:682:23                     
+CHANNEL_VALIDATION_REFRESH_KEY                   lib/redis.js:769:14                     
+loadWhitelistItem                      function  lib/redis.js:846:23                     
+getNotificationChannel                 function  lib/redis.js:940:23                     
+setNotificationChannel                 function  lib/redis.js:953:23                     
+fetchIkiruRecentChaptersFromAjax       function  lib/scrapers/ikiru.js:483:23            
+fetchIkiruRecentChaptersFromMangaPage  function  lib/scrapers/ikiru.js:566:23            
+expandIkiruUpdatesFromDetailPages      function  lib/scrapers/ikiru.js:751:23            
+extractDateFromLatestChapter           function  lib/scrapers/ikiru.js:866:23            
+fetchLatestMangaUpdateTime             function  lib/scrapers/ikiru.js:892:23            
+searchIkiru                            function  lib/scrapers/ikiru.js:1248:23           
+fetchRecentChaptersFromMangaPage       function  lib/scrapers/ikiru.js:1562:23           
+scrapeMangaUpdates                     function  lib/scrapers/orchestrator.js:784:23     
+extractDetailChaptersFromMangaDetail   function  lib/scrapers/secondary.js:169:17        
+fetchSecondaryFullMangaInfo            function  lib/scrapers/secondary.js:223:23        
+searchShngm                            function  lib/scrapers/secondary.js:1124:23       
+fetchRandomShinigamiManga              function  lib/scrapers/secondary.js:1213:23       
+IKIRU_COOKIE_CACHE_KEY                           lib/scrapers/shared.js:138:14           
+IKIRU_COOKIE_REFRESHED_AT_KEY                    lib/scrapers/shared.js:139:14           
+IKIRU_COOKIE_MAX_AGE_SEC                         lib/scrapers/shared.js:140:14           
+IKIRU_COOKIE_REFRESH_BACKOFF_MS                  lib/scrapers/shared.js:144:14           
+withRetry                              function  lib/scrapers/shared.js:158:23           
+ChapterScrapeSchema                              lib/scrapers/shared.js:446:14           
+CHANNEL_VALIDATION_CONCURRENCY                   lib/services/channelValidation.js:9:14  
+fetchDiscordChannel                    function  lib/services/channelValidation.js:34:23 
+getCachedChannelValidity               function  lib/services/channelValidation.js:49:23 
+fetchDiscordChannelsBatch              function  lib/services/channelValidation.js:125:23
+getCachedChannelsValidityBatch         function  lib/services/channelValidation.js:174:23
+validateDiscordChannelsBatch           function  lib/services/channelValidation.js:227:23
+scanAndCleanupExpired                  function  lib/services/dispatch.js:1135:23        
+SOURCE_KEYS                                      lib/services/health.js:5:10             
+checkSingleLink                        function  lib/services/health.js:17:23            
+HEALTH_STATS_KEY                                 lib/services/health.js:51:14            
+linkStatsHash                          function  lib/services/health.js:53:17            
+updateLinkStats                        function  lib/services/health.js:57:23            
+resetSourceCooldown                    function  lib/services/health.js:326:23           
+dequeueNotifications                   function  lib/services/notificationQueue.js:36:23 
+getQueueLength                         function  lib/services/notificationQueue.js:73:23 
+NOTIFY_MODES                                     lib/services/notifications.js:8:14      
+getUserNotifyMode                      function  lib/services/notifications.js:49:23     
+setUserNotifyMode                      function  lib/services/notifications.js:67:23     
+getUserFollowsMembers                  function  lib/services/notifications.js:97:23     
+isUserFollowing                        function  lib/services/notifications.js:105:23    
+followManga                            function  lib/services/notifications.js:114:23    
+unfollowManga                          function  lib/services/notifications.js:139:23    
+muteManga                              function  lib/services/notifications.js:162:23    
+unmuteManga                            function  lib/services/notifications.js:177:23    
+updateNotifyModeIndex                  function  lib/services/notifications.js:224:23    
+migrateSubscribersToHash               function  lib/services/notifications.js:236:23    
+removeWhitelistEntryIdentity           function  lib/services/whitelist.js:428:23        
+clearWhitelist                         function  lib/services/whitelist.js:519:23        
+buildWhitelistListResponse             function  lib/services/whitelist.js:598:23        
+onceFn                                 function  lib/utils.js:101:17                     
+curryFn                                function  lib/utils.js:108:17                     
+compose                                function  lib/utils.js:115:17                     
+setValue                               function  lib/utils.js:145:17                     
+unsetValue                             function  lib/utils.js:152:17                     
+pickKeys                               function  lib/utils.js:159:17                     
+omitKeys                               function  lib/utils.js:166:17                     
+deepEqual                              function  lib/utils.js:173:17                     
+isEmptyValue                           function  lib/utils.js:180:17                     
+isNilValue                             function  lib/utils.js:187:17                     
+is                                               lib/utils.js:194:14                     
+orderByKey                             function  lib/utils.js:240:17                     
+flattenArray                           function  lib/utils.js:261:17                     
+flattenDeepArray                       function  lib/utils.js:268:17                     
+arrayDifference                        function  lib/utils.js:275:17                     
+arrayIntersection                      function  lib/utils.js:282:17                     
+arraySample                            function  lib/utils.js:296:17                     
+shuffleArray                           function  lib/utils.js:303:17                     
+numberRange                            function  lib/utils.js:310:17                     
+keyByField                             function  lib/utils.js:317:17                     
+mapObjectValues                        function  lib/utils.js:324:17                     
+mapObjectKeys                          function  lib/utils.js:331:17                     
+sumArray                               function  lib/utils.js:338:17                     
+sumByKey                               function  lib/utils.js:345:17                     
+meanArray                              function  lib/utils.js:352:17                     
+maxArray                               function  lib/utils.js:359:17                     
+minArray                               function  lib/utils.js:366:17                     
+maxByKey                               function  lib/utils.js:373:17                     
+minByKey                               function  lib/utils.js:380:17                     
+countByKey                             function  lib/utils.js:387:17                     
+partitionArray                         function  lib/utils.js:394:17                     
+takeFirst                              function  lib/utils.js:401:17                     
+dropFirst                              function  lib/utils.js:408:17                     
+takeWhileMatch                         function  lib/utils.js:415:17                     
+dropWhileMatch                         function  lib/utils.js:422:17                     
+findIndexOf                            function  lib/utils.js:429:17                     
+findLastIndexOf                        function  lib/utils.js:436:17                     
+zipArrays                              function  lib/utils.js:450:17                     
+unzipArrays                            function  lib/utils.js:457:17                     
+toCamelCase                            function  lib/utils.js:466:17                     
+toKebabCase                            function  lib/utils.js:473:17                     
+toSnakeCase                            function  lib/utils.js:480:17                     
+toTitleCase                            function  lib/utils.js:487:17                     
+truncateString                         function  lib/utils.js:494:17                     
+trimString                             function  lib/utils.js:505:17                     
+padStartString                         function  lib/utils.js:512:17                     
+padEndString                           function  lib/utils.js:519:17                     
+escapeHtml                             function  lib/utils.js:526:17                     
+unescapeHtml                           function  lib/utils.js:533:17                     
+batchAsync                             function  lib/utils.js:585:23                     
+keysToCamelCase                        function  lib/utils.js:610:17                     
+keysToSnakeCase                        function  lib/utils.js:625:17                     
+removeNilValues                        function  lib/utils.js:640:17                     
+sanitizeForLogging                     function  lib/utils.js:657:17                     
+debounce                                         lib/utils.js:689:3                      
+throttle                                         lib/utils.js:690:3                      
+cloneDeep                                        lib/utils.js:691:3                      
+merge                                            lib/utils.js:692:3                      
+get                                              lib/utils.js:693:3                      
+set                                              lib/utils.js:694:3                      
+unset                                            lib/utils.js:695:3                      
+chunk                                            lib/utils.js:696:3                      
+uniq                                             lib/utils.js:697:3                      
+uniqBy                                           lib/utils.js:698:3                      
+groupBy                                          lib/utils.js:699:3                      
+orderBy                                          lib/utils.js:700:3                      
+sortBy                                           lib/utils.js:701:3                      
+filter                                           lib/utils.js:702:3                      
+pick                                             lib/utils.js:703:3                      
+omit                                             lib/utils.js:704:3                      
+isEqual                                          lib/utils.js:705:3                      
+isEmpty                                          lib/utils.js:706:3                      
+isNil                                            lib/utils.js:707:3                      
+isString                                         lib/utils.js:708:3                      
+isNumber                                         lib/utils.js:709:3                      
+isArray                                          lib/utils.js:710:3                      
+isObject                                         lib/utils.js:711:3                      
+isFunction                                       lib/utils.js:712:3                      
+isDate                                           lib/utils.js:713:3                      
+isRegExp                                         lib/utils.js:714:3                      
+camelCase                                        lib/utils.js:715:3                      
+kebabCase                                        lib/utils.js:716:3                      
+snakeCase                                        lib/utils.js:717:3                      
+startCase                                        lib/utils.js:718:3                      
+truncate                                         lib/utils.js:719:3                      
+trim                                             lib/utils.js:720:3                      
+padStart                                         lib/utils.js:721:3                      
+padEnd                                           lib/utils.js:722:3                      
+escape                                           lib/utils.js:723:3                      
+unescape                                         lib/utils.js:724:3                      
+memoize                                          lib/utils.js:725:3                      
+once                                             lib/utils.js:726:3                      
+curry                                            lib/utils.js:727:3                      
+flow                                             lib/utils.js:728:3                      
+flatten                                          lib/utils.js:729:3                      
+flattenDeep                                      lib/utils.js:730:3                      
+difference                                       lib/utils.js:731:3                      
+intersection                                     lib/utils.js:732:3                      
+union                                            lib/utils.js:733:3                      
+sample                                           lib/utils.js:734:3                      
+shuffle                                          lib/utils.js:735:3                      
+range                                            lib/utils.js:736:3                      
+keyBy                                            lib/utils.js:737:3                      
+mapValues                                        lib/utils.js:738:3                      
+mapKeys                                          lib/utils.js:739:3                      
+sum                                              lib/utils.js:740:3                      
+sumBy                                            lib/utils.js:741:3                      
+mean                                             lib/utils.js:742:3                      
+max                                              lib/utils.js:743:3                      
+min                                              lib/utils.js:744:3                      
+maxBy                                            lib/utils.js:745:3                      
+minBy                                            lib/utils.js:746:3                      
+countBy                                          lib/utils.js:747:3                      
+partition                                        lib/utils.js:748:3                      
+take                                             lib/utils.js:749:3                      
+drop                                             lib/utils.js:750:3                      
+takeWhile                                        lib/utils.js:751:3                      
+dropWhile                                        lib/utils.js:752:3                      
+findIndex                                        lib/utils.js:753:3                      
+findLastIndex                                    lib/utils.js:754:3                      
+compact                                          lib/utils.js:755:3                      
+zip                                              lib/utils.js:756:3                      
+unzip                                            lib/utils.js:757:3                      
+Configuration hints (1)
+. (root)    .  Create knip.json configuration file, and add entry and/or refine project files (30 unused files)

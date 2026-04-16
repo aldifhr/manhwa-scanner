@@ -5,6 +5,7 @@ import {
   normalizeSource,
   normalizeSourceUrl,
   sourceLabel,
+  getShinigamiPublicBase,
 } from "../lib/domain.js";
 
 test("normalizeSource normalizes known aliases", () => {
@@ -26,20 +27,22 @@ test("sourceLabel returns human-readable label", () => {
 });
 
 test("normalizeSourceUrl normalizes shngm and shinigami domains", () => {
+  const shigBase = getShinigamiPublicBase();
   assert.equal(
     normalizeSourceUrl("https://shngm.id/series/abc/"),
-    "https://a.shinigami.asia/series/abc/",
+    `${shigBase}/series/abc/`,
   );
   assert.equal(
     normalizeSourceUrl("http://www.shinigami.asia/series/abc"),
-    "https://a.shinigami.asia/series/abc/",
+    `${shigBase}/series/abc/`,
   );
 });
 
 test("normalizeSourceUrl lowercases and trims trailing slash", () => {
+  const shigBase = getShinigamiPublicBase();
   assert.equal(
-    normalizeSourceUrl("HTTPS://A.SHINIGAMI.ASIA/SERIES/ABC/"),
-    "https://a.shinigami.asia/series/abc/",
+    normalizeSourceUrl(`${shigBase.toUpperCase()}/SERIES/ABC/`),
+    `${shigBase}/series/abc/`,
   );
 });
 
@@ -50,7 +53,7 @@ test("inferSourceFromUrl detects canonical source from url", () => {
     "ikiru",
   );
   assert.equal(
-    inferSourceFromUrl("https://a.shinigami.asia/series/abc/"),
+    inferSourceFromUrl(`${getShinigamiPublicBase()}/series/abc/`),
     "shinigami_project",
   );
   assert.equal(inferSourceFromUrl("https://example.com/series/abc"), null);

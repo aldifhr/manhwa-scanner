@@ -38,6 +38,11 @@ function createRedisMock() {
       for (const [f, v] of Object.entries(obj)) hash.set(f, v);
       return Object.keys(obj).length;
     },
+    async hgetall(key) {
+      const hash = hashes.get(key);
+      if (!hash) return {};
+      return Object.fromEntries(hash);
+    },
     async hsetnx(key, field, value) {
       const hash = getHash(key);
       if (hash.has(field)) return 0;
@@ -52,6 +57,28 @@ function createRedisMock() {
       }
       return deleted;
     },
+    async del(key) {
+      const deleted = kv.delete(key);
+      return deleted ? 1 : 0;
+    },
+    pipeline() {
+      const operations = [];
+      const p = {
+        lpush: (key, val) => { operations.push(() => {
+          if (!kv.has(key)) kv.set(key, []);
+          kv.get(key).unshift(val);
+        }); return p; },
+        ltrim: (key, start, end) => { operations.push(() => {
+          if (kv.has(key)) kv.set(key, kv.get(key).slice(start, end + 1));
+        }); return p; },
+        expire: () => { return p; },
+        exec: async () => {
+          for (const op of operations) op();
+          return operations.map(() => "OK");
+        },
+      };
+      return p;
+    },
   };
 }
 
@@ -61,6 +88,8 @@ function createLoggerMock() {
     warn() {},
     error() {},
     debug() {},
+    fatal() {},
+    child() { return this; },
   };
 }
 
@@ -131,6 +160,8 @@ test("Ikiru whitelist flow narrows orchestration results before dispatch queuein
         detailSkippedNonPriority: 0,
       },
     }),
+    fetchIkiruMetadataFn: async () => null,
+    fetchSecondaryMetadataFn: async () => null,
     logger: createLoggerMock(),
   });
 
