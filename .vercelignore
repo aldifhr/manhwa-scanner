@@ -1,0 +1,18 @@
+# Ignore documentation and tests
+tests/
+docs/
+scratch/
+scripts/
+ARCHITECTURE.md
+README.md
+
+# Ignore local configs and build artifacts
+.env
+.env.example
+dist/
+node_modules/
+
+# Ignore IDE and OS files
+.DS_Store
+.vscode/
+.idea/

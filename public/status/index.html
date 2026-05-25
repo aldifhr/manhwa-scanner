@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ManhwaScanner · Status</title>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+            rel="stylesheet" />
+    </noscript>
+    <link rel="stylesheet" href="./status.css" />
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-name">ManhwaScanner</div>
+            <span class="brand-sub">/ status</span>
+        </div>
+        <button class="btn-soft" onclick="location.href='../'" title="Dashboard">← Dashboard</button>
+        <div class="topbar-sep"></div>
+        <button class="btn-icon" id="btnRefresh" onclick="refreshStatus()" title="Refresh">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+            </svg>
+        </button>
+        <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    </header>
+
+    <main class="container">
+        <!-- Status Banner -->
+        <div class="status-banner" id="statusBanner">
+            <div class="status-indicator">
+                <div class="status-dot healthy" id="statusDot"></div>
+                <div>
+                    <div class="status-text" id="statusText">Loading…</div>
+                    <div class="status-meta" id="statusMeta">Checking system status</div>
+                </div>
+            </div>
+            <div class="status-uptime">
+                <div class="uptime-value" id="uptimeValue">…</div>
+                <div class="uptime-label">Uptime</div>
+            </div>
+        </div>
+
+        <!-- System health quick-stats -->
+        <div class="health-grid" id="systemHealthOverview">
+            <div class="health-card">
+                <div class="health-lbl">Supabase DB</div>
+                <div class="health-val" style="color:var(--muted)">—</div>
+            </div>
+            <div class="health-card">
+                <div class="health-lbl">Redis Cache</div>
+                <div class="health-val" style="color:var(--muted)">—</div>
+            </div>
+            <div class="health-card">
+                <div class="health-lbl">Discord API</div>
+                <div class="health-val" style="color:var(--muted)">—</div>
+            </div>
+        </div>
+
+        <!-- Networks -->
+        <div id="networksContainer">
+            <div class="loading-container">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Loading status data…</div>
+            </div>
+        </div>
+
+        <!-- Notices -->
+        <div class="notices-section">
+            <div class="notices-header"><span class="notices-title">Recent Notices</span></div>
+            <div class="notices-content">
+                <div class="notice-item">
+                    <div class="notice-icon">✓</div>
+                    <span class="notice-message">No notices reported for the past 7 days</span>
+                </div>
+            </div>
+            <div class="notices-footer">
+                <button class="notice-nav-btn" id="noticePrev" aria-label="Previous">←</button>
+                <span class="notice-history-link" onclick="openNoticeModal()">Show notice history</span>
+                <button class="notice-nav-btn" id="noticeNext" aria-label="Next">→</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span class="last-updated" id="lastUpdated">Last updated: —</span>
+            <div class="footer-links">
+                <a href="https://manhwa-scrap-discord.vercel.app" class="footer-link" target="_blank">Dashboard</a>
+                <a href="https://github.com" class="footer-link" target="_blank">GitHub</a>
+                <a href="#" class="footer-link" onclick="openIncidentModal(); return false;">Incident History</a>
+            </div>
+        </footer>
+    </main>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- Notice Modal -->
+    <div class="modal-overlay" id="noticeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Notice History</h2>
+                <button class="modal-close" onclick="closeNoticeModal()">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content" id="noticeModalContent">
+                <div class="notice-history-empty">
+                    <div
+                        style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">
+                        ✓</div>
+                    <p>No notices reported</p><span>Everything is running smoothly</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incident Modal -->
+    <div class="modal-overlay" id="incidentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Incident History</h2>
+                <button class="modal-close" onclick="closeIncidentModal()">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content" id="incidentModalContent">
+                <div class="notice-history-empty">
+                    <div
+                        style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">
+                        ✓</div>
+                    <p>No incidents reported</p><span>All systems operational</span>
+                </div>
+            </div>
+            <div id="incidentTimeline"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_ENDPOINT = "/api/health-status?realtime=1";
+        const REFRESH_INTERVAL = 60000;
+        const DAYS_TO_SHOW = 7;
+        const NOTICES_API_ENDPOINT = "/api/notices?public=1";
+        const INCIDENTS_API_ENDPOINT = "/api/incidents?public=1";
+        const NOTICES_REFRESH_INTERVAL = 300000;
+
+        let refreshTimer = null, currentData = null, noticesData = null, noticesTimer = null, incidentsData = null;
+
+        const ICONS = {
+            check: "✓", x: "✕", warning: "!",
+            chevron: `<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`
+        };
+
+        // Theme
+        function applyTheme(isDark) {
+            document.body.classList.toggle("dark", isDark);
+            const btn = document.getElementById("themeBtn");
+            if (btn) btn.innerHTML = isDark ? "☀️" : "🌙";
+        }
+        function toggleTheme() {
+            const dark = !document.body.classList.contains("dark");
+            localStorage.setItem("ms_status_theme", dark ? "dark" : "light");
+            applyTheme(dark);
+        }
+
+        // Modals
+        function openNoticeModal() { renderNoticeHistory(); document.getElementById("noticeModal").classList.add("show"); document.body.style.overflow = "hidden"; }
+        function closeNoticeModal() { document.getElementById("noticeModal").classList.remove("show"); document.body.style.overflow = ""; }
+        function openIncidentModal() { renderIncidentTimeline(); document.getElementById("incidentModal").classList.add("show"); document.body.style.overflow = "hidden"; }
+        function closeIncidentModal() { document.getElementById("incidentModal").classList.remove("show"); document.body.style.overflow = ""; }
+
+        document.addEventListener("click", e => {
+            if (e.target === document.getElementById("noticeModal")) closeNoticeModal();
+            if (e.target === document.getElementById("incidentModal")) closeIncidentModal();
+        });
+
+        // Notices
+        async function fetchNotices() {
+            try {
+                const r = await fetch(`${NOTICES_API_ENDPOINT}&days=7`);
+                if (!r.ok) throw new Error();
+                const res = await r.json();
+                if (res.success) { noticesData = res.data; renderNotices(); }
+            } catch (e) { console.error("notices:", e); }
+        }
+
+        function renderNotices() {
+            const item = document.querySelector(".notice-item");
+            if (!noticesData?.hasNotices) {
+                if (item) item.innerHTML = `<div class="notice-icon">✓</div><span class="notice-message">No notices reported for the past 7 days</span>`;
+                return;
+            }
+            const n = noticesData.notices[0], col = n.severity === "high" ? "var(--red)" : "var(--amber)";
+            if (item) item.innerHTML = `<div class="notice-icon" style="background:${col}">${n.severity === "high" ? "!" : "⚠"}</div>
+                <div style="display:flex;flex-direction:column">
+                    <span class="notice-message" style="font-weight:600;color:var(--text)">${n.title}</span>
+                    <span style="font:400 8px var(--mono);color:var(--muted)">${n.message}</span>
+                </div>`;
+        }
+
+        function renderNoticeHistory() {
+            const el = document.getElementById("noticeModalContent");
+            if (!el || !noticesData) return;
+            if (!noticesData.hasNotices) {
+                el.innerHTML = `<div class="notice-history-empty"><div style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">✓</div><p>No notices</p><span>Everything running smoothly</span></div>`;
+                return;
+            }
+            el.innerHTML = '<ul style="list-style:none">' + noticesData.notices.map(n => {
+                const date = new Date(n.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                const col = n.severity === "high" ? "var(--red)" : "var(--amber)";
+                return `<li class="notice-history-item">
+                    <div class="notice-history-date">${date}</div>
+                    <div class="notice-history-content">
+                        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+                            <span style="background:${col};color:#fff;padding:1px 4px;border-radius:2px;font:600 6px var(--mono);text-transform:uppercase">${n.severity === "high" ? "Critical" : "Warning"}</span>
+                            <h3>${n.title}</h3>
+                        </div>
+                        <p>${n.message}</p>
+                        <div style="font:400 7px var(--mono);color:var(--muted);margin-top:2px">Source: ${n.source} · ${n.type.replace(/_/g, " ")}</div>
+                    </div>
+                </li>`;
+            }).join("") + "</ul>";
+        }
+
+        // Incidents
+        async function fetchIncidents() {
+            try {
+                const r = await fetch(`${INCIDENTS_API_ENDPOINT}&days=30`);
+                if (!r.ok) throw new Error();
+                const res = await r.json();
+                if (res.success) incidentsData = res.data;
+            } catch (e) { console.error("incidents:", e); }
+        }
+
+        function renderIncidentTimeline() {
+            const timeline = document.getElementById("incidentTimeline");
+            const modal = document.getElementById("incidentModalContent");
+            if (!timeline || !incidentsData) return;
+            if (incidentsData.totalCount === 0) {
+                modal.innerHTML = `<div class="notice-history-empty"><div style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">✓</div><p>No incidents</p><span>All systems operational for the past 30 days</span></div>`;
+                timeline.innerHTML = ""; return;
+            }
+            let html = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px;padding:9px;background:var(--surface2);border-radius:var(--r)">
+                <div style="text-align:center"><div style="font:600 16px var(--mono);color:var(--text)">${incidentsData.totalCount}</div><div style="font:400 7px var(--mono);color:var(--muted);text-transform:uppercase">Total</div></div>
+                <div style="text-align:center"><div style="font:600 16px var(--mono);color:${incidentsData.ongoingCount > 0 ? "var(--red)" : "var(--green)"}">${incidentsData.ongoingCount}</div><div style="font:400 7px var(--mono);color:var(--muted);text-transform:uppercase">Ongoing</div></div>
+                <div style="text-align:center"><div style="font:600 16px var(--mono);color:var(--text)">${incidentsData.recent24h}</div><div style="font:400 7px var(--mono);color:var(--muted);text-transform:uppercase">Last 24h</div></div>
+            </div>`;
+            incidentsData.timeline.forEach(day => {
+                const isToday = new Date().toISOString().split("T")[0] === day.date;
+                html += `<div style="margin-bottom:14px">
+                    <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--border)">
+                        <span style="font:600 8px var(--mono);color:var(--text2);text-transform:uppercase;letter-spacing:.08em">${isToday ? "Today" : day.displayDate}</span>
+                        <span style="font:400 7px var(--mono);color:var(--muted)">${day.incidentCount} incident${day.incidentCount !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:5px">`;
+                day.incidents.forEach(inc => {
+                    const sev = inc.severity === "critical" ? "var(--red)" : "var(--amber)";
+                    html += `<div style="display:flex;gap:7px;padding:7px;background:var(--surface2);border-radius:var(--r);border-left:2px solid ${sev}">
+                        <div style="flex-shrink:0;width:14px;height:14px;border-radius:50%;background:${inc.resolved ? "var(--green)" : sev};color:#fff;display:flex;align-items:center;justify-content:center;font:700 6px var(--mono)">${inc.resolved ? "✓" : "○"}</div>
+                        <div style="flex:1;min-width:0">
+                            <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+                                <span style="font:600 6px var(--mono);text-transform:uppercase;color:${sev};background:color-mix(in srgb,${sev} 12%,transparent);padding:1px 3px;border-radius:2px">${inc.severity}</span>
+                                <span style="font:400 7px var(--mono);color:var(--muted)">${inc.type.replace(/_/g, " ")}</span>
+                            </div>
+                            <div style="font:600 10px var(--sans);margin-bottom:2px">${inc.title}</div>
+                            <div style="font:400 8px var(--mono);color:var(--text2);line-height:1.4">${inc.message}</div>
+                            <div style="font:400 7px var(--mono);color:var(--muted);margin-top:2px">
+                                ${inc.source} · ${new Date(inc.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                                · <span style="color:${inc.resolved ? "var(--green)" : sev}">${inc.resolved ? "Resolved" : "Ongoing"}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            });
+            modal.style.display = "none";
+            timeline.innerHTML = html;
+        }
+
+        // Status loading
+        function startAutoRefresh() { if (refreshTimer) clearInterval(refreshTimer); refreshTimer = setInterval(loadStatus, REFRESH_INTERVAL); }
+
+        async function loadStatus() {
+            try {
+                const r = await fetch(API_ENDPOINT, { cache: "no-store" });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                currentData = await r.json();
+                renderStatus(currentData);
+                updateLastUpdated();
+            } catch (e) { console.error(e); renderError(e.message); }
+        }
+
+        function refreshStatus() {
+            const btn = document.getElementById("btnRefresh");
+            btn.style.transform = "rotate(360deg)"; btn.style.transition = "transform .5s ease";
+            loadStatus().then(() => setTimeout(() => { btn.style.transform = ""; btn.style.transition = ""; }, 500));
+        }
+
+        function calculateOverallUptime(networks) {
+            if (!networks?.length) return "99.98%";
+            let t = 0, c = 0;
+            networks.forEach(n => (n.services || []).forEach(s => {
+                const u = s.uptime ?? s.availability;
+                const v = typeof u === "number" ? u : parseFloat(String(u || "").replace("%", ""));
+                if (!isNaN(v)) { t += v; c++; }
+            }));
+            return c ? (t / c).toFixed(2) + "%" : "99.98%";
+        }
+
+        function renderStatus(data) {
+            const nets = data.networks || [], uptime = data.uptime || calculateOverallUptime(nets), daily = data.dailyStats || [];
+            updateStatusBanner(data.overallStatus || "healthy", nets, uptime);
+            const active = new Set(daily.filter(s => (s.runs || 0) > 0 || (s.sentLogs || 0) > 0 || (s.failedLogs || 0) > 0 || (s.chaptersSent || 0) > 0).map(s => s.date).filter(Boolean));
+            document.getElementById("networksContainer").innerHTML = nets.map((n, i) => renderNetwork(n, i, active)).join("");
+        }
+
+        function updateStatusBanner(status, nets, uptime) {
+            const dot = document.getElementById("statusDot"), txt = document.getElementById("statusText"), meta = document.getElementById("statusMeta");
+            document.getElementById("uptimeValue").textContent = uptime;
+            const total = nets.reduce((a, n) => a + (n.services?.length || 0), 0);
+            const failed = nets.reduce((a, n) => a + (n.services?.filter(s => s.status === "failed" || s.consecutiveFailures >= 3).length || 0), 0);
+            const deg = nets.reduce((a, n) => a + (n.services?.filter(s => s.status === "degraded" || (s.consecutiveFailures > 0 && s.consecutiveFailures < 3)).length || 0), 0);
+            dot.className = "status-dot";
+            if (failed > 0) { dot.classList.add("degraded"); txt.textContent = "Partial outage"; meta.textContent = `${failed} of ${total} services down`; }
+            else if (deg > 0) { dot.classList.add("warning"); txt.textContent = "Some systems degraded"; meta.textContent = `${deg} of ${total} services affected`; }
+            else { dot.classList.add("healthy"); txt.textContent = "All systems operational"; meta.textContent = `All ${total} services running normally`; }
+
+            const overview = document.getElementById("systemHealthOverview");
+            if (overview) {
+                const sys = nets.find(n => n.name === "System Services")?.services || [];
+                const supabase = sys.find(s => s.name === "Supabase DB"), redis = sys.find(s => s.name === "Redis Database"), discord = sys.find(s => s.name === "Discord API");
+                const fmt = s => s ? (s.status === "healthy" ? `<span style="color:var(--green)">${s.ping && s.ping !== "-" ? s.ping : "OK"}</span>` : `<span style="color:var(--red)">Down</span>`) : `<span style="color:var(--muted)">—</span>`;
+                overview.innerHTML = `
+                    <div class="health-card"><div class="health-lbl">Supabase DB</div><div class="health-val">${fmt(supabase)}</div></div>
+                    <div class="health-card"><div class="health-lbl">Redis Cache</div><div class="health-val">${fmt(redis)}</div></div>
+                    <div class="health-card"><div class="health-lbl">Discord API</div><div class="health-val">${fmt(discord)}</div></div>`;
+            }
+        }
+
+        function getServiceUptime(service) {
+            const u = service.uptime ?? service.availability ?? service.uptimePercent;
+            if (!u || u === "N/A" || u === "—" || u === "-") return (service.ping && service.ping !== "-") ? "Collecting…" : "No data";
+            if (typeof u === "string") return u.includes("%") ? u : (parseFloat(u).toFixed(2) + "%");
+            return typeof u === "number" ? u.toFixed(2) + "%" : "No data";
+        }
+
+        function renderService(service, activeDates) {
+            const st = service.status || "healthy";
+            const isFailed = st === "failed" || service.consecutiveFailures >= 3;
+            const isDeg = st === "degraded" || (service.consecutiveFailures > 0 && service.consecutiveFailures < 3);
+            const cls = isFailed ? "failed" : isDeg ? "degraded" : "healthy";
+            const ico = isFailed ? ICONS.x : isDeg ? ICONS.warning : ICONS.check;
+
+            let cooldownHtml = "";
+            if (service.disabledUntil) {
+                const rem = new Date(service.disabledUntil).getTime() - Date.now();
+                if (rem > 0) { const m = Math.ceil(rem / 60000); cooldownHtml = `<span class="cooldown-badge">${m > 60 ? Math.ceil(m / 60) + "h" : m + "m"}</span>`; }
+            }
+
+            const p = String(service.ping || "");
+            const ping = !service.ping ? "—" : (p.endsWith("s") || p.endsWith("ms")) ? p : parseFloat(p) < 1000 ? Math.round(parseFloat(p)) + "ms" : (parseFloat(p) / 1000).toFixed(1) + "s";
+            const meta = service.name === "Cron Scheduler" && service.note ? service.note : `Response: ${ping}`;
+            const up = getServiceUptime(service);
+
+            return `<div class="service-row">
+                <div class="service-info">
+                    <div class="service-icon ${cls}">${ico}</div>
+                    <div>
+                        <div class="service-name">${escapeHtml(service.name)}${cooldownHtml}</div>
+                        <div class="service-meta">${meta}</div>
+                    </div>
+                </div>
+                <div class="service-metrics">
+                    <div class="uptime-badge">
+                        <div class="uptime-percent ${up === "N/A" || up === "No data" || up === "Collecting…" ? "na" : ""}">${up}</div>
+                        <div class="uptime-text">Uptime</div>
+                    </div>
+                    <div class="timeline-container">
+                        <div class="timeline-labels"><span>7d ago</span><span>Today</span></div>
+                        <div class="timeline-bars">${generateTimelineBars(service, activeDates)}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateTimelineBars(service, activeDates) {
+            const incs = service.incidents || [], degs = service.degraded || [], stats = service.dailyStats || service.history || [];
+            const svcD = new Set(stats.map(s => s.date).filter(Boolean));
+            return Array.from({ length: DAYS_TO_SHOW }, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (DAYS_TO_SHOW - 1 - i));
+                const key = d.toISOString().split("T")[0];
+                const ds = stats.find(s => s.date === key);
+                const isInc = incs.includes(key) || (ds && (ds.incident || ds.failed || ds.down));
+                const isDeg = degs.includes(key) || (ds && ds.degraded);
+                const isAct = (activeDates?.has(key)) || svcD.has(key);
+                const cls = isInc ? "failed" : isDeg ? "degraded" : isAct ? "healthy" : "no-data";
+                const lbl = isInc ? "Incident" : isDeg ? "Degraded" : isAct ? "Operational" : "No data";
+                const dt = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                return `<div class="timeline-bar ${cls}" data-tooltip="${dt}: ${lbl}"></div>`;
+            }).join("");
+        }
+
+        function renderNetwork(network, index, activeDates) {
+            const svcs = network.services || [];
+            const hF = svcs.some(s => s.status === "failed" || s.consecutiveFailures >= 3);
+            const hD = svcs.some(s => s.status === "degraded" || (s.consecutiveFailures > 0 && s.consecutiveFailures < 3));
+            const ns = hF ? "degraded" : hD ? "warning" : "healthy";
+            const si = ns === "healthy" ? ICONS.check : ns === "warning" ? ICONS.warning : ICONS.x;
+            return `<div class="network-card ${network.open !== false ? "" : "collapsed"}" id="network-${index}">
+                <div class="network-header" onclick="toggleNetwork(${index})">
+                    <div class="network-info">
+                        <div class="network-status-icon ${ns}">${si}</div>
+                        <div>
+                            <div class="network-title">${escapeHtml(network.name)}</div>
+                            <div class="network-subtitle">${svcs.length} service${svcs.length !== 1 ? "s" : ""} monitored</div>
+                        </div>
+                    </div>
+                    <div class="network-toggle">
+                        <span class="service-count">${svcs.length}</span>
+                        ${ICONS.chevron}
+                    </div>
+                </div>
+                <div class="services-container">${svcs.map(s => renderService(s, activeDates)).join("")}</div>
+            </div>`;
+        }
+
+        function toggleNetwork(i) { document.getElementById(`network-${i}`).classList.toggle("collapsed"); }
+
+        function setupTooltip() {
+            const tip = document.getElementById("tooltip");
+            document.addEventListener("mouseover", e => { const t = e.target.closest("[data-tooltip]"); if (t) { tip.textContent = t.dataset.tooltip; tip.classList.add("visible"); } });
+            document.addEventListener("mouseout", e => { if (e.target.closest("[data-tooltip]")) tip.classList.remove("visible"); });
+            document.addEventListener("mousemove", e => { if (tip.classList.contains("visible")) { tip.style.left = (e.clientX + 10) + "px"; tip.style.top = (e.clientY - 26) + "px"; } });
+        }
+
+        function updateLastUpdated() {
+            document.getElementById("lastUpdated").textContent = "Last updated: " + new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        }
+
+        function renderError(msg) {
+            document.getElementById("networksContainer").innerHTML = `<div class="error-container">
+                <div class="error-icon">!</div>
+                <div class="error-title">Failed to load status</div>
+                <div class="error-message">${escapeHtml(msg)}</div>
+                <button class="btn-primary" onclick="loadStatus()">Try Again</button>
+            </div>`;
+            document.getElementById("statusDot").className = "status-dot degraded";
+            document.getElementById("statusText").textContent = "Unable to check status";
+            document.getElementById("statusMeta").textContent = "Error loading data";
+        }
+
+        function escapeHtml(t) { if (!t) return ""; const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const saved = localStorage.getItem("ms_status_theme");
+            applyTheme(saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches);
+            setupTooltip();
+            loadStatus();
+            startAutoRefresh();
+            fetchNotices();
+            noticesTimer = setInterval(fetchNotices, NOTICES_REFRESH_INTERVAL);
+            fetchIncidents();
+            const lnk = document.querySelector(".notice-history-link");
+            if (lnk) lnk.onclick = e => { e.preventDefault(); openNoticeModal(); };
+        });
+    </script>
+</body>
+
+</html>

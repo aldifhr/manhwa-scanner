@@ -1,0 +1,69 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron?action=prefetch-metadata",
+      "schedule": "0 3 * * *"
+    }
+  ],
+  "functions": {
+    "api/cron.ts": {
+      "maxDuration": 300
+    },
+    "api/cron-task.ts": {
+      "maxDuration": 300
+    },
+    "api/interactive.ts": {
+      "maxDuration": 10
+    },
+    "api/analytics.ts": {
+      "maxDuration": 10
+    },
+    "api/scrapling_bridge.py": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/notices",
+      "destination": "/api/incidents?action=notices"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/public/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
+}

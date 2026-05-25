@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.bak.*
+.qoder/
+.vercel
+tmp/.kilo/
+scripts/
+scratch/
+dist/
+
+.vercel
+api/__pycache__/
+__pycache__/
+*.pyc
+.env*.local

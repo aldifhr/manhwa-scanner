@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ManhwaScanner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="./dashboard.css" />
+</head>
+
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div id="loadingScreen">
+        <div class="spin"></div>
+        <span style="font:400 9px var(--mono);color:var(--muted)">Loading…</span>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2>ManhwaScanner</h2>
+            <p>Enter password to access the dashboard.</p>
+            <form onsubmit="event.preventDefault(); submitPassword();">
+                <input type="password" id="passwordInput" placeholder="Password…" autocomplete="off" />
+                <button type="submit" class="btn-primary">Sign in</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteConfirmOverlay">
+        <div class="modal">
+            <h2 style="color:var(--red)">Remove title</h2>
+            <p id="deleteConfirmText">Remove this title from the whitelist?</p>
+            <div style="display:flex;gap:6px;margin-top:8px">
+                <button type="button" class="btn-soft" id="deleteCancelBtn" style="flex:1">Cancel</button>
+                <button type="button" class="btn-primary" id="deleteConfirmBtn" style="flex:1">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-dot" id="statusDot"></div>
+                <div class="brand-name">ManhwaScanner</div>
+                <span id="topStatusText"
+                    style="font:600 8px var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-left:12px"></span>
+            </div>
+            <span class="topbar-time" id="topLastUpdated">--:--:--</span>
+            <button type="button" class="btn-soft" id="btnAutoRefresh" onclick="toggleAutoRefresh()" style="font-size:10px; height:24px; padding: 0 8px; border-radius: 4px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--border); background: var(--surface); color: var(--fg); cursor: pointer;">auto: on</button>
+            <select id="pollInterval" onchange="setPollInterval()" style="font-size:10px; height:24px; padding: 0 4px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); cursor: pointer; margin-right: 6px;">
+                <option value="60000">1m</option>
+                <option value="120000">2m</option>
+            </select>
+            <button type="button" class="btn-icon" id="btnTheme" onclick="toggleTheme()" title="Theme">🌙</button>
+            <button type="button" class="btn-icon" id="btnRefresh" onclick="loadAll()" title="Refresh">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                </svg>
+            </button>
+        </header>
+
+        <main class="app-main">
+            <div class="alert" id="alertBox"></div>
+
+            <!-- Hero -->
+            <div class="hero" id="lastCronBar">
+                <div>
+                    <div class="hero-lbl">Next run</div>
+                    <div class="hero-countdown" id="cronCountdown">--:--</div>
+                </div>
+                <div>
+                    <div class="hero-lbl">Last run</div>
+                    <div class="hero-val" id="lastCronTime">--:--:--</div>
+                    <div class="hero-val" id="statDuration" style="color:var(--muted)">--</div>
+                </div>
+                <div class="hero-right">
+                    <div>
+                        <div class="hstat-v g" id="lastCronSent">-</div>
+                        <div class="hstat-l">Sent</div>
+                    </div>
+                    <div>
+                        <div class="hstat-v a" id="lastCronSkipped">-</div>
+                        <div class="hstat-l">Skip</div>
+                    </div>
+                    <div>
+                        <div class="hstat-v r" id="lastCronFailed">-</div>
+                        <div class="hstat-l">Fail</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-row">
+                <div class="kpi">
+                    <div class="kpi-lbl">Health</div>
+                    <div class="kpi-val g" id="overviewHealth">-</div>
+                    <div class="kpi-sub" id="overviewLastRun">--</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-lbl">Tracking</div>
+                    <div class="kpi-val ac" id="overviewWhitelist">-</div>
+                    <div class="kpi-sub">Titles</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-lbl">Success rate</div>
+                    <div class="kpi-val g" id="statSuccessRate">--%</div>
+                    <div class="kpi-sub" id="overviewSent24h">- sent (24h)</div>
+                </div>
+                <div class="kpi" id="fastCronCard" style="display:none">
+                    <div class="kpi-lbl">FastCron</div>
+                    <div class="kpi-val ac" id="overviewFastCron">-</div>
+                    <div class="kpi-sub" style="display:flex; align-items:center; justify-content:center; gap:5px">
+                        <span>Scheduler</span>
+                        <span id="activeWorkersBadge" style="display:none; font-size:7.5px; font-weight:600; padding:1.5px 4.5px; border-radius:3px; background-color:color-mix(in srgb, var(--green) 15%, transparent); color:var(--green); letter-spacing:.02em; animation:pulse 1.5s infinite"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts + right column -->
+            <div class="three-col">
+                <!-- Trend (left, wide) -->
+                <div class="panel">
+                    <div class="panel-head">
+                        <div class="panel-title">Activity trend</div>
+                        <select id="chartRange" class="poll-select" onchange="renderTrendChart()">
+                            <option value="24h">24h</option>
+                            <option value="7d">7d</option>
+                        </select>
+                    </div>
+                    <div class="panel-body" style="padding:12px">
+                        <div class="chart-wrap" style="height:200px"><canvas id="chartTrend"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Right side 2x2 mini panels -->
+                <div class="four-mini">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title">Sources</div>
+                        </div>
+                        <div class="panel-body" style="padding:7px">
+                            <div class="chart-wrap" style="height:100px"><canvas id="chartSourceHealth"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title">Response</div>
+                        </div>
+                        <div class="panel-body" style="padding:7px">
+                            <div class="chart-wrap" style="height:100px"><canvas id="chartPerformance"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title">Source health</div>
+                        </div>
+                        <div class="panel-body" style="padding:7px">
+                            <ul id="sourceHealthList" style="list-style:none;padding:0;margin:0"></ul>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title">System Tools</div>
+                        </div>
+                        <div class="panel-body" style="padding:10px; display:flex; flex-direction:column; gap:6px; justify-content:center;">
+                            <button type="button" class="btn-soft" id="btnRunCron" onclick="runCronNow()" style="text-align:left; display:flex; align-items:center; gap:8px; font-size:10px; height:28px; color:var(--green); border-color:color-mix(in srgb, var(--green) 30%, var(--border));">
+                                <span>⚡</span> Run Scraper Cron
+                            </button>
+                            <button type="button" class="btn-soft" onclick="adminAction('sync-db')" style="text-align:left; display:flex; align-items:center; gap:8px; font-size:10px; height:28px;">
+                                <span>🔄</span> Sync Whitelist DB
+                            </button>
+                            <button type="button" class="btn-soft" onclick="adminAction('clear-cache')" style="text-align:left; display:flex; align-items:center; gap:8px; font-size:10px; height:28px;">
+                                <span>🧹</span> Clear Whitelist Cache
+                            </button>
+                            <button type="button" class="btn-soft" onclick="adminAction('force-unlock')" style="text-align:left; display:flex; align-items:center; gap:8px; font-size:10px; height:28px; color:var(--red); border-color:color-mix(in srgb, var(--red) 30%, var(--border));">
+                                <span>🔓</span> Force Unlock Redis Locks
+                            </button>
+                            <button type="button" class="btn-soft" onclick="adminAction('reset-health')" style="text-align:left; display:flex; align-items:center; gap:8px; font-size:10px; height:28px; color:var(--orange); border-color:color-mix(in srgb, var(--orange) 30%, var(--border));">
+                                <span>🔌</span> Reset Source Health Status
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs + Recent -->
+            <div class="two-col">
+                <div class="panel" style="min-height:300px">
+                    <div class="panel-head">
+                        <div class="panel-title">Logs</div>
+                        <div style="display:flex;align-items:center;gap:5px">
+                            <span class="badge" id="logCount">0</span>
+                        </div>
+                    </div>
+                    <div
+                        style="padding:5px 12px;border-bottom:1px solid var(--border);display:flex;gap:5px;flex-wrap:wrap">
+                        <input type="search" id="inputLogSearch" placeholder="Search…" oninput="applyLogFilter()"
+                            style="flex:1;min-width:100px" />
+                        <div style="display:flex;gap:3px">
+                            <button type="button" id="logFilter_all" class="btn-mini active"
+                                onclick="setLogTagFilter('all')">All</button>
+                            <button type="button" id="logFilter_sent" class="btn-mini"
+                                onclick="setLogTagFilter('sent')">Sent</button>
+                            <button type="button" id="logFilter_failed" class="btn-mini"
+                                onclick="setLogTagFilter('failed')">Err</button>
+                        </div>
+                    </div>
+                    <ul class="list-scroll" id="logList" style="max-height:260px">
+                        <li class="empty">Loading…</li>
+                    </ul>
+                </div>
+
+                <div class="panel" style="min-height:300px">
+                    <div class="panel-head">
+                        <div class="panel-title">Recent dispatch</div>
+                        <span class="badge" id="recentCount">0</span>
+                    </div>
+                    <ul class="list-scroll" id="recentList" style="max-height:270px">
+                        <li class="empty">None</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Whitelist -->
+            <div class="panel" style="margin-top:5px">
+                <div class="panel-head">
+                    <div class="panel-title">Whitelist</div>
+                    <span class="badge" id="whitelistCount">0</span>
+                </div>
+                <div style="padding:5px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px">
+                    <input type="search" id="inputWhitelistSearch" placeholder="Filter…"
+                        oninput="applyWhitelistFilter()" style="flex:1;min-width:140px" />
+                    <select id="inputWhitelistSource" class="poll-select" onchange="applyWhitelistFilter()"
+                        style="width:100px;height:26px">
+                        <option value="">All sources</option>
+                        <option value="ikiru">Ikiru</option>
+                        <option value="shinigami">Shinigami</option>
+                    </select>
+                    <div style="display:flex;gap:3px">
+                        <button type="button" id="sortBtn_default" class="btn-mini active"
+                            onclick="setSortOrder('default')">Default</button>
+                        <button type="button" id="sortBtn_az" class="btn-mini" onclick="setSortOrder('az')">A–Z</button>
+                    </div>
+                </div>
+                <div
+                    style="padding:5px 12px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr auto;gap:5px;background:var(--surface2)">
+                    <input type="text" id="inputMangaTitle" placeholder="Title…" />
+                    <input type="text" id="inputMangaUrl" placeholder="Source URL…" />
+                    <button type="button" class="btn-strong" id="btnAddManga" onclick="addManga()">+ Add</button>
+                </div>
+                <ul class="list-scroll" id="mangaList" style="max-height:320px">
+                    <li class="empty">Loading…</li>
+                </ul>
+                <div class="pagination" id="whitelistPagination">
+                    <button type="button" class="btn-page" onclick="changeWhitelistPage(-1)">‹</button>
+                    <div id="pageNumbers"></div>
+                    <button type="button" class="btn-page" onclick="changeWhitelistPage(1)">›</button>
+                </div>
+            </div>
+
+            <span id="statSent" style="display:none"></span>
+            <span id="statSkipped" style="display:none"></span>
+            <span id="statDedupe" style="display:none"></span>
+            <span id="statFailed" style="display:none"></span>
+            <div id="recommendationsPanel"></div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="foot-status">
+                <div class="foot-dot" id="footerStatusDot"></div>
+                <span id="footerStatusText">Checking…</span>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+                <a href="./status/" class="footer-link">Monitor</a>
+                <span>v2.5.1</span>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module" src="./script.js" defer></script>
+</body>
+
+</html>
