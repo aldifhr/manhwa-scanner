@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { Receiver } from "@upstash/qstash";
 import { redis, withDistributedLock } from "../lib/redis.js";
 import { runCronJob } from "../lib/cronRuntime.js";

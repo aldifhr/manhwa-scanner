@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { Receiver } from "@upstash/qstash";
 import { redis } from "../lib/redis.js";
 import { sendDiscordEmbedsChannelBatch } from "../lib/discord.js";

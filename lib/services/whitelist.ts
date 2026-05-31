@@ -211,6 +211,12 @@ export async function addWhitelistEntry(
     loadWhitelistFn = loadWhitelist,
     saveWhitelistFn = saveWhitelist,
     redisClient = redis,
+    preloadedWhitelistRaw = undefined,
+  }: {
+    loadWhitelistFn?: typeof loadWhitelist;
+    saveWhitelistFn?: typeof saveWhitelist;
+    redisClient?: RedisClient;
+    preloadedWhitelistRaw?: string | null;
   } = {},
 ): Promise<{ 
   status: string; 
@@ -234,7 +240,7 @@ export async function addWhitelistEntry(
     addHexpireToPipeline(pipeline, MANGA_LAST_UPDATES_KEY, titleKey, CHAPTER_TTL_SEC * 1000, redisClient);
     const initUpdateTask = pipeline.exec();
 
-    const whitelist = await loadWhitelistFn(redisClient);
+    const whitelist = await loadWhitelistFn(redisClient, preloadedWhitelistRaw);
 
     const existingIndex = findWhitelistEntryIndex(whitelist, {
       title: normalizedTitle,

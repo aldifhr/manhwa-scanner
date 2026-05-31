@@ -11,6 +11,22 @@ import {
 const logger = getLogger({ scope: "redis" });
 
 /**
+ * Lua script for re-entrant lock acquisition
+ */
+const ACQUIRE_LOCK_SCRIPT = `
+  local val = redis.call("get", KEYS[1])
+  if not val then
+    redis.call("set", KEYS[1], ARGV[1], "EX", tonumber(ARGV[2]))
+    return 1
+  elseif val == ARGV[1] then
+    redis.call("expire", KEYS[1], tonumber(ARGV[2]))
+    return 1
+  else
+    return 0
+  end
+`;
+
+/**
  * Lua script for atomic lock release (compare-and-delete)
  * Prevents race condition where lock expires between GET and DEL
  */
@@ -158,6 +174,12 @@ function createMockRedisClient(): RedisClient {
         zremrangebyrank: wrap(pipelineOperation("zremrangebyrank")),
         lrem: wrap(pipelineOperation("lrem")),
         lmove: wrap(pipelineOperation("lmove")),
+        smembers: wrap(pipelineOperation("smembers")),
+        sismember: wrap(pipelineOperation("sismember")),
+        sadd: wrap(pipelineOperation("sadd")),
+        srem: wrap(pipelineOperation("srem")),
+        scard: wrap(pipelineOperation("scard")),
+        exists: wrap(pipelineOperation("exists")),
         eval: wrap(pipelineOperation("eval")),
         exec: () => {
           const finalCount = count;
@@ -172,7 +194,29 @@ function createMockRedisClient(): RedisClient {
   } as unknown as RedisClient;
 }
 
-export const redis = createRedisClient();
+let activeRedisClient: RedisClient | null = null;
+
+function getRedisClient(): RedisClient {
+  if (!activeRedisClient) {
+    activeRedisClient = createRedisClient();
+  }
+  return activeRedisClient;
+}
+
+export const redis = new Proxy({} as RedisClient, {
+  get(target, prop, receiver) {
+    const client = getRedisClient();
+    const value = Reflect.get(client, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
+  },
+  set(target, prop, value, receiver) {
+    const client = getRedisClient();
+    return Reflect.set(client, prop, value, receiver);
+  }
+});
 
 /**
  * Simple rate limiting using Redis INCR and EXPIRE.
@@ -253,32 +297,7 @@ export function addHexpireToPipeline(
   }
 }
 
-const inFlightRequests = new Map<string, Promise<unknown>>();
-export async function dedupedRequest<T>(
-  key: string,
-  fn: () => Promise<T>,
-  ttlMs = 30000,
-): Promise<T> {
-  if (inFlightRequests.has(key)) return inFlightRequests.get(key) as Promise<T>;
-  
-  let cleanupScheduled = false;
-  const scheduleCleanup = () => {
-    if (!cleanupScheduled) {
-      cleanupScheduled = true;
-      setTimeout(() => inFlightRequests.delete(key), ttlMs);
-    }
-  };
-  
-  const promise = fn()
-    .finally(scheduleCleanup)
-    .catch((err) => {
-      scheduleCleanup();
-      throw err;
-    });
-    
-  inFlightRequests.set(key, promise as Promise<unknown>);
-  return promise;
-}
+
 
 /**
  * Executes a list of asynchronous tasks in batches
@@ -312,8 +331,8 @@ export async function withDistributedLock<T>(
   const maxWait = timeoutMs;
   
   while (true) {
-    const res = await redisClient.set(lockKey, clientId, { nx: true, ex: ttlSec });
-    if (res === "OK") {
+    const res = await redisClient.eval(ACQUIRE_LOCK_SCRIPT, [lockKey], [clientId, String(ttlSec)]);
+    if (Number(res) === 1 || res === "OK") {
       acquired = true;
       break;
     }

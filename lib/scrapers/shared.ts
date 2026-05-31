@@ -16,7 +16,7 @@ import { getLogger } from "../logger.js";
 import { IKIRU_CONFIG, SECONDARY_CONFIG } from "../config.js";
 import { env } from "../config/env.js";
 import { FINGERPRINT_HASH_KEY } from "../constants/redis.js";
-import { ExternalError } from "../errors.js";
+import { AppError } from "../errors.js";
 import { RedisClient, ProviderErrorCode, HttpScrapeOptions, RetryOptions } from "../types.js";
 import { redis } from "../redis.js";
 
@@ -489,9 +489,10 @@ export async function scrapeWithHeaders(
   } catch (err: unknown) {
     const statusCode = (err as any)?.response?.status || 500;
     const message = err instanceof Error ? err.message : String(err);
-    throw new ExternalError(source, message, {
+    throw new AppError(message, {
+      code: "EXTERNAL_ERROR",
       statusCode,
-      details: { url, method: "GET" }
+      details: { url, method: "GET", source }
     });
   }
 }

@@ -1,73 +1,118 @@
-import pino, { Logger, Bindings, Level } from "pino";
 import { env } from "./config/env.js";
-import axios from "axios";
 
 // Determine log level from environment
-const LOG_LEVEL = env.LOG_LEVEL;
+const LOG_LEVEL = env.LOG_LEVEL || "info";
 
-// Determine if we're in development
-const isDevelopment = env.NODE_ENV !== "production";
+export type Level = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
-// Base configuration for pino
-const baseConfig = {
-  level: LOG_LEVEL,
-  base: (typeof process !== 'undefined' && process.pid) ? {
-    pid: process.pid,
-    env: env.NODE_ENV || "development",
-  } : {
-    env: env.NODE_ENV || "development",
-  },
-  // Redact sensitive fields
-  redact: {
-    paths: [
-      "password",
-      "token",
-      "secret",
-      "authorization",
-      "cookie",
-      "session",
-      "*.password",
-      "*.token",
-      "*.secret",
-      "req.headers.authorization",
-      "req.headers.cookie",
-      "res.headers['set-cookie']",
-    ],
-    remove: true,
-  },
-  // Custom serializers
-  serializers: {
-    err: pino.stdSerializers.err,
-    req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res,
-  },
+const LEVEL_VALUES: Record<Level, number> = {
+  trace: 10,
+  debug: 20,
+  info: 30,
+  warn: 40,
+  error: 50,
+  fatal: 60,
 };
 
-// Create transport based on environment
-let transport;
-
-if (isDevelopment && typeof process !== 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
-  // Pretty print for development - only supported in Node.js
-  try {
-    transport = {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
-        ignore: "pid,hostname,env",
-        messageFormat: "{msg} [{scope}]",
-      },
-    };
-  } catch (e) {
-    // Fallback if pino-pretty not available
-  }
+export interface Logger {
+  level: string;
+  child(bindings: Record<string, any>): Logger;
+  trace(msg: string, ...args: any[]): void;
+  trace(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  debug(msg: string, ...args: any[]): void;
+  debug(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  info(msg: string, ...args: any[]): void;
+  info(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  warn(msg: string, ...args: any[]): void;
+  warn(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  error(msg: string, ...args: any[]): void;
+  error(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  fatal(msg: string, ...args: any[]): void;
+  fatal(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  [key: string]: any;
 }
 
-// Create the base logger
-const baseLogger: Logger = pino({
-  ...baseConfig,
-  transport: transport || undefined,
-});
+class SimpleConsoleLogger implements Logger {
+  public level: string;
+  private bindings: Record<string, any>;
+  private minLevelValue: number;
+  [key: string]: any;
+
+  constructor(bindings: Record<string, any> = {}, minLevel: Level = LOG_LEVEL as Level) {
+    this.level = minLevel;
+    this.bindings = bindings;
+    this.minLevelValue = LEVEL_VALUES[minLevel] || 30;
+  }
+
+  public child(newBindings: Record<string, any>): Logger {
+    return new SimpleConsoleLogger(
+      { ...this.bindings, ...newBindings },
+      LOG_LEVEL as Level
+    );
+  }
+
+  private log(level: Level, msgOrObj: any, msg?: string) {
+    const levelVal = LEVEL_VALUES[level];
+    if (levelVal < this.minLevelValue) return;
+
+    let obj: Record<string, any> = {};
+    let finalMsg = "";
+
+    if (typeof msgOrObj === "string") {
+      finalMsg = msgOrObj;
+    } else if (msgOrObj && typeof msgOrObj === "object") {
+      obj = msgOrObj;
+      finalMsg = msg || obj.message || obj.msg || "";
+    }
+
+    const payload: Record<string, any> = {
+      level: levelVal,
+      time: Date.now(),
+      msg: finalMsg,
+      pid: typeof process !== "undefined" ? process.pid : undefined,
+      env: env.NODE_ENV || "development",
+      ...this.bindings,
+      ...obj,
+    };
+
+    // Serialize error if present
+    if (payload.err && payload.err instanceof Error) {
+      payload.err = {
+        message: payload.err.message,
+        stack: payload.err.stack,
+        name: payload.err.name,
+      };
+    }
+
+    console.log(JSON.stringify(payload));
+  }
+
+  public trace(msg: string, ...args: any[]): void;
+  public trace(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  public trace(msgOrObj: any, msg?: string) { this.log("trace", msgOrObj, msg); }
+
+  public debug(msg: string, ...args: any[]): void;
+  public debug(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  public debug(msgOrObj: any, msg?: string) { this.log("debug", msgOrObj, msg); }
+
+  public info(msg: string, ...args: any[]): void;
+  public info(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  public info(msgOrObj: any, msg?: string) { this.log("info", msgOrObj, msg); }
+
+  public warn(msg: string, ...args: any[]): void;
+  public warn(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  public warn(msgOrObj: any, msg?: string) { this.log("warn", msgOrObj, msg); }
+
+  public error(msg: string, ...args: any[]): void;
+  public error(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  public error(msgOrObj: any, msg?: string) { this.log("error", msgOrObj, msg); }
+
+  public fatal(msg: string, ...args: any[]): void;
+  public fatal(obj: Record<string, any>, msg?: string, ...args: any[]): void;
+  public fatal(msgOrObj: any, msg?: string) { this.log("fatal", msgOrObj, msg); }
+}
+
+const baseLogger = new SimpleConsoleLogger();
 
 import type { LoggerOptions } from "./types.js";
 export type { LoggerOptions } from "./types.js";
@@ -103,7 +148,7 @@ export function generateCorrelationId(): string {
 export function getLogger(bindings: LoggerOptions = {}): Logger {
   const { scope, module, ...rest } = bindings;
 
-  const childBindings: Bindings = {
+  const childBindings: Record<string, any> = {
     ...rest,
   };
 
@@ -144,8 +189,7 @@ export const fastLog = {
   fatal: (msg: string, meta: Record<string, any> = {}) => baseLogger.fatal(meta, msg),
 };
 
-// Request logging middleware pattern (simplified for TS)
-// In a real app, this would use express types if needed
+// Request logging middleware pattern
 export function requestLogger(req: any, res: any, next: () => void) {
   const start = Date.now();
   const requestId =
@@ -307,4 +351,4 @@ export async function sendErrorLog(webhookUrl: string | undefined, error: any, c
 export default baseLogger;
 
 // Re-export pino levels for convenience
-export const levels = pino.levels;
+export const levels = LEVEL_VALUES;

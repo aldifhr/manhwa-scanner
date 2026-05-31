@@ -33,37 +33,45 @@ export function invalidateWhitelistCache(): void {
   whitelistCacheExpiry = 0;
 }
 
-export async function loadWhitelist(redisClient: RedisClient = redis): Promise<WhitelistEntry[]> {
+export async function loadWhitelist(
+  redisClient: RedisClient = redis,
+  preloadedRaw?: string | null,
+): Promise<WhitelistEntry[]> {
   const now = Date.now();
   if (whitelistCache && now < whitelistCacheExpiry) {
     return whitelistCache;
   }
 
-  try {
-    const cached = await redisClient.get(WHITELIST_DB_CACHE_KEY);
-    if (cached) {
-      const parsed = typeof cached === "string" ? JSON.parse(cached) : cached;
-      if (Array.isArray(parsed)) {
-        const hydrated = parsed.map((entry) => {
-          entry._normalizedTitle = normalizeTitleKey(entry.title);
-          entry._normalizedUrls = new Set(
-            (entry.sources || [])
-              .map((s: { url?: string | null }) => normalizeSourceUrl(s?.url ?? undefined))
-              .filter((u: string | null): u is string => !!u),
-          );
-          return entry;
-        });
-        whitelistCache = hydrated;
-        whitelistCacheExpiry = Date.now() + WHITELIST_CACHE_TTL_MS;
-        logger.info({ count: hydrated.length }, "[loadWhitelist] Loaded from Redis cache");
-        return hydrated;
+  const hasPreloaded = preloadedRaw !== undefined;
+  const cached = hasPreloaded ? preloadedRaw : null;
+
+  if (cached || !hasPreloaded) {
+    try {
+      const cacheVal = hasPreloaded ? cached : await redisClient.get(WHITELIST_DB_CACHE_KEY);
+      if (cacheVal) {
+        const parsed = typeof cacheVal === "string" ? JSON.parse(cacheVal) : cacheVal;
+        if (Array.isArray(parsed)) {
+          const hydrated = parsed.map((entry) => {
+            entry._normalizedTitle = normalizeTitleKey(entry.title);
+            entry._normalizedUrls = new Set(
+              (entry.sources || [])
+                .map((s: { url?: string | null }) => normalizeSourceUrl(s?.url ?? undefined))
+                .filter((u: string | null): u is string => !!u),
+            );
+            return entry;
+          });
+          whitelistCache = hydrated;
+          whitelistCacheExpiry = Date.now() + WHITELIST_CACHE_TTL_MS;
+          logger.info({ count: hydrated.length }, "[loadWhitelist] Loaded from Redis cache" + (hasPreloaded ? " (preloaded)" : ""));
+          return hydrated;
+        }
       }
+    } catch (err: unknown) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err) },
+        "[loadWhitelist] Redis cache read failed, falling back to Supabase",
+      );
     }
-  } catch (err: unknown) {
-    logger.warn(
-      { err: err instanceof Error ? err.message : String(err) },
-      "[loadWhitelist] Redis cache read failed, falling back to Supabase",
-    );
   }
 
   try {

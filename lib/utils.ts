@@ -1,8 +1,3 @@
-import { 
-  chunk, 
-  compact, 
-} from "lodash-es";
-
 export function arrayUnion<T>(...arrays: T[][]): T[] {
   const result = new Set<T>();
   for (const arr of arrays) {
@@ -20,46 +15,19 @@ export function arrayUnique<T>(array: T[]): T[] {
 }
 
 export function chunkArray<T>(arr: T[], size: number): T[][] {
-  return chunk(arr, size);
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
 }
 
 export function compactArray<T>(arr: (T | null | undefined | false | "" | 0)[]): T[] {
-  return compact(arr) as T[];
+  return arr.filter(Boolean) as T[];
 }
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-export async function retryAsync<T>(
-  fn: (attempt: number) => Promise<T>,
-  options: {
-    maxAttempts?: number;
-    delay?: number;
-    backoff?: number;
-    shouldRetry?: (error: any, attempt: number) => boolean;
-  } = {},
-): Promise<T> {
-  const {
-    maxAttempts = 3,
-    delay = 1000,
-    backoff = 2,
-    shouldRetry = () => true,
-  } = options;
-
-  let lastError: any;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn(attempt);
-    } catch (error) {
-      lastError = error;
-      if (attempt === maxAttempts || !shouldRetry(error, attempt)) {
-        throw error;
-      }
-      await sleep(delay * Math.pow(backoff, attempt - 1));
-    }
-  }
-  throw lastError;
 }
 
 export function withTimeout<T>(
@@ -78,11 +46,4 @@ export function withTimeout<T>(
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
-}
-export function isApproachingTimeout(
-  startTime: number,
-  totalTimeoutMs: number,
-  bufferMs = 5000,
-): boolean {
-  return Date.now() - startTime > totalTimeoutMs - bufferMs;
 }

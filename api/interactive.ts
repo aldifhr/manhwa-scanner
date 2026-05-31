@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { InteractionType, InteractionResponseType, verifyKey } from "discord-interactions";
 import { waitUntil } from "@vercel/functions";
 import { redis } from "../lib/redis.js";
@@ -8,7 +8,7 @@ import {
 } from "../lib/discord.js";
 import { logApiError, logApiHit, logApiOk, runWithContext, generateCorrelationId } from "../lib/logger.js";
 import { getLogger } from "../lib/logger.js";
-import { z } from "zod";
+import type { z } from "zod";
 import { discordInteractionSchema, safeParse } from "../lib/validation.js";
 import {
   createErrorResponse,
@@ -41,8 +41,17 @@ async function handleInteractionError(
     logger.error({ err, isPublic, payload: payload?.data?.name }, "Interaction error");
   }
 
-  // Reply to Discord or HTTP
+  // Reply to Discord with proper interaction response format
   if (res && !res.headersSent) {
+    if (payload) {
+      return res.json({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: displayMessage,
+          flags: DISCORD_EPHEMERAL_FLAG,
+        },
+      });
+    }
     return res.status(statusCode).json(createErrorResponse(err, displayMessage));
   }
 
@@ -110,6 +119,8 @@ export default async function handler(req: Request, res: Response) {
     // Add correlation ID to logger
     reqLogger.correlationId = correlationId;
 
+    let discordPayload: DiscordPayload | null = null;
+
     try {
       if (req.method !== "POST") {
         logApiOk(reqLogger, { status: 405 });
@@ -170,6 +181,7 @@ export default async function handler(req: Request, res: Response) {
     }
 
     const interaction = validation.data;
+    discordPayload = interaction;
     const { type, data: interactionData } = interaction;
     const commandName = interactionData?.name;
     const commandOptions = interactionData?.options || [];
@@ -331,7 +343,7 @@ export default async function handler(req: Request, res: Response) {
         createErrorResponse("UNKNOWN_INTERACTION_TYPE", "Unknown interaction type"),
       );
     } catch (err: unknown) {
-      await handleInteractionError(null, err, res, reqLogger);
+      await handleInteractionError(discordPayload, err, res, reqLogger);
     }
   });
 }

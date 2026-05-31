@@ -8,7 +8,6 @@ process.on("warning", (warning) => {
 
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
-import compression from "compression";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -118,17 +117,7 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 // Rate limiting middleware
 app.use(rateLimitMiddleware.standard);
 
-// Compression middleware
-app.use(
-  compression({
-    level: 6,
-    filter: (req: Request, res: Response) => {
-      if (req.headers["x-no-compression"]) return false;
-      if (req.path.match(/\.(jpg|jpeg|png|gif|webp|mp4|webm)$/)) return false;
-      return compression.filter(req, res);
-    },
-  }),
-);
+
 
 // Global error tracking middleware
 app.use((req: Request, _res: Response, next: NextFunction) => {

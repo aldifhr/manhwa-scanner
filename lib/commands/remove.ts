@@ -58,15 +58,11 @@ export default function handleRemove(payload: any, options: CommandOption[], res
       try {
         if (isClearAll) {
           const result = await clearWhitelist();
-          try {
-            return await editInteractionResponse(
-              payload,
-              `✅ **Whitelist dikosongkan.**\nBerhasil menghapus **${result.count}** manga dari database.`,
-            );
-          } catch (editErr: unknown) {
-            logger.warn({ err: (editErr as any).message }, "[handleRemove] Failed to edit response");
-            return;
-          }
+          await editInteractionResponse(
+            payload,
+            `✅ **Whitelist dikosongkan.**\nBerhasil menghapus **${result.count}** manga dari database.`,
+          );
+          return;
         }
 
         const result = await removeWhitelistEntry(input);
@@ -80,14 +76,10 @@ export default function handleRemove(payload: any, options: CommandOption[], res
             ? `Berhasil menghapus sumber **${sourceLabelStr}** dan karena merupakan sumber terakhir, manga **"${title}"** juga dihapus dari whitelist!`
             : `Berhasil menghapus sumber **${sourceLabelStr}** dari manga **"${title}"**!`;
 
-          try {
-            await editInteractionResponse(
-              payload,
-              `${message}\nTotal Whitelist: **${result.items.length}** manga`,
-            );
-          } catch (editErr: unknown) {
-            logger.warn({ err: (editErr as any).message }, "[handleRemove] Failed to edit response");
-          }
+          await editInteractionResponse(
+            payload,
+            `${message}\nTotal Whitelist: **${result.items.length}** manga`,
+          );
           return;
         }
 
@@ -100,50 +92,38 @@ export default function handleRemove(payload: any, options: CommandOption[], res
               .join(" ");
             return `${index + 1}. ${title} ${sources}`;
           });
-          try {
-            await editInteractionResponse(
-              payload,
-              `Ditemukan lebih dari satu hasil untuk **"${input}"**:\n${lines.join("\n")}\n\nGunakan \`/remove <nomor>\` dari hasil di atas.`,
-            );
-          } catch (editErr: unknown) {
-            logger.warn({ err: (editErr as any).message }, "[handleRemove] Failed to edit response");
-          }
+          await editInteractionResponse(
+            payload,
+            `Ditemukan lebih dari satu hasil untuk **"${input}"**:\n${lines.join("\n")}\n\nGunakan \`/remove <nomor>\` dari hasil di atas.`,
+          );
           return;
         }
 
         if (result.status === "not_found") {
           const count = (result as any).totalCount ?? 0;
-          try {
-            await editInteractionResponse(
-              payload,
-              `Peringatan: "${input}" tidak ditemukan di whitelist! (Jumlah item di database: ${count})${mockWarning()}\nGunakan /list untuk melihat nomor urut manga.`,
-            );
-          } catch (editErr: any) {
-            logger.warn({ err: editErr.message }, "[handleRemove] Failed to edit response");
-          }
+          await editInteractionResponse(
+            payload,
+            `Peringatan: "${input}" tidak ditemukan di whitelist! (Jumlah item di database: ${count})${mockWarning()}\nGunakan /list untuk melihat nomor urut manga.`,
+          );
           return;
         }
 
+        const title = result.item?.title || "Manga";
+        await editInteractionResponse(
+          payload,
+          `Berhasil menghapus **"${title}"** dan semua sumbernya dari whitelist!\nTotal Whitelist: **${result.items.length}** manga`,
+        );
+      } catch (err: unknown) {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, "[handleRemove] Error");
         try {
-          const title = result.item?.title || "Manga";
           await editInteractionResponse(
             payload,
-            `Berhasil menghapus **"${title}"** dan semua sumbernya dari whitelist!\nTotal Whitelist: **${result.items.length}** manga`,
+            `Terjadi kesalahan: ${err instanceof Error ? err.message : String(err)}`,
           );
-        } catch (editErr: any) {
-          logger.warn({ err: editErr.message }, "[handleRemove] Failed to edit response");
+        } catch (editErr: unknown) {
+          logger.warn({ err: editErr instanceof Error ? editErr.message : String(editErr) }, "[handleRemove] Failed to edit error response");
         }
-        } catch (err: unknown) {
-          logger.error({ err: (err as any).message }, "[handleRemove] Error");
-          try {
-            await editInteractionResponse(
-              payload,
-              `Terjadi kesalahan: ${(err as any).message}`,
-            );
-          } catch (editErr: unknown) {
-            logger.warn({ err: (editErr as any).message }, "[handleRemove] Failed to edit error response");
-          }
-        }
+      }
     })(),
   );
 }

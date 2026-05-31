@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { isCronAuthorized } from "../lib/auth.js";
 import { runCronJob } from "../lib/cronRuntime.js";
 import { redis, withDistributedLock } from "../lib/redis.js";

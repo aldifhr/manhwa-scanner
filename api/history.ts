@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { redis } from "../lib/redis.js";
 import {
   LOGS_API_CACHE_KEY,

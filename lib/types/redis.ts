@@ -58,9 +58,11 @@ export interface RedisPipeline {
   lrem: (key: string, count: number, element: string) => RedisPipeline;
   lmove: (source: string, destination: string, from: "LEFT" | "RIGHT", to: "LEFT" | "RIGHT") => RedisPipeline;
   smembers: (key: string) => RedisPipeline;
+  sismember: (key: string, member: string) => RedisPipeline;
   sadd: (key: string, ...members: string[]) => RedisPipeline;
   srem: (key: string, ...members: string[]) => RedisPipeline;
   scard: (key: string) => RedisPipeline;
+  exists: (...keys: string[]) => RedisPipeline;
   mget: (...keys: string[]) => RedisPipeline;
   incr: (key: string) => RedisPipeline;
   decr: (key: string) => RedisPipeline;

@@ -7,12 +7,18 @@ import { RedisClient } from "../types.js";
 import { normalizeTitleKey } from "../domain.js";
 import { arrayUnique, arrayUnion } from "../utils.js";
 import { getLogger } from "../logger.js";
+import { supabase } from "../supabase.js";
+import {
+  MANGA_SUBSCRIBERS_SET_PREFIX,
+  USER_ALL_MODE_SET_KEY,
+  MANGA_MUTES_SET_PREFIX
+} from "../constants/redis.js";
 
 const logger = getLogger({ scope: "notifications:batch" });
 
-const SUBSCRIBERS_SET = "subscribers:";
-const ALL_MODE_SET = "notify:all_mode";
-const MUTES_SET = "mutes:";
+const SUBSCRIBERS_SET = MANGA_SUBSCRIBERS_SET_PREFIX;
+const ALL_MODE_SET = USER_ALL_MODE_SET_KEY;
+const MUTES_SET = MANGA_MUTES_SET_PREFIX;
 
 /**
  * Batch fetch subscribers for multiple titles in one round-trip
@@ -48,14 +54,17 @@ export async function batchGetMangaSubscribers(
     // Single pipeline for all queries
     const pipeline = redis.pipeline();
 
-    // Queue all smembers calls
+    // 1. Queue all subscribers checks
     for (const key of subscriberKeys) {
+      pipeline.exists(key);
       pipeline.smembers(key);
     }
-    // Single all_mode set (same for all)
+    // 2. Queue all_mode check
+    pipeline.exists(ALL_MODE_SET);
     pipeline.smembers(ALL_MODE_SET);
-    // Queue all mute checks
+    // 3. Queue all mute checks
     for (const key of muteKeys) {
+      pipeline.exists(key);
       pipeline.smembers(key);
     }
 
@@ -64,20 +73,127 @@ export async function batchGetMangaSubscribers(
       return result;
     }
 
-    // Parse results
-    // Layout: [sub1, sub2, ..., allMode, mute1, mute2, ...]
     const titleCount = uniqueTitles.length;
-    const allModeResult = results[titleCount] as string[] | null; // After all subscriber sets
+    
+    // Parse all_mode
+    const allModeExists = Number(results[titleCount * 2]) === 1;
+    let allModeUsers = (results[titleCount * 2 + 1] as string[] | null) || [];
+    
+    if (!allModeExists) {
+      try {
+        const { data } = await supabase.from("user_all_mode").select("user_id");
+        allModeUsers = (data || []).map(r => r.user_id);
+        
+        const backfillPipeline = redis.pipeline();
+        if (allModeUsers.length > 0) backfillPipeline.sadd(ALL_MODE_SET, ...allModeUsers);
+        else backfillPipeline.sadd(ALL_MODE_SET, "__empty__");
+        backfillPipeline.expire(ALL_MODE_SET, 86400);
+        await backfillPipeline.exec();
+      } catch (err) {
+        logger.warn({ err }, "Failed to backfill all_mode cache");
+      }
+    }
+    allModeUsers = allModeUsers.filter(x => x !== "__empty__");
 
+    // Collect missing subscriber titles
+    const missingSubTitles: string[] = [];
+    const cachedSubs = new Map<string, string[]>();
+
+    for (let i = 0; i < titleCount; i++) {
+      const titleKey = uniqueTitles[i];
+      const exists = Number(results[i * 2]) === 1;
+      const members = (results[i * 2 + 1] as string[] | null) || [];
+      
+      if (exists) {
+        cachedSubs.set(titleKey, members.filter(x => x !== "__empty__"));
+      } else {
+        missingSubTitles.push(titleKey);
+      }
+    }
+
+    // Collect missing mute titles
+    const missingMuteTitles: string[] = [];
+    const cachedMutes = new Map<string, string[]>();
+
+    const muteStartIndex = titleCount * 2 + 2;
+    for (let i = 0; i < titleCount; i++) {
+      const titleKey = uniqueTitles[i];
+      const exists = Number(results[muteStartIndex + i * 2]) === 1;
+      const members = (results[muteStartIndex + i * 2 + 1] as string[] | null) || [];
+      
+      if (exists) {
+        cachedMutes.set(titleKey, members.filter(x => x !== "__empty__"));
+      } else {
+        missingMuteTitles.push(titleKey);
+      }
+    }
+
+    // Batch fetch missing subs from Supabase
+    if (missingSubTitles.length > 0) {
+      try {
+        const { data } = await supabase.from("user_follows").select("title_key, user_id").in("title_key", missingSubTitles);
+        const fetchedMap = new Map<string, string[]>();
+        for (const titleKey of missingSubTitles) {
+          fetchedMap.set(titleKey, []);
+        }
+        if (data) {
+          for (const row of data) {
+            fetchedMap.get(row.title_key)?.push(row.user_id);
+          }
+        }
+        
+        const backfillPipeline = redis.pipeline();
+        for (const [titleKey, userIds] of fetchedMap.entries()) {
+          cachedSubs.set(titleKey, userIds);
+          const key = `${SUBSCRIBERS_SET}${titleKey}`;
+          if (userIds.length > 0) backfillPipeline.sadd(key, ...userIds);
+          else backfillPipeline.sadd(key, "__empty__");
+          backfillPipeline.expire(key, 86400);
+        }
+        await backfillPipeline.exec();
+      } catch (err) {
+        logger.error({ err }, "Failed to batch load subscribers from Supabase");
+      }
+    }
+
+    // Batch fetch missing mutes from Supabase
+    if (missingMuteTitles.length > 0) {
+      try {
+        const { data } = await supabase.from("manga_mutes").select("title_key, user_id").in("title_key", missingMuteTitles);
+        const fetchedMap = new Map<string, string[]>();
+        for (const titleKey of missingMuteTitles) {
+          fetchedMap.set(titleKey, []);
+        }
+        if (data) {
+          for (const row of data) {
+            fetchedMap.get(row.title_key)?.push(row.user_id);
+          }
+        }
+        
+        const backfillPipeline = redis.pipeline();
+        for (const [titleKey, userIds] of fetchedMap.entries()) {
+          cachedMutes.set(titleKey, userIds);
+          const key = `${MUTES_SET}${titleKey}`;
+          if (userIds.length > 0) backfillPipeline.sadd(key, ...userIds);
+          else backfillPipeline.sadd(key, "__empty__");
+          backfillPipeline.expire(key, 86400);
+        }
+        await backfillPipeline.exec();
+      } catch (err) {
+        logger.error({ err }, "Failed to batch load mutes from Supabase");
+      }
+    }
+
+    // Combine results
     for (let i = 0; i < titleCount; i++) {
       const titleKey = uniqueTitles[i];
       const originalTitle = normalizedMap.get(titleKey)!;
 
-      const subscribers = (results[i] as string[] | null) || [];
-      const mutes = (results[titleCount + 1 + i] as string[] | null) || [];
+      const subscribers = cachedSubs.get(titleKey) || [];
+      const mutes = cachedMutes.get(titleKey) || [];
 
       // Combine native subs + all_mode, then filter mutes
-      const combined = arrayUnique(arrayUnion(subscribers, allModeResult || []));
+      const combined = arrayUnique(arrayUnion(subscribers, allModeUsers));
       const muteSet = new Set(mutes);
       const filtered = combined.filter((userId: string) => !muteSet.has(userId));
 
@@ -88,7 +204,6 @@ export async function batchGetMangaSubscribers(
       { error: (err as Error).message, titleCount: titles.length },
       "batchGetMangaSubscribers failed",
     );
-    // Return empty map on error (fail safe)
   }
 
   return result;
@@ -157,7 +272,6 @@ export function calculateBatchSavings(
   const redisCalls = 1;
 
   // Individual: 3 calls per unique title (subscribers, all_mode, mutes)
-  // Note: all_mode is cached after first call, but worst case is 3 per title
   const estimatedIndividualCalls = uniqueTitles * 3;
 
   const savingsPercent =

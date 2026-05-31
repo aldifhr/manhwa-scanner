@@ -1,5 +1,5 @@
 import { env } from "../lib/config/env.js";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import {
   INCIDENT_CACHE_KEY,
   DISCORD_NOTIFICATION_FAILURES_KEY,

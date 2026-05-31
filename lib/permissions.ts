@@ -17,7 +17,7 @@ export function isOwner(payload: any): boolean {
 
 const ADMINISTRATOR = 0x8n;
 const MANAGE_GUILD = 0x20n;
-const ADD_ALLOWED_USER_IDS = new Set([
+export const ADD_ALLOWED_USER_IDS = new Set([
   "451393015798300683",
   "536168856339611648",
   "758889693235904522",
@@ -80,15 +80,6 @@ export async function isAddAllowedUser(payload: any, redis: RedisClient | null =
   return false;
 }
 
-export async function ensureAddAllowedResponse(payload: any, redis: RedisClient | null = null) {
-  if (await isAddAllowedUser(payload, redis)) return null;
-  return {
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: {
-      content: "Command `/add` hanya diizinkan untuk user tertentu.",
-      flags: DISCORD_EPHEMERAL_FLAG,
-    },
-  };
-}
+
 
 
