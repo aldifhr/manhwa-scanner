@@ -10,15 +10,9 @@ import { getLogger } from "../logger.js";
 import { withTimeout } from "../utils.js";
 import { RedisClient, AutocompleteOption } from "../types.js";
 import { env } from "../config/env.js";
+import { getMockRedisWarning } from "../redis.js";
 
 const logger = getLogger({ scope: "commands:add" });
-
-function mockWarning(): string {
-  if (!env.UPSTASH_REDIS_REST_URL || env.UPSTASH_REDIS_REST_URL.includes("mock-redis.com")) {
-    return "\n\n⚠️ **Mode Mock Redis Aktif:** Data tidak akan tersimpan secara permanen. Silakan konfigurasi `UPSTASH_REDIS_REST_URL`.";
-  }
-  return "";
-}
 
 import { initializeAllProviders } from "../boot.js";
 
@@ -110,7 +104,7 @@ async function handleUrlAddWithSource(
     return editInteractionResponse(
       payload,
       {
-        content: `✅ **${title}** sudah ditambah ke dalam whitelist.\n📊 Total: **${addResult.whitelist.length}** manga${mockWarning()}`,
+        content: `✅ **${title}** sudah ditambah ke dalam whitelist.\n📊 Total: **${addResult.whitelist.length}** manga${getMockRedisWarning()}`,
         embeds: [embed]
       }
     );
@@ -247,7 +241,7 @@ async function handleUrlAdd(
     return editInteractionResponse(
       payload,
       {
-        content: `✅ **${title}** sudah ditambah ke dalam whitelist.\n📊 Total: **${result.whitelist.length}** manga${mockWarning()}`,
+        content: `✅ **${title}** sudah ditambah ke dalam whitelist.\n📊 Total: **${result.whitelist.length}** manga${getMockRedisWarning()}`,
         embeds: [embed],
         components: [
           {

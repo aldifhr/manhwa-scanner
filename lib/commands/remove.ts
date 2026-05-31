@@ -9,13 +9,7 @@ import { getLogger } from "../logger.js";
 import { CommandOption } from "../types.js";
 
 const logger = getLogger({ scope: "commands:remove" });
-
-function mockWarning(): string {
-  if (!process.env.UPSTASH_REDIS_REST_URL) {
-    return "\n\n⚠️ **Mode Mock Redis Aktif:** Bot tidak terhubung ke database. Silakan pasang `UPSTASH_REDIS_REST_URL` di Environment Variables.";
-  }
-  return "";
-}
+import { getMockRedisWarning } from "../redis.js";
 
 export default function handleRemove(payload: any, options: CommandOption[], res: any) {
   const denied = ensureGuildAdminResponse(payload);
@@ -103,7 +97,7 @@ export default function handleRemove(payload: any, options: CommandOption[], res
           const count = (result as any).totalCount ?? 0;
           await editInteractionResponse(
             payload,
-            `Peringatan: "${input}" tidak ditemukan di whitelist! (Jumlah item di database: ${count})${mockWarning()}\nGunakan /list untuk melihat nomor urut manga.`,
+            `Peringatan: "${input}" tidak ditemukan di whitelist! (Jumlah item di database: ${count})${getMockRedisWarning()}\nGunakan /list untuk melihat nomor urut manga.`,
           );
           return;
         }

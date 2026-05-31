@@ -384,3 +384,14 @@ export async function withDistributedLock<T>(
   }
 }
 
+/**
+ * Warn user when Upstash Redis config is missing or using a mock
+ */
+export function getMockRedisWarning(): string {
+  const url = env.UPSTASH_REDIS_REST_URL;
+  if (!url || url.includes("mock-redis.com") || url === "") {
+    return "\n\n⚠️ **Mode Mock Redis Aktif:** Data tidak akan tersimpan secara permanen. Silakan konfigurasi `UPSTASH_REDIS_REST_URL` di Environment Variables.";
+  }
+  return "";
+}
+
