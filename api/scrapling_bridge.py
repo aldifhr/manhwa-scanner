@@ -12,7 +12,8 @@ class IkiruScraper:
     def __init__(self, base_url: str, username: Optional[str] = None, password: Optional[str] = None, cookies: Optional[Dict] = None):
         match = re.match(r'(https?://[^/]+)', base_url)
         self.base_url = match.group(1).rstrip('/') + '/' if match else base_url.rstrip('/') + '/'
-        self.fetcher = Fetcher(impersonate="chrome124")
+        Fetcher.configure(impersonate="chrome124")
+        self.fetcher = Fetcher()
         self.username = username
         self.password = password
         self.cookies = cookies or {}
