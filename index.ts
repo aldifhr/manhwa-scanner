@@ -17,6 +17,15 @@ import { rateLimitMiddleware } from "./lib/rateLimiter.js";
 
 const log = getLogger({ module: "express-dev" });
 
+// Global process exception/rejection logging handlers
+process.on("unhandledRejection", (reason) => {
+  log.error({ err: reason instanceof Error ? { message: reason.message, stack: reason.stack } : String(reason) }, "Global Unhandled Rejection");
+});
+
+process.on("uncaughtException", (error) => {
+  log.error({ err: { message: error.message, stack: error.stack } }, "Global Uncaught Exception");
+});
+
 // Define custom interface for tracked errors
 interface TrackedError extends Error {
   code?: string | number;
