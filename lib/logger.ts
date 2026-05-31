@@ -1,3 +1,13 @@
+// Suppress Node.js url.parse() deprecation warning from dependencies
+if (typeof process !== "undefined" && typeof process.on === "function") {
+  process.on("warning", (warning) => {
+    if (warning.name === "DeprecationWarning" && warning.message.includes("url.parse()")) {
+      return; // Suppress url.parse() warnings from dependencies
+    }
+    console.warn(warning);
+  });
+}
+
 import { env } from "./config/env.js";
 
 // Determine log level from environment
