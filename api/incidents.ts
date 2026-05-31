@@ -613,6 +613,17 @@ export default async function handler(req: Request, res: Response) {
 
   const reqLogger = logApiHit(isNotices ? "notices" : "incidents", req);
 
+  // Apply Serverless Rate Limiting
+  const ip = req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.ip || "unknown";
+  const clientIp = Array.isArray(ip) ? ip[0] : ip;
+  try {
+    const { rateLimiters } = await import("../lib/rateLimiter.js");
+    await rateLimiters.standard.consume(clientIp);
+  } catch (err: any) {
+    logApiOk(reqLogger, { status: 429, reason: "rate_limited" });
+    return res.status(429).json(createErrorResponse("TOO_MANY_REQUESTS", "Rate limit exceeded. Please try again later."));
+  }
+
   const isPublicRead =
     String(req.query?.public || "").toLowerCase() === "1" ||
     String(req.query?.public || "").toLowerCase() === "true";

@@ -11,6 +11,10 @@ import { withTimeout } from "../utils.js";
 import { RedisClient, AutocompleteOption } from "../types.js";
 import { env } from "../config/env.js";
 import { getMockRedisWarning } from "../redis.js";
+import type { Response } from "express";
+import { discordInteractionSchema } from "../validation.js";
+import { z } from "zod";
+type DiscordPayload = z.infer<typeof discordInteractionSchema>;
 
 const logger = getLogger({ scope: "commands:add" });
 
@@ -267,9 +271,9 @@ async function handleUrlAdd(
 
 
 export default async function handleAdd(
-  payload: { data?: { options?: { name: string; options?: unknown[] }[] }; member?: { user?: { id?: string } }; user?: { id?: string }; channel_id?: string; token?: string },
+  payload: DiscordPayload,
   options: AutocompleteOption[],
-  res: { json: (data: Record<string, unknown>) => void },
+  res: Response,
   redis: RedisClient | null = null,
 ) {
   // 1. ULTRA-FAST DEFER (must be < 3s for Discord)

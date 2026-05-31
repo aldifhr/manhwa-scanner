@@ -10,8 +10,12 @@ import { CommandOption } from "../types.js";
 
 const logger = getLogger({ scope: "commands:remove" });
 import { getMockRedisWarning } from "../redis.js";
+import type { Response } from "express";
+import { discordInteractionSchema } from "../validation.js";
+import { z } from "zod";
+type DiscordPayload = z.infer<typeof discordInteractionSchema>;
 
-export default function handleRemove(payload: any, options: CommandOption[], res: any) {
+export default function handleRemove(payload: DiscordPayload, options: CommandOption[], res: Response) {
   const denied = ensureGuildAdminResponse(payload);
   if (denied) {
     return res.json(denied);

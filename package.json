@@ -6,8 +6,10 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "check": "npm run lint && npm run type-check",
+    "check": "npm run lint && npm run type-check && npm run test",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "track:fresh24h": "tsx scripts/track-fresh24h.ts",
     "cleanup:health": "tsx scripts/cleanup-health.ts",
     "test:hexpire": "tsx scripts/test-hexpire.ts",
@@ -54,6 +56,7 @@
     "@types/node-fetch": "^2.6.13",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "dotenv": "^17.4.2",
     "eslint": "^10.0.2",
     "globals": "^17.3.0",
@@ -63,7 +66,8 @@
     "nodemon": "^3.1.14",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.0"
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.7"
   },
   "lint-staged": {
     "*.{js,ts}": [
