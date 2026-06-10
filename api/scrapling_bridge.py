@@ -2,7 +2,7 @@ import sys
 import json
 import argparse
 from typing import List, Dict, Any, Optional
-from scrapling import Fetcher
+from scrapling.engines.static import FetcherClient
 import re
 import os
 from http.server import BaseHTTPRequestHandler
@@ -12,21 +12,19 @@ class IkiruScraper:
     def __init__(self, base_url: str, username: Optional[str] = None, password: Optional[str] = None, cookies: Optional[Dict] = None):
         match = re.match(r'(https?://[^/]+)', base_url)
         self.base_url = match.group(1).rstrip('/') + '/' if match else base_url.rstrip('/') + '/'
-        self.fetcher = Fetcher()
+        self.fetcher = FetcherClient(impersonate="chrome124")
         self.username = username
         self.password = password
         self.cookies = cookies or {}
         self._is_logged_in = bool(cookies)
 
     def _do_get(self, url, **kwargs):
-        kwargs.setdefault("impersonate", "chrome131")
         res = self.fetcher.get(url, cookies=self.cookies, **kwargs)
         if hasattr(res, 'cookies') and res.cookies:
             self.cookies.update(res.cookies)
         return res
 
     def _do_post(self, url, data=None, **kwargs):
-        kwargs.setdefault("impersonate", "chrome131")
         res = self.fetcher.post(url, data=data, cookies=self.cookies, **kwargs)
         if hasattr(res, 'cookies') and res.cookies:
             self.cookies.update(res.cookies)
