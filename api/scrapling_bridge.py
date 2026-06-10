@@ -18,21 +18,39 @@ class IkiruScraper:
         self.cookies = cookies or {}
         self._is_logged_in = bool(cookies)
 
-    def _do_get(self, url, **kwargs):
+    def _request(self, method, url, **kwargs):
         headers = kwargs.pop("headers", {})
         headers.setdefault("Referer", self.base_url)
-        res = self.fetcher.get(url, cookies=self.cookies, headers=headers, **kwargs)
-        if hasattr(res, 'cookies') and res.cookies:
-            self.cookies.update(res.cookies)
+        data = kwargs.pop("data", None)
+
+        for attempt in range(2):
+            if attempt == 1:
+                sys.stderr.write(f"Retrying {url} without impersonation (got 403)\n")
+                fetch_kwargs = dict(kwargs, impersonate=None, stealthy_headers=False)
+                fetch_headers = dict(headers)
+                fetch_headers.setdefault("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            else:
+                fetch_kwargs = dict(kwargs)
+                fetch_headers = dict(headers)
+
+            if method == "GET":
+                res = self.fetcher.get(url, cookies=self.cookies, headers=fetch_headers, **fetch_kwargs)
+            else:
+                res = self.fetcher.post(url, data=data, cookies=self.cookies, headers=fetch_headers, **fetch_kwargs)
+
+            if hasattr(res, 'cookies') and res.cookies:
+                self.cookies.update(res.cookies)
+
+            if res.status != 403:
+                return res
+
         return res
 
+    def _do_get(self, url, **kwargs):
+        return self._request("GET", url, **kwargs)
+
     def _do_post(self, url, data=None, **kwargs):
-        headers = kwargs.pop("headers", {})
-        headers.setdefault("Referer", self.base_url)
-        res = self.fetcher.post(url, data=data, cookies=self.cookies, headers=headers, **kwargs)
-        if hasattr(res, 'cookies') and res.cookies:
-            self.cookies.update(res.cookies)
-        return res
+        return self._request("POST", url, data=data, **kwargs)
 
     def to_absolute_url(self, url: str) -> str:
         if not url: return ""
