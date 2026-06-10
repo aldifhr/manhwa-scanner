@@ -12,7 +12,11 @@ class IkiruScraper:
     def __init__(self, base_url: str, username: Optional[str] = None, password: Optional[str] = None, cookies: Optional[Dict] = None):
         match = re.match(r'(https?://[^/]+)', base_url)
         self.base_url = match.group(1).rstrip('/') + '/' if match else base_url.rstrip('/') + '/'
-        self.fetcher = FetcherClient(impersonate="chrome124")
+        proxy = os.environ.get("SCRAPLING_PROXY") or None
+        fc_kwargs = {"impersonate": "chrome124"}
+        if proxy:
+            fc_kwargs["proxy"] = proxy
+        self.fetcher = FetcherClient(**fc_kwargs)
         self.username = username
         self.password = password
         self.cookies = cookies or {}
