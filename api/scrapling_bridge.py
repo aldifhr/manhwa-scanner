@@ -2,81 +2,92 @@ import sys
 import json
 import argparse
 from typing import List, Dict, Any, Optional
-from scrapling.engines.static import FetcherClient
+from scrapling.parser import Selector
 import re
 import os
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode
 import urllib.request
-import ssl
+import urllib.error
+import http.cookiejar
+
+class SimpleResponse:
+    def __init__(self, status, text, cookies, url):
+        self.status = status
+        self.text = text
+        self.cookies = cookies or {}
+        self.url = url
+        self._sel = Selector(content=text, url=url) if text else None
+
+    def css(self, selector):
+        return self._sel.css(selector) if self._sel else []
+
+    def xpath(self, xpath):
+        return self._sel.xpath(xpath) if self._sel else []
+
 
 class IkiruScraper:
     def __init__(self, base_url: str, username: Optional[str] = None, password: Optional[str] = None, cookies: Optional[Dict] = None):
         match = re.match(r'(https?://[^/]+)', base_url)
         self.base_url = match.group(1).rstrip('/') + '/' if match else base_url.rstrip('/') + '/'
-        proxy = os.environ.get("SCRAPLING_PROXY") or None
-        fc_kwargs = {"impersonate": "chrome124"}
-        if proxy:
-            fc_kwargs["proxy"] = proxy
-        self.fetcher = FetcherClient(**fc_kwargs)
         self.username = username
         self.password = password
         self.cookies = cookies or {}
         self._is_logged_in = bool(cookies)
+        self._cookie_jar = http.cookiejar.CookieJar()
+        if self.cookies:
+            for name, val in self.cookies.items():
+                self._cookie_jar.set_cookie(http.cookiejar.Cookie(
+                    version=0, name=name, value=val,
+                    port=None, port_specified=False,
+                    domain=urlparse(base_url).hostname,
+                    domain_specified=True, domain_initial_dot=False,
+                    path="/", path_specified=True,
+                    secure=False, expires=None, discard=True,
+                    comment=None, comment_url=None, rest={},
+                    rfc2109=False
+                ))
+        proxy = os.environ.get("SCRAPLING_PROXY") or None
+        self._proxy_handler = urllib.request.ProxyHandler({"https": proxy, "http": proxy}) if proxy else urllib.request.ProxyHandler({})
+        self._http_opener = urllib.request.build_opener(self._proxy_handler, urllib.request.HTTPCookieProcessor(self._cookie_jar))
+        self._default_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        }
 
-    def _request(self, method, url, **kwargs):
-        headers = kwargs.pop("headers", {})
-        headers.setdefault("Referer", self.base_url)
-        data = kwargs.pop("data", None)
+    def _fetch(self, method, url, data=None, referer=None):
+        headers = dict(self._default_headers)
+        headers["Referer"] = referer or self.base_url
 
-        for attempt in range(2):
-            if attempt == 1:
-                fetch_kwargs = dict(kwargs, impersonate=None, stealthy_headers=False)
-                fetch_headers = dict(headers)
-                fetch_headers.setdefault("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            else:
-                fetch_kwargs = dict(kwargs)
-                fetch_headers = dict(headers)
+        if method == "POST" and data:
+            if isinstance(data, dict):
+                data = urlencode(data).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        else:
+            req = urllib.request.Request(url, headers=headers, method="GET")
 
-            if method == "GET":
-                res = self.fetcher.get(url, cookies=self.cookies, headers=fetch_headers, **fetch_kwargs)
-            else:
-                res = self.fetcher.post(url, data=data, cookies=self.cookies, headers=fetch_headers, **fetch_kwargs)
-
-            if hasattr(res, 'cookies') and res.cookies:
-                self.cookies.update(res.cookies)
-
-            if res.status == 403:
-                sys.stderr.write(f"[403] {url}\n")
-                sys.stderr.write(f"  Sent headers: {json.dumps(dict(getattr(res, 'request_headers', {})))}\n")
-                sys.stderr.write(f"  Response headers: {json.dumps(dict(getattr(res, 'headers', {})))}\n")
-                body = str(getattr(res, 'text', getattr(res, 'content', b'')))[:800]
-                sys.stderr.write(f"  Body: {body}\n")
-                continue
-
-            return res
-
-        sys.stderr.write(f"Trying urllib fallback for {url}\n")
         try:
-            req = urllib.request.Request(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Referer": self.base_url,
-            })
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
-                sys.stderr.write(f"  urllib fallback status: {resp.status}\n")
-        except Exception as e:
-            sys.stderr.write(f"  urllib fallback failed: {e}\n")
+            with self._http_opener.open(req, timeout=60) as resp:
+                status = resp.status
+                text = resp.read().decode("utf-8", errors="replace")
+                new_url = resp.url
+        except urllib.error.HTTPError as e:
+            status = e.code
+            text = e.read().decode("utf-8", errors="replace")
+            new_url = e.url
 
-        return res
+        # Update cookies from cookie jar
+        cookie_dict = {}
+        for c in self._cookie_jar:
+            cookie_dict[c.name] = c.value
+        self.cookies.update(cookie_dict)
+
+        return SimpleResponse(status, text, cookie_dict, new_url)
 
     def _do_get(self, url, **kwargs):
-        return self._request("GET", url, **kwargs)
+        return self._fetch("GET", url, referer=kwargs.get("headers", {}).get("Referer"))
 
     def _do_post(self, url, data=None, **kwargs):
-        return self._request("POST", url, data=data, **kwargs)
+        return self._fetch("POST", url, data=data, referer=kwargs.get("headers", {}).get("Referer"))
 
     def to_absolute_url(self, url: str) -> str:
         if not url: return ""
