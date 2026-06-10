@@ -6,7 +6,7 @@ from scrapling.parser import Selector
 import re
 import os
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import urlparse, parse_qs, urlencode, quote
 import urllib.request
 import urllib.error
 import http.cookiejar
@@ -398,58 +398,28 @@ class IkiruScraper:
     def search(self, query: str) -> List[Dict[str, Any]]:
         try:
             self.login_if_needed()
-            response = self._do_get(f"{self.base_url}?s={query}")
+            api_url = f"{self.base_url}wp-json/wp/v2/manga?search={quote(query)}&per_page=20"
+            response = self._do_get(api_url)
             if response.status != 200: return []
-            results = []
-            # Try multiple selectors for search results
-            manga_links = (
-                response.css("a.text-base.font-medium") 
-                or response.xpath("//a[contains(@class, 'text-base') and contains(@class, 'font-medium')]")
-                or response.css("div.relative.group a[href*='/manga/']")
-                or response.css("a[href*='/manga/']:not([href*='/chapter-'])")
-            )
-            
-            # sys.stderr.write(f"DEBUG: Found {len(manga_links)} potential links\n")
-            
-            for link in manga_links:
-                manga_url = self.to_absolute_url(str(link.attrib.get("href") or ""))
-                if not manga_url or '/manga/' not in manga_url or '/chapter-' in manga_url: continue
-                
-                title = self.normalize_text(link)
-                if not title:
-                    title = self.normalize_text(link.css("img::attr(alt)").get())
-                
-                if not title: continue
-                
-                # Basic metadata from search page
-                container = link.parent
-                if container: container = container.parent
-                img = container.css("img::attr(src), img::attr(data-src)").get() if container else None
-                
-                # Try to get rating if present (using new Tailwind selectors)
-                rating = "N/A"
-                if container:
-                    rating_el = container.css("span.text-amber-400::text, div.numscore::text, span.font-bold::text").get()
-                    if rating_el:
-                        rating = self.normalize_text(rating_el)
-                
-                # Try to get status from badge
-                status = "Ongoing"
-                if container:
-                    status_el = container.css("span.bg-emerald-500::text, span.bg-blue-500::text, span.bg-red-500::text, span.bg-secondary-bg::text").get()
-                    if status_el:
-                        status = self.normalize_status(status_el)
+            data = json.loads(response.text)
+            if not isinstance(data, list): return []
 
+            results = []
+            for item in data:
+                title = item.get("title", {}).get("rendered", "")
+                if not title: continue
+                manga_url = item.get("link", "")
                 results.append({
-                    "title": title, 
-                    "mangaUrl": manga_url, 
-                    "cover": self.to_absolute_url(str(img or "")), 
-                    "status": status, 
-                    "rating": rating, 
+                    "title": title,
+                    "mangaUrl": manga_url,
+                    "cover": "",
+                    "status": "Ongoing",
+                    "rating": "N/A",
                     "source": "ikiru"
                 })
             return results
-        except: return []
+        except Exception:
+            return []
 
     def get_cookies(self):
         return self.cookies
