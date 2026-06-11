@@ -743,9 +743,9 @@ export function createDashboardRenderer({ state, $, esc }) {
     const data = normalizeStatusData(statusData);
     const entries = Object.entries(data?.sourceHealth || {});
     const countEl = $("sourceHealthCount");
-    if (countEl) countEl.textContent = entries.length;
 
     if (!entries.length) {
+      if (countEl) countEl.textContent = "0";
       list.innerHTML = `
         <li class="empty enhanced-empty">
           <span class="empty-icon">⏳</span>
@@ -756,34 +756,57 @@ export function createDashboardRenderer({ state, $, esc }) {
       return;
     }
 
-    list.innerHTML = entries
-      .map(([source, health], index) => {
-        const status = classifySourceHealth(health);
-        const fToday = health.failuresToday || 0;
-        const sToday = health.successesToday || 0;
-        const totalToday = fToday + sToday;
-        const rateToday = totalToday > 0 ? Math.round((sToday / totalToday) * 100) : 100;
+    // Group by display name (merge shinigami variants)
+    const groups = new Map();
+    for (const [source, health] of entries) {
+      const name = sourceDisplayName(source);
+      if (!groups.has(name)) {
+        groups.set(name, { failures: 0, failuresToday: 0, successesToday: 0, responseTimes: [], worstTone: "healthy", worstLabel: "healthy", sourceCount: 0 });
+      }
+      const g = groups.get(name);
+      const status = classifySourceHealth(health);
+      const toneOrder = { degraded: 3, warning: 2, unknown: 1, healthy: 0 };
+      if (toneOrder[status.tone] > toneOrder[g.worstTone]) {
+        g.worstTone = status.tone;
+        g.worstLabel = status.label;
+      }
+      g.failures += status.failures;
+      g.failuresToday += health.failuresToday || 0;
+      g.successesToday += health.successesToday || 0;
+      if (health.responseTime != null) g.responseTimes.push(Number(health.responseTime));
+      g.sourceCount++;
+    }
+
+    if (countEl) countEl.textContent = groups.size;
+
+    let idx = 0;
+    list.innerHTML = Array.from(groups.entries())
+      .map(([name, g]) => {
+        idx++;
+        const totalToday = g.failuresToday + g.successesToday;
+        const rateToday = totalToday > 0 ? Math.round((g.successesToday / totalToday) * 100) : 100;
+        const avgMs = g.responseTimes.length > 0 ? Math.round(g.responseTimes.reduce((a, b) => a + b, 0) / g.responseTimes.length) : null;
         return `<li class="manga-item" style="padding: 8px 12px; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 10px; border-bottom: 1px solid var(--border);">
-          <span class="manga-index" style="font-size: 8px; opacity: 0.5;">${String(index + 1).padStart(2, "0")}</span>
+          <span class="manga-index" style="font-size: 8px; opacity: 0.5;">${String(idx).padStart(2, "0")}</span>
           <div style="overflow: hidden;">
             <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 1px;">
-                <span class="manga-item-title" style="font: 600 11px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${esc(sourceDisplayName(source))}</span>
-                <span class="status-pill ${status.tone === "degraded" ? "invalid" : status.tone === "warning" ? "warning" : status.tone === "unknown" ? "" : "active"}" style="font-size: 7px; padding: 1px 4px; border-radius: 2px;">${status.label}</span>
+                <span class="manga-item-title" style="font: 600 11px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${esc(name)}${g.sourceCount > 1 ? ` <span style="opacity:0.4; font-size:8px;">(${g.sourceCount}x)</span>` : ""}</span>
+                <span class="status-pill ${g.worstTone === "degraded" ? "invalid" : g.worstTone === "warning" ? "warning" : g.worstTone === "unknown" ? "" : "active"}" style="font-size: 7px; padding: 1px 4px; border-radius: 2px;">${g.worstLabel}</span>
             </div>
             <div style="font: 400 9px var(--mono); color: var(--muted); display: flex; gap: 8px;">
               <span style="display: flex; align-items: center; gap: 3px;">
                 <span style="opacity: 0.6;">ms:</span>
-                <span style="color:var(--text2)">${health.responseTime ? `${health.responseTime}` : "-"}</span>
+                <span style="color:var(--text2)">${avgMs !== null ? avgMs : "-"}</span>
               </span>
               <span style="display: flex; align-items: center; gap: 3px;">
                 <span style="opacity: 0.6;">stk:</span>
-                <span style="color:${status.failures > 0 ? "var(--red)" : "var(--green)"}">${status.failures}</span>
+                <span style="color:${g.failures > 0 ? "var(--red)" : "var(--green)"}">${g.failures}</span>
               </span>
             </div>
           </div>
           <div style="text-align: right;">
             <div style="font: 600 11px var(--mono);">
-               <span class="green">${sToday}</span><span style="opacity:0.3; margin: 0 1px;">/</span><span class="red">${fToday}</span>
+               <span class="green">${g.successesToday}</span><span style="opacity:0.3; margin: 0 1px;">/</span><span class="red">${g.failuresToday}</span>
             </div>
             <div style="font: 600 8px var(--mono); color: ${rateToday < 90 ? "var(--amber)" : "var(--muted)"}; opacity: 0.7;">${rateToday}%</div>
           </div>

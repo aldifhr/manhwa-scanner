@@ -67,22 +67,22 @@ export function countSentLast24h(items) {
   }).length;
 }
 
+const SHINIGAMI_VARIANTS = ["shinigami", "shinigami_mirror", "shinigami_project"];
+
+function isShinigamiLike(source) {
+  return SHINIGAMI_VARIANTS.includes(String(source || "").toLowerCase().trim());
+}
+
 export function sourceName(source) {
-  const s = String(source || "").toLowerCase().trim();
-  if (s === "shinigami") return "Shinigami";
-  return "Ikiru";
+  return isShinigamiLike(source) ? "Shinigami" : "Ikiru";
 }
 
 export function sourceBadgeClass(source) {
-  const s = String(source || "").toLowerCase().trim();
-  return s === "ikiru" ? "source-ikiru" : "source-shinigami";
+  return isShinigamiLike(source) ? "source-shinigami" : "source-ikiru";
 }
 
 export function sourceDisplayName(source) {
-  const s = String(source || "").toLowerCase().trim();
-  if (s === "ikiru") return "Ikiru";
-  if (s === "shinigami") return "Shinigami";
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return isShinigamiLike(source) ? "Shinigami" : "Ikiru";
 }
 
 function normalizeMarkReason(value = "") {
