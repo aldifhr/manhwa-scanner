@@ -866,7 +866,7 @@ function updateFooterStatus(snapshot) {
   const isQueueBackedUp = (snapshot.queueLength || 0) > 50;
   
   let statusClass = "status-indicator-dot";
-  let statusMsg = "All systems operational";
+  let statusMsg = "ONLINE";
   let tickerStatus = "NOMINAL";
   
   if (hasErrors || hasSourceErrors) {

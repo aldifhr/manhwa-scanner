@@ -148,7 +148,7 @@
                     <div
                         style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">
                         ✓</div>
-                    <p>No incidents reported</p><span>All systems operational</span>
+                    <p>No incidents reported</p><span>ONLINE</span>
                 </div>
             </div>
             <div id="incidentTimeline"></div>
@@ -256,7 +256,7 @@
             const modal = document.getElementById("incidentModalContent");
             if (!timeline || !incidentsData) return;
             if (incidentsData.totalCount === 0) {
-                modal.innerHTML = `<div class="notice-history-empty"><div style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">✓</div><p>No incidents</p><span>All systems operational for the past 30 days</span></div>`;
+                modal.innerHTML = `<div class="notice-history-empty"><div style="width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);margin:0 auto 8px">✓</div><p>No incidents</p><span>ONLINE for the past 30 days</span></div>`;
                 timeline.innerHTML = ""; return;
             }
             let html = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px;padding:9px;background:var(--surface2);border-radius:var(--r)">
@@ -342,7 +342,7 @@
             dot.className = "status-dot";
             if (failed > 0) { dot.classList.add("degraded"); txt.textContent = "Partial outage"; meta.textContent = `${failed} of ${total} services down`; }
             else if (deg > 0) { dot.classList.add("warning"); txt.textContent = "Some systems degraded"; meta.textContent = `${deg} of ${total} services affected`; }
-            else { dot.classList.add("healthy"); txt.textContent = "All systems operational"; meta.textContent = `All ${total} services running normally`; }
+            else { dot.classList.add("healthy"); txt.textContent = "ONLINE"; meta.textContent = `All ${total} services running normally`; }
 
             const overview = document.getElementById("systemHealthOverview");
             if (overview) {

@@ -731,7 +731,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     const topStatus = $("topStatusText");
     if (topStatus) {
         const degraded = Number(data.failed || 0) > 0;
-        topStatus.textContent = degraded ? "System degraded" : "All systems operational";
+        topStatus.textContent = degraded ? "System degraded" : "ONLINE";
         topStatus.style.color = degraded ? "var(--amber)" : "var(--green)";
         topStatus.style.opacity = "0.8";
     }
