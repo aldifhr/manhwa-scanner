@@ -1001,17 +1001,12 @@ export function createDashboardRenderer({ state, $, esc }) {
           )
           .join("");
 
-        return `<li class="manga-item" style="padding: 4px 12px; border-bottom: 1px solid var(--border); min-height: 36px;">
+        return `<li class="manga-item wl-chip" title="${esc(title)} — click to open">
           <span class="manga-index">${String(displayIndex + 1).padStart(2, "0")}</span>
-          <div class="whitelist-item-content" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
-            <span class="manga-item-title" style="font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${highlight(title, query)}${marksHtml}</span>
-            <div style="display:flex; align-items:center; flex-shrink: 0;">${badgesHtml}</div>
-          </div>
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn-mini ${isRead ? "active-red" : "active-green"}" style="min-width: 60px;" onclick="toggleMarkReadByIndex(${originalIndex})">${isRead ? "sudah ✓" : "mark"}</button>
-            <button class="btn-mini" onclick="copyWhitelistUrlByIndex(${originalIndex})">copy</button>
-            <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})">x</button>
-          </div>
+          <span class="manga-item-title">${highlight(title, query)}${marksHtml}</span>
+          ${badgesHtml}
+          <button class="btn-mini ${isRead ? "active-red" : "active-green"}" onclick="toggleMarkReadByIndex(${originalIndex})" title="mark">${isRead ? "✓" : "m"}</button>
+          <button class="btn-delete" onclick="deleteMangaByIndex(${originalIndex})" title="delete">x</button>
         </li>`;
       })
       .join("");
