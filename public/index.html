@@ -29,16 +29,6 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="deleteConfirmOverlay">
-        <div class="modal">
-            <h2 style="color:var(--red)">Remove title</h2>
-            <p id="deleteConfirmText">Remove this title from the whitelist?</p>
-            <div class="modal-actions">
-                <button type="button" class="btn-soft" id="deleteCancelBtn">Cancel</button>
-                <button type="button" class="btn-primary" id="deleteConfirmBtn">Remove</button>
-            </div>
-        </div>
-    </div>
 
     <div class="app-shell">
         <aside class="sidebar">
@@ -212,38 +202,7 @@
                     </div>
                 </div>
 
-                <!-- Whitelist -->
-                <div class="panel panel--whitelist">
-                    <div class="panel-header">
-                        <span class="panel-title">Whitelist</span>
-                        <span class="badge" id="whitelistCount">0</span>
-                    </div>
-                    <div class="panel-toolbar panel-toolbar--multi">
-                        <input type="search" id="inputWhitelistSearch" placeholder="Filter" oninput="applyWhitelistFilter()" />
-                        <select id="inputWhitelistSource" class="panel-select" onchange="applyWhitelistFilter()">
-                            <option value="">All sources</option>
-                            <option value="ikiru">Ikiru</option>
-                            <option value="shinigami">Shinigami</option>
-                        </select>
-                        <div class="btn-group">
-                            <button type="button" id="sortBtn_default" class="btn-mini active" onclick="setSortOrder('default')">Def</button>
-                            <button type="button" id="sortBtn_az" class="btn-mini" onclick="setSortOrder('az')">A–Z</button>
-                        </div>
-                    </div>
-                    <div class="panel-add">
-                        <input type="text" id="inputMangaTitle" placeholder="Title" />
-                        <input type="text" id="inputMangaUrl" placeholder="Source URL" />
-                        <button type="button" class="btn-primary btn-add" id="btnAddManga" onclick="addManga()">+ Add</button>
-                    </div>
-                    <ul class="list-scroll" id="mangaList">
-                        <li class="empty">Loading</li>
-                    </ul>
-                    <div class="pagination" id="whitelistPagination">
-                        <button type="button" class="btn-page" id="btnPrevPage" onclick="changeWhitelistPage(-1)">‹</button>
-                        <div id="pageNumbers"></div>
-                        <button type="button" class="btn-page" id="btnNextPage" onclick="changeWhitelistPage(1)">›</button>
-                    </div>
-                </div>
+
 
                 <span id="statSent" style="display:none"></span>
                 <span id="statSkipped" style="display:none"></span>
