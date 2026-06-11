@@ -739,6 +739,7 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function renderSourceHealth(statusData) {
     const list = $("sourceHealthList");
+    if (!list) return;
     const data = normalizeStatusData(statusData);
     const entries = Object.entries(data?.sourceHealth || {});
     const countEl = $("sourceHealthCount");
@@ -805,6 +806,7 @@ export function createDashboardRenderer({ state, $, esc }) {
       .trim()
       .toLowerCase();
     const list = $("mangaList");
+    if (!list) return;
 
     const entries = state.whitelistItems.map((item, originalIndex) => {
       const title = typeof item === "string" ? item : item.title;
@@ -1012,6 +1014,7 @@ export function createDashboardRenderer({ state, $, esc }) {
   }
 
   function renderTimelineList(ul, items, rowRenderer, getDateValue, emptyMessage = null) {
+    if (!ul) return;
     if (!items.length) {
       const msg = emptyMessage || {
         icon: "📭",
@@ -1044,6 +1047,7 @@ export function createDashboardRenderer({ state, $, esc }) {
 
   function renderRecent(data) {
     const list = $("recentList");
+    if (!list) return;
     // Expand minified field names from backend ('t'->title, 'c'->chapter, 's'->source, etc.)
     const expandMinified = (item) => ({
       title: item.t || item.title,
@@ -1101,6 +1105,7 @@ export function createDashboardRenderer({ state, $, esc }) {
     const query = ($("inputLogSearch")?.value ?? "").trim().toLowerCase();
     const tagFilter = state.logTagFilter || "all";
     const list = $("logList");
+    if (!list) return;
 
     const filteredLogs = state.logsItems.filter((log) => {
       // Filter by tag
@@ -1193,6 +1198,7 @@ export function createDashboardRenderer({ state, $, esc }) {
   function renderRecommendations(statusData) {
     const panel = $("recommendationsPanel");
     const list = $("recommendationList");
+    if (!list) return;
     const countEl = $("recommendationCount");
     const items = statusData?.recommendations || [];
 

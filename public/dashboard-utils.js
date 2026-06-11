@@ -80,8 +80,9 @@ export function sourceBadgeClass(source) {
 
 export function sourceDisplayName(source) {
   const s = String(source || "").toLowerCase().trim();
+  if (s === "ikiru") return "Ikiru";
   if (s === "shinigami") return "Shinigami";
-  return "Ikiru";
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function normalizeMarkReason(value = "") {

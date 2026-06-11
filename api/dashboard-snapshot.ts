@@ -198,6 +198,16 @@ export default async function handler(req: Request, res: Response) {
     let snapshot: Awaited<ReturnType<typeof fetchDashboardSnapshot>>;
     try {
       snapshot = await fetchDashboardSnapshot();
+      // Filter source health to only known sources (ignore stale/legacy keys)
+      if (snapshot.sourceHealth && typeof snapshot.sourceHealth === "object") {
+        const filtered: Record<string, unknown> = {};
+        for (const key of SOURCE_KEYS) {
+          if (key in snapshot.sourceHealth) {
+            filtered[key] = (snapshot.sourceHealth as Record<string, unknown>)[key];
+          }
+        }
+        snapshot.sourceHealth = filtered;
+      }
     } catch (redisErr: unknown) {
       logger.error({ err: redisErr instanceof Error ? redisErr.message : String(redisErr) }, "Redis fetch failed, using empty snapshot");
       snapshot = {
