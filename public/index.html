@@ -31,55 +31,6 @@
 
 
     <div class="app-shell">
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="sidebar-logo">
-                    <span class="logo-bracket">&lt;</span>
-                    <span class="logo-char">M</span>
-                    <span class="logo-bracket">/&gt;</span>
-                </div>
-                <div class="sidebar-version">v2.5.1</div>
-            </div>
-
-            <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" onclick="loadAll()">
-                    <span class="nav-icon">≡</span>
-                    <span class="nav-label">Dashboard</span>
-                </a>
-                <a href="./status/" class="nav-item">
-                    <span class="nav-icon">◉</span>
-                    <span class="nav-label">Monitor</span>
-                </a>
-            </nav>
-
-            <div class="sidebar-section">
-                <div class="sidebar-section-title">System</div>
-                <div class="sidebar-status">
-                    <div class="sidebar-status-row">
-                        <span class="sidebar-status-label">Status</span>
-                        <div class="sidebar-status-value">
-                            <div class="foot-dot" id="footerStatusDot"></div>
-                            <span id="footerStatusText">Checking</span>
-                        </div>
-                    </div>
-                    <div class="sidebar-status-row">
-                        <span class="sidebar-status-label">Last run</span>
-                        <span id="footerLastUpdated" class="sidebar-status-time">--:--:--</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="sidebar-tools">
-                <button type="button" id="btnTheme" onclick="toggleTheme()" title="Theme" class="sidebar-tool-btn">○</button>
-                <button type="button" id="btnRefresh" onclick="loadAll()" title="Refresh" class="sidebar-tool-btn">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                        <path d="M3 3v5h5" />
-                    </svg>
-                </button>
-            </div>
-        </aside>
-
         <div class="main-area">
             <header class="topbar">
                 <div class="topbar-left">
