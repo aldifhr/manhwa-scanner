@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 
 interface VirtualizedListProps<T> {
@@ -100,6 +100,19 @@ export default function VirtualizedList<T>({
     scrollMargin,
   });
 
+  // Defer measureElement to microtask to avoid flushSync inside render (React 19)
+  const measureRef = useCallback(
+    (el: HTMLElement | null) => {
+      if (!el) return;
+      queueMicrotask(() => {
+        try {
+          virtualizer.measureElement(el);
+        } catch {}
+      });
+    },
+    [virtualizer]
+  );
+
   // Deep-link: scroll the matching row into view. Off-screen rows aren't in the
   // DOM, so a DOM query (scrollIntoView) can't find them — scroll by index.
   useEffect(() => {
@@ -128,7 +141,7 @@ export default function VirtualizedList<T>({
           <div
             key={vi.key}
             data-index={vi.index}
-            ref={virtualizer.measureElement}
+            ref={measureRef}
             className="absolute top-0 left-0 w-full"
             style={{ transform: `translateY(${vi.start - scrollMargin}px)` }}
           >
