@@ -233,9 +233,10 @@ async def rss(request: Request):
         # Source of truth for isSent (BUG3): a chapter is "sent" if it appears
         # in dispatch_history for THAT title+chapter (any source). Dispatch is
         # per-release, not per-source, so we key on (title_key, chapter_num).
+        # Filter by cutoff (24h) to avoid full-table scan as history grows.
         dh_sent: set[tuple[str, float]] = set()
         try:
-            dh_rows = sb.table("dispatch_history").select("title_key, source, chapter_title").execute().data or []
+            dh_rows = sb.table("dispatch_history").select("title_key, source, chapter_title").gte("sent_at", cutoff).limit(2000).execute().data or []
             for dh in dh_rows:
                 tk = str(dh.get("title_key") or "")
                 ct = dh.get("chapter_title")

@@ -169,6 +169,13 @@ async def post_excluded(request: Request):
         if res.get("status") == "error":
             return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
         _LIST_CACHE[0] = 0.0  # invalidate GET cache
+        # Also invalidate storage excluded_keys cache so RSS respects new exclude immediately
+        try:
+            excl_store._CACHE_TS = 0.0
+            from app.api import rss as _rss_mod
+            _rss_mod.invalidate_rss_cache()
+        except Exception:
+            pass
         # Audit log
         from app.services.audit import log_action, AuditAction
         log_action(AuditAction.EXCLUDE_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
@@ -197,6 +204,12 @@ async def delete_excluded(request: Request):
         if res.get("status") == "error":
             return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
         _LIST_CACHE[0] = 0.0  # invalidate GET cache
+        try:
+            excl_store._CACHE_TS = 0.0
+            from app.api import rss as _rss_mod
+            _rss_mod.invalidate_rss_cache()
+        except Exception:
+            pass
         # Audit log
         from app.services.audit import log_action, AuditAction
         log_action(AuditAction.EXCLUDE_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
@@ -226,6 +239,12 @@ async def post_excluded_bulk(request: Request):
         if res.get("status") == "error":
             return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
         _LIST_CACHE[0] = 0.0
+        try:
+            excl_store._CACHE_TS = 0.0
+            from app.api import rss as _rss_mod
+            _rss_mod.invalidate_rss_cache()
+        except Exception:
+            pass
         return JSONResponse(content={"success": True, "data": res})
     except Exception as e:
         logger.error("post_excluded_bulk failed", exc=e)

@@ -72,8 +72,8 @@ class Settings(BaseSettings):
 
     # Image proxy: only these upstream hosts may be fetched. NO wildcards,
     # NO arbitrary ports — explicit host:port pairs to prevent SSRF.
+    # Note: derived dynamically via get_proxy_hosts() to stay in sync with IKIRU/SHINIGAMI/VORATOON URLs.
     PROXY_ALLOWED_HOSTS: list[str] = [
-        # Derived from settings at startup; hostnames are static to prevent SSRF.
         "07.ikiru.wtf:443",
         "ikiru.wtf:443",
         "g.shinigami.asia:443",
@@ -82,6 +82,21 @@ class Settings(BaseSettings):
         "cvr.voratoon.id:443",
         "cdn.voratoon.com:443",
     ]
+
+    def get_proxy_hosts(self) -> list[str]:
+        """Dynamic allowlist derived from current IKIRU/SHINIGAMI/VORATOON settings."""
+        from urllib.parse import urlparse
+
+        hosts: set[str] = set(self.PROXY_ALLOWED_HOSTS)
+        for raw in (self.IKIRU_BASE_URL, self.SECONDARY_SOURCE_URL, self.VORATOON_API_URL, self.SECONDARY_PUBLIC_BASE):
+            try:
+                p = urlparse(raw)
+                if p.hostname:
+                    port = p.port or (443 if p.scheme == "https" else 80)
+                    hosts.add(f"{p.hostname.lower()}:{port}")
+            except Exception:
+                pass
+        return sorted(hosts)
 
     # Deploy env: "production" | "development"
     ENVIRONMENT: str = "production"

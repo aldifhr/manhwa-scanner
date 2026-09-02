@@ -289,8 +289,8 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
     _meta: dict = {}
     if fetch_meta:
         _meta = _cached_series_meta("shinigami", manga_id, tk=normalize_title_key(title or ""))
-    _meta_rating = normalize_rating(u.get("rating")) or normalize_rating(_meta.get("rating"))
-    _meta_genres = u.get("genre") or _meta.get("genres") or []
+    _meta_rating = normalize_rating(m.get("rating") or m.get("user_rate")) or normalize_rating(_meta.get("rating"))
+    _meta_genres = (m.get("genre") or m.get("genres") or _meta.get("genres") or [])
     try:
         ch_list = _cached_chapter_list(
             "shinigami", manga_id,

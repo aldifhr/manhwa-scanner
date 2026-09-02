@@ -348,7 +348,9 @@ async def legacy_redirect_middleware(request: Request, call_next):
     path = request.url.path
     if path in _LEGACY_REDIRECTS:
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=_LEGACY_REDIRECTS[path] + "?" + str(request.query_params), status_code=307)
+        qs = str(request.query_params)
+        url = _LEGACY_REDIRECTS[path] + (f"?{qs}" if qs else "")
+        return RedirectResponse(url=url, status_code=307)
     return await call_next(request)
 
 # --- Router includes ---
@@ -463,12 +465,22 @@ async def health_detailed_v1():
     degraded_count = sum(1 for s in sources if s["status"] == "degraded")
     overall = "down" if down_count > 0 else ("degraded" if degraded_count > 0 else "healthy")
     
+    import time as _t_up
+    _uptime_s = _t_up.time() - health_store.APP_START_TS if hasattr(health_store, "APP_START_TS") else 0
+    # Fallback to api observability start if health has no start ts
+    if not _uptime_s:
+        try:
+            from app.api.observability import APP_START_TS as _api_start
+            _uptime_s = _t_up.time() - _api_start
+        except Exception:
+            _uptime_s = 0
     return {
         "success": True,
         "data": {
             "sources": sources,
             "overall": overall,
-            "uptime": 99.9,  # TODO: calculate real uptime
+            "uptime": round(_uptime_s / 86400, 2) if _uptime_s else 0,  # days
+            "uptime_human": f"{int(_uptime_s//3600)}h {int((_uptime_s%3600)//60)}m" if _uptime_s else "0m",
             "version": "1.0.0",
             "circuit_breakers": {
                 "discord": cb_discord.state.value,

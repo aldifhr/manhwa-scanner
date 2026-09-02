@@ -171,11 +171,12 @@ async def analytics_engagement(request: Request):
             WHERE updated_at >= NOW() - INTERVAL '24 hours'
         """)
 
-        # Total reading progress entries
+        # Total reading progress entries — count keys via lateral join
         total_progress = q("""
             SELECT COUNT(*) as total_sessions,
-                   SUM(jsonb_object_keys(entries)::int) as total_entries
+                   COUNT(k) as total_entries
             FROM continue_reading
+            LEFT JOIN LATERAL jsonb_object_keys(entries) AS k ON true
         """)
 
         # Most read series (by continue_reading entries)

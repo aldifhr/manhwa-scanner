@@ -32,16 +32,8 @@ __all__ = [
 
 
 def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: int = 100, merge: bool = True) -> dict:
-    """Get whitelist with metadata joins. Honors page/page_size for DB-side
-    slicing (stable ORDER BY created_at DESC)."""
+    """Get whitelist with metadata joins. DB-side pagination for source/title filters."""
     from app.db import get_supabase
-
-    rows = wl_store.load_whitelist()
-    if source:
-        rows = [r for r in rows if (r.get("source") or "") == source]
-    if title:
-        q = title.lower()
-        rows = [r for r in rows if q in (r.get("title", "") or "").lower()]
 
     try:
         page = max(1, int(page))
@@ -51,13 +43,72 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         page_size = max(1, min(10000, int(page_size)))
     except (TypeError, ValueError):
         page_size = 100
-    total = len(rows)
+
+    # DB-side pagination when filters present — avoids loading full table
+    use_db_pagination = bool(source or title)
+    if use_db_pagination:
+        try:
+            sb_pg = get_supabase()
+            q = sb_pg.table("whitelist").select("*", count="exact")
+            if source:
+                q = q.eq("source", source)
+            if title:
+                _t = title.replace("%", r"\%").replace("_", r"\_")
+                q = q.ilike("title", f"%{_t}%")
+            # Need total for dedup calc — fetch count first
+            cnt_res = q.limit(1).execute()
+            total_raw = cnt_res.count or 0
+            # Merge requires dedup across all pages — fetch all filtered for dedup
+            # but still DB-filtered (much smaller than full table)
+            if merge:
+                # Fetch all filtered rows for dedup (bounded by whitelist size ~500)
+                q2 = sb_pg.table("whitelist").select("*")
+                if source:
+                    q2 = q2.eq("source", source)
+                if title:
+                    _t2 = title.replace("%", r"\%").replace("_", r"\_")
+                    q2 = q2.ilike("title", f"%{_t2}%")
+                q2 = q2.order("created_at", desc=True).limit(10000)
+                rows = q2.execute().data or []
+                total = total_raw  # will be recalculated after dedup below
+            else:
+                start = (page - 1) * page_size
+                q2 = sb_pg.table("whitelist").select("*")
+                if source:
+                    q2 = q2.eq("source", source)
+                if title:
+                    _t2 = title.replace("%", r"\%").replace("_", r"\_")
+                    q2 = q2.ilike("title", f"%{_t2}%")
+                q2 = q2.order("created_at", desc=True).limit(page_size).offset(start)
+                rows = q2.execute().data or []
+                total = total_raw
+                # For non-merge path we can return early after enrichment
+                # (handled below via paged_out logic — set flag)
+                _db_paginated = True
+            sb = sb_pg
+            all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
+            _db_paginated_flag = not merge  # True means rows already paginated
+        except Exception:
+            # Fallback to in-memory on DB failure
+            rows = wl_store.load_whitelist()
+            if source:
+                rows = [r for r in rows if (r.get("source") or "") == source]
+            if title:
+                _ql = title.lower()
+                rows = [r for r in rows if _ql in (r.get("title", "") or "").lower()]
+            sb = get_supabase()
+            all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
+            _db_paginated_flag = False
+            total = len(rows)
+    else:
+        rows = wl_store.load_whitelist()
+        sb = get_supabase()
+        all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
+        _db_paginated_flag = False
+        total = len(rows)
     offset = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if page_size else 1
     has_more = page * page_size < total
-
-    sb = get_supabase()
-    all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
     rc_map = {}
     rc_series_by_title: dict[str, str] = {}
 
@@ -129,6 +180,8 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
     mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, last_notified) for r in rows]
 
     # ---- Dedup by title_key (cross-source merge) ----
+    # DB-paginated non-merge path is already sliced — skip second slicing
+    _is_db_paginated = locals().get("_db_paginated_flag", False)
     if merge:
         _groups: dict[str, list[dict]] = {}
         for m in mapped:
@@ -171,11 +224,18 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
     else:
         deduped = mapped
 
-    total = len(deduped)
-    total_pages = (total + page_size - 1) // page_size if page_size else 1
-    has_more = page * page_size < total
-    offset = (page - 1) * page_size
-    paged_out = deduped[offset:offset + page_size]
+    if _is_db_paginated:
+        # Already DB-paginated and not merged — total from count, no reslice
+        total = locals().get("total_raw", len(deduped))
+        total_pages = (total + page_size - 1) // page_size if page_size else 1
+        has_more = page * page_size < total
+        paged_out = deduped
+    else:
+        total = len(deduped)
+        total_pages = (total + page_size - 1) // page_size if page_size else 1
+        has_more = page * page_size < total
+        offset = (page - 1) * page_size
+        paged_out = deduped[offset:offset + page_size]
 
     paged_out.sort(
         key=lambda x: (x.get("last_chapter") or x.get("last_notified") or "", x.get("title") or ""),
@@ -303,11 +363,21 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
             for x in (r.data or []):
                 matched_ids.add(x["id"])
         if _title:
-            r = sb.table("whitelist").select("id, title_key, source").ilike("title", f"%{_title}%").execute()
+            # Escape LIKE wildcards to avoid over-match + use exact title_key fallback first
+            _esc_title = _title.replace("%", r"\%").replace("_", r"\_")
+            # Prefer exact title_key match via normalized title before ILIKE
+            from app.utils.text import normalize_title_key as _ntk_del
+            _ntk_title = _ntk_del(_title)
+            if _ntk_title:
+                r = sb.table("whitelist").select("id, title_key, source").eq("title_key", _ntk_title).execute()
+                for x in (r.data or []):
+                    matched_ids.add(x["id"])
+            r = sb.table("whitelist").select("id, title_key, source").ilike("title", f"%{_esc_title}%").execute()
             for x in (r.data or []):
                 matched_ids.add(x["id"])
         if _url:
-            r = sb.table("whitelist").select("id, title_key, source").ilike("url", f"%{_url.split('/')[-1]}%").execute()
+            _esc_url = _url.split('/')[-1].replace("%", r"\%").replace("_", r"\_")
+            r = sb.table("whitelist").select("id, title_key, source").ilike("url", f"%{_esc_url}%").execute()
             for x in (r.data or []):
                 matched_ids.add(x["id"])
     except Exception as _e:
@@ -347,11 +417,13 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
             _conds.append("title_key=%s OR title_key=%s")
             _params.extend([_tk, _tk.replace("-", " ")])
         if _title:
+            _esc_t = _title.replace("%", r"\%").replace("_", r"\_")
             _conds.append("title ILIKE %s")
-            _params.append(f"%{_title}%")
+            _params.append(f"%{_esc_t}%")
         if _url:
+            _esc_u = _url.replace("%", r"\%").replace("_", r"\_")
             _conds.append("series_url ILIKE %s OR url ILIKE %s OR chapter_url ILIKE %s")
-            _params.extend([f"%{_url}%", f"%{_url}%", f"%{_url}%"])
+            _params.extend([f"%{_esc_u}%", f"%{_esc_u}%", f"%{_esc_u}%"])
         if _conds:
             _where = " OR ".join(_conds)
             if _src:

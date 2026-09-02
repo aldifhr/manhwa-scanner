@@ -11,11 +11,14 @@ import { rewriteCoverUrl } from "@/lib/utils";
 interface ExcludedBackendItem {
   id?: string;
   title_key?: string;
+  titleKey?: string;
   title?: string | null;
   source?: string;
   created_at?: string | null;
+  createdAt?: string | null;
   cover?: string | null;
   series_url?: string | null;
+  seriesUrl?: string | null;
 }
 
 interface BackendResponse {
@@ -49,15 +52,34 @@ export async function GET(request: NextRequest) {
     }
     const backendData =
       (body.data as { results?: ExcludedBackendItem[]; total?: number }) || {};
-    const results = (backendData.results ?? []).map((item) => ({
-      id: item.id || item.title_key || "",
-      titleKey: item.title_key || item.id || "",
-      title: item.title || null,
-      source: item.source || "all",
-      createdAt: item.created_at || null,
-      cover: rewriteCoverUrl(item.cover),
-      seriesUrl: item.series_url || null,
-    }));
+    const results = (backendData.results ?? []).map(
+      (item: ExcludedBackendItem) => {
+        const raw = item as unknown as Record<string, unknown>;
+        return {
+          id:
+            (raw.id as string) ||
+            (raw.title_key as string) ||
+            (raw.titleKey as string) ||
+            "",
+          titleKey:
+            (raw.title_key as string) ||
+            (raw.titleKey as string) ||
+            (raw.id as string) ||
+            "",
+          title: (raw.title as string | null) || null,
+          source: (raw.source as string) || "all",
+          createdAt:
+            (raw.created_at as string | null) ||
+            (raw.createdAt as string | null) ||
+            null,
+          cover: rewriteCoverUrl((raw.cover as string | null) || null),
+          seriesUrl:
+            (raw.series_url as string | null) ||
+            (raw.seriesUrl as string | null) ||
+            null,
+        };
+      }
+    );
     return NextResponse.json({
       success: true,
       data: { results, total: backendData?.total ?? results.length },

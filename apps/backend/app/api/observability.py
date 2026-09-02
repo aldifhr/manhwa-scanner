@@ -584,14 +584,11 @@ async def reader_cover_public(request: Request):
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
     host_port = f"{host}:{port}"
-    # DEBUG
     _scheme_ok = p.scheme in ("http", "https")
     _host_ok = host_port in allowed
-    print(f"[cover-img] url={url[:60]} host_port={host_port} scheme_ok={_scheme_ok} host_ok={_host_ok} allowed_list={allowed}")
     if not _scheme_ok or not _host_ok:
-        print(f"[cover-img] REJECTED: scheme={p.scheme} host_port={host_port}")
+        logger.warn("cover-img rejected", scheme=p.scheme, host_port=host_port)
         return FastResponse(status_code=403)
-    print("[cover-img] PASSED check, proceeding to fetch")
 
     cached = _cache_get(url)
     if cached is not None:
@@ -603,7 +600,6 @@ async def reader_cover_public(request: Request):
     try:
         async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
             r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; IkiruBot/1.0)"})
-        print(f"[cover-img] Upstream status: {r.status_code}")
         if r.status_code == 200:
             content = r.content[:_RESPONSE_SIZE_CAP]
             _cache_put(url, content)
@@ -614,7 +610,7 @@ async def reader_cover_public(request: Request):
             )
         return FastResponse(status_code=r.status_code)
     except Exception as e:
-        print(f"[cover-img] Exception: {str(e)[:100]}")
+        logger.warn("cover-img fetch failed", err=str(e)[:100])
         return FastResponse(status_code=502)
 
 

@@ -146,7 +146,7 @@ def list_excluded_titles() -> list[dict]:
         rows = (
             get_supabase()
             .table("excluded_titles")
-            .select("title_key, title, source, created_at, cover, series_url")
+            .select("id, title_key, title, source, created_at, cover, series_url")
             .order("created_at", desc=True)
             .execute()
         )

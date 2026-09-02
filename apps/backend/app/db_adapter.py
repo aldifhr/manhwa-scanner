@@ -244,6 +244,9 @@ class _Query:
         "dashboard_snapshot.payload",
         "failed_dispatches.metadata",
         "whitelist.genres",
+        "recent_chapters.genres",
+        "series_meta.genres",
+        "series_meta.payload",
     }
 
     def contains(self, col, val):

@@ -1,8 +1,12 @@
 """Source health storage + cron lock (parity with lib/services/health.ts + shared/lock.ts)."""
+import time as _time
+
 from app.db import get_supabase
 from app.logger import get_logger
 
 logger = get_logger("storage:health")
+
+APP_START_TS = _time.time()
 
 
 def save_source_health_map(health_map: dict) -> None:

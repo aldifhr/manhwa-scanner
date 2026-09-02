@@ -121,12 +121,14 @@ export function ExcludeListClient() {
         .replace(/[\u2018\u2019]/g, "'")
         .replace(/[\u201C\u201D]/g, '"')
         .trim();
-      console.log("[exclude delete] payload", {
-        title_key,
-        rawKey,
-        source: it.source,
-        it,
-      });
+      if (process.env.NODE_ENV === "development") {
+        console.log("[exclude delete] payload", {
+          title_key,
+          rawKey,
+          source: it.source,
+          it,
+        });
+      }
       if (!title_key) throw new Error("title_key missing");
       await removeExcludedTitle({
         title_key,
