@@ -233,10 +233,12 @@ def _scheduler_loop() -> None:
                     if _stop.is_set():
                         break
                     try:
+                        logger.info("scheduler enqueue rss-fetch", source=src)
                         enqueue_cron(f"rss-fetch:{src}")
                     except Exception as e:
                         logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
                     _stop.wait(20)
+            logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
             last_source = _now
         # Periodic enrich so metadata stays fresh without FastCron.
         if _now - last_enrich >= _ENRICH_INTERVAL_S:

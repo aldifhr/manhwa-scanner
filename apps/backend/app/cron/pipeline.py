@@ -71,6 +71,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
     if ":" in action:
         action, source = action.split(":", 1)
 
+    logger.info("pipeline start", action=action, source=source or "all", do_dispatch=do_dispatch, instance=instance_id)
     try:
         # ── Per-source health telemetry ──
         _health_map: dict = {}
