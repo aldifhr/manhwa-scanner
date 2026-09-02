@@ -55,6 +55,4 @@ w3lib==2.4.1
 websockets==15.0.1
 yarl==1.24.2
 
-# Optional: Upstash QStash (cloud task queue). Configured via QSTASH_* env vars
-# but NOT wired into the app yet — Redis (local) remains the primary queue.
-qstash==3.4.0
+

@@ -60,10 +60,6 @@ class Settings(BaseSettings):
     CRON_ENABLED: str = "true"
     # Dev/test only: disable monitor auth entirely. NEVER set true in production.
     AUTH_DISABLED: bool = False
-    QSTASH_URL: str = ""
-    QSTASH_TOKEN: str = ""
-    QSTASH_CURRENT_SIGNING_KEY: str = ""
-    QSTASH_NEXT_SIGNING_KEY: str = ""
 
     # Redis (durable task queue for Discord add-to-whitelist jobs)
     REDIS_URL: str = "redis://localhost:6379/0"
