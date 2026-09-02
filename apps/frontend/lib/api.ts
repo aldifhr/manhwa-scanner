@@ -28,6 +28,7 @@ import {
   AnalyticsEngagement,
   RssCustomFeedResult,
   RssFilterMetadata,
+  DashboardSnapshot,
 } from "@/lib/types";
 
 /* ── Whitelist (raw from GET /api/whitelist) ── */
@@ -269,8 +270,6 @@ export async function getStats(): Promise<StatsData | null> {
 
 /* ── Dashboard snapshot (overview widgets) ── */
 
-import { DashboardSnapshot } from "@/lib/types";
-
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   return Reader.getDashboardSnapshot() as Promise<DashboardSnapshot>;
 }
@@ -431,62 +430,4 @@ export async function deleteBookmark(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
-/* ── A/B Testing (GET /api/v1/ab-tests) ── */
-
-export interface ABTestInfo {
-  description: string;
-  variants: string[];
-  weights: number[];
-}
-
-export interface ABTestResult {
-  [variant: string]: {
-    [event: string]: number;
-  };
-}
-
-export async function getABTests(): Promise<Record<string, ABTestInfo>> {
-  const res = await fetch("/api/v1/ab-tests");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return body.data || {};
-}
-
-export async function getABTestVariant(
-  testName: string,
-  userId = "default"
-): Promise<{
-  test: string;
-  variant: string;
-  format: Record<string, unknown>;
-}> {
-  const res = await fetch(
-    `/api/v1/ab-tests/${testName}/variant?user_id=${userId}`
-  );
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return body.data;
-}
-
-export async function trackABTestEvent(
-  testName: string,
-  variant: string,
-  event: string,
-  metadata?: Record<string, unknown>
-): Promise<void> {
-  const res = await fetch(`/api/v1/ab-tests/${testName}/track`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ variant, event, metadata }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-}
-
-export async function getABTestResults(
-  testName: string
-): Promise<ABTestResult> {
-  const res = await fetch(`/api/v1/ab-tests/${testName}/results`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return body.data || {};
-}
+/* ── A/B Testing removed — /ab-tests page deleted per CONTEXT.md 2026-09-02 ── */
