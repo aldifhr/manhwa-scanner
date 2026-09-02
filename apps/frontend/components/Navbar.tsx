@@ -43,11 +43,16 @@ export default function Navbar() {
 
           <NavbarStatus />
 
+          <div
+            className="hidden md:block w-px h-6 bg-white/10 mx-2"
+            aria-hidden
+          />
+
           <button
             onClick={logout}
             title="Logout"
             aria-label="Logout"
-            className="hidden md:flex items-center justify-center p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            className="hidden md:flex items-center justify-center p-2 ml-1 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
           >
             <SignOut size={18} />
           </button>
