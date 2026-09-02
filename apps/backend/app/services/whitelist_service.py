@@ -33,7 +33,7 @@ __all__ = [
 
 def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: int = 100, merge: bool = True) -> dict:
     """Get whitelist with metadata joins. DB-side pagination for source/title filters."""
-    from app.db import get_supabase
+    from app.services.whitelist_repo import fetch_whitelist_rows
 
     try:
         page = max(1, int(page))
@@ -44,68 +44,10 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
     except (TypeError, ValueError):
         page_size = 100
 
-    # DB-side pagination when filters present — avoids loading full table
-    use_db_pagination = bool(source or title)
-    if use_db_pagination:
-        try:
-            sb_pg = get_supabase()
-            q = sb_pg.table("whitelist").select("*", count="exact")
-            if source:
-                q = q.eq("source", source)
-            if title:
-                _t = title.replace("%", r"\%").replace("_", r"\_")
-                q = q.ilike("title", f"%{_t}%")
-            # Need total for dedup calc — fetch count first
-            cnt_res = q.limit(1).execute()
-            total_raw = cnt_res.count or 0
-            # Merge requires dedup across all pages — fetch all filtered for dedup
-            # but still DB-filtered (much smaller than full table)
-            if merge:
-                # Fetch all filtered rows for dedup (bounded by whitelist size ~500)
-                q2 = sb_pg.table("whitelist").select("*")
-                if source:
-                    q2 = q2.eq("source", source)
-                if title:
-                    _t2 = title.replace("%", r"\%").replace("_", r"\_")
-                    q2 = q2.ilike("title", f"%{_t2}%")
-                q2 = q2.order("created_at", desc=True).limit(10000)
-                rows = q2.execute().data or []
-                total = total_raw  # will be recalculated after dedup below
-            else:
-                start = (page - 1) * page_size
-                q2 = sb_pg.table("whitelist").select("*")
-                if source:
-                    q2 = q2.eq("source", source)
-                if title:
-                    _t2 = title.replace("%", r"\%").replace("_", r"\_")
-                    q2 = q2.ilike("title", f"%{_t2}%")
-                q2 = q2.order("created_at", desc=True).limit(page_size).offset(start)
-                rows = q2.execute().data or []
-                total = total_raw
-                # For non-merge path we can return early after enrichment
-                # (handled below via paged_out logic — set flag)
-                _db_paginated = True
-            sb = sb_pg
-            all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
-            _db_paginated_flag = not merge  # True means rows already paginated
-        except Exception:
-            # Fallback to in-memory on DB failure
-            rows = wl_store.load_whitelist()
-            if source:
-                rows = [r for r in rows if (r.get("source") or "") == source]
-            if title:
-                _ql = title.lower()
-                rows = [r for r in rows if _ql in (r.get("title", "") or "").lower()]
-            sb = get_supabase()
-            all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
-            _db_paginated_flag = False
-            total = len(rows)
-    else:
-        rows = wl_store.load_whitelist()
-        sb = get_supabase()
-        all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
-        _db_paginated_flag = False
-        total = len(rows)
+    rows, total, sb, _db_paginated_flag = fetch_whitelist_rows(
+        source=source, title=title, page=page, page_size=page_size, merge=merge
+    )
+    all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
     offset = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if page_size else 1
     has_more = page * page_size < total
@@ -179,54 +121,17 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
 
     mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, last_notified) for r in rows]
 
-    # ---- Dedup by title_key (cross-source merge) ----
-    # DB-paginated non-merge path is already sliced — skip second slicing
-    _is_db_paginated = locals().get("_db_paginated_flag", False)
-    if merge:
-        _groups: dict[str, list[dict]] = {}
-        for m in mapped:
-            _nk = _canonical_of(m["titleKey"]) or m["titleKey"]
-            _groups.setdefault(_nk, []).append(m)
+    # ---- Dedup (extracted) ----
+    from app.services.whitelist_dedup import dedup_whitelist
 
-        deduped = []
-        for _nk, _items in _groups.items():
-            if len(_items) == 1:
-                deduped.append(_items[0])
-                continue
-            _primary = _items[0]
-            _sources = []
-            _seen_src = set()
-            for _it in _items:
-                for _s in _it.get("sources", []):
-                    if _s not in _seen_src:
-                        _seen_src.add(_s)
-                        _sources.append({"source": _s, "url": _it.get("series_url") or ""})
-            _merged = dict(_primary)
-            _merged["sources"] = [s["source"] for s in _sources]
-            _merged["source"] = _sources[0]["source"] if _sources else (_primary.get("source") or "")
-            _merged["source_detail"] = _sources
-            for _fld in ("cover", "origin", "rating", "description", "type"):
-                for _it in _items:
-                    if _it.get(_fld):
-                        _merged[_fld] = _it[_fld]
-                        break
-            _genres = []
-            for _it in _items:
-                for _g in (_it.get("genres") or []):
-                    if _g not in _genres:
-                        _genres.append(_g)
-            _merged["genres"] = _genres
-            _merged["created_at"] = max([_it.get("created_at") or "" for _it in _items]) or _primary.get("created_at")
-            for _fld in ("latest_chapter", "latest_sent_chapter"):
-                _vals = [_it.get(_fld) for _it in _items if _it.get(_fld) is not None]
-                _merged[_fld] = max(_vals) if _vals else None
-            deduped.append(_merged)
+    _is_db_paginated = bool(_db_paginated_flag)
+    if merge:
+        deduped = dedup_whitelist(mapped, _canonical_of)
     else:
         deduped = mapped
 
     if _is_db_paginated:
-        # Already DB-paginated and not merged — total from count, no reslice
-        total = locals().get("total_raw", len(deduped))
+        total = total  # already count from repo
         total_pages = (total + page_size - 1) // page_size if page_size else 1
         has_more = page * page_size < total
         paged_out = deduped

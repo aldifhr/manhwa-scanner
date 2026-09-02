@@ -181,23 +181,61 @@ async def rss(request: Request):
             except Exception as _e:
                 logger.warn("exclude_notified SQL failed, falling back to unfiltered", err=str(_e)[:160])
 
-        # Build whitelist lookup (title_key → metadata)
-        wl_rows = sb.table("whitelist").select(
-            "title_key, source, cover, genres, rating, description, series_url, origin, status, type, latest_sent_chapter"
-        ).execute().data or []
+        # Build whitelist lookup (title_key → metadata) + series_meta in parallel
+        import asyncio
+
+        async def _fetch_wl_and_sm():
+            loop = asyncio.get_running_loop()
+
+            def _fetch_wl():
+                try:
+                    return sb.table("whitelist").select(
+                        "title_key, source, cover, genres, rating, description, series_url, origin, status, type, latest_sent_chapter"
+                    ).execute().data or []
+                except Exception:
+                    return []
+
+            def _fetch_sm():
+                try:
+                    return sb.table("series_meta").select(
+                        "title_key, source, rating, genres, description, cover, type"
+                    ).execute().data or []
+                except Exception:
+                    return []
+
+            wl_rows, sm_rows = await asyncio.gather(
+                loop.run_in_executor(None, _fetch_wl),
+                loop.run_in_executor(None, _fetch_sm),
+            )
+            return wl_rows, sm_rows
+
+        try:
+            wl_rows, sm_rows = await _fetch_wl_and_sm()
+        except Exception:
+            # Fallback sequential if event loop not available (e.g. sync test)
+            try:
+                wl_rows = sb.table("whitelist").select(
+                    "title_key, source, cover, genres, rating, description, series_url, origin, status, type, latest_sent_chapter"
+                ).execute().data or []
+            except Exception:
+                wl_rows = []
+            try:
+                sm_rows = sb.table("series_meta").select(
+                    "title_key, source, rating, genres, description, cover, type"
+                ).execute().data or []
+            except Exception:
+                sm_rows = []
 
         wl_map: dict[tuple[str, str], dict] = {}
         for w in wl_rows:
             tk = str(w.get("title_key", "") or "")
             src = str(w.get("source", "") or "")
             if tk:
-                # Normalize key so dash-format and space-format whitelist
-                # entries both match scraped (space-format) recent_chapters.
                 nk = normalize_title_key(tk)
                 wl_map[(nk, src)] = w
-                wl_map[(tk, src)] = w  # also keep raw key for exact match
+                wl_map[(tk, src)] = w
 
-        # Build whitelist metadata lookup for non-whitelisted fallback (status/rating/genres/description)
+        # Build whitelist metadata lookup for non-whitelisted fallback
         meta_map: dict[str, dict] = {}
         try:
             slugs = list({ (r.get("series_url") or "").rstrip("/").split("/")[-1] for r in rc_rows if r.get("series_url") })
@@ -214,20 +252,13 @@ async def rss(request: Request):
         except Exception:
             pass
 
-        # Build series_meta lookup (title_key, source) -> static per-series data.
-        # This is the single source of truth for rating/description/genres/type.
+        # series_meta map from parallel fetch
         sm_map: dict[tuple[str, str], dict] = {}
-        try:
-            sm_rows = sb.table("series_meta").select(
-                "title_key, source, rating, genres, description, cover, type"
-            ).execute().data or []
-            for s in sm_rows:
-                stk = str(s.get("title_key") or "")
-                ssrc = str(s.get("source") or "")
-                if stk and ssrc:
-                    sm_map[(stk, ssrc)] = s
-        except Exception:
-            pass
+        for s in sm_rows:
+            stk = str(s.get("title_key") or "")
+            ssrc = str(s.get("source") or "")
+            if stk and ssrc:
+                sm_map[(stk, ssrc)] = s
 
         # Build dispatch_history lookup (title_key, chapter_num) -> sent
         # Source of truth for isSent (BUG3): a chapter is "sent" if it appears
