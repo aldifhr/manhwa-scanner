@@ -17,7 +17,7 @@ router = APIRouter()
 _click_buffer: list[dict] = []
 
 
-@router.get("/api/redirect/chapter")
+@router.get("/redirect/chapter")
 async def redirect_chapter(url: str, request: Request):
     """Redirect to actual chapter URL while tracking the click.
     
@@ -93,7 +93,7 @@ def _flush_clicks():
         logger.warn("flush clicks failed", err=str(e)[:100], count=len(clicks))
 
 
-@router.get("/api/reading-stats/overview")
+@router.get("/reading-stats/overview")
 async def reading_stats_overview(request: Request):
     """Reading stats overview — most clicked chapters, peak hours, trends."""
     if not require_monitor_auth(request):
@@ -166,7 +166,7 @@ async def reading_stats_overview(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.get("/api/reading-stats/series/{title_key}")
+@router.get("/reading-stats/series/{title_key}")
 async def reading_stats_series(request: Request, title_key: str):
     """Reading stats for a specific series."""
     if not require_monitor_auth(request):

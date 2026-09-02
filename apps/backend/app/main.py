@@ -339,6 +339,7 @@ _LEGACY_REDIRECTS = {
     "/api/reader/rss": "/api/v1/rss",
     "/api/reader/rss/new": "/api/v1/rss/new",
     "/api/reader/rss/health": "/api/v1/rss/health",
+    "/api/redirect/chapter": "/api/v1/redirect/chapter",
 }
 
 @app.middleware("http")
