@@ -16,6 +16,7 @@ def fetch_whitelist_rows(
     page: int = 1,
     page_size: int = 100,
     merge: bool = True,
+    cursor: str | None = None,
 ):
     """Fetch whitelist rows DB-side when filters present.
 
@@ -57,6 +58,17 @@ def fetch_whitelist_rows(
                 rows = q2.execute().data or []
                 return rows, total_raw, sb_pg, False
             else:
+                # Cursor pagination (keyset) — preferred for large tables
+                if cursor:
+                    q2 = sb_pg.table("whitelist").select("*")
+                    if source:
+                        q2 = q2.eq("source", source)
+                    if title:
+                        _t2 = title.replace("%", r"\%").replace("_", r"\_")
+                        q2 = q2.ilike("title", f"%{_t2}%")
+                    q2 = q2.lt("created_at", cursor).order("created_at", desc=True).limit(page_size)
+                    rows = q2.execute().data or []
+                    return rows, total_raw, sb_pg, True
                 start = (page - 1) * page_size
                 q2 = sb_pg.table("whitelist").select("*")
                 if source:

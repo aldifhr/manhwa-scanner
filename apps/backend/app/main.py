@@ -298,6 +298,13 @@ def custom_openapi():
             "schema": {"type": "string"},
             "description": "Case-insensitive title search.",
         },
+        {
+            "name": "cursor",
+            "in": "query",
+            "required": False,
+            "schema": {"type": "string"},
+            "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables.",
+        },
     ]
     for _p in ("/api/v1/whitelist", "/api/v1/reader/whitelist"):
         _ep = schema.get("paths", {}).get(_p, {}).get("get")

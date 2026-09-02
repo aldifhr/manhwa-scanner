@@ -51,6 +51,7 @@ async def get_whitelist_reader(request: Request):
     shinigami for the same title) into a single canonical entry. Pass
     ?merge=false to get one flat row per whitelist entry (no grouping by
     title) — used by the /whitelist management page.
+    cursor: keyset pagination — pass ?cursor=<created_at> from previous page's nextCursor.
     """
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
@@ -58,7 +59,8 @@ async def get_whitelist_reader(request: Request):
     page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
     _merge_raw = (request.query_params.get("merge") or "true").lower()
     _merge = _merge_raw not in ("false", "0", "no")
-    return get_whitelist(page=page, page_size=page_size, merge=_merge)
+    cursor = request.query_params.get("cursor")
+    return get_whitelist(page=page, page_size=page_size, merge=_merge, cursor=cursor)
 
 
 @router.get("/whitelist")
@@ -72,7 +74,8 @@ async def whitelist_get(request: Request):
         page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
         _merge_raw = (request.query_params.get("merge") or "true").lower()
         _merge = _merge_raw not in ("false", "0", "no")
-        result = get_whitelist(source=source, title=title, page=page, page_size=page_size, merge=_merge)
+        cursor = request.query_params.get("cursor")
+        result = get_whitelist(source=source, title=title, page=page, page_size=page_size, merge=_merge, cursor=cursor)
         return JSONResponse(content=result)
     except Exception as e:
         logger.warn("whitelist failed", err=str(e))

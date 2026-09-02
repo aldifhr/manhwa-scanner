@@ -31,8 +31,8 @@ __all__ = [
 ]
 
 
-def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: int = 100, merge: bool = True) -> dict:
-    """Get whitelist with metadata joins. DB-side pagination for source/title filters."""
+def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: int = 100, merge: bool = True, cursor: str | None = None) -> dict:
+    """Get whitelist with metadata joins. DB-side pagination + cursor (keyset)."""
     from app.services.whitelist_repo import fetch_whitelist_rows
 
     try:
@@ -45,7 +45,7 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         page_size = 100
 
     rows, total, sb, _db_paginated_flag = fetch_whitelist_rows(
-        source=source, title=title, page=page, page_size=page_size, merge=merge
+        source=source, title=title, page=page, page_size=page_size, merge=merge, cursor=cursor
     )
     all_tks = [r.get("title_key") for r in rows if r.get("title_key")]
     offset = (page - 1) * page_size
@@ -83,6 +83,7 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         key=lambda x: (x.get("last_chapter") or x.get("last_notified") or "", x.get("title") or ""),
         reverse=True,
     )
+    next_cursor = paged_out[-1].get("created_at") if has_more and paged_out else None
     return {
         "success": True,
         "data": {
@@ -94,6 +95,8 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
             "totalPages": total_pages,
             "hasMore": has_more,
             "has_more": has_more,
+            "nextCursor": next_cursor,
+            "next_cursor": next_cursor,
         },
     }
 
