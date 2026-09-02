@@ -193,12 +193,8 @@ export function WhitelistGrid() {
         </div>
       ) : (
         <div className={GRID_CLASS}>
-          {filtered.map((item, i) => (
-            <WhitelistCard
-              key={`${item.id}-${i}`}
-              item={item}
-              onRefetch={refetch}
-            />
+          {filtered.map((item) => (
+            <WhitelistCard key={item.id} item={item} onRefetch={refetch} />
           ))}
         </div>
       )}

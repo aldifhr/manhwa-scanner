@@ -355,6 +355,17 @@ export default function HomePage() {
     clearAll: clearContinueReading,
   } = useContinueReading();
 
+  const sortedContinueReading = useMemo(
+    () =>
+      [...continueReading.values()]
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+        .slice(0, 10),
+    [continueReading]
+  );
+
   const rawResults = (data?.data?.results ?? []) as unknown[];
 
   // grouped by titleKey — same seam as /recent AllTab
@@ -402,20 +413,13 @@ export default function HomePage() {
             </button>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
-            {[...continueReading.values()]
-              .sort(
-                (a, b) =>
-                  new Date(b.updatedAt).getTime() -
-                  new Date(a.updatedAt).getTime()
-              )
-              .slice(0, 10)
-              .map((entry) => (
-                <ContinueReadingCard
-                  key={entry.titleKey}
-                  entry={entry}
-                  onRemove={removeReading}
-                />
-              ))}
+            {sortedContinueReading.map((entry) => (
+              <ContinueReadingCard
+                key={entry.titleKey}
+                entry={entry}
+                onRemove={removeReading}
+              />
+            ))}
           </div>
         </div>
       )}
