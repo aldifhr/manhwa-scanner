@@ -34,7 +34,7 @@ def test_fcfs_key():
     # HTML entities
     assert fcfs_key("Academy's", "1") == fcfs_key("Academy&#8217;s", "1")
     # trailing punctuation stripped
-    assert fcfs_key("Lookism!", "5") == "lookism#5"
+    assert fcfs_key("Example Series!", "5") == "example series#5"
 
 
 def test_chapter_label():
@@ -62,23 +62,23 @@ def test_normalize_cover():
 
 def test_whitelist_key():
     from app.utils.text import normalize_title_key
-    k = whitelist_key("Lookism", "shinigami")
-    assert k == (normalize_title_key("Lookism"), "shinigami")
+    k = whitelist_key("Example Series", "shinigami")
+    assert k == (normalize_title_key("Example Series"), "shinigami")
 
 
 def test_is_whitelisted():
-    wl = {(("lookism", "shinigami")): {"title": "Lookism"}}
-    assert is_whitelisted("lookism", "shinigami", wl) is True
+    wl = {(("example series", "shinigami")): {"title": "Example Series"}}
+    assert is_whitelisted("example series", "shinigami", wl) is True
     assert is_whitelisted("nope", "shinigami", wl) is False
 
 
 def test_get_whitelisted_items():
-    wl = {(("lookism", "shinigami")): {}, (("tower", "ikiru")): {}}
+    wl = {(("example series", "shinigami")): {}, (("tower", "ikiru")): {}}
     items = [
-        {"title_key": "lookism", "source": "shinigami"},
+        {"title_key": "example series", "source": "shinigami"},
         {"title_key": "tower", "source": "ikiru"},
         {"title_key": "nope", "source": "ikiru"},
     ]
     out = get_whitelisted_items(items, wl)
     assert len(out) == 2
-    assert all(it["title_key"] in ("lookism", "tower") for it in out)
+    assert all(it["title_key"] in ("example series", "tower") for it in out)

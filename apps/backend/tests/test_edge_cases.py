@@ -54,8 +54,8 @@ def test_whitelist_duplicates():
 
 def test_concurrent_fcfs():
     # fcfs_key must be deterministic so concurrent calls agree
-    k1 = fcfs_key("Lookism", "100")
-    k2 = fcfs_key("Lookism", "100")
+    k1 = fcfs_key("Example Series", "100")
+    k2 = fcfs_key("Example Series", "100")
     assert k1 == k2
 
 

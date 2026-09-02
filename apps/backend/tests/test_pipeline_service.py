@@ -7,8 +7,8 @@ from app.services.pipeline_service import PipelineService
 def test_run_dispatch_end_to_end():
     svc = PipelineService()
     items = [{
-        "title": "Lookism", "title_key": "lookism", "source": "shinigami",
-        "chapter": "622", "url": "https://x/622", "chapter_url": "https://x/622",
+        "title": "Example Series", "title_key": "example series", "source": "shinigami",
+        "chapter": "99", "url": "https://x/99", "chapter_url": "https://x/99",
         "cover": "", "series_url": "s", "status": "", "rating": "", "genres": [], "description": "", "updated_time": "",
     }]
     with patch.object(svc.scraper_service, "collect_recent_chapters", return_value=(items, {})), \
@@ -17,7 +17,7 @@ def test_run_dispatch_end_to_end():
          patch("app.db.get_supabase") as gs, \
          patch.object(svc.dispatch_service, "send_chapter", return_value=True) as send:
         # mock whitelist query (title_key, source)
-        wl_res = MagicMock(); wl_res.data = [{"title_key": "lookism", "source": "shinigami"}]
+        wl_res = MagicMock(); wl_res.data = [{"title_key": "example series", "source": "shinigami"}]
         gs.return_value.table.return_value.select.return_value.execute.return_value = wl_res
         stats = svc.run_dispatch()
     assert stats["sent"] >= 1

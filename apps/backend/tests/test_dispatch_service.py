@@ -24,10 +24,10 @@ def test_get_target_channels():
 
 def test_get_claimed_keys():
     svc = DispatchService()
-    sb = _mock_supabase([{"fcfs_key": "lookism#1"}, {"fcfs_key": "tower#2"}])
+    sb = _mock_supabase([{"fcfs_key": "example series#1"}, {"fcfs_key": "tower#2"}])
     with patch("app.services.dispatch_service.get_supabase", return_value=sb):
-        out = svc.get_claimed_keys(["lookism#1", "nope#9"])
-    assert out == {"lookism#1", "tower#2"}
+        out = svc.get_claimed_keys(["example series#1", "nope#9"])
+    assert out == {"example series#1", "tower#2"}
 
 
 def test_get_claimed_urls():
@@ -70,6 +70,6 @@ def test_send_chapter_with_cover():
 def test_update_latest_sent_chapter():
     svc = DispatchService()
     with patch("app.db.q") as q:
-        svc.update_latest_sent_chapter("lookism", "shinigami", 621.0)
+        svc.update_latest_sent_chapter("example series", "shinigami", 621.0)
         assert q.called
         assert "GREATEST" in q.call_args[0][0].upper()
