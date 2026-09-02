@@ -247,6 +247,7 @@ export function ExcludeListClient() {
           <input
             type="text"
             placeholder="Search title..."
+            aria-label="Search excluded titles"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-colors"

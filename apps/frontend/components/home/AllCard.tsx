@@ -134,7 +134,7 @@ function AllCard({
         href={seriesHref}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0"
+        className="shrink-0 focus-visible:ring-2 focus-visible:ring-accent rounded-lg"
         title="Open series"
         onClick={(e) => e.stopPropagation()}
       >
@@ -148,7 +148,7 @@ function AllCard({
             href={seriesHref}
             target="_blank"
             rel="noopener noreferrer"
-            className=""
+            className="focus-visible:ring-2 focus-visible:ring-accent rounded"
             title="Open series"
           >
             <h3 className="text-[15px] font-semibold leading-snug truncate text-white group-hover:text-white/80 transition-colors">
@@ -211,7 +211,9 @@ function AllCard({
                 e.stopPropagation();
                 onToggleRead();
               }}
-              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              aria-pressed={isRead}
+              aria-label={isRead ? "Mark as unread" : "Mark as read"}
+              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-accent"
             >
               {isRead ? <Check size={13} weight="bold" /> : null}
               {isRead ? "Read" : "Mark read"}

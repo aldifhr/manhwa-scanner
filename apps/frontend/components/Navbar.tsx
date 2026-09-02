@@ -56,6 +56,8 @@ export default function Navbar() {
             onClick={() => setMobileOpen((v) => !v)}
             className="md:hidden p-3 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors"
             aria-label="Menu"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav"
           >
             {mobileOpen ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -81,7 +83,10 @@ export default function Navbar() {
 
         {/* Mobile hamburger menu */}
         {mobileOpen && (
-          <div className="md:hidden pb-4 space-y-1 border-t border-white/10 pt-2">
+          <div
+            id="mobile-nav"
+            className="md:hidden pb-4 space-y-1 border-t border-white/10 pt-2"
+          >
             {NAV.map(({ href, label, icon }) => (
               <NavItem
                 key={href}
