@@ -1,5 +1,6 @@
 // transport — low-level fetch seam (csrf + 401 + abort), testable via injection
 import { withCsrf } from "@/lib/csrf";
+import { parseErrorMessage } from "@/lib/fetchError";
 
 export type FetchImpl = typeof fetch;
 
@@ -15,16 +16,7 @@ export async function readerFetch<T>(
   if (res.status === 204) return { success: true, data: { results: [] } } as T;
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    let msg = `HTTP ${res.status}`;
-    try {
-      const body = JSON.parse(text) as { error?: unknown };
-      msg =
-        typeof body.error === "string"
-          ? body.error
-          : ((body.error as { message?: string })?.message ?? msg);
-    } catch {
-      if (text) msg = text.slice(0, 200);
-    }
+    const msg = parseErrorMessage(res.status, text);
     if (res.status === 401) throw new Error(`UNAUTHORIZED: ${msg}`);
     throw new Error(msg);
   }

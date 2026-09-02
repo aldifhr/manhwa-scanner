@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withCsrf } from "@/lib/csrf";
 import { openapi } from "@manhwa-scanner/shared";
+import { parseErrorMessage } from "@/lib/fetchError";
 
 /**
  * Server-side backend URL for FE→backend fetches (proxy/image/auth routes).
@@ -34,7 +35,8 @@ export function backendUrl(): string {
     return publicBase.replace(/\/$/, "");
   }
   // Single source from shared/openapi.json servers[0].url
-  const sharedBase = (openapi as { servers?: { url: string }[] })?.servers?.[0]?.url;
+  const sharedBase = (openapi as { servers?: { url: string }[] })?.servers?.[0]
+    ?.url;
   if (sharedBase) return sharedBase.replace(/\/$/, "");
   return "https://scanner.aldifhr.fun";
 }
@@ -139,16 +141,22 @@ export type FetchImpl = typeof fetch;
 export interface ServerClient {
   base: string;
   headers: Record<string, string>;
-  fetchJson<T>(path: string, init?: RequestInit, fetchImpl?: FetchImpl): Promise<T>;
+  fetchJson<T>(
+    path: string,
+    init?: RequestInit,
+    fetchImpl?: FetchImpl
+  ): Promise<T>;
   proxyImage(url: string, fetchImpl?: FetchImpl): Promise<Response>;
   getRssCache(key: string): unknown | null;
   setRssCache(key: string, data: unknown): void;
 }
 
 // Shared RSS cache — single locality (sebelumnya duplikat di 2 route files)
-const rssCache: Map<string, { data: unknown; expiry: number }> = (
-  globalThis as unknown as { __rssCache?: Map<string, { data: unknown; expiry: number }> }
-).__rssCache ??= new Map();
+const rssCache: Map<string, { data: unknown; expiry: number }> = ((
+  globalThis as unknown as {
+    __rssCache?: Map<string, { data: unknown; expiry: number }>;
+  }
+).__rssCache ??= new Map());
 const RSS_TTL = 10_000;
 const RSS_STALE = 20_000;
 
@@ -186,30 +194,38 @@ export function createServerClient(
   return {
     base,
     headers,
-    fetchJson: async <T>(path: string, init?: RequestInit, impl: FetchImpl = fetchImpl): Promise<T> => {
+    fetchJson: async <T>(
+      path: string,
+      init?: RequestInit,
+      impl: FetchImpl = fetchImpl
+    ): Promise<T> => {
       const res = await impl(`${base}${path}`, {
         ...init,
-        headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+        headers: {
+          ...headers,
+          ...(init?.headers as Record<string, string> | undefined),
+        },
         signal: init?.signal ?? AbortSignal.timeout(TIMEOUT.DEFAULT),
       } as RequestInit);
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
-        let msg = `HTTP ${res.status}`;
-        try {
-          const body = JSON.parse(text) as { error?: unknown };
-          msg = typeof body.error === "string" ? body.error : ((body.error as { message?: string })?.message ?? msg);
-        } catch {
-          if (text) msg = text.slice(0, 200);
-        }
+        const msg = parseErrorMessage(res.status, text);
         if (res.status === 401) throw new Error(`UNAUTHORIZED: ${msg}`);
         throw new Error(msg);
       }
       return res.json() as Promise<T>;
     },
-    proxyImage: async (url: string, impl: FetchImpl = fetchImpl): Promise<Response> => {
+    proxyImage: async (
+      url: string,
+      impl: FetchImpl = fetchImpl
+    ): Promise<Response> => {
       const target = new URL(`${base}/api/v1/reader/proxy`);
       target.searchParams.set("url", url);
-      return impl(target.toString(), { headers, signal: AbortSignal.timeout(TIMEOUT.COVER), cache: "no-store" });
+      return impl(target.toString(), {
+        headers,
+        signal: AbortSignal.timeout(TIMEOUT.COVER),
+        cache: "no-store",
+      });
     },
     getRssCache,
     setRssCache,
@@ -217,12 +233,14 @@ export function createServerClient(
 }
 
 // In-memory adapter for tests — 2nd adapter = real seam
-export function createInMemoryServerClient(overrides?: Partial<ServerClient>): ServerClient {
+export function createInMemoryServerClient(
+  overrides?: Partial<ServerClient>
+): ServerClient {
   const store = new Map<string, unknown>();
   return {
     base: "http://test",
     headers: {},
-    fetchJson: async <T>(): Promise<T> => ({ success: true, data: {} } as T),
+    fetchJson: async <T>(): Promise<T> => ({ success: true, data: {} }) as T,
     proxyImage: async () => new Response(null, { status: 200 }),
     getRssCache: (k) => store.get(k) ?? null,
     setRssCache: (k, v) => store.set(k, v),
