@@ -326,10 +326,7 @@ _LEGACY_REDIRECTS = {
     "/api/queue": "/api/v1/queue",
     "/api/stats": "/api/v1/stats",
     "/api/analytics": "/api/v1/analytics",
-    "/api/audit-log": "/api/v1/audit-log",
     "/api/bookmarks": "/api/v1/bookmarks",
-    "/api/ab-tests": "/api/v1/ab-tests",
-    "/api/graphql": "/api/v1/graphql",
     "/api/reader/dispatch-history": "/api/v1/dispatch-history",
     "/api/dispatch-history": "/api/v1/dispatch-history",
     "/api/reader/stats": "/api/v1/stats",
@@ -400,21 +397,9 @@ app.include_router(continue_reading_api.router, prefix="/api/v1")
 from app.api import bookmark as bookmark_api
 app.include_router(bookmark_api.router)
 
-# --- A/B Testing ---
-from app.api import ab_test as ab_test_api
-app.include_router(ab_test_api.router)
-
-# --- GraphQL API ---
-from app.api.graphql_api import get_graphql_router
-graphql_router = get_graphql_router()
-app.include_router(graphql_router, prefix="/api/v1")
-
 # --- WebSocket ---
 from app.api.websocket import router as websocket_router
 app.include_router(websocket_router)
-
-from app.api import audit as audit_api
-app.include_router(audit_api.router, prefix="/api/v1")
 
 # --- Whitelist (dispatch-history) ---
 from app.api.dashboard import whitelist as whitelist_api

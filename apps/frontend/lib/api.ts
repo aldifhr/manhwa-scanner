@@ -349,43 +349,7 @@ export async function getRssFilterMetadata(): Promise<RssFilterMetadata> {
   return Reader.getRssFilterMetadata() as unknown as Promise<RssFilterMetadata>;
 }
 
-/* ── Audit Log (GET /api/v1/audit-log) ── */
-
-export interface AuditLogEntry {
-  id: number;
-  action: string;
-  actor: string;
-  target: string;
-  details: Record<string, unknown>;
-  ip: string;
-  created_at: string;
-}
-
-export async function getAuditLog(params?: {
-  limit?: number;
-  offset?: number;
-  action?: string;
-  actor?: string;
-  since?: string;
-}): Promise<AuditLogEntry[]> {
-  const p = new URLSearchParams();
-  if (params?.limit) p.set("limit", String(params.limit));
-  if (params?.offset) p.set("offset", String(params.offset));
-  if (params?.action) p.set("action", params.action);
-  if (params?.actor) p.set("actor", params.actor);
-  if (params?.since) p.set("since", params.since);
-  const res = await fetch(`/api/v1/audit-log?${p}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return body.data || [];
-}
-
-export async function getAuditStats(days = 7): Promise<Record<string, number>> {
-  const res = await fetch(`/api/v1/audit-log/stats?days=${days}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return body.data || {};
-}
+/* ── Audit Log removed — page deleted per CONTEXT.md 2026-09-02 ── */
 
 /* ── Bookmarks (GET/POST/DELETE /api/v1/bookmarks) ── */
 
