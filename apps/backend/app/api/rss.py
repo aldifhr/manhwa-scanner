@@ -44,8 +44,19 @@ def _rss_cache_put(key: str, val: dict):
             _RSS_CACHE.pop(k, None)
 
 
-def invalidate_rss_cache():
-    _RSS_CACHE.clear()
+def invalidate_rss_cache(key_prefix: str | None = None):
+    """Invalidate RSS cache — per-key if prefix given, else all.
+
+    Excluded whitelist changes affect all RSS keys (filter applied in Python),
+    so caller may clear all. If prefix given, only matching keys are removed
+    to avoid thundering herd on unrelated queries.
+    """
+    if key_prefix is None:
+        _RSS_CACHE.clear()
+    else:
+        for k in list(_RSS_CACHE.keys()):
+            if k.startswith(key_prefix):
+                _RSS_CACHE.pop(k, None)
 
 
 @router.get("/rss")

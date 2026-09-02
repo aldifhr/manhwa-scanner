@@ -250,6 +250,7 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
     # Also delete matching recent_chapters rows (FE reader source).
     # Match by title_key (space/dash variants) OR title ILIKE OR url, plus source.
     rc_deleted = 0
+    conn = None
     try:
         conn = get_conn()
         cur = conn.cursor()
@@ -274,9 +275,19 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
             cur.execute(f"DELETE FROM recent_chapters WHERE {_where}", _params)
             rc_deleted = cur.rowcount
             conn.commit()
-        put_conn(conn)
     except Exception as _e:
         logger.warn("delete_whitelist: recent_chapters delete failed", err=str(_e)[:160])
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        if conn:
+            try:
+                put_conn(conn)
+            except Exception:
+                pass
 
     total_deleted = deleted + rc_deleted
     logger.info(

@@ -19,86 +19,76 @@ async def analytics_overview(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
 
-    try:
-        from app.db import q
+    from app.db import q
 
-        # Most popular series (by dispatch count, last 7 days)
-        popular_series = q("""
-            SELECT dh.title_key, dh.source, COUNT(*) as dispatch_count,
-                   MAX(dh.sent_at) as last_dispatched
-            FROM dispatch_history dh
-            WHERE dh.sent_at >= NOW() - INTERVAL '7 days'
-            GROUP BY dh.title_key, dh.source
-            ORDER BY dispatch_count DESC
-            LIMIT 20
-        """)
+    def _safe(sql: str, params=None, fallback=None):
+        try:
+            return q(sql, params) if params else q(sql)
+        except Exception as e:
+            logger.warn("analytics_overview subquery failed", sql=sql[:80], err=str(e)[:160])
+            return fallback if fallback is not None else []
 
-        # Chapter velocity (avg chapters per day, last 7 days)
-        velocity = q("""
-            SELECT 
-                DATE(sent_at) as date,
-                COUNT(*) as total_dispatches,
-                COUNT(DISTINCT title_key) as unique_series
-            FROM dispatch_history
-            WHERE sent_at >= NOW() - INTERVAL '7 days'
-            GROUP BY DATE(sent_at)
-            ORDER BY date DESC
-        """)
+    popular_series = _safe("""
+        SELECT dh.title_key, dh.source, COUNT(*) as dispatch_count,
+               MAX(dh.sent_at) as last_dispatched
+        FROM dispatch_history dh
+        WHERE dh.sent_at >= NOW() - INTERVAL '7 days'
+        GROUP BY dh.title_key, dh.source
+        ORDER BY dispatch_count DESC
+        LIMIT 20
+    """)
+    velocity = _safe("""
+        SELECT DATE(sent_at) as date,
+               COUNT(*) as total_dispatches,
+               COUNT(DISTINCT title_key) as unique_series
+        FROM dispatch_history
+        WHERE sent_at >= NOW() - INTERVAL '7 days'
+        GROUP BY DATE(sent_at)
+        ORDER BY date DESC
+    """)
+    source_dist = _safe("""
+        SELECT source, COUNT(*) as count
+        FROM dispatch_history
+        WHERE sent_at >= NOW() - INTERVAL '7 days'
+        GROUP BY source
+        ORDER BY count DESC
+    """)
+    whitelist_growth = _safe("""
+        SELECT DATE(created_at) as date, COUNT(*) as new_entries
+        FROM whitelist
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+    """)
+    failed_stats = _safe("""
+        SELECT COUNT(*) as total_failed,
+               COUNT(CASE WHEN status = 'failed' THEN 1 END) as still_failed,
+               COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved,
+               COUNT(CASE WHEN status = 'permanent_failure' THEN 1 END) as permanent
+        FROM failed_dispatches
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+    """)
+    top_genres = _safe("""
+        SELECT jsonb_array_elements_text(genres) as genre, COUNT(*) as count
+        FROM series_meta
+        WHERE genres IS NOT NULL AND genres != '[]'::jsonb
+        GROUP BY genre
+        ORDER BY count DESC
+        LIMIT 15
+    """)
 
-        # Source distribution
-        source_dist = q("""
-            SELECT source, COUNT(*) as count
-            FROM dispatch_history
-            WHERE sent_at >= NOW() - INTERVAL '7 days'
-            GROUP BY source
-            ORDER BY count DESC
-        """)
-
-        # Whitelist growth (new entries per day, last 30 days)
-        whitelist_growth = q("""
-            SELECT DATE(created_at) as date, COUNT(*) as new_entries
-            FROM whitelist
-            WHERE created_at >= NOW() - INTERVAL '30 days'
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-        """)
-
-        # Failed dispatch rate
-        failed_stats = q("""
-            SELECT 
-                COUNT(*) as total_failed,
-                COUNT(CASE WHEN status = 'failed' THEN 1 END) as still_failed,
-                COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved,
-                COUNT(CASE WHEN status = 'permanent_failure' THEN 1 END) as permanent
-            FROM failed_dispatches
-            WHERE created_at >= NOW() - INTERVAL '7 days'
-        """)
-
-        # Top genres (from series_meta)
-        top_genres = q("""
-            SELECT jsonb_array_elements_text(genres) as genre, COUNT(*) as count
-            FROM series_meta
-            WHERE genres IS NOT NULL AND genres != '[]'::jsonb
-            GROUP BY genre
-            ORDER BY count DESC
-            LIMIT 15
-        """)
-
-        return JSONResponse(content={
-            "success": True,
-            "data": {
-                "popular_series": popular_series,
-                "chapter_velocity": velocity,
-                "source_distribution": source_dist,
-                "whitelist_growth": whitelist_growth,
-                "failed_dispatch_stats": failed_stats[0] if failed_stats else {},
-                "top_genres": top_genres,
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        })
-    except Exception as e:
-        logger.warn("analytics_overview failed", err=str(e)[:120])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+    return JSONResponse(content={
+        "success": True,
+        "data": {
+            "popular_series": popular_series,
+            "chapter_velocity": velocity,
+            "source_distribution": source_dist,
+            "whitelist_growth": whitelist_growth,
+            "failed_dispatch_stats": failed_stats[0] if failed_stats else {},
+            "top_genres": top_genres,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    })
 
 
 @router.get("/analytics/series/{title_key}")
