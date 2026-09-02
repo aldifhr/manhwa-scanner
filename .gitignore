@@ -34,6 +34,7 @@ __pycache__/
 /.clerk/
 .vercel
 
-# backend next cache
+# backend next cache + local bin
 apps/backend/.next/
+apps/backend/.local/
 .git-rewrite/

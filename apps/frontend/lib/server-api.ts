@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withCsrf } from "@/lib/csrf";
+import { openapi } from "@manhwa-scanner/shared";
 
 /**
  * Server-side backend URL for FE→backend fetches (proxy/image/auth routes).
@@ -32,6 +33,9 @@ export function backendUrl(): string {
   if (publicBase && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(publicBase)) {
     return publicBase.replace(/\/$/, "");
   }
+  // Single source from shared/openapi.json servers[0].url
+  const sharedBase = (openapi as { servers?: { url: string }[] })?.servers?.[0]?.url;
+  if (sharedBase) return sharedBase.replace(/\/$/, "");
   return "https://scanner.aldifhr.fun";
 }
 
