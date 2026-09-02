@@ -127,3 +127,25 @@ export function catchError(err: unknown) {
     : `Upstream request failed${msg ? `: ${msg.slice(0, 200)}` : ""}`;
   return errorResponse(detail, isTimeout ? 504 : 502);
 }
+
+// Deep module: createServerClient — single seam for all server→backend fetches
+export function createServerClient(request: Request) {
+  const base = backendUrl();
+  const headers = authHeaders(request);
+  return {
+    base,
+    headers,
+    fetch: (path: string, init?: RequestInit) =>
+      fetch(`${base}${path}`, {
+        ...init,
+        headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+        signal: init?.signal ?? AbortSignal.timeout(TIMEOUT.DEFAULT),
+      }),
+    fetchWithTimeout: (path: string, init?: RequestInit, ms = TIMEOUT.DEFAULT) =>
+      fetch(`${base}${path}`, {
+        ...init,
+        headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+        signal: AbortSignal.timeout(ms),
+      }),
+  };
+}
