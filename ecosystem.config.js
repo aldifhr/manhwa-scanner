@@ -1,0 +1,38 @@
+module.exports = {
+  apps: [
+    {
+      name: "manhwa-api",
+      cwd: "/root/projects/manhwa-scanner/apps/backend",
+      script: "/root/projects/manhwa-scanner/apps/backend/.venv/bin/python",
+      args: "app/main.py --port 3000",
+      interpreter: "none",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      kill_timeout: 30000,
+      env: { ROLE: "api", PYTHONUNBUFFERED: "1", PYTHONPATH: "/root/projects/manhwa-scanner/apps/backend" },
+    },
+    {
+      name: "manhwa-cron",
+      cwd: "/root/projects/manhwa-scanner/apps/backend",
+      script: "/root/projects/manhwa-scanner/apps/backend/.venv/bin/python",
+      args: "app/main.py --port 3001",
+      interpreter: "none",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      kill_timeout: 30000,
+      env: { ROLE: "cron", PYTHONUNBUFFERED: "1", PYTHONPATH: "/root/projects/manhwa-scanner/apps/backend" },
+    },
+    {
+      name: "manhwa-frontend",
+      cwd: "/root/projects/manhwa-scanner/apps/frontend",
+      script: "node_modules/next/dist/bin/next",
+      args: "start --port 5175 --hostname 0.0.0.0",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      env: { NODE_ENV: "production", PORT: "5175" },
+    },
+  ],
+};
