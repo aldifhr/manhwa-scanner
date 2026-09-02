@@ -16,6 +16,7 @@ router = APIRouter()
 
 
 class PopularSeriesItem(BaseModel):
+    model_config = {"extra": "allow"}
     title_key: str
     source: str
     dispatch_count: int
@@ -23,22 +24,26 @@ class PopularSeriesItem(BaseModel):
 
 
 class VelocityItem(BaseModel):
+    model_config = {"extra": "allow"}
     date: str
     total_dispatches: int
     unique_series: int
 
 
 class SourceDistItem(BaseModel):
+    model_config = {"extra": "allow"}
     source: str
     count: int
 
 
 class WhitelistGrowthItem(BaseModel):
+    model_config = {"extra": "allow"}
     date: str
     new_entries: int
 
 
 class FailedStats(BaseModel):
+    model_config = {"extra": "allow"}
     total_failed: int = 0
     still_failed: int = 0
     resolved: int = 0
@@ -46,11 +51,13 @@ class FailedStats(BaseModel):
 
 
 class GenreItem(BaseModel):
+    model_config = {"extra": "allow"}
     genre: str
     count: int
 
 
 class AnalyticsOverviewResponse(BaseModel):
+    model_config = {"extra": "allow"}
     popular_series: list[PopularSeriesItem]
     chapter_velocity: list[VelocityItem]
     source_distribution: list[SourceDistItem]
@@ -61,13 +68,26 @@ class AnalyticsOverviewResponse(BaseModel):
 
 
 class EngagementResponse(BaseModel):
+    model_config = {"extra": "allow"}
     active_sessions_24h: int
     total_reading_sessions: int
     most_read_series: list[dict[str, Any]]
     activity_over_time: list[dict[str, Any]]
 
 
-@router.get("/analytics/overview", response_model=dict)
+class AnalyticsOverviewEnvelope(BaseModel):
+    model_config = {"extra": "allow"}
+    success: bool
+    data: AnalyticsOverviewResponse
+
+
+class EngagementEnvelope(BaseModel):
+    model_config = {"extra": "allow"}
+    success: bool
+    data: EngagementResponse
+
+
+@router.get("/analytics/overview", response_model=AnalyticsOverviewEnvelope)
 async def analytics_overview(request: Request):
     """Overview analytics — popular series, velocity, engagement."""
     if not require_monitor_auth(request):
@@ -145,7 +165,20 @@ async def analytics_overview(request: Request):
     })
 
 
-@router.get("/analytics/series/{title_key}", response_model=dict)
+class SeriesDetailResponse(BaseModel):
+    model_config = {"extra": "allow"}
+    series: dict[str, Any]
+    dispatch_history: list[dict[str, Any]]
+    velocity: list[dict[str, Any]]
+
+
+class SeriesDetailEnvelope(BaseModel):
+    model_config = {"extra": "allow"}
+    success: bool
+    data: SeriesDetailResponse
+
+
+@router.get("/analytics/series/{title_key}", response_model=SeriesDetailEnvelope)
 async def analytics_series_detail(request: Request, title_key: str):
     """Detailed analytics for a specific series."""
     if not require_monitor_auth(request):
@@ -199,7 +232,7 @@ async def analytics_series_detail(request: Request, title_key: str):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.get("/analytics/engagement", response_model=dict)
+@router.get("/analytics/engagement", response_model=EngagementEnvelope)
 async def analytics_engagement(request: Request):
     """User engagement metrics — reading activity, active users."""
     if not require_monitor_auth(request):
