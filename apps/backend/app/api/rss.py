@@ -92,10 +92,17 @@ async def rss(request: Request):
     q = request.query_params.get("q", "")
     exclude_origin = request.query_params.get("exclude_origin", "")
     type_f = request.query_params.get("type", "")
+    # Custom filters (merged from /rss/custom) — handled in Python post-filter for now
+    genres_f = request.query_params.get("genres", "")
+    status_f = request.query_params.get("status", "")
+    min_rating = request.query_params.get("min_rating", "")
+    max_rating = request.query_params.get("max_rating", "")
+    subscribed_only = request.query_params.get("subscribed_only", "false").lower() == "true"
+    sort_f = request.query_params.get("sort", "newest")
     # Reader feed shows ALL recent chapters by default (respects FE "all" feed).
     # Previously defaulted to True, which overrode the FE's "all" request and
     # hid every non-whitelisted title — making /recent look permanently stale.
-    whitelist_only = request.query_params.get("whitelist", "false").lower() == "true"
+    whitelist_only = request.query_params.get("whitelist", "false").lower() == "true" or subscribed_only
     # Default: show ALL chapters (including already-notified).
     # RSS is the discovery feed — hiding notified chapters breaks the
     # "see latest → add to whitelist" workflow. The FE marks isSent
@@ -333,6 +340,66 @@ async def rss(request: Request):
 
         if whitelist_only:
             results = [r for r in results if r["isWhitelisted"]]
+
+        # unread_only from /rss/custom → filter not sent
+        unread_only = request.query_params.get("unread_only", "false").lower() == "true"
+        if unread_only:
+            results = [r for r in results if not r.get("isSent")]
+
+        # Custom filters (merged from /rss/custom) — genres/status/rating/sort
+        if genres_f:
+            try:
+                wanted = {g.strip().lower() for g in genres_f.split(",") if g.strip()}
+                if wanted:
+                    results = [r for r in results if wanted & {str(g).lower() for g in (r.get("genres") or [])}]
+            except Exception:
+                pass
+        if status_f:
+            try:
+                sf = status_f.strip().lower()
+                results = [r for r in results if str(r.get("status") or r.get("whitelistStatus") or "").lower() == sf]
+            except Exception:
+                pass
+        if min_rating:
+            try:
+                mv = float(min_rating)
+                results = [r for r in results if r.get("rating") is not None and float(r.get("rating") or 0) >= mv]
+            except Exception:
+                pass
+        if max_rating:
+            try:
+                mv = float(max_rating)
+                results = [r for r in results if r.get("rating") is not None and float(r.get("rating") or 0) <= mv]
+            except Exception:
+                pass
+        if sort_f == "rating":
+            try:
+                results.sort(key=lambda x: float(x.get("rating") or 0), reverse=True)
+            except Exception:
+                pass
+        elif sort_f == "popular":
+            # popularity via rating as proxy (dispatch_count not in rss map)
+            try:
+                results.sort(key=lambda x: float(x.get("rating") or 0), reverse=True)
+            except Exception:
+                pass
+        # sources/origins plural (from /rss/custom)
+        sources_f = request.query_params.get("sources", "")
+        if sources_f:
+            try:
+                wanted_src = {s.strip().lower() for s in sources_f.split(",") if s.strip()}
+                if wanted_src:
+                    results = [r for r in results if str(r.get("source") or "").lower() in wanted_src]
+            except Exception:
+                pass
+        origins_f = request.query_params.get("origins", "")
+        if origins_f:
+            try:
+                wanted_o = {o.strip().upper() for o in origins_f.split(",") if o.strip()}
+                if wanted_o:
+                    results = [r for r in results if str(r.get("origin") or "").upper() in wanted_o]
+            except Exception:
+                pass
 
         # BUG1: dedupe flat mode by (canonicalTitleKey, chapterNumber).
         # Cross-source duplicates (same chapter scraped from ikiru + voratoon,
