@@ -37,4 +37,5 @@ __pycache__/
 # backend next cache + local bin
 apps/backend/.next/
 apps/backend/.local/
+.git-rewrite/
 .git-rewrite/*.bak*
