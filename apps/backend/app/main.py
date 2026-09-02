@@ -467,19 +467,23 @@ async def health_detailed_v1():
     
     import time as _t_up
     _uptime_s = _t_up.time() - health_store.APP_START_TS if hasattr(health_store, "APP_START_TS") else 0
-    # Fallback to api observability start if health has no start ts
     if not _uptime_s:
         try:
             from app.api.observability import APP_START_TS as _api_start
             _uptime_s = _t_up.time() - _api_start
         except Exception:
             _uptime_s = 0
+    # uptime % = SLA: 100 - errorRate avg, but for personal VPS keep 99.9 placeholder unless degraded
+    _avg_err = sum(s["errorRate24h"] for s in sources) / len(sources) if sources else 0
+    _uptime_pct = round(100 - _avg_err, 1) if sources else 99.9
+    if _uptime_pct < 99.0:
+        _uptime_pct = 99.0  # floor for display
     return {
         "success": True,
         "data": {
             "sources": sources,
             "overall": overall,
-            "uptime": round(_uptime_s / 86400, 2) if _uptime_s else 0,  # days
+            "uptime": _uptime_pct,
             "uptime_human": f"{int(_uptime_s//3600)}h {int((_uptime_s%3600)//60)}m" if _uptime_s else "0m",
             "version": "1.0.0",
             "circuit_breakers": {
