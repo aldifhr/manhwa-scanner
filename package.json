@@ -8,7 +8,8 @@
     "dev": "pnpm --filter manhwa-reader dev",
     "build": "pnpm --recursive build",
     "lint": "pnpm --recursive lint",
-    "typecheck": "pnpm --recursive typecheck"
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --filter manhwa-reader test"
   },
   "workspaces": [
     "apps/*",

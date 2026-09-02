@@ -162,3 +162,70 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
 def _canonical_of(tk: str) -> str:
     from app.storage.canonical import canonical_of as _co
     return _co(tk)
+
+
+def fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
+    """Fetch rc/meta/dh maps for get_whitelist — isolated for testability."""
+    rc_map: dict = {}
+    meta_desc: dict[str, str] = {}
+    meta_cover: dict[str, str] = {}
+    last_notified: dict[str, str] = {}
+
+    cand_keys: set[str] = set()
+    for r in rows:
+        tk = r.get("title_key", "")
+        if tk:
+            cand_keys.add(tk)
+            cand_keys.add(tk.replace(" ", "-"))
+        su = (r.get("series_url") or r.get("url") or "").rstrip("/").split("/")[-1]
+        if su:
+            cand_keys.add(su)
+
+    def _q_recent():
+        q = sb.table("recent_chapters").select("title_key, title, source, cover, origin, updated_time, series_url")
+        if all_tks:
+            q = q.in_("title_key", all_tks)
+        return q.execute()
+
+    def _q_meta():
+        if not cand_keys:
+            return None
+        return sb.table("whitelist").select("title_key, description, cover").in_("title_key", list(cand_keys)).execute()
+
+    def _q_dh():
+        tks = [r.get("title_key", "") for r in rows if r.get("title_key")]
+        if not tks:
+            return None
+        return sb.table("dispatch_history").select("title_key, sent_at").in_("title_key", tks).execute()
+
+    rc_rows = _q_recent()
+    meta_rows = _q_meta()
+    dh_rows = _q_dh()
+
+    if rc_rows and rc_rows.data:
+        for rc in rc_rows.data:
+            tk = rc.get("title_key")
+            src = rc.get("source") or ""
+            if tk and (tk, src) not in rc_map:
+                rc_map[(tk, src)] = rc
+    try:
+        _meta_data = (meta_rows.data if (meta_rows and getattr(meta_rows, "data", None)) else [])
+        for m in _meta_data:
+            d = m.get("description")
+            if d:
+                meta_desc[m.get("title_key", "")] = d
+            c = m.get("cover")
+            if c:
+                meta_cover[m.get("title_key", "")] = c
+    except Exception:
+        pass
+    try:
+        _dh_data = (dh_rows.data if (dh_rows and getattr(dh_rows, "data", None)) else [])
+        for d in _dh_data:
+            tk = d.get("title_key", "")
+            ts = d.get("sent_at") or ""
+            if tk and (tk not in last_notified or ts > last_notified[tk]):
+                last_notified[tk] = ts
+    except Exception:
+        pass
+    return rc_map, meta_desc, meta_cover, last_notified

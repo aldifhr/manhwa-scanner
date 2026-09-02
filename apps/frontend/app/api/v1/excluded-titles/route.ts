@@ -7,23 +7,11 @@ import {
   catchError,
 } from "@/lib/server-api";
 import { rewriteCoverUrl } from "@/lib/utils";
-
-interface ExcludedBackendItem {
-  id?: string;
-  title_key?: string;
-  titleKey?: string;
-  title?: string | null;
-  source?: string;
-  created_at?: string | null;
-  createdAt?: string | null;
-  cover?: string | null;
-  series_url?: string | null;
-  seriesUrl?: string | null;
-}
+import { excludedTitleSchema } from "@manhwa-scanner/shared";
 
 interface BackendResponse {
   success: boolean;
-  data: { results?: ExcludedBackendItem[]; total?: number };
+  data: { results?: unknown[]; total?: number };
   error?: unknown;
 }
 
@@ -51,35 +39,47 @@ export async function GET(request: NextRequest) {
       return errorResponse(msg, res.status);
     }
     const backendData =
-      (body.data as { results?: ExcludedBackendItem[]; total?: number }) || {};
-    const results = (backendData.results ?? []).map(
-      (item: ExcludedBackendItem) => {
-        const raw = item as unknown as Record<string, unknown>;
+      (body.data as { results?: unknown[]; total?: number }) || {};
+    const results = (backendData.results ?? []).map((raw: unknown) => {
+      const parsed = excludedTitleSchema.safeParse(raw);
+      if (parsed.success) {
+        const p = parsed.data;
         return {
-          id:
-            (raw.id as string) ||
-            (raw.title_key as string) ||
-            (raw.titleKey as string) ||
-            "",
-          titleKey:
-            (raw.title_key as string) ||
-            (raw.titleKey as string) ||
-            (raw.id as string) ||
-            "",
-          title: (raw.title as string | null) || null,
-          source: (raw.source as string) || "all",
-          createdAt:
-            (raw.created_at as string | null) ||
-            (raw.createdAt as string | null) ||
-            null,
-          cover: rewriteCoverUrl((raw.cover as string | null) || null),
-          seriesUrl:
-            (raw.series_url as string | null) ||
-            (raw.seriesUrl as string | null) ||
-            null,
+          id: p.id,
+          titleKey: p.titleKey,
+          title: p.title,
+          source: p.source,
+          createdAt: p.createdAt,
+          cover: rewriteCoverUrl(p.cover),
+          seriesUrl: p.seriesUrl,
         };
       }
-    );
+      // Fallback if zod parse fails (e.g. extra fields) — keep raw mapping
+      const r = raw as Record<string, unknown>;
+      return {
+        id:
+          (r.id as string) ||
+          (r.title_key as string) ||
+          (r.titleKey as string) ||
+          "",
+        titleKey:
+          (r.title_key as string) ||
+          (r.titleKey as string) ||
+          (r.id as string) ||
+          "",
+        title: (r.title as string | null) || null,
+        source: (r.source as string) || "all",
+        createdAt:
+          (r.created_at as string | null) ||
+          (r.createdAt as string | null) ||
+          null,
+        cover: rewriteCoverUrl((r.cover as string | null) || null),
+        seriesUrl:
+          (r.series_url as string | null) ||
+          (r.seriesUrl as string | null) ||
+          null,
+      };
+    });
     return NextResponse.json({
       success: true,
       data: { results, total: backendData?.total ?? results.length },

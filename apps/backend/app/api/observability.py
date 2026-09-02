@@ -500,10 +500,14 @@ async def _proxy_url(url: str) -> "FastResponse":
     """Fetch `url` (already SSRF-checked by caller) and return image bytes."""
     from urllib.parse import urlparse
     p = urlparse(url)
-    allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-        "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
-        "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
-    ]
+    # Use dynamic allowlist so domain changes in config auto-sync
+    try:
+        allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
+    except Exception:
+        allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
+            "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
+            "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
+        ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
     host_port = f"{host}:{port}"
@@ -577,10 +581,13 @@ async def reader_cover_public(request: Request):
     except ValueError:
         return FastResponse(status_code=400)
 
-    allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-        "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
-        "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
-    ]
+    try:
+        allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
+    except Exception:
+        allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
+            "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
+            "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
+        ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
     host_port = f"{host}:{port}"
@@ -651,10 +658,13 @@ async def reader_proxy(request: Request):
         p = urlparse(url)
     except ValueError:
         return FastResponse(status_code=400)
-    allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-        "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
-        "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
-    ]
+    try:
+        allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
+    except Exception:
+        allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
+            "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
+            "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
+        ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
     host_port = f"{host}:{port}"

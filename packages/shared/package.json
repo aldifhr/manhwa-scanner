@@ -7,7 +7,9 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "generate": "node ./scripts/generate.js"
+    "generate": "node ./scripts/generate.js",
+    "test": "echo \"shared: no tests\"",
+    "lint": "echo \"shared: no lint\""
   },
   "dependencies": {
     "zod": "^4.0.0"

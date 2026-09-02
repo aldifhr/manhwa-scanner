@@ -51,73 +51,10 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
     offset = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size if page_size else 1
     has_more = page * page_size < total
-    rc_map = {}
-    rc_series_by_title: dict[str, str] = {}
 
-    cand_keys: set[str] = set()
-    for r in rows:
-        tk = r.get("title_key", "")
-        if tk:
-            cand_keys.add(tk)
-            cand_keys.add(tk.replace(" ", "-"))
-        su = (r.get("series_url") or r.get("url") or "").rstrip("/").split("/")[-1]
-        if su:
-            cand_keys.add(su)
+    from app.services.whitelist_enrichment import fetch_whitelist_enrichment
 
-    def _q_recent():
-        q = sb.table("recent_chapters").select("title_key, title, source, cover, origin, updated_time, series_url")
-        if all_tks:
-            q = q.in_("title_key", all_tks)
-        return q.execute()
-
-    def _q_meta():
-        if not cand_keys:
-            return None
-        return sb.table("whitelist").select("title_key, description, cover").in_("title_key", list(cand_keys)).execute()
-
-    def _q_dh():
-        tks = [r.get("title_key", "") for r in rows if r.get("title_key")]
-        if not tks:
-            return None
-        return sb.table("dispatch_history").select("title_key, sent_at").in_("title_key", tks).execute()
-
-    rc_rows = _q_recent()
-    meta_rows = _q_meta()
-    dh_rows = _q_dh()
-
-    if rc_rows and rc_rows.data:
-        for rc in rc_rows.data:
-            tk = rc.get("title_key")
-            src = rc.get("source") or ""
-            if tk and (tk, src) not in rc_map:
-                rc_map[(tk, src)] = rc
-            t = (rc.get("title") or "").strip().lower()
-            su = rc.get("series_url") or ""
-            if t and su and t not in rc_series_by_title:
-                rc_series_by_title[t] = su
-    meta_desc: dict[str, str] = {}
-    meta_cover: dict[str, str] = {}
-    try:
-        _meta_data = (meta_rows.data if (meta_rows and getattr(meta_rows, "data", None)) else [])
-        for m in _meta_data:
-            d = m.get("description")
-            if d:
-                meta_desc[m.get("title_key", "")] = d
-            c = m.get("cover")
-            if c:
-                meta_cover[m.get("title_key", "")] = c
-    except Exception:
-        pass
-    last_notified: dict[str, str] = {}
-    try:
-        _dh_data = (dh_rows.data if (dh_rows and getattr(dh_rows, "data", None)) else [])
-        for d in _dh_data:
-            tk = d.get("title_key", "")
-            ts = d.get("sent_at") or ""
-            if tk and (tk not in last_notified or ts > last_notified[tk]):
-                last_notified[tk] = ts
-    except Exception:
-        pass
+    rc_map, meta_desc, meta_cover, last_notified = fetch_whitelist_enrichment(sb, rows, all_tks)
 
     mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, last_notified) for r in rows]
 

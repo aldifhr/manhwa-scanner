@@ -235,20 +235,43 @@ async def rss(request: Request):
                 wl_map[(nk, src)] = w
                 wl_map[(tk, src)] = w
 
-        # Build whitelist metadata lookup for non-whitelisted fallback
+        # Build whitelist metadata lookup for non-whitelisted fallback — parallel chunk fetch
         meta_map: dict[str, dict] = {}
         try:
             slugs = list({ (r.get("series_url") or "").rstrip("/").split("/")[-1] for r in rc_rows if r.get("series_url") })
             slugs = [s for s in slugs if s]
             if slugs:
-                for i in range(0, len(slugs), 100):
-                    chunk = slugs[i:i+100]
-                    try:
-                        mrows = sb.table("whitelist").select("title_key, cover, status, rating, genres, description, origin").in_("title_key", chunk).execute().data or []
+                chunks = [slugs[i:i+100] for i in range(0, len(slugs), 100)]
+
+                async def _fetch_meta_chunks():
+                    loop = asyncio.get_running_loop()
+
+                    def _fetch_one(chunk):
+                        try:
+                            return sb.table("whitelist").select("title_key, cover, status, rating, genres, description, origin").in_("title_key", chunk).execute().data or []
+                        except Exception:
+                            return []
+
+                    results = await asyncio.gather(
+                        *[loop.run_in_executor(None, _fetch_one, c) for c in chunks]
+                    )
+                    out: dict[str, dict] = {}
+                    for mrows in results:
                         for m in mrows:
-                            meta_map[str(m.get("title_key") or "")] = m
-                    except Exception:
-                        continue
+                            out[str(m.get("title_key") or "")] = m
+                    return out
+
+                try:
+                    meta_map = await _fetch_meta_chunks()
+                except Exception:
+                    # Fallback sequential if no running loop
+                    for chunk in chunks:
+                        try:
+                            mrows = sb.table("whitelist").select("title_key, cover, status, rating, genres, description, origin").in_("title_key", chunk).execute().data or []
+                            for m in mrows:
+                                meta_map[str(m.get("title_key") or "")] = m
+                        except Exception:
+                            continue
         except Exception:
             pass
 
