@@ -161,51 +161,46 @@ async def analytics_engagement(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
 
-    try:
-        from app.db import q
+    from app.db import q
 
-        # Active reading sessions (last 24h)
-        active_sessions = q("""
-            SELECT COUNT(DISTINCT session_hash) as active_users
-            FROM continue_reading
-            WHERE updated_at >= NOW() - INTERVAL '24 hours'
-        """)
+    # Each query isolated — one failing shouldn't 500 the whole endpoint
+    def _safe_q(sql: str, fallback: list | None = None):
+        try:
+            return q(sql)
+        except Exception as e:
+            logger.warn("analytics_engagement subquery failed", sql=sql[:80], err=str(e)[:160])
+            return fallback if fallback is not None else []
 
-        # Total reading progress entries — count keys via lateral join
-        total_progress = q("""
-            SELECT COUNT(*) as total_sessions,
-                   COUNT(k) as total_entries
-            FROM continue_reading
-            LEFT JOIN LATERAL jsonb_object_keys(entries) AS k ON true
-        """)
+    active_sessions = _safe_q("""
+        SELECT COUNT(DISTINCT session_hash) as active_users
+        FROM continue_reading
+        WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '24 hours'
+    """)
+    total_progress = _safe_q("""
+        SELECT COUNT(*) as total_sessions
+        FROM continue_reading
+    """)
+    most_read = _safe_q("""
+        SELECT key as title_key, COUNT(*) as reader_count
+        FROM continue_reading, jsonb_object_keys(entries) as key
+        GROUP BY key
+        ORDER BY reader_count DESC
+        LIMIT 20
+    """)
+    activity = _safe_q("""
+        SELECT DATE(to_timestamp(updated_at)) as date, COUNT(*) as active_users
+        FROM continue_reading
+        WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(to_timestamp(updated_at))
+        ORDER BY date DESC
+    """)
 
-        # Most read series (by continue_reading entries)
-        most_read = q("""
-            SELECT key as title_key, COUNT(*) as reader_count
-            FROM continue_reading, jsonb_object_keys(entries) as key
-            GROUP BY key
-            ORDER BY reader_count DESC
-            LIMIT 20
-        """)
-
-        # Reading activity over time (last 30 days)
-        activity = q("""
-            SELECT DATE(updated_at) as date, COUNT(*) as active_users
-            FROM continue_reading
-            WHERE updated_at >= NOW() - INTERVAL '30 days'
-            GROUP BY DATE(updated_at)
-            ORDER BY date DESC
-        """)
-
-        return JSONResponse(content={
-            "success": True,
-            "data": {
-                "active_sessions_24h": active_sessions[0]["active_users"] if active_sessions else 0,
-                "total_reading_sessions": total_progress[0]["total_sessions"] if total_progress else 0,
-                "most_read_series": most_read,
-                "activity_over_time": activity,
-            }
-        })
-    except Exception as e:
-        logger.warn("analytics_engagement failed", err=str(e)[:120])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+    return JSONResponse(content={
+        "success": True,
+        "data": {
+            "active_sessions_24h": active_sessions[0]["active_users"] if active_sessions else 0,
+            "total_reading_sessions": total_progress[0]["total_sessions"] if total_progress else 0,
+            "most_read_series": most_read,
+            "activity_over_time": activity,
+        }
+    })

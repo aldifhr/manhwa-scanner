@@ -27,6 +27,8 @@ export const queryKeys = {
   stats: ["stats"] as const,
   rssHealth: ["rss-health"] as const,
   cronStatus: ["cron-status"] as const,
+  analyticsOverview: ["analytics-overview"] as const,
+  analyticsEngagement: ["analytics-engagement"] as const,
 };
 
 export const staleTimes = {

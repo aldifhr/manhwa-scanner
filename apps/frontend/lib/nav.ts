@@ -6,6 +6,7 @@ import {
   Clock,
   Pulse,
   BookBookmark,
+  ChartBar,
 } from "@phosphor-icons/react";
 
 /** Central nav definition — single source for Navbar + mobile bottom nav */
@@ -17,6 +18,7 @@ export const NAV = [
   { href: "/dispatch-history", label: "History", icon: Clock },
   { href: "/health", label: "Health", icon: Pulse },
   { href: "/bookmarks", label: "Bookmarks", icon: BookBookmark },
+  { href: "/analytics", label: "Analytics", icon: ChartBar },
 ] as const;
 
 /** Sidebar / nav active-state helper (single source of truth).
