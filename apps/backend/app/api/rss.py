@@ -146,8 +146,8 @@ async def rss(request: Request):
         if q:
             _q = q.replace("%", r"\%").replace("_", r"\_")
             rc_q = rc_q.ilike("title", f"%{_q}%")
-        # Fetch only what pagination needs (cap at 1000 to bound memory).
-        _fetch_limit = min(limit * page, 1000) if (limit * page) > 0 else 1000
+        # Fetch up to 1000 for consistent total (fix: limit*page made total vary per page)
+        _fetch_limit = 1000
         rc_rows = rc_q.order("updated_time", desc=True).limit(_fetch_limit).execute().data or []
 
         # Exclude chapters already notified (FCFS dispatch_history) so RSS shows
