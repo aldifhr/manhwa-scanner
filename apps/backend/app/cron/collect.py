@@ -354,7 +354,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
 # class of bug as shinigami's old collector). 60s is safely above ikiru's
 # real runtime and well within the 10-min cron interval. shinigami is now
 # list-based (~0.5s) so it's unaffected.
-_SOURCE_TIMEOUT = 60.0
+_SOURCE_TIMEOUT = 180.0
 
 
 def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = True, exclude_keys: set[str] | None = None) -> list[dict]:

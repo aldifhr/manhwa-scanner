@@ -36,7 +36,7 @@ def _proxy_cover(cover: str | None) -> str | None:
     # upstream> wrapper (so the FE fetches them through the authed proxy).
     # Discord needs the DIRECT upstream URL wrapped in the PUBLIC cover-img
     # proxy instead — unwrap the inner url first, else the double-wrap 403s.
-    if "/api/reader/proxy" in cover and "url=" in cover:
+    if ("/api/reader/proxy" in cover or "/api/v1/reader/proxy" in cover) and "url=" in cover:
         from urllib.parse import urlparse as _up, parse_qs as _pqs, unquote as _uq
         _inner = _pqs(_up(cover).query).get("url", [""])[0]
         if _inner:
@@ -251,6 +251,6 @@ def _build_embed(
     }
     if desc:
         embed["description"] = desc
-    if cover and (cover.startswith("http") or cover.startswith("/api/reader/")):
+    if cover and (cover.startswith("http") or cover.startswith("/api/reader/") or cover.startswith("/api/v1/reader/")):
         embed["thumbnail"] = {"url": _proxy_cover(cover)}
     return embed

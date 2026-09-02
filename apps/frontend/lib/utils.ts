@@ -263,6 +263,13 @@ export function rewriteCoverUrl(
     } catch {
       /* keep as-is */
     }
+    // Voratoon presigned S3: serve direct, never re-proxy (S3 sig breaks on re-encode)
+    try {
+      const h = new URL(raw).hostname;
+      if (h === "cvr.voratoon.id" || h === "cdn.voratoon.com" || h === "assets.shngm.id") {
+        return putCover(cover, raw);
+      }
+    } catch {}
     return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
   }
   // Reject obviously invalid covers (e.g. "x", "undefined", non-URL)

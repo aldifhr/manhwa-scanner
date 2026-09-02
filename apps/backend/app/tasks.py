@@ -186,15 +186,18 @@ def run_cron_worker() -> None:
 # runs, so a double-fire just becomes a no-op skip.
 _SCHED_THREAD: "threading.Thread | None" = None
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
-_SOURCE_INTERVAL_S = 300          # 5 min per source
+_SOURCE_INTERVAL_S = 300          # 5 min per source (RSS)
+_DISPATCH_INTERVAL_S = 60        # 1 min Discord dispatch (user request)
 _ENRICH_INTERVAL_S = 900         # 15 min
 
 
 def _scheduler_loop() -> None:
     from datetime import datetime, timezone
     last_enrich = 0.0
+    last_dispatch = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
+                dispatch_interval=_DISPATCH_INTERVAL_S,
                 enrich_interval=_ENRICH_INTERVAL_S)
     # Kick off immediately on startup so freshness doesn't wait 10 min.
     _t0 = __import__("time").monotonic()
@@ -210,27 +213,38 @@ def _scheduler_loop() -> None:
         last_enrich = __import__("time").monotonic()
     except Exception:
         pass
-    # Then loop on the interval.
+    # Then loop: dispatch every 60s, RSS every 300s (staggered), enrich every 900s
+    last_source = __import__("time").monotonic()
     while not _stop.is_set():
-        if _stop.wait(_SOURCE_INTERVAL_S):
+        if _stop.wait(_DISPATCH_INTERVAL_S):
             break
-        if not _stop.is_set():
-            for src in _RSS_SOURCES:
-                if _stop.is_set():
-                    break
-                try:
-                    enqueue_cron(f"rss-fetch:{src}")
-                except Exception as e:
-                    logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
-                _stop.wait(20)
-            # Periodic enrich so metadata stays fresh without FastCron.
-            _now = __import__("time").monotonic()
-            if _now - last_enrich >= _ENRICH_INTERVAL_S:
-                try:
-                    enqueue_cron("enrich")
-                    last_enrich = _now
-                except Exception:
-                    pass
+        _now = __import__("time").monotonic()
+        # Discord dispatch every 60s
+        if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
+            try:
+                enqueue_cron("update")
+                last_dispatch = _now
+            except Exception as e:
+                logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
+        # RSS fetch every 300s
+        if _now - last_source >= _SOURCE_INTERVAL_S:
+            if not _stop.is_set():
+                for src in _RSS_SOURCES:
+                    if _stop.is_set():
+                        break
+                    try:
+                        enqueue_cron(f"rss-fetch:{src}")
+                    except Exception as e:
+                        logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
+                    _stop.wait(20)
+            last_source = _now
+        # Periodic enrich so metadata stays fresh without FastCron.
+        if _now - last_enrich >= _ENRICH_INTERVAL_S:
+            try:
+                enqueue_cron("enrich")
+                last_enrich = _now
+            except Exception:
+                pass
 
 
 def start_cron_scheduler() -> None:
@@ -255,6 +269,7 @@ def get_cron_status() -> dict:
     status: dict = {
         "scheduler_alive": bool(_SCHED_THREAD and _SCHED_THREAD.is_alive()),
         "source_interval_s": _SOURCE_INTERVAL_S,
+        "dispatch_interval_s": _DISPATCH_INTERVAL_S,
         "enrich_interval_s": _ENRICH_INTERVAL_S,
         "sources": list(_RSS_SOURCES),
         "now": datetime.now(timezone.utc).isoformat(),

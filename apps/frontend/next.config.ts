@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 // Mirrors the SECURITY_HEADERS block in middleware.ts. Applied at the routing
@@ -18,6 +19,7 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
   experimental: {

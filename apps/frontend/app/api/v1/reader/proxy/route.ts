@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         status: 200,
         headers: {
           "Content-Type": "image/svg+xml",
-          "Cache-Control": "public, max-age=60",
+          "Cache-Control": "no-store, max-age=0",
           "X-Cache": "MISS-PLACEHOLDER",
         },
       });
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=60",
+        "Cache-Control": "no-store, max-age=0",
         "X-Cache": "ERROR-PLACEHOLDER",
       },
     });
