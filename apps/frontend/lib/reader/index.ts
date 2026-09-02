@@ -1,16 +1,29 @@
 // Deep module: Reader — seam untuk semua fetch whitelist/history/rss.
 // Interface adalah test surface; di balik seam: pagination, snake→camel, csrf, 401.
 // Transport + mapper dipisah biar testable (inject fetch, unit test mapper tanpa network).
-import type { QueueDepth, DashboardSnapshot, ExcludedTitleItem } from "@/lib/types";
+import type {
+  QueueDepth,
+  DashboardSnapshot,
+  ExcludedTitleItem,
+} from "@/lib/types";
 import { readerFetch, paginatedGet } from "./transport";
 import { mapWhitelist, mapHistory, mapRss, mapExcluded } from "./mapper";
 
 function buildRssParams(
   page: number,
   limit: number,
-  opts: { exclude?: string; whitelist?: boolean; source?: string | null; type?: string | null }
+  opts: {
+    exclude?: string;
+    whitelist?: boolean;
+    source?: string | null;
+    type?: string | null;
+  }
 ) {
-  const p = new URLSearchParams({ page: String(page), limit: String(limit), group: "false" });
+  const p = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    group: "false",
+  });
   if (opts.exclude) p.set("exclude", opts.exclude);
   if (opts.whitelist) p.set("whitelist", "true");
   if (opts.source) p.set("source", opts.source);
@@ -25,7 +38,11 @@ export const Reader = {
       page_size: String(pageSize),
       merge: merge ? "true" : "false",
     });
-    return paginatedGet("/api/v1/reader/whitelist", p, mapWhitelist as never);
+    return paginatedGet(
+      "/api/v1/reader/whitelist",
+      p,
+      mapWhitelist
+    ) as unknown as Promise<import("@/lib/types").WhitelistRouteItem[]>;
   },
   getDispatchHistory: (page = 1, pageSize = 1000, search = "") => {
     const p = new URLSearchParams({
@@ -36,8 +53,8 @@ export const Reader = {
     return paginatedGet(
       "/api/v1/reader/dispatch-history",
       p,
-      mapHistory as never
-    );
+      mapHistory
+    ) as unknown as Promise<import("@/lib/types").DispatchHistoryItem[]>;
   },
   getRssFlat: (
     page = 1,
@@ -48,18 +65,24 @@ export const Reader = {
       source?: string | null;
       type?: string | null;
     } = {}
-  ) => paginatedGet("/api/v1/reader/rss", buildRssParams(page, limit, opts), mapRss as never),
+  ) =>
+    paginatedGet(
+      "/api/v1/reader/rss",
+      buildRssParams(page, limit, opts),
+      mapRss
+    ) as unknown as Promise<import("@/lib/types").RssFlatItem[]>,
   getExcludedTitles: async (): Promise<ExcludedTitleItem[]> => {
     const data = await readerFetch<{
       success: boolean;
       data: { results: Record<string, unknown>[] };
     }>("/api/v1/excluded-titles");
-    return (data.data?.results ?? []).map(mapExcluded as never) as ExcludedTitleItem[];
+    return (data.data?.results ?? []).map(mapExcluded) as ExcludedTitleItem[];
   },
   getDashboardSnapshot: async (): Promise<DashboardSnapshot | null> => {
-    const data = await readerFetch<{ success: boolean; data: DashboardSnapshot }>(
-      "/api/v1/dashboard-snapshot"
-    );
+    const data = await readerFetch<{
+      success: boolean;
+      data: DashboardSnapshot;
+    }>("/api/v1/dashboard-snapshot");
     return (data.data ?? null) as DashboardSnapshot | null;
   },
   getStats: async () => {

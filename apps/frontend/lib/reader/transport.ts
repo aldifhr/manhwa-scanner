@@ -8,7 +8,9 @@ export async function readerFetch<T>(
   init?: RequestInit,
   fetchImpl: FetchImpl = fetch
 ): Promise<T> {
-  const csrfInit = init ? (withCsrf(init as RequestInit) as RequestInit) : undefined;
+  const csrfInit = init
+    ? (withCsrf(init as RequestInit) as RequestInit)
+    : undefined;
   const res = await fetchImpl(path, csrfInit as RequestInit);
   if (res.status === 204) return { success: true, data: { results: [] } } as T;
   if (!res.ok) {
@@ -36,7 +38,9 @@ export async function paginatedGet<T>(
   signal?: AbortSignal,
   fetchImpl: FetchImpl = fetch
 ): Promise<T[]> {
-  const pageSize = Number(params.get("page_size") ?? params.get("limit") ?? 1000);
+  const pageSize = Number(
+    params.get("page_size") ?? params.get("limit") ?? 1000
+  );
   if (pageSize > 1000) {
     params.set(params.has("page_size") ? "page_size" : "limit", "1000");
     const first = await readerFetch<{
@@ -62,18 +66,20 @@ export async function paginatedGet<T>(
     const batched: unknown[] = [];
     for (let i = 0; i < fetchers.length; i += 4) {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      const batch = await Promise.allSettled(fetchers.slice(i, i + 4).map((f) => f()));
+      const batch = await Promise.allSettled(
+        fetchers.slice(i, i + 4).map((f) => f())
+      );
       for (const r of batch) {
-        if (r.status === "fulfilled") batched.push(...((r.value.data?.results ?? []) as unknown[]));
+        if (r.status === "fulfilled")
+          batched.push(...(r.value.data?.results ?? []));
         else if ((r.reason as Error)?.name !== "AbortError") throw r.reason;
       }
     }
     return [...firstRows, ...batched.map(map)];
   }
-  const data = await readerFetch<{ success: boolean; data: { results: unknown[] } }>(
-    `${basePath}?${params}`,
-    signal ? { signal } : undefined,
-    fetchImpl
-  );
+  const data = await readerFetch<{
+    success: boolean;
+    data: { results: unknown[] };
+  }>(`${basePath}?${params}`, signal ? { signal } : undefined, fetchImpl);
   return (data.data?.results ?? []).map(map);
 }

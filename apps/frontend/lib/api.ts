@@ -9,7 +9,9 @@ export async function getWhitelist(
   page = 1,
   pageSize = 1000
 ): Promise<WhitelistRouteItem[]> {
-  return Reader.getWhitelist(page, pageSize) as Promise<WhitelistRouteItem[]>;
+  return Reader.getWhitelist(page, pageSize) as unknown as Promise<
+    WhitelistRouteItem[]
+  >;
 }
 
 /* ── History (GET /api/history) ── */
@@ -252,9 +254,11 @@ export async function getDispatchHistory(
   pageSize = 50,
   search = ""
 ): Promise<DispatchHistoryItem[]> {
-  return Reader.getDispatchHistory(page, pageSize, search) as Promise<
-    DispatchHistoryItem[]
-  >;
+  return Reader.getDispatchHistory(
+    page,
+    pageSize,
+    search
+  ) as unknown as Promise<DispatchHistoryItem[]>;
 }
 
 /* ── Stats (GET /api/reader/stats) ── */

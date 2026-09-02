@@ -21,7 +21,9 @@ export function WhitelistGrid() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.whitelist,
     queryFn: () =>
-      Reader.getWhitelist(1, 1000, false) as Promise<WhitelistRouteItem[]>,
+      Reader.getWhitelist(1, 1000, false) as unknown as Promise<
+        WhitelistRouteItem[]
+      >,
     staleTime: 30_000,
   });
 

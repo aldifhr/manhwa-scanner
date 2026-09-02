@@ -1,27 +1,36 @@
 // mapper — snake→camel, single place for BE↔FE field renames
-export function mapWhitelist(r: Record<string, unknown>) {
+export function mapWhitelist(r: unknown) {
+  const x = r as Record<string, unknown>;
   return {
-    ...r,
-    titleKey: (r.title_key as string) ?? (r.titleKey as string),
-    seriesUrl: (r.series_url as string) ?? (r.seriesUrl as string),
-    canonicalTitleKey: (r.canonical_title_key as string) ?? (r.canonicalTitleKey as string),
+    ...x,
+    titleKey: (x.title_key as string) ?? (x.titleKey as string),
+    seriesUrl: (x.series_url as string) ?? (x.seriesUrl as string),
+    canonicalTitleKey:
+      (x.canonical_title_key as string) ?? (x.canonicalTitleKey as string),
   };
 }
-export function mapHistory(r: Record<string, unknown>) {
-  return r;
+export function mapHistory(r: unknown) {
+  return r as Record<string, unknown>;
 }
-export function mapRss(r: Record<string, unknown>) {
+export function mapRss(r: unknown) {
+  const x = r as Record<string, unknown>;
   return {
-    ...r,
-    titleKey: (r.title_key as string) ?? (r.titleKey as string),
-    chapterUrl: (r.chapter_url as string) ?? (r.chapterUrl as string),
-    seriesUrl: (r.series_url as string) ?? (r.seriesUrl as string),
-    isWhitelisted: (r.is_whitelisted as boolean) ?? (r.isWhitelisted as boolean),
+    ...x,
+    titleKey: (x.title_key as string) ?? (x.titleKey as string),
+    chapterUrl: (x.chapter_url as string) ?? (x.chapterUrl as string),
+    seriesUrl: (x.series_url as string) ?? (x.seriesUrl as string),
+    isWhitelisted:
+      (x.is_whitelisted as boolean) ?? (x.isWhitelisted as boolean),
   };
 }
-export function mapExcluded(r: Record<string, unknown>) {
+export function mapExcluded(r: unknown) {
+  const x = r as Record<string, unknown>;
   return {
-    ...r,
-    titleKey: (r.title_key as string) ?? (r.titleKey as string) ?? (r.id as string) ?? "",
+    ...x,
+    titleKey:
+      (x.title_key as string) ??
+      (x.titleKey as string) ??
+      (x.id as string) ??
+      "",
   };
 }

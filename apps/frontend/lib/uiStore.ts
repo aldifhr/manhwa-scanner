@@ -60,11 +60,7 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: "alltab-ui",
-      storage: createJSONStorage(() =>
-        typeof window !== "undefined"
-          ? localStorage
-          : (undefined as unknown as Storage)
-      ),
+      storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         feed: s.feed,
         groupMode: s.groupMode,

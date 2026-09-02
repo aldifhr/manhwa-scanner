@@ -105,7 +105,7 @@ export default function DispatchHistoryClient() {
         1,
         debouncedSearch ? 500 : 10000,
         debouncedSearch || ""
-      ) as Promise<DispatchHistoryItem[]>,
+      ) as unknown as Promise<DispatchHistoryItem[]>,
   });
 
   const items = data ?? [];

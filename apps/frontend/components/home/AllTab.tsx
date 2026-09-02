@@ -128,7 +128,7 @@ function AllTabInner() {
   const { data: dispatchHistory } = useQuery({
     queryKey: queryKeys.dispatchHistory(),
     queryFn: () =>
-      Reader.getDispatchHistory(1, 10000) as Promise<
+      Reader.getDispatchHistory(1, 10000) as unknown as Promise<
         import("@/lib/types").DispatchHistoryItem[]
       >,
     staleTime: 300_000,
