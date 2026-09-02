@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+
+# bun
+bun.lockb
+
+# build
+.next/
+dist/
+tsconfig.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.bak.*
+.env*.local
+
+# committed session cookies (NEVER track — contain live auth JWTs)
+cookies.txt
+*-cookies.txt
+be-cookies.txt
+fe-cookies.txt
+
+# vercel
+.vercel/
+
+# misc
+.slim/
+.qoder/
+*.pyc
+__pycache__/
+
+# clerk configuration (can include secrets)
+/.clerk/
+.vercel
+
+# backend next cache
+apps/backend/.next/
+.git-rewrite/

@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""cronlog — human-readable viewer for PM2 JSON logs (manhwa stack).
+
+Usage:
+  cronlog                       # manhwa-cron, last 50, all levels
+  cronlog api                   # manhwa-api logs instead
+  cronlog -e                    # errors + warnings only
+  cronlog -l warn               # level filter (debug|info|warn|error)
+  cronlog -s ikiru              # scope filter (partial match)
+  cronlog -g timeout            # grep msg/scope/extra for pattern
+  cronlog -m 30                 # last 30 minutes only
+  cronlog -n 100                # last N lines
+  cronlog -f                    # follow (tail -f style)
+  cronlog api -e -g error -m 60
+
+Process names: cron (default) | api | fe
+"""
+import sys
+import json
+import re
+import os
+from datetime import datetime, timezone, timedelta
+
+PM2 = "/root/.pm2/logs"
+PROCS = {
+    "cron": "manhwa-cron",
+    "api": "manhwa-api",
+    "fe": "manhwa-fe",
+}
+
+LEVEL_COLOR = {
+    "debug": "\033[2;37m",
+    "info": "\033[0m",
+    "warn": "\033[33m",
+    "error": "\033[31m",
+}
+RESET = "\033[0m"
+
+
+def parse_args(argv):
+    a = {"proc": "cron", "level": None, "scope": None, "minutes": None,
+         "n": 50, "follow": False, "errors_only": False, "grep": None}
+    i = 0
+    while i < len(argv):
+        x = argv[i]
+        if x == "-e":
+            a["errors_only"] = True
+        elif x == "-l":
+            a["level"] = argv[i+1].lower(); i += 1
+        elif x == "-s":
+            a["scope"] = argv[i+1].lower(); i += 1
+        elif x in ("-p", "--proc"):
+            a["proc"] = argv[i+1].lower(); i += 1
+        elif x == "-g":
+            a["grep"] = argv[i+1]; i += 1
+        elif x == "-m":
+            a["minutes"] = int(argv[i+1]); i += 1
+        elif x == "-n":
+            a["n"] = int(argv[i+1]); i += 1
+        elif x == "-f":
+            a["follow"] = True
+        elif x in PROCS and a["proc"] == "cron":
+            a["proc"] = x  # positional proc name
+        i += 1
+    if a["errors_only"]:
+        a["level"] = "warn"
+    return a
+
+
+def fmt(rec):
+    lvl = (rec.get("level") or "info").lower()
+    t = rec.get("time", "")
+    m = re.search(r"T(\d\d:\d\d:\d\d)", t)
+    ts = m.group(1) if m else t[:8]
+    scope = rec.get("scope", "")
+    msg = rec.get("msg", "")
+    extra = {k: v for k, v in rec.items() if k not in ("level", "time", "scope", "msg")}
+    ext_str = ""
+    if extra:
+        parts = []
+        for k, v in extra.items():
+            if isinstance(v, dict) and len(str(v)) > 60:
+                v = "{...}"
+            parts.append(f"{k}={v}")
+        if parts:
+            ext_str = "  " + " ".join(parts)
+    color = LEVEL_COLOR.get(lvl, "")
+    return f"{color}{ts} [{lvl:<5}] {scope:<22} {msg}{ext_str}{RESET}"
+
+
+def load(proc):
+    name = PROCS.get(proc, proc)
+    out = f"{PM2}/{name}-out.log"
+    err = f"{PM2}/{name}-error.log"
+    lines = []
+    for f in (err, out):
+        if os.path.exists(f):
+            with open(f, "r", errors="replace") as fh:
+                for ln in fh:
+                    ln = ln.strip()
+                    if not ln:
+                        continue
+                    try:
+                        lines.append(json.loads(ln))
+                    except json.JSONDecodeError:
+                        lines.append({"level": "info", "time": "", "scope": "raw", "msg": ln[:200]})
+    lines.sort(key=lambda r: r.get("time", ""))
+    return lines
+
+
+def match(r, a):
+    if a["level"]:
+        order = {"debug": 0, "info": 1, "warn": 2, "error": 3}
+        rl = (r.get("level") or "info").lower()
+        if order.get(rl, 1) < order.get(a["level"], 1):
+            return False
+    if a["scope"]:
+        if a["scope"] not in (r.get("scope", "") or "").lower():
+            return False
+    if a["grep"]:
+        hay = f"{r.get('scope','')} {r.get('msg','')} {r}".lower()
+        if a["grep"].lower() not in hay:
+            return False
+    if a["minutes"]:
+        t = r.get("time", "")
+        m = re.search(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", t)
+        if m:
+            try:
+                dt = datetime.fromisoformat(m.group(1))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt < datetime.now(timezone.utc) - timedelta(minutes=a["minutes"]):
+                    return False
+            except ValueError:
+                pass
+    return True
+
+
+def main():
+    a = parse_args(sys.argv[1:])
+    if a["follow"]:
+        import time
+        seen = 0
+        while True:
+            recs = load(a["proc"])
+            filt = [r for r in recs if match(r, a)]
+            for r in filt[seen:]:
+                print(fmt(r))
+            seen = len(filt)
+            time.sleep(2)
+        return
+    recs = load(a["proc"])
+    filt = [r for r in recs if match(r, a)]
+    for r in filt[-a["n"]:]:
+        print(fmt(r))
+
+
+if __name__ == "__main__":
+    main()

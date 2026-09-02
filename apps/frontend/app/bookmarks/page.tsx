@@ -1,0 +1,119 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getBookmarks, deleteBookmark, type BookmarkEntry } from "@/lib/api";
+
+export default function BookmarksPage() {
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const {
+    data: bookmarks,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["bookmarks"],
+    queryFn: getBookmarks,
+  });
+
+  const handleDelete = async (titleKey: string, chapterNumber: number) => {
+    try {
+      await deleteBookmark(titleKey, chapterNumber);
+      refetch();
+    } catch (err) {
+      console.error("Failed to delete bookmark:", err);
+    }
+    setDeleteConfirm(null);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Bookmarks</h1>
+        <span className="text-sm text-text-muted">
+          {bookmarks?.length || 0} saved
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        </div>
+      ) : bookmarks && bookmarks.length > 0 ? (
+        <div className="space-y-3">
+          {bookmarks.map((b) => (
+            <div
+              key={`${b.title_key}-${b.chapter_number}`}
+              className="bg-surface rounded-lg p-4 border border-border flex items-center justify-between"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{b.title_key}</p>
+                <p className="text-sm text-text-muted">
+                  Chapter {b.chapter_number} • {b.source} •{" "}
+                  {new Date(b.updated_at).toLocaleDateString()}
+                </p>
+                {b.position_pct > 0 && (
+                  <div className="mt-2">
+                    <div className="h-1.5 bg-surface-active rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent"
+                        style={{ width: `${b.position_pct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-text-muted mt-1">
+                      {b.position_pct.toFixed(0)}% read
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <a
+                  href={b.chapter_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 text-xs font-medium rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
+                >
+                  Read
+                </a>
+                {deleteConfirm === `${b.title_key}-${b.chapter_number}` ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        handleDelete(b.title_key, b.chapter_number)
+                      }
+                      className="px-3 py-1.5 text-xs font-medium rounded bg-red-500/15 text-red-400 border border-red-500/20"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      className="px-3 py-1.5 text-xs font-medium rounded bg-surface border border-border"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() =>
+                      setDeleteConfirm(`${b.title_key}-${b.chapter_number}`)
+                    }
+                    className="px-3 py-1.5 text-xs font-medium rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-text-muted">
+          <p>No bookmarks yet</p>
+          <p className="text-sm mt-1">
+            Save your reading position to see it here
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

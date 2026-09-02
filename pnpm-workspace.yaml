@@ -1,0 +1,7 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  tree-sitter: true
+  tree-sitter-javascript: true
+  tree-sitter-typescript: true

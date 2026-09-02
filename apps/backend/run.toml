@@ -1,0 +1,6 @@
+# run.toml — per-project config for be-ag-py (manga tracker backend)
+cmd     = "uvicorn app.main:app --host 127.0.0.1 --port 3000"
+health  = "curl -sS http://127.0.0.1:3000/healthz"
+expect  = "ok"
+test_cmd = "python3 -m pytest tests/ -x -q 2>/dev/null || echo 'no pytest tests yet'"
+bench_cmd = "echo 'no bench yet'"

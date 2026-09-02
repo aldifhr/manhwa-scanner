@@ -1,0 +1,191 @@
+"""Auto-split from dashboard.py — whitelist routes."""
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+from app.logger import get_logger
+from app.services.whitelist_service import (
+    get_dispatch_history,
+    get_whitelist,
+    post_whitelist,
+    delete_whitelist,
+    patch_whitelist,
+    normalize_whitelist_urls,
+)
+from app.utils.request_auth import require_monitor_auth, require_role_auth, int_safe, safe_error
+
+logger = get_logger("api:whitelist")
+router = APIRouter()
+
+
+@router.get("/dispatch-history")
+async def dispatch_history(request: Request):
+    """Flat list of all dispatched (notified) chapters from dispatch_history."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        page = int_safe(request.query_params.get("page", "1"), 1)
+        _ps_raw = request.query_params.get("page_size", "50")
+        try:
+            page_size = int(_ps_raw)
+        except (ValueError, TypeError):
+            page_size = 50
+        if page_size > 1000 or page_size < 1:
+            return JSONResponse(content={"success": False, "error": "page_size must be between 1 and 1000"}, status_code=400)
+        search = request.query_params.get("search", "").strip().lower()
+        return JSONResponse(content=get_dispatch_history(page, page_size, search))
+    except Exception as e:
+        logger.warn("dispatch-history failed", err=str(e))
+        return JSONResponse(content=safe_error(e), status_code=500)
+
+
+@router.get("/reader/whitelist")
+async def get_whitelist_reader(request: Request):
+    """Backward-compat alias for the FE (fe.aldifhr.fun) which calls
+    /api/reader/whitelist (Node-era path).
+
+    Security: this serves the SAME protected data as GET /api/whitelist, so it
+    requires the monitor Bearer token (or ?token= / dashboard session cookie),
+    exactly like whitelist_get. An unauthenticated caller gets 401 — the same
+    data was previously world-readable through this alias.
+
+    merge (default true): collapses cross-source duplicates (ikiru+voratoon+
+    shinigami for the same title) into a single canonical entry. Pass
+    ?merge=false to get one flat row per whitelist entry (no grouping by
+    title) — used by the /whitelist management page.
+    """
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    page = request.query_params.get("page", "1")
+    page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
+    _merge_raw = (request.query_params.get("merge") or "true").lower()
+    _merge = _merge_raw not in ("false", "0", "no")
+    return get_whitelist(page=page, page_size=page_size, merge=_merge)
+
+
+@router.get("/whitelist")
+async def whitelist_get(request: Request):
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        source = request.query_params.get("source", "")
+        title = request.query_params.get("title") or request.query_params.get("q", "")
+        page = request.query_params.get("page", "1")
+        page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
+        _merge_raw = (request.query_params.get("merge") or "true").lower()
+        _merge = _merge_raw not in ("false", "0", "no")
+        result = get_whitelist(source=source, title=title, page=page, page_size=page_size, merge=_merge)
+        return JSONResponse(content=result)
+    except Exception as e:
+        logger.warn("whitelist failed", err=str(e))
+        return JSONResponse(content=safe_error(e), status_code=500)
+
+
+@router.post("/whitelist")
+async def whitelist_post(request: Request):
+    if not require_role_auth(request, {"admin", "member"}):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+    title = body.get("title")
+    url = body.get("url")
+    source = body.get("source", "ikiru")
+    if not title:
+        return JSONResponse(content={"error": "Title required"}, status_code=400)
+
+    res = post_whitelist(title=title, url=url, source=source, body=body)
+    # Audit log
+    from app.services.audit import log_action, AuditAction
+    log_action(AuditAction.WHITELIST_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title, details={"source": source, "status": res.get("status")})
+    return JSONResponse(content=res)
+
+
+@router.delete("/whitelist")
+async def whitelist_delete(request: Request):
+    if not require_role_auth(request, {"admin"}):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+
+    # Accept any identifier the FE might send (id/title_key/title/url/source).
+    title_key = body.get("title_key") or ""
+    source = body.get("source") or ""
+    entry_id = body.get("id") or ""
+    title = body.get("title") or ""
+    url = body.get("url") or ""
+    if not any([title_key, entry_id, title, url]):
+        # Fall back to deriving title_key from url/title (legacy behavior).
+        if url:
+            title_key = url.rstrip("/").split("/")[-1]
+        elif title:
+            title_key = title.lower().replace(" ", "-")
+    if not any([title_key, entry_id, title, url]):
+        return JSONResponse(content={"error": "one of title_key/id/title/url required"}, status_code=400)
+    try:
+        result = delete_whitelist(
+            title_key=title_key,
+            source=source,
+            id=entry_id,
+            title=title,
+            url=url,
+        )
+        # Audit log
+        from app.services.audit import log_action, AuditAction
+        log_action(AuditAction.WHITELIST_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key or title, details={"source": source, "status": result.get("status")})
+        # Map not_found -> 404 so the FE gets a real signal instead of 200 ok.
+        if result.get("status") == "not_found":
+            return JSONResponse(content=result, status_code=404)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(content=safe_error(e), status_code=500)
+
+
+@router.patch("/whitelist")
+async def whitelist_patch(request: Request):
+    if not require_role_auth(request, {"admin"}):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+    title_key = body.get("title_key") or ""
+    if not title_key:
+        url = body.get("url") or ""
+        if url:
+            title_key = url.rstrip("/").split("/")[-1]
+        elif body.get("title"):
+            title_key = body["title"].lower().replace(" ", "-")
+    if not title_key:
+        return JSONResponse(content={"success": False, "error": "title_key required"}, status_code=400)
+    source = body.get("source") or ""
+    updatable = ("status", "rating", "cover", "origin", "genres", "description", "title", "series_url")
+    updates = {}
+    for f in updatable:
+        v = body.get(f)
+        if v is not None and v != "":
+            updates[f] = v
+    try:
+        result = patch_whitelist(title_key, source, updates)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(content=safe_error(e), status_code=500)
+
+
+@router.post("/reader/whitelist/normalize-urls")
+async def whitelist_normalize_urls(request: Request):
+    if not require_role_auth(request, {"admin", "member"}):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    dry_run = bool(body.get("dry_run") if isinstance(body, dict) else False)
+    return JSONResponse(content=normalize_whitelist_urls(dry_run=dry_run))

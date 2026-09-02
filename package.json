@@ -1,0 +1,17 @@
+{
+  "name": "manhwa-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:frontend": "pnpm --filter manhwa-reader dev",
+    "dev:backend": "echo \"backend: cd apps/backend && uv run uvicorn app.main:app --reload\"",
+    "dev": "pnpm --filter manhwa-reader dev",
+    "build": "pnpm --recursive build",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

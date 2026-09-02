@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+*.log
+logs/*.log.*
+# NOTE: test_*.py are tracked (see tests/ dir) — only ignore stray test
+# artifacts, not the suite itself.
+.pytest_cache/
+logs/be-ag-py.log.1

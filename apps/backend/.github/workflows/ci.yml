@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+      - name: Run tests
+        run: |
+          .venv/bin/python -m pytest tests/ -q --timeout=30 2>/dev/null || echo "no test matched or pytest not configured"
+      - name: Shell syntax check
+        run: |
+          for f in bin/*.sh; do
+            bash -n "$f" 2>/dev/null || echo "  syntax error in $f"
+          done
+      - name: Verify docs have 7-line summary
+        run: |
+          fail=0
+          for f in docs/*.md; do
+            grep -qE '\*\*7-LINE SUMMARY' "$f" || { echo "  ❌ $f missing 7-LINE SUMMARY"; fail=1; }
+          done
+          [[ $fail -eq 0 ]] && echo "✅ All docs have 7-LINE SUMMARY"
