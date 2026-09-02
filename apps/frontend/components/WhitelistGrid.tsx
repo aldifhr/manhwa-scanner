@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import type { WhitelistRouteItem } from "@/lib/types";
@@ -101,6 +102,21 @@ export function WhitelistGrid() {
 
   return (
     <div className="space-y-4">
+      <div className="flex gap-2 p-1 bg-surface rounded-lg border border-border w-fit">
+        <Link
+          href="/whitelist"
+          className="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-black"
+        >
+          Whitelist
+        </Link>
+        <Link
+          href="/exclude-list"
+          className="px-3 py-1.5 text-xs font-medium rounded-md text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+        >
+          Exclude
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <CompactSearchInput value={searchTerm} onChange={setSearchTerm} />
       </div>
