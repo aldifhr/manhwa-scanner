@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { PageShell } from "@/components/PageShell";
 import { useQuery } from "@tanstack/react-query";
 import { getHealthDetailed } from "@/lib/api";
 
@@ -43,26 +43,29 @@ export default function HealthDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" />
-      </div>
+      <PageShell>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" />
+        </div>
+      </PageShell>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="p-6">
+      <PageShell>
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
           <p className="text-red-400">Failed to load health data</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   const health = data as HealthData;
 
   return (
-    <div className="p-6 space-y-6">
+    <PageShell>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Health Dashboard</h1>
         <div className="flex items-center gap-2">
@@ -131,6 +134,7 @@ export default function HealthDashboard() {
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    </PageShell>
   );
 }
