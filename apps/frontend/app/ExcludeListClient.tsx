@@ -363,8 +363,19 @@ export function ExcludeListClient() {
                           <p className="text-sm font-medium text-text truncate">
                             {displayTitle(it)}
                           </p>
-                          <p className="text-[11px] text-text-muted truncate">
-                            {it.titleKey || it.id}
+                          <p
+                            className="text-[11px] text-text-muted truncate font-mono tracking-wide"
+                            title={it.titleKey || it.id || ""}
+                          >
+                            {(it.titleKey || it.id || "").includes(" ")
+                              ? (it.titleKey || it.id || "").replaceAll(
+                                  " ",
+                                  "-"
+                                )
+                              : it.titleKey || it.id || ""}{" "}
+                            <span className="opacity-60">
+                              · {it.source || "all"}
+                            </span>
                           </p>
                         </div>
                         <button

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.logger import get_logger
 from app.utils.request_auth import require_monitor_auth
@@ -13,7 +15,59 @@ logger = get_logger("api:analytics")
 router = APIRouter()
 
 
-@router.get("/analytics/overview")
+class PopularSeriesItem(BaseModel):
+    title_key: str
+    source: str
+    dispatch_count: int
+    last_dispatched: str | None = None
+
+
+class VelocityItem(BaseModel):
+    date: str
+    total_dispatches: int
+    unique_series: int
+
+
+class SourceDistItem(BaseModel):
+    source: str
+    count: int
+
+
+class WhitelistGrowthItem(BaseModel):
+    date: str
+    new_entries: int
+
+
+class FailedStats(BaseModel):
+    total_failed: int = 0
+    still_failed: int = 0
+    resolved: int = 0
+    permanent: int = 0
+
+
+class GenreItem(BaseModel):
+    genre: str
+    count: int
+
+
+class AnalyticsOverviewResponse(BaseModel):
+    popular_series: list[PopularSeriesItem]
+    chapter_velocity: list[VelocityItem]
+    source_distribution: list[SourceDistItem]
+    whitelist_growth: list[WhitelistGrowthItem]
+    failed_dispatch_stats: FailedStats
+    top_genres: list[GenreItem]
+    generated_at: str
+
+
+class EngagementResponse(BaseModel):
+    active_sessions_24h: int
+    total_reading_sessions: int
+    most_read_series: list[dict[str, Any]]
+    activity_over_time: list[dict[str, Any]]
+
+
+@router.get("/analytics/overview", response_model=dict)
 async def analytics_overview(request: Request):
     """Overview analytics — popular series, velocity, engagement."""
     if not require_monitor_auth(request):
@@ -91,7 +145,7 @@ async def analytics_overview(request: Request):
     })
 
 
-@router.get("/analytics/series/{title_key}")
+@router.get("/analytics/series/{title_key}", response_model=dict)
 async def analytics_series_detail(request: Request, title_key: str):
     """Detailed analytics for a specific series."""
     if not require_monitor_auth(request):
@@ -145,7 +199,7 @@ async def analytics_series_detail(request: Request, title_key: str):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.get("/analytics/engagement")
+@router.get("/analytics/engagement", response_model=dict)
 async def analytics_engagement(request: Request):
     """User engagement metrics — reading activity, active users."""
     if not require_monitor_auth(request):
