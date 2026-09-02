@@ -132,24 +132,100 @@ export function catchError(err: unknown) {
   return errorResponse(detail, isTimeout ? 504 : 502);
 }
 
-// Deep module: createServerClient — single seam for all server→backend fetches
-export function createServerClient(request: Request) {
-  const base = backendUrl();
-  const headers = authHeaders(request);
+// Deep module: ServerClient — seam untuk semua server→backend fetches
+// Interface adalah test surface; di balik seam: backendUrl locality, authHeaders, TIMEOUT, rssCache, zod, 401.
+export type FetchImpl = typeof fetch;
+
+export interface ServerClient {
+  base: string;
+  headers: Record<string, string>;
+  fetchJson<T>(path: string, init?: RequestInit, fetchImpl?: FetchImpl): Promise<T>;
+  proxyImage(url: string, fetchImpl?: FetchImpl): Promise<Response>;
+  getRssCache(key: string): unknown | null;
+  setRssCache(key: string, data: unknown): void;
+}
+
+// Shared RSS cache — single locality (sebelumnya duplikat di 2 route files)
+const rssCache: Map<string, { data: unknown; expiry: number }> = (
+  globalThis as unknown as { __rssCache?: Map<string, { data: unknown; expiry: number }> }
+).__rssCache ??= new Map();
+const RSS_TTL = 10_000;
+const RSS_STALE = 20_000;
+
+function getRssCache(key: string): unknown | null {
+  const e = rssCache.get(key);
+  if (!e) return null;
+  const now = Date.now();
+  if (now <= e.expiry) return e.data;
+  if (now <= e.expiry + RSS_STALE) return e.data;
+  rssCache.delete(key);
+  return null;
+}
+function setRssCache(key: string, data: unknown) {
+  rssCache.set(key, { data, expiry: Date.now() + RSS_TTL });
+  if (rssCache.size > 50) {
+    const now = Date.now();
+    for (const [k, entry] of rssCache) {
+      if (rssCache.size <= 50) break;
+      if (now > entry.expiry) rssCache.delete(k);
+    }
+    for (const [k] of rssCache) {
+      if (rssCache.size <= 50) break;
+      rssCache.delete(k);
+    }
+  }
+}
+
+export function createServerClient(
+  request: Request,
+  opts?: { fetchImpl?: FetchImpl }
+): ServerClient {
+  const base = backendUrl(); // captured once — HMR-safe locality
+  const headers = authHeaders(request); // captured once
+  const fetchImpl = opts?.fetchImpl ?? fetch;
   return {
     base,
     headers,
-    fetch: (path: string, init?: RequestInit) =>
-      fetch(`${base}${path}`, {
+    fetchJson: async <T>(path: string, init?: RequestInit, impl: FetchImpl = fetchImpl): Promise<T> => {
+      const res = await impl(`${base}${path}`, {
         ...init,
         headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
         signal: init?.signal ?? AbortSignal.timeout(TIMEOUT.DEFAULT),
-      }),
-    fetchWithTimeout: (path: string, init?: RequestInit, ms = TIMEOUT.DEFAULT) =>
-      fetch(`${base}${path}`, {
-        ...init,
-        headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
-        signal: AbortSignal.timeout(ms),
-      }),
+      } as RequestInit);
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        let msg = `HTTP ${res.status}`;
+        try {
+          const body = JSON.parse(text) as { error?: unknown };
+          msg = typeof body.error === "string" ? body.error : ((body.error as { message?: string })?.message ?? msg);
+        } catch {
+          if (text) msg = text.slice(0, 200);
+        }
+        if (res.status === 401) throw new Error(`UNAUTHORIZED: ${msg}`);
+        throw new Error(msg);
+      }
+      return res.json() as Promise<T>;
+    },
+    proxyImage: async (url: string, impl: FetchImpl = fetchImpl): Promise<Response> => {
+      const target = new URL(`${base}/api/v1/reader/proxy`);
+      target.searchParams.set("url", url);
+      return impl(target.toString(), { headers, signal: AbortSignal.timeout(TIMEOUT.COVER), cache: "no-store" });
+    },
+    getRssCache,
+    setRssCache,
+  };
+}
+
+// In-memory adapter for tests — 2nd adapter = real seam
+export function createInMemoryServerClient(overrides?: Partial<ServerClient>): ServerClient {
+  const store = new Map<string, unknown>();
+  return {
+    base: "http://test",
+    headers: {},
+    fetchJson: async <T>(): Promise<T> => ({ success: true, data: {} } as T),
+    proxyImage: async () => new Response(null, { status: 200 }),
+    getRssCache: (k) => store.get(k) ?? null,
+    setRssCache: (k, v) => store.set(k, v),
+    ...overrides,
   };
 }
