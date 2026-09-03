@@ -10,9 +10,5 @@
     "lint": "pnpm --recursive lint",
     "typecheck": "pnpm --recursive typecheck",
     "test": "pnpm --filter manhwa-reader test"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+  }
 }
