@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { PageShell } from "@/components/PageShell";
 import { useQuery } from "@tanstack/react-query";
-import { getAnalyticsOverview, getAnalyticsEngagement } from "@/lib/api";
+import { getAnalyticsOverview, getAnalyticsEngagement, getAnalyticsRetention } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { AnalyticsOverview, AnalyticsEngagement } from "@/lib/types";
 
@@ -38,9 +38,15 @@ export default function AnalyticsPage() {
     queryFn: getAnalyticsEngagement,
     refetchInterval: 15_000,
   });
+  const retentionQ = useQuery({
+    queryKey: queryKeys.analyticsRetention,
+    queryFn: getAnalyticsRetention,
+    refetchInterval: 15_000,
+  });
 
   const overview = overviewQ.data as AnalyticsOverview | null;
   const engagement = engagementQ.data as AnalyticsEngagement | null;
+  const retention = (retentionQ.data as any) as import("@/lib/api").RetentionData | null;
   const overviewError = overviewQ.error as Error | null;
   const engagementError = engagementQ.error as Error | null;
 
@@ -126,8 +132,8 @@ export default function AnalyticsPage() {
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-muted">{overview.generated_at ? new Date(overview.generated_at).toLocaleString() : ""} · auto 15s</span>
           <button
-            onClick={() => { overviewQ.refetch(); engagementQ.refetch(); }}
-            disabled={overviewQ.isFetching || engagementQ.isFetching}
+            onClick={() => { overviewQ.refetch(); engagementQ.refetch(); retentionQ.refetch(); }}
+            disabled={overviewQ.isFetching || engagementQ.isFetching || retentionQ.isFetching}
             className="px-2.5 py-1 rounded-md border border-border text-xs hover:bg-white/5 disabled:opacity-50"
           >
             {overviewQ.isFetching ? "Refreshing…" : "Refresh"}
@@ -139,6 +145,57 @@ export default function AnalyticsPage() {
         <StatCard label="Dispatches (7d)" value={overview.chapter_velocity?.reduce((a, b) => a + (b.total_dispatches ?? 0), 0) ?? 0} sub={`${overview.chapter_velocity?.length ?? 0} days`} />
         <StatCard label="Active readers (24h)" value={engagement?.active_sessions_24h ?? 0} sub="sessions" />
         <StatCard label="Failed (7d)" value={overview.failed_dispatch_stats?.still_failed ?? 0} sub={`${overview.failed_dispatch_stats?.total_failed ?? 0} total`} />
+      </div>
+
+      {/* Retention: dispatched vs read (continue_reading) */}
+      <div className="bg-surface rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold mb-1">Retention 30d — dispatched vs read</h2>
+        <p className="text-xs text-text-muted mb-3">isWhitelisted dispatch (30d) vs continue_reading read sessions — title-based (handles shinigami UUID vs voratoon slug)</p>
+        {retentionQ.isLoading ? (
+          <p className="text-xs text-text-muted">Loading retention…</p>
+        ) : retention ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Overall" value={`${retention.overall_retention_30d}%`} sub={`${retention.retained_titles}/${retention.total_whitelisted} retained`} />
+              <StatCard label="Retained" value={retention.retained_titles} sub="titles read ≥1" />
+              <StatCard label="Churned" value={retention.churned_titles} sub="dispatched but not read" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-xs font-semibold mb-2">Top retained</h3>
+                {retention.top_retained?.length ? (
+                  <div className="space-y-1.5">
+                    {retention.top_retained.map((r) => (
+                      <div key={r.title_key} className="flex items-center gap-2 text-xs">
+                        <span className="flex-1 truncate">{r.title}</span>
+                        <span className="text-text-muted">{r.dispatched_30d} disp</span>
+                        <span className="font-medium">{r.read_sessions} read</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">{r.retention_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-xs text-text-muted">No retained</p>}
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold mb-2">Top churned</h3>
+                {retention.top_churned?.length ? (
+                  <div className="space-y-1.5">
+                    {retention.top_churned.map((r) => (
+                      <div key={r.title_key} className="flex items-center gap-2 text-xs">
+                        <span className="flex-1 truncate">{r.title}</span>
+                        <span className="text-text-muted">{r.dispatched_30d} disp</span>
+                        <span className="font-medium text-red-400">{r.read_sessions} read</span>
+                        <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">{r.retention_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-xs text-text-muted">No churned</p>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-text-muted">No retention data</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
