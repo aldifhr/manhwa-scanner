@@ -235,6 +235,120 @@ async def analytics_series_detail(request: Request, title_key: str):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
+class RetentionItem(BaseModel):
+    model_config = {"extra": "allow"}
+    title_key: str
+    title: str
+    dispatched_30d: int
+    read_sessions: int
+    retention_pct: float
+
+class RetentionResponse(BaseModel):
+    model_config = {"extra": "allow"}
+    overall_retention_30d: float
+    total_whitelisted: int
+    retained_titles: int
+    churned_titles: int
+    top_retained: list[RetentionItem]
+    top_churned: list[RetentionItem]
+
+class RetentionEnvelope(BaseModel):
+    model_config = {"extra": "allow"}
+    success: bool
+    data: RetentionResponse
+
+
+@router.get("/analytics/retention", response_model=RetentionEnvelope)
+async def analytics_retention(request: Request):
+    """Retention: dispatched vs actually read (continue_reading) per whitelisted title.
+    Uses isWhitelisted logic (title-based) via dispatch_history + continue_reading."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    from app.db import q
+    from app.utils.text import normalize_title_key
+
+    def _safe(sql, params=None, fallback=None):
+        try:
+            return q(sql, params) if params else q(sql)
+        except Exception as e:
+            logger.warn("retention subquery failed", sql=sql[:80], err=str(e)[:160])
+            return fallback if fallback is not None else []
+
+    # Whitelisted titles
+    wl = _safe("SELECT title_key, title FROM whitelist", fallback=[])
+    wl_title_norm = {normalize_title_key(r.get("title") or r.get("title_key") or ""): r for r in wl}
+    total_wl = len(wl)
+
+    # Dispatched per title 30d
+    disp = _safe("""
+        SELECT title_key, COUNT(*) as cnt
+        FROM dispatch_history
+        WHERE sent_at >= NOW() - INTERVAL '30 days'
+        GROUP BY title_key
+    """, fallback=[])
+    disp_map = {normalize_title_key(r.get("title_key") or ""): int(r.get("cnt") or 0) for r in disp}
+
+    # Read sessions per title 30d (from continue_reading jsonb)
+    # continue_reading.entries is jsonb per session_hash, need to unnest
+    read = _safe("""
+        SELECT normalize_title_key(key) as nk, COUNT(*) as readers
+        FROM continue_reading, jsonb_object_keys(entries) as key
+        WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '30 days'
+        GROUP BY nk
+    """, fallback=[])
+    # Fallback if normalize_title_key SQL func not exists -> do in Python
+    if not read:
+        # Python fallback: fetch all entries and count in Python
+        try:
+            rows = _safe("SELECT entries FROM continue_reading WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '30 days'", fallback=[])
+            from collections import Counter
+            cnt = Counter()
+            for r in rows:
+                ents = r.get("entries") or {}
+                if isinstance(ents, dict):
+                    for k in ents.keys():
+                        cnt[normalize_title_key(k)] += 1
+            read = [{"nk": k, "readers": v} for k, v in cnt.items()]
+        except Exception:
+            read = []
+    read_map = {r.get("nk") or r.get("normalize_title_key") or "": int(r.get("readers") or r.get("count") or 0) for r in read}
+
+    # Build per-title retention
+    items: list[dict] = []
+    retained = 0
+    for nk, wrow in wl_title_norm.items():
+        d = disp_map.get(nk, 0)
+        r = read_map.get(nk, 0)
+        # retention = read_sessions / dispatched (cap 100)
+        pct = round(min(100.0, (r / d * 100) if d else (100.0 if r else 0.0)), 1) if (d or r) else 0.0
+        if r > 0:
+            retained += 1
+        items.append({
+            "title_key": wrow.get("title_key") or nk,
+            "title": wrow.get("title") or nk,
+            "dispatched_30d": d,
+            "read_sessions": r,
+            "retention_pct": pct,
+        })
+    items.sort(key=lambda x: x["retention_pct"], reverse=True)
+    top_retained = [x for x in items if x["retention_pct"] > 0][:10]
+    top_churned = [x for x in items if x["retention_pct"] == 0 and x["dispatched_30d"] > 0][:10]
+    overall = round((retained / total_wl * 100) if total_wl else 0.0, 1)
+    churned = total_wl - retained
+
+    return JSONResponse(content={
+        "success": True,
+        "data": {
+            "overall_retention_30d": overall,
+            "total_whitelisted": total_wl,
+            "retained_titles": retained,
+            "churned_titles": churned,
+            "top_retained": top_retained,
+            "top_churned": top_churned,
+        }
+    })
+
+
 @router.get("/analytics/engagement", response_model=EngagementEnvelope)
 async def analytics_engagement(request: Request):
     """User engagement metrics — reading activity, active users."""

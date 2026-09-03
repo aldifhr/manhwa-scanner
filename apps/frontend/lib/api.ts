@@ -219,6 +219,21 @@ export async function getAnalyticsEngagement(): Promise<AnalyticsEngagement | nu
   return Reader.getAnalyticsEngagement() as Promise<AnalyticsEngagement | null>;
 }
 
+export interface RetentionData {
+  overall_retention_30d: number;
+  total_whitelisted: number;
+  retained_titles: number;
+  churned_titles: number;
+  top_retained: { title_key: string; title: string; dispatched_30d: number; read_sessions: number; retention_pct: number }[];
+  top_churned: { title_key: string; title: string; dispatched_30d: number; read_sessions: number; retention_pct: number }[];
+}
+
+export async function getAnalyticsRetention(): Promise<RetentionData | null> {
+  const { readerFetch } = await import("@/lib/reader/transport");
+  const data = await readerFetch<{ success: boolean; data: RetentionData }>("/api/v1/analytics/retention");
+  return (data.data ?? null) as RetentionData | null;
+}
+
 /* ── Custom RSS Feed (GET /api/rss/custom) ── */
 
 export async function getRssCustomFeed(params: {
