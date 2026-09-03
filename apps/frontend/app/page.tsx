@@ -11,7 +11,6 @@ import {
   Star,
   ArrowClockwise,
   BookOpen,
-  BookBookmark,
   Compass,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
@@ -295,9 +294,9 @@ function HomeGroupedCard({ series }: { series: GroupedSeries }) {
                   } catch (err) { toast.error(err instanceof Error ? err.message : "Bookmark failed"); }
                 }}
                 title={`Bookmark Ch. ${label}`}
-                className="p-1 rounded-md bg-white/5 hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-colors"
+                className="inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-medium leading-none rounded-md bg-white/5 hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-colors"
               >
-                <BookBookmark size={12} weight="fill" />
+                Bookmark
               </button>
               </span>
             );
