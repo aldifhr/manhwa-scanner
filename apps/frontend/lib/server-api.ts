@@ -20,15 +20,9 @@ import { parseErrorMessage } from "@/lib/fetchError";
 export function backendUrl(): string {
   const fromEnv = process.env.BACKEND_URL?.trim();
   if (fromEnv) {
-    // In production never trust a localhost value (common mis-config via .env import).
-    // Fall through to NEXT_PUBLIC_API_BASE / default instead of throwing ECONNREFUSED.
-    const isLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(fromEnv);
-    if (process.env.NODE_ENV === "production" && isLocal) {
-      // prod mode on VPS: localhost backend is expected
-      return fromEnv.replace(/\/$/, "");
-    } else {
-      return fromEnv.replace(/\/$/, "");
-    }
+    // BACKEND_URL is server-only runtime env; localhost is expected on VPS prod (127.0.0.1:3000)
+    // and also valid in dev. No filtering — return as-is.
+    return fromEnv.replace(/\/$/, "");
   }
   const publicBase = process.env.NEXT_PUBLIC_API_BASE;
   if (publicBase && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(publicBase)) {
