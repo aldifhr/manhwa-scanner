@@ -16,7 +16,7 @@ ignore = ["E501", "B008"]          # long lines, fastapi endpoint decorator
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-q --cov=app --cov-fail-under=40"
+addopts = "-q --cov=app --cov-fail-under=60"
 
 [tool.mypy]
 python_version = "3.11"
