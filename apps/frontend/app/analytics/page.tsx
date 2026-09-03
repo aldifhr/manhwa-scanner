@@ -27,14 +27,22 @@ function StatCard({
   );
 }
 
+const SOURCE_COLOR: Record<string, string> = {
+  ikiru: "bg-emerald-500",
+  shinigami: "bg-red-500",
+  voratoon: "bg-orange-500",
+};
+
 function BarRow({
   label,
   value,
   max,
+  color,
 }: {
   label: string;
   value: number;
   max: number;
+  color?: string;
 }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
@@ -44,7 +52,7 @@ function BarRow({
       </span>
       <div className="flex-1 h-2 bg-surface-hover rounded-full overflow-hidden">
         <div
-          className="h-full bg-accent rounded-full"
+          className={`h-full rounded-full ${color ?? "bg-accent"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -157,6 +165,7 @@ export default function AnalyticsPage() {
                   label={`${s.title_key.slice(0, 22)} · ${s.source}`}
                   value={s.dispatch_count}
                   max={maxDispatch}
+                  color={SOURCE_COLOR[s.source] ?? "bg-accent"}
                 />
               ))}
             </div>
@@ -205,15 +214,22 @@ export default function AnalyticsPage() {
         <div className="bg-surface rounded-lg border border-border p-4 space-y-3">
           <h2 className="text-sm font-semibold">Source distribution (7d)</h2>
           <div className="space-y-2">
-            {(overview.source_distribution ?? []).map((s) => (
-              <div
-                key={s.source}
-                className="flex items-center justify-between text-xs"
-              >
-                <span className="capitalize text-text-muted">{s.source}</span>
-                <span className="font-medium">{s.count}</span>
-              </div>
-            ))}
+            {(() => {
+              const maxSrc = Math.max(...(overview.source_distribution?.map((x) => x.count) ?? [1]), 1);
+              return (overview.source_distribution ?? []).map((s) => {
+                const pct = Math.round((s.count / maxSrc) * 100);
+                return (
+                  <div key={s.source} className="flex items-center gap-3">
+                    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${SOURCE_COLOR[s.source] ?? "bg-accent"}`} />
+                    <span className="capitalize text-xs text-text-muted w-20">{s.source}</span>
+                    <div className="flex-1 h-2 bg-surface-hover rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${SOURCE_COLOR[s.source] ?? "bg-accent"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs font-medium w-8 text-right">{s.count}</span>
+                  </div>
+                );
+              });
+            })()}
             {!overview.source_distribution?.length ? (
               <p className="text-xs text-text-muted">No data</p>
             ) : null}
