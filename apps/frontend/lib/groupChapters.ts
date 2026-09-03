@@ -47,6 +47,7 @@ export interface GroupedSeries {
   title: string;
   cover: string;
   origin: string;
+  type?: string | null;
   seriesUrl: string;
   status?: string | null;
   rating?: string | number | null;
@@ -73,6 +74,7 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
         title: it.title,
         cover: it.cover,
         origin: it.origin,
+        type: (it as unknown as { type?: string | null }).type ?? null,
         seriesUrl: it.seriesUrl,
         status: it.status,
         rating: it.rating,
@@ -86,6 +88,8 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
       map.set(gk, g!);
     } else {
       g._sources.add(it.source);
+      // keep type if missing (for flag visibility)
+      if (!g!.type && it.type) g!.type = it.type;
     }
     g!.chapters.push({
       key: `${tk}:${it.source}:${it.chapter}`,
