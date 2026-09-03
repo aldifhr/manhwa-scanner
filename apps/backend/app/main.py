@@ -11,19 +11,8 @@ from app.logger import get_logger
 
 logger = get_logger("hono-server")
 
-from app.api import dashboard as dashboard_api
-from app.api import catalog as catalog_api
-from app.api import auth as auth_api
-from app.api import dispatches as dispatches_api
-from app.api import observability as observability_api
-from app.api import system as system_api
-from app.api import rss as rss_api
-from app.api import settings as settings_api
-from app.api import activity as activity_api
-from app.api import public_stats as public_stats_api
-from app.api import continue_reading as continue_reading_api
-from app.api import health as health_api
-from fastapi.openapi.utils import get_openapi
+from app.routers import register_routers
+from fastapi.openapi.utils import get_openapi  # kept for custom_openapi delegate
 
 
 @asynccontextmanager
@@ -100,238 +89,19 @@ app.middleware("http")(security_headers_middleware)
 
 from app.utils.request_auth import safe_error, require_monitor_auth
 
-# Health now in app/api/health.py (extracted from god-file)
+# CSRF/metrics/legacy now in app/middleware/* (extracted)
 
 
-# --- CSRF defense ---
-# Double-submit cookie pattern. FE sends X-CSRF-Token header on mutating requests.
-# Whitelisted endpoints (no CSRF check): auth (user has no token yet),
-# Discord webhook (separately signed), cron (server-side, signed).
-# Note: Bearer token-authenticated requests are already exempt (line ~167).
-_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/cron"}
-
-
-@app.middleware("http")
-async def metrics_middleware(request: Request, call_next):
-    """Track Prometheus metrics for all requests."""
-    import time
-    start = time.time()
-    response = await call_next(request)
-    duration = time.time() - start
-    
-    # Track metrics (skip /metrics and /healthz to avoid self-instrumentation)
-    if request.url.path not in ("/metrics", "/healthz"):
-        try:
-            from app.metrics_prometheus import track_request
-            track_request(
-                method=request.method,
-                endpoint=request.url.path,
-                status=response.status_code,
-                duration=duration,
-            )
-        except Exception:
-            pass
-    
-    return response
-
-
-@app.middleware("http")
-async def csrf_middleware(request: Request, call_next):
-    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
-        # Bearer token proves non-browser origin — exempt from double-submit CSRF.
-        if request.headers.get("authorization", "").lower().startswith("bearer "):
-            return await call_next(request)
-        # Whitelist exact + trailing-slash tolerant (proxy may add "/")
-        _path = request.url.path.rstrip("/")
-        if _path in {p.rstrip("/") for p in _CSRF_WHITELIST}:
-            return await call_next(request)
-        cookie_token = request.cookies.get("ikiru_csrf_token", "")
-        header_token = request.headers.get("x-csrf-token", "")
-        if not cookie_token or not header_token or cookie_token != header_token:
-            return JSONResponse(
-                content={"success": False, "error": "CSRF validation failed"},
-                status_code=403,
-            )
-    return await call_next(request)
-
-
-# Security headers now in app/middleware/security.py
-
-
-# --- OpenAPI ---
-app.openapi_schema = None
-
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    schema = get_openapi(
-        title="manhwa-backend",
-        version="1.0.0",
-        description=(
-            "Ikiru Bot manhwa scraper API. "
-            "Backend runs fully on local VPS Postgres (no Supabase). "
-            "Use Bearer token for protected endpoints."
-        ),
-        routes=app.routes,
-    )
-    schema["servers"] = [{"url": "https://scanner.aldifhr.fun", "description": "Production (VPS)"}]
-    schema.setdefault("components", {}).setdefault("securitySchemes", {})["BearerAuth"] = {
-        "type": "http",
-        "scheme": "bearer",
-    }
-    for path in schema.get("paths", {}).values():
-        for method in path.values():
-            method.setdefault("security", [{"BearerAuth": []}])
-    # Add query params for paginated whitelist endpoints (read from
-    # request.query_params, so they don't appear in the auto-generated schema).
-    _wl_params = [
-        {
-            "name": "page",
-            "in": "query",
-            "required": False,
-            "schema": {"type": "integer", "default": 1, "minimum": 1},
-            "description": "Page number (1-based).",
-        },
-        {
-            "name": "page_size",
-            "in": "query",
-            "required": False,
-            "schema": {"type": "integer", "default": 100, "minimum": 1, "maximum": 10000},
-            "description": "Rows per page (1..10000).",
-        },
-        {
-            "name": "source",
-            "in": "query",
-            "required": False,
-            "schema": {"type": "string", "enum": ["ikiru", "shinigami", "voratoon"]},
-            "description": "Filter by source.",
-        },
-        {
-            "name": "title",
-            "in": "query",
-            "required": False,
-            "schema": {"type": "string"},
-            "description": "Case-insensitive title search.",
-        },
-        {
-            "name": "cursor",
-            "in": "query",
-            "required": False,
-            "schema": {"type": "string"},
-            "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables.",
-        },
-    ]
-    for _p in ("/api/v1/whitelist", "/api/v1/reader/whitelist"):
-        _ep = schema.get("paths", {}).get(_p, {}).get("get")
-        if _ep is not None:
-            _ep["parameters"] = _wl_params
-    app.openapi_schema = schema
-    return schema
-
-
-app.openapi = custom_openapi
-
-# --- Backward compatibility: redirect legacy /api/ to /api/v1/ (MUST be before routers) ---
-_LEGACY_REDIRECTS = {
-    "/api/auth": "/api/v1/auth",
-    "/api/whitelist": "/api/v1/whitelist",
-    "/api/history": "/api/v1/dispatch-history",
-    "/api/excluded-titles": "/api/v1/excluded-titles",
-    "/api/rss": "/api/v1/rss",
-    "/api/rss/new": "/api/v1/rss/new",
-    "/api/rss/health": "/api/v1/rss/health",
-    "/api/rss/custom": "/api/v1/rss/custom",
-    "/api/rss/filters/metadata": "/api/v1/rss/filters/metadata",
-    "/api/health": "/api/v1/health",
-    "/api/cron": "/api/v1/cron",
-    "/api/settings": "/api/v1/settings",
-    "/api/queue": "/api/v1/queue",
-    "/api/stats": "/api/v1/stats",
-    "/api/analytics": "/api/v1/analytics",
-    "/api/bookmarks": "/api/v1/bookmarks",
-    "/api/reader/dispatch-history": "/api/v1/dispatch-history",
-    "/api/dispatch-history": "/api/v1/dispatch-history",
-    "/api/reader/stats": "/api/v1/stats",
-    "/api/reader/queue": "/api/v1/queue",
-    "/api/reader/cron/status": "/api/v1/cron/status",
-    "/api/reader/continue-reading": "/api/v1/continue-reading",
-    "/api/reader/rss": "/api/v1/rss",
-    "/api/reader/rss/new": "/api/v1/rss/new",
-    "/api/reader/rss/health": "/api/v1/rss/health",
-    "/api/redirect/chapter": "/api/v1/redirect/chapter",
-}
-
-@app.middleware("http")
-async def legacy_redirect_middleware(request: Request, call_next):
-    """Redirect legacy /api/* paths to /api/v1/*."""
-    path = request.url.path
-    if path in _LEGACY_REDIRECTS:
-        from fastapi.responses import RedirectResponse
-        qs = str(request.query_params)
-        url = _LEGACY_REDIRECTS[path] + (f"?{qs}" if qs else "")
-        return RedirectResponse(url=url, status_code=307)
-    return await call_next(request)
-
-# --- Router includes ---
-app.include_router(health_api.router)  # /healthz + /api/v1/health + /api/v1/health/detailed
-app.include_router(dashboard_api.router, prefix="/api/v1")
-app.include_router(catalog_api.router, prefix="/api/v1")
-app.include_router(auth_api.router, prefix="/api/v1")
-app.include_router(dispatches_api.router, prefix="/api/v1")
-app.include_router(observability_api.router, prefix="/api/v1")
-app.include_router(rss_api.router, prefix="/api/v1")
-from app.api.cron_status import router as _cron_status_router  # noqa: E402
-
-app.include_router(_cron_status_router, prefix="/api/v1")
-app.include_router(system_api.router, prefix="/api/v1")
-
-# --- Web settings (per-guild notification config) ---
-from fastapi import APIRouter as _AR
-_settings_router = _AR()
-
-@_settings_router.get("/settings")
-async def _settings_get(request: Request):
-    return await settings_api.settings_get(request)
-
-@_settings_router.put("/settings/{guild_id}")
-async def _settings_put(request: Request, guild_id: str):
-    return await settings_api.settings_put(request, guild_id)
-
-app.include_router(_settings_router, prefix="/api/v1")
-
-# --- Activity heatmap (public aggregate) ---
-app.include_router(activity_api.router, prefix="/api/v1")
-
-# --- Analytics dashboard ---
-from app.api import analytics as analytics_api
-from app.api import reading_stats as reading_stats_api
-app.include_router(analytics_api.router, prefix="/api/v1")
-app.include_router(reading_stats_api.router, prefix="/api/v1")
-
-# --- Custom RSS feed with advanced filters ---
-from app.api import rss_custom as rss_custom_api
-app.include_router(rss_custom_api.router, prefix="/api/v1")
-
-# --- Public stats (portfolio/showcase aggregate) ---
-app.include_router(public_stats_api.router, prefix="/api/v1")
-app.include_router(continue_reading_api.router, prefix="/api/v1")
-
-# --- Bookmark API ---
-from app.api import bookmark as bookmark_api
-app.include_router(bookmark_api.router)
-
-# --- WebSocket ---
-from app.api.websocket import router as websocket_router
-app.include_router(websocket_router)
-
-# --- Whitelist (dispatch-history) ---
-from app.api.dashboard import whitelist as whitelist_api
-app.include_router(whitelist_api.router, prefix="/api/v1")
-
-# --- Queue dashboard ---
-from app.api import queue_dashboard as queue_dashboard_api
-app.include_router(queue_dashboard_api.router)
+# --- OpenAPI / routers / legacy — extracted ---
+from app.api.openapi import custom_openapi  # noqa: E402
+app.openapi = lambda: custom_openapi(app)
+from app.middleware.legacy import legacy_redirect_middleware  # noqa: E402
+from app.middleware.csrf import csrf_middleware  # noqa: E402
+from app.middleware.metrics import metrics_middleware  # noqa: E402
+app.middleware("http")(legacy_redirect_middleware)
+app.middleware("http")(csrf_middleware)
+app.middleware("http")(metrics_middleware)
+register_routers(app)
 
 # Health/detailed now in app/api/health.py; metrics stays here (gated)
 @app.get("/metrics")
