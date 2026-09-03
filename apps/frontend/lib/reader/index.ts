@@ -199,6 +199,79 @@ export const Reader = {
     );
     return (data.data ?? null) as unknown;
   },
+  // Whitelist mutations — single seam so api.ts has no bare fetch
+  addWhitelistEntry: async (data: Record<string, unknown>) => {
+    try {
+      const res = await readerFetch<{ status?: string; success?: boolean }>(
+        "/api/v1/reader/whitelist",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        }
+      );
+      return { status: "added" as const };
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("409") || msg.toLowerCase().includes("already_exists") || msg.toLowerCase().includes("already exists")) {
+        return { status: "already_exists" as const };
+      }
+      throw e;
+    }
+  },
+  removeWhitelistEntry: async (data: Record<string, unknown>) => {
+    try {
+      const res = await readerFetch<{
+        status?: string;
+        deleted?: number;
+        success?: boolean;
+        error?: string | { message?: string };
+      }>("/api/v1/reader/whitelist", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if ((res as unknown as { status?: string }).status === "not_found" || (res as unknown as { deleted?: number }).deleted === 0) {
+        throw new Error("No matching whitelist entry to delete");
+      }
+      return;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("404") || msg.toLowerCase().includes("not_found")) {
+        throw new Error("No matching whitelist entry to delete");
+      }
+      throw e;
+    }
+  },
+  addExcludedTitle: async (data: Record<string, unknown>) => {
+    const res = await readerFetch<{ success?: boolean; data?: unknown }>(
+      "/api/v1/excluded-titles",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }
+    );
+    return { status: "ok" as const };
+  },
+  removeExcludedTitle: async (data: Record<string, unknown>) => {
+    await readerFetch("/api/v1/excluded-titles", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  },
+  bulkExcludeBySource: async (source: string) => {
+    const data = await readerFetch<{ success: boolean; data: { excluded: number } }>(
+      "/api/v1/excluded-titles/bulk",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source }),
+      }
+    );
+    return { excluded: data.data?.excluded ?? 0 };
+  },
   // Page-wise seam for AllTab infinite scroll — hides snake→camel + hasMore logic
   async getRssFlatPage(
     page: number,

@@ -1,8 +1,9 @@
 // Deep module: ContinueReading — seam for tracking read progress.
-// Interface is the test surface; behind the seam: localStorage, sync, deduplication, max 20.
+// Storage + sync extracted to store.ts / sync.ts for DI + testability.
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { withCsrf } from "@/lib/csrf";
+import { localStorageStore, MAX_ENTRIES, type ContinueReadingStore } from "./store";
+import { fetchRemote, pushRemote } from "./sync";
 
 export interface ContinueReadingEntry {
   title: string;
@@ -14,45 +15,6 @@ export interface ContinueReadingEntry {
   seriesUrl: string;
   origin: string;
   updatedAt: string;
-}
-
-const LS_KEY = "continue_reading";
-const SYNC_ENDPOINT = "/api/v1/continue-reading";
-const MAX_ENTRIES = 20;
-let globalHasFetched = false;
-
-// — internal: storage seam (ter-isolasi untuk testability) —
-function loadFromStorage(): Map<string, ContinueReadingEntry> {
-  if (typeof window === "undefined") return new Map();
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    const data: Record<string, ContinueReadingEntry> = raw
-      ? JSON.parse(raw)
-      : {};
-    const m = new Map<string, ContinueReadingEntry>();
-    for (const [k, v] of Object.entries(data)) {
-      if (v?.titleKey && v?.updatedAt && v?.chapterUrl) m.set(k, v);
-    }
-    return m;
-  } catch {
-    return new Map();
-  }
-}
-
-function saveToStorage(entries: Map<string, ContinueReadingEntry>) {
-  try {
-    // cap sebelum simpan — keep most recent 20
-    const sorted = [...entries.values()].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
-    const capped = new Map<string, ContinueReadingEntry>();
-    for (const e of sorted.slice(0, MAX_ENTRIES)) capped.set(e.titleKey, e);
-    localStorage.setItem(LS_KEY, JSON.stringify(Object.fromEntries(capped)));
-    return capped;
-  } catch {
-    return entries;
-  }
 }
 
 // — builder helpers — caller tidak perlu tahu mapping field manual —
@@ -91,36 +53,36 @@ export function buildEntryFromChapter(ch: {
   };
 }
 
-export function useContinueReading() {
-  const [entries, setEntries] = useState<Map<string, ContinueReadingEntry>>(
-    () => new Map()
-  );
+export function useContinueReading(
+  store: ContinueReadingStore = localStorageStore,
+  sync: { fetchRemote?: typeof fetchRemote; pushRemote?: typeof pushRemote } = {}
+) {
+  const { fetchRemote: doFetch = fetchRemote, pushRemote: doPush = pushRemote } = sync;
+  const [entries, setEntries] = useState<Map<string, ContinueReadingEntry>>(() => new Map());
   const hasHydrated = useRef(false);
+  const hasFetchedRemote = useRef(false);
 
-  // Load from localStorage after mount — avoids hydration mismatch (server empty vs client populated)
   useEffect(() => {
-    const loaded = loadFromStorage();
+    const loaded = store.load();
     if (loaded.size > 0) setEntries(loaded);
-  }, []);
+    // mark hydrated after microtask so initial save effect can skip wiping
+    const id = setTimeout(() => {
+      hasHydrated.current = true;
+    }, 0);
+    return () => clearTimeout(id);
+  }, [store]);
 
-  // Hydrate from backend (cross-device) — merges with local, newer wins (once globally to avoid spam)
   useEffect(() => {
-    if (globalHasFetched) {
-      const t = setTimeout(() => {
-        hasHydrated.current = true;
-      }, 1200);
-      return () => clearTimeout(t);
+    if (hasFetchedRemote.current) {
+      hasHydrated.current = true;
+      return;
     }
-    globalHasFetched = true;
+    hasFetchedRemote.current = true;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(SYNC_ENDPOINT, { cache: "no-store" });
-        if (!res.ok || cancelled) return;
-        const body = await res.json().catch(() => null);
-        const remote: Record<string, ContinueReadingEntry> =
-          body?.data ?? body ?? {};
-        if (!remote || typeof remote !== "object") return;
+        const remote = await doFetch();
+        if (cancelled || !remote || typeof remote !== "object") return;
         setEntries((prev) => {
           const next = new Map(prev);
           let changed = false;
@@ -132,58 +94,39 @@ export function useContinueReading() {
               changed = true;
             }
           }
-          if (changed) saveToStorage(next);
+          if (changed) store.save(next);
           return changed ? next : prev;
         });
       } catch {
         /* backend not yet implemented — keep local only */
       } finally {
-        hasHydrated.current = true;
+        if (!cancelled) hasHydrated.current = true;
       }
     })();
-    const t = setTimeout(() => {
-      hasHydrated.current = true;
-    }, 1200);
     return () => {
       cancelled = true;
-      clearTimeout(t);
     };
-  }, []);
+  }, [store, doFetch]);
 
   useEffect(() => {
-    // Skip initial empty save before storage load (avoids wiping localStorage on hydration)
     if (entries.size === 0 && !hasHydrated.current) {
-      const raw =
-        typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null;
-      if (raw) return;
+      const loaded = store.load();
+      if (loaded.size > 0) return;
     }
-    saveToStorage(entries);
+    store.save(entries);
     if (!hasHydrated.current) return;
     const id = setTimeout(() => {
-      // Filter invalid entries before sync — BE requires titleKey + chapterUrl
       const clean = Object.fromEntries(
-        [...entries].filter(
-          ([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim()
-        )
+        [...entries].filter(([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim())
       );
       if (Object.keys(clean).length === 0 && entries.size > 0) {
-        // All entries invalid → clean localStorage to stop spam
-        try {
-          localStorage.removeItem(LS_KEY);
-        } catch {}
+        store.clear();
         return;
       }
-      fetch(
-        SYNC_ENDPOINT,
-        withCsrf({
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(clean),
-        })
-      ).catch(() => {});
+      doPush(clean as Record<string, ContinueReadingEntry>);
     }, 1500);
     return () => clearTimeout(id);
-  }, [entries]);
+  }, [entries, store, doPush]);
 
   const trackReading = useCallback((entry: ContinueReadingEntry) => {
     if (!entry?.titleKey || !entry?.chapterUrl) return;

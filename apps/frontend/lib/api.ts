@@ -1,7 +1,3 @@
-import { withCsrf } from "@/lib/csrf";
-
-/* ── Whitelist route returns transformed items ── */
-
 import { WhitelistRouteItem } from "@/lib/types";
 import { Reader } from "@/lib/reader";
 
@@ -31,7 +27,7 @@ import {
   DashboardSnapshot,
 } from "@/lib/types";
 
-/* ── Whitelist (raw from GET /api/whitelist) ── */
+/* ── Whitelist mutations — delegate to Reader seam (no bare fetch) ── */
 
 export async function addWhitelistEntry(data: {
   title: string;
@@ -52,77 +48,24 @@ export async function addWhitelistEntry(data: {
   if (data.title_key) body.title_key = data.title_key;
   if (data.cover) body.cover = data.cover;
   if (data.status) body.status = data.status;
-  if (data.rating !== null && data.rating !== undefined)
-    body.rating = data.rating;
+  if (data.rating !== null && data.rating !== undefined) body.rating = data.rating;
   if (data.origin) body.origin = data.origin;
   if (data.type) body.type = data.type;
   if (data.genres && data.genres.length > 0) body.genres = data.genres;
   if (data.description) body.description = data.description;
-
-  const res = await fetch(
-    "/api/v1/reader/whitelist",
-    withCsrf({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-  );
-  if (!res.ok) {
-    if (res.status === 409) return { status: "already_exists" };
-    const body = await res.json().catch(() => ({}));
-    const errMsg =
-      typeof body.error === "string"
-        ? body.error
-        : body.error?.message || `HTTP ${res.status}`;
-    throw new Error(errMsg);
-  }
-  return { status: "added" };
+  return Reader.addWhitelistEntry(body) as Promise<{ status: "added" | "already_exists" }>;
 }
 
-/** Matches backend WhitelistDeleteRequest: { title_key?, url?, title?, source? } */
 export async function removeWhitelistEntry(data: {
   title_key?: string;
   title?: string;
   url?: string;
   source?: string;
 }): Promise<void> {
-  const res = await fetch(
-    "/api/v1/reader/whitelist",
-    withCsrf({
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-  );
-  const body = (await res.json().catch(() => ({}))) as {
-    status?: string;
-    deleted?: number;
-    error?: string | { message?: string };
-  };
-  // BE returns 404 {status:"not_found"} when nothing matched, OR 200
-  // {status:"ok", deleted:0} on a silent no-op. Both mean "nothing was
-  // deleted" — treat as failure so the FE optimistic-remove is rolled back
-  // on the next refetch instead of leaving a ghost card.
-  if (!res.ok) {
-    const errMsg =
-      typeof (body as { error?: unknown }).error === "string"
-        ? String((body as { error: string }).error)
-        : ((body as { error?: { message?: string } }).error
-            ?.message as string) ||
-          (body as { message?: string }).message ||
-          `HTTP ${res.status}`;
-    throw new Error(errMsg);
-  }
-  if (body.status === "not_found" || body.deleted === 0) {
-    const errMsg =
-      typeof body.error === "string"
-        ? body.error
-        : body.error?.message || "No matching whitelist entry to delete";
-    throw new Error(errMsg);
-  }
+  return Reader.removeWhitelistEntry(data as Record<string, unknown>);
 }
 
-/* ── Excluded titles (RSS "Exclude" feature) ── */
+/* ── Excluded titles (RSS "Exclude" feature) — delegate to Reader ── */
 
 export async function getExcludedTitles(): Promise<ExcludedTitleItem[]> {
   return Reader.getExcludedTitles() as Promise<ExcludedTitleItem[]>;
@@ -135,78 +78,18 @@ export async function addExcludedTitle(data: {
   cover?: string | null;
   series_url?: string | null;
 }): Promise<{ status: "ok" | "error" }> {
-  const res = await fetch(
-    "/api/v1/excluded-titles",
-    withCsrf({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-  );
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const errMsg =
-      typeof body.error === "string"
-        ? body.error
-        : body.error?.message || `HTTP ${res.status}`;
-    throw new Error(errMsg);
-  }
-  return { status: body?.success ? "ok" : "error" };
+  return Reader.addExcludedTitle(data as Record<string, unknown>) as Promise<{ status: "ok" | "error" }>;
 }
 
 export async function removeExcludedTitle(data: {
   title_key: string;
   source?: string;
 }): Promise<void> {
-  const res = await fetch(
-    "/api/v1/excluded-titles",
-    withCsrf({
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-  );
-  const body = (await res.json().catch(() => ({}))) as {
-    success?: boolean;
-    error?: unknown;
-    received?: unknown;
-  };
-  if (!res.ok || body.success === false) {
-    console.error("[removeExcludedTitle] failed", {
-      sent: data,
-      body,
-      status: res.status,
-    });
-    const errMsg =
-      typeof body.error === "string"
-        ? body.received
-          ? `${body.error} (received: ${JSON.stringify(body.received).slice(0, 200)})`
-          : body.error
-        : (body.error as { message?: string })?.message || `HTTP ${res.status}`;
-    throw new Error(errMsg);
-  }
+  return Reader.removeExcludedTitle(data as Record<string, unknown>);
 }
 
-export async function bulkExcludeBySource(
-  source: string
-): Promise<{ excluded: number }> {
-  const res = await fetch(
-    "/api/v1/excluded-titles/bulk",
-    withCsrf({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source }),
-    })
-  );
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const errMsg =
-      typeof body.error === "string"
-        ? body.error
-        : body.error?.message || `HTTP ${res.status}`;
-    throw new Error(errMsg);
-  }
-  return { excluded: body?.data?.excluded ?? 0 };
+export async function bulkExcludeBySource(source: string): Promise<{ excluded: number }> {
+  return Reader.bulkExcludeBySource(source);
 }
 
 /* ── RSS Flat (no grouping) ── */
@@ -297,14 +180,25 @@ export async function getHealthDetailed(): Promise<{
   circuit_breakers: Record<string, string>;
   db_pool: Record<string, number>;
 }> {
-  const res = await fetch("/api/v1/health/detailed", {
-    headers: {
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_TOKEN || "manhwascan"}`,
-    },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return body.data;
+  const { readerFetch } = await import("@/lib/reader/transport");
+  const body = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/health/detailed");
+  return (body as unknown as { data: unknown }).data as unknown as {
+    sources: Array<{
+      name: string;
+      status: string;
+      lastScrape: string;
+      lastSuccess: string;
+      errorRate24h: number;
+      consecutiveFailures: number;
+      lastError: string | null;
+      disabledUntil: string | null;
+    }>;
+    overall: string;
+    uptime: number;
+    version: string;
+    circuit_breakers: Record<string, string>;
+    db_pool: Record<string, number>;
+  };
 }
 
 /* ── Analytics (GET /api/analytics/*) ── */
@@ -365,9 +259,8 @@ export interface BookmarkEntry {
 }
 
 export async function getBookmarks(): Promise<BookmarkEntry[]> {
-  const res = await fetch("/api/v1/bookmarks");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
+  const { readerFetch } = await import("@/lib/reader/transport");
+  const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>("/api/v1/bookmarks");
   return body.data || [];
 }
 
@@ -380,28 +273,19 @@ export async function saveBookmark(data: {
   title?: string;
   cover?: string | null;
 }): Promise<void> {
-  const res = await fetch("/api/v1/bookmarks", withCsrf({
+  const { readerFetch } = await import("@/lib/reader/transport");
+  await readerFetch("/api/v1/bookmarks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
-  }));
-  if (!res.ok) {
-    const body = await res.json().catch(()=>({}));
-    throw new Error(body.error || `HTTP ${res.status}`);
-  }
+  });
 }
 
-export async function deleteBookmark(
-  titleKey: string,
-  chapterNumber: number
-): Promise<void> {
-  const res = await fetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, withCsrf({
+export async function deleteBookmark(titleKey: string, chapterNumber: number): Promise<void> {
+  const { readerFetch } = await import("@/lib/reader/transport");
+  await readerFetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, {
     method: "DELETE",
-  }));
-  if (!res.ok) {
-    const body = await res.json().catch(()=>({}));
-    throw new Error(body.error || `HTTP ${res.status}`);
-  }
+  });
 }
 
 /* ── A/B Testing removed — /ab-tests page deleted per CONTEXT.md 2026-09-02 ── */

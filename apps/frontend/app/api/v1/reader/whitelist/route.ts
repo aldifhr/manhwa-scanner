@@ -8,10 +8,7 @@ import {
   hashSession,
 } from "@/lib/server-api";
 import { rewriteCoverUrl } from "@/lib/utils";
-import {
-  whitelistCache,
-  clearCachesForSession,
-} from "@/lib/cache";
+import { whitelistCache } from "@/lib/cache";
 
 interface CatalogItem {
   title: string;
@@ -78,14 +75,6 @@ interface BackendResponse {
   success: boolean;
   data: CatalogData;
   error?: { code: string; message: string };
-}
-
-function clearCacheForSession(request: Request) {
-  const raw =
-    (request.headers.get("cookie") || "").match(
-      /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
-    )?.[1] || "anon";
-  clearCachesForSession(hashSession(raw));
 }
 
 export async function GET(request: NextRequest) {
@@ -297,225 +286,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/reader/whitelist — Add new whitelist entry
- */
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const res = await fetch(`${backendUrl()}/api/whitelist`, {
-      method: "POST",
-      headers: { ...authHeaders(request), "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT.WHITELIST),
-      cache: "no-store",
-    });
-    let data: unknown;
-    try {
-      data = await res.json();
-    } catch {
-      data = { success: false, error: `Upstream ${res.status}` };
-    }
-    if (res.ok) clearCacheForSession(request);
-    return NextResponse.json(data, { status: res.ok ? 200 : res.status });
-  } catch (err) {
-    return catchError(err);
-  }
+  const { handleWhitelistPost } = await import("@/lib/server/whitelist");
+  return handleWhitelistPost(request);
 }
 
-/**
- * DELETE /api/reader/whitelist — Remove whitelist entry
- */
 export async function DELETE(request: NextRequest) {
-  try {
-    const body = await request.json();
-    console.log("[whitelist DELETE] -> backend payload", JSON.stringify(body));
-    const res = await fetch(`${backendUrl()}/api/whitelist`, {
-      method: "DELETE",
-      headers: { ...authHeaders(request), "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT.WHITELIST),
-      cache: "no-store",
-    });
-    let data: unknown;
-    let raw = "";
-    try {
-      raw = await res.text();
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        data = { success: res.ok, raw };
-      }
-    } catch {
-      data = { success: false, error: `Upstream ${res.status}` };
-    }
-    console.log("[whitelist DELETE] <- backend", res.status, raw.slice(0, 800));
-    // verify: fetch whitelist immediately after delete to see if backend actually removed
-    try {
-      const verify = await fetch(
-        `${backendUrl()}/api/whitelist?page=1&page_size=1000`,
-        {
-          headers: authHeaders(request),
-          signal: AbortSignal.timeout(TIMEOUT.WHITELIST),
-          cache: "no-store",
-        }
-      );
-      const vText = await verify.text();
-      const vBody = JSON.parse(vText) as {
-        whitelist?: unknown[];
-        data?: { results?: unknown[] };
-      };
-      const list =
-        (vBody as unknown as { whitelist?: unknown[] }).whitelist ??
-        (vBody as unknown as { data?: { results?: unknown[] } }).data
-          ?.results ??
-        [];
-      const matched = (list as unknown[]).find(
-        (it) =>
-          (it as Record<string, unknown>).title ===
-          (body as Record<string, unknown>).title
-      ) as Record<string, unknown> | undefined;
-      if (matched)
-        console.log(
-          "[whitelist DELETE] matched raw",
-          JSON.stringify(matched).slice(0, 1200)
-        );
-      const stillThere = !!matched;
-      console.log(
-        "[whitelist DELETE] verify after",
-        verify.status,
-        "total",
-        (list as unknown[]).length,
-        "stillThere",
-        stillThere
-      );
-      if (stillThere) {
-        const orig = body as Record<string, unknown>;
-        const candidates: {
-          label: string;
-          payload: Record<string, unknown>;
-          url?: string;
-        }[] = [];
-        // candidate from matched raw id (UUID)
-        const matchedId = (matched as Record<string, unknown>).id as
-          string | undefined;
-        const matchedTitleKey = (matched as Record<string, unknown>)
-          .titleKey as string | undefined;
-        if (matchedId)
-          candidates.push({
-            label: "id+title",
-            payload: { id: matchedId, title: orig.title },
-          });
-        if (matchedId)
-          candidates.push({ label: "id only", payload: { id: matchedId } });
-        if (matchedTitleKey)
-          candidates.push({
-            label: "titleKey only",
-            payload: { title_key: matchedTitleKey },
-          });
-        candidates.push({
-          label: "title only",
-          payload: { title: orig.title },
-        });
-        candidates.push({ label: "url only", payload: { url: orig.url } });
-        if (matchedId)
-          candidates.push({
-            label: "query?title_key UUID",
-            payload: {},
-            url: `${backendUrl()}/api/whitelist?title_key=${encodeURIComponent(matchedId)}`,
-          });
-        if (orig.title)
-          candidates.push({
-            label: "query?title",
-            payload: {},
-            url: `${backendUrl()}/api/whitelist?title=${encodeURIComponent(String(orig.title))}`,
-          });
-        for (const cand of candidates) {
-          console.log(
-            `[whitelist DELETE] fallback try ${cand.label}`,
-            cand.url ? cand.url : JSON.stringify(cand.payload)
-          );
-          try {
-            const retry = cand.url
-              ? await fetch(cand.url, {
-                  method: "DELETE",
-                  headers: authHeaders(request),
-                  signal: AbortSignal.timeout(TIMEOUT.WHITELIST),
-                  cache: "no-store",
-                })
-              : await fetch(`${backendUrl()}/api/whitelist`, {
-                  method: "DELETE",
-                  headers: {
-                    ...authHeaders(request),
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(cand.payload),
-                  signal: AbortSignal.timeout(TIMEOUT.WHITELIST),
-                  cache: "no-store",
-                });
-            const rText = await retry.text();
-            console.log(
-              `[whitelist DELETE] fallback ${cand.label} <-`,
-              retry.status,
-              rText.slice(0, 600)
-            );
-            const verify2 = await fetch(
-              `${backendUrl()}/api/whitelist?page=1&page_size=1000`,
-              {
-                headers: authHeaders(request),
-                signal: AbortSignal.timeout(TIMEOUT.WHITELIST),
-                cache: "no-store",
-              }
-            );
-            const v2Text = await verify2.text();
-            const v2Body = JSON.parse(v2Text) as {
-              whitelist?: unknown[];
-              data?: { results?: unknown[] };
-            };
-            const list2 =
-              (v2Body as unknown as { whitelist?: unknown[] }).whitelist ??
-              (v2Body as unknown as { data?: { results?: unknown[] } }).data
-                ?.results ??
-              [];
-            const still2 = (list2 as unknown[]).some(
-              (it) => (it as Record<string, unknown>).title === orig.title
-            );
-            console.log(
-              `[whitelist DELETE] verify after ${cand.label} total`,
-              (list2 as unknown[]).length,
-              "stillThere",
-              still2
-            );
-            if (!still2) {
-              try {
-                data = JSON.parse(rText) as unknown;
-              } catch {
-                data = { success: retry.ok, raw: rText } as unknown;
-              }
-              raw = rText;
-              break;
-            }
-          } catch (e) {
-            console.log(
-              `[whitelist DELETE] fallback ${cand.label} failed`,
-              String(e).slice(0, 300)
-            );
-          }
-        }
-      }
-    } catch (e) {
-      console.log("[whitelist DELETE] verify failed", String(e).slice(0, 300));
-    }
-    // only clear cache if backend actually succeeded (check body.success too)
-    const bodyOk = (data as { success?: boolean })?.success !== false;
-    const statusOk = (data as { status?: string })?.status === "ok";
-    if (res.ok && (bodyOk || statusOk)) clearCacheForSession(request);
-    // surface upstream body even on 200 so FE can see "success:false" without 4xx
-    if (res.ok && !bodyOk && !statusOk) {
-      return NextResponse.json(data, { status: 400 });
-    }
-    return NextResponse.json(data, { status: res.ok ? 200 : res.status });
-  } catch (err) {
-    return catchError(err);
-  }
+  const { handleWhitelistDelete } = await import("@/lib/server/whitelist");
+  return handleWhitelistDelete(request);
 }
