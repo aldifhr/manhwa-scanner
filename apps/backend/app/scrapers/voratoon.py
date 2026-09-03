@@ -11,7 +11,9 @@ from app.utils.cover_scrub import scrub_cover
 
 logger = get_logger("scraper:voratoon")
 
-BASE_URL = settings.VORATOON_API_URL.rstrip("/")
+def _base_url() -> str:
+    return settings.VORATOON_API_URL.rstrip("/")
+BASE_URL = _base_url()
 TIMEOUT = 30.0
 
 

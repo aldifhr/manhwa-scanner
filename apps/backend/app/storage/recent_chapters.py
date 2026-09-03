@@ -392,6 +392,8 @@ def claim_recent_chapters_for_dispatch(
     whitelist: list[dict] | None = None, hours: int = 24, limit: int = 500
 ) -> list[dict]:
     """Deep queue claim: atomically SELECT whitelisted recent chapters FOR UPDATE SKIP LOCKED and claim them.
+    NOTE: This is dispatch orchestration, not pure storage (leaky abstraction, P1 #14).
+    Long-term belongs in app/services/dispatch_service.py - kept here to avoid large move now.
 
     Concentrates 24h window + whitelist match + FCFS dedup + claim in one seam.
     Uses single DB transaction so concurrent dispatch workers skip locked rows.

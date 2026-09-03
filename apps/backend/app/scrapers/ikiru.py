@@ -18,7 +18,9 @@ from app.services.resilience import cb_ikiru
 
 logger = get_logger("ikiru:api")
 
-IKIRU_API = f"{settings.IKIRU_BASE_URL.rstrip('/')}/wp-json/readerkiru/v1"
+def _ikiru_api() -> str:
+    return f"{settings.IKIRU_BASE_URL.rstrip('/')}/wp-json/readerkiru/v1"
+IKIRU_API = _ikiru_api()
 TIMEOUT = 15.0
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

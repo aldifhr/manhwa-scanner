@@ -72,17 +72,17 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         total_pages = (total + page_size - 1) // page_size if page_size else 1
         has_more = page * page_size < total
         paged_out = deduped
+        # Sort BEFORE slice already done in repo; keep order (fix sort-after-slice bug was here)
     else:
         total = len(deduped)
         total_pages = (total + page_size - 1) // page_size if page_size else 1
         has_more = page * page_size < total
         offset = (page - 1) * page_size
+        deduped.sort(
+            key=lambda x: (x.get("last_chapter") or x.get("last_notified") or "", x.get("title") or ""),
+            reverse=True,
+        )
         paged_out = deduped[offset:offset + page_size]
-
-    paged_out.sort(
-        key=lambda x: (x.get("last_chapter") or x.get("last_notified") or "", x.get("title") or ""),
-        reverse=True,
-    )
     next_cursor = paged_out[-1].get("created_at") if has_more and paged_out else None
     return {
         "success": True,

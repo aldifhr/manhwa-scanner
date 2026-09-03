@@ -22,6 +22,7 @@ from app.api import settings as settings_api
 from app.api import activity as activity_api
 from app.api import public_stats as public_stats_api
 from app.api import continue_reading as continue_reading_api
+from app.api import health as health_api
 from fastapi.openapi.utils import get_openapi
 
 
@@ -90,78 +91,16 @@ app.add_middleware(
     max_age=600,
 )
 
-
-# --- Health/readiness probe (PM2 + gateway liveness check) ---
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok", "service": "be-ag-py"}
-
-
-# Root: redirect to the FE dashboard (people hitting the API domain directly).
-@app.get("/", include_in_schema=False)
-async def root_redirect():
-    from fastapi.responses import RedirectResponse
-    fe = str(settings.PUBLIC_BASE_URL or "").strip()
-    # PUBLIC_BASE_URL points at this API in prod config; FE is a separate host.
-    target = "https://manhwa.aldifhr.fun/"
-    if fe and "scanner.aldifhr.fun" not in fe:
-        target = fe if fe.startswith("http") else f"https://{fe}/"
-    return RedirectResponse(target, status_code=302)
-
-
-# --- Aggregate health: per-source status, last scrape, pending, error rate ---
-@app.get("/api/v1/health")
-async def api_health(request: Request):
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    try:
-        from app.config import settings as _s
-        from app.storage import health as _h
-        from app.db import get_supabase as _gsb
-
-        hm = _h.load_source_health_map(_s.SOURCE_KEYS)
-        sources = []
-        for src, row in (hm or {}).items():
-            ok_24h = int(row.get("successes_today") or 0) + int(row.get("failures_today") or 0)
-            err_rate = round(100.0 * int(row.get("failures_today") or 0) / ok_24h, 1) if ok_24h else 0.0
-            sources.append({
-                "name": src,
-                "status": row.get("status", "healthy"),
-                "lastScrape": row.get("last_checked_at") or "",
-                "lastSuccess": row.get("last_success_at") or "",
-                "errorRate24h": err_rate,
-                "consecutiveFailures": row.get("consecutive_failures") or 0,
-                "lastError": row.get("last_error"),
-                "disabledUntil": row.get("disabled_until"),
-            })
-
-        # Pending = recent chapters not yet in dispatch_history (the queue
-        # the dispatcher still has to send) within the last 24h.
-        pending = 0
-        try:
-            from app.storage import recent_chapters as _rc
-            rows = _rc._fetch_recent_rows(hours=24, limit=2000, offset=0)
-            urls = [r.get("chapter_url") for r in rows if r.get("chapter_url")]
-            if urls:
-                _dh = _gsb().table("dispatch_history").select("chapter_url").in_("chapter_url", urls).execute()
-                sent_urls = {r["chapter_url"] for r in (_dh.data or [])}
-                pending = sum(1 for u in urls if u not in sent_urls)
-        except Exception:
-            pending = -1
-        return JSONResponse(content={
-            "success": True,
-            "data": {
-                "sources": sources,
-                "pending": pending,
-                "lastScrapeAt": max((s["lastScrape"] for s in sources), default=""),
-                "service": "be-ag-py",
-            },
-        })
-    except Exception as e:
-        return JSONResponse(content=safe_error(e), status_code=500)
+# Extracted middlewares (was inline 150L in god-file)
+from app.middleware.correlation import correlation_middleware  # noqa: E402
+from app.middleware.security import security_headers_middleware  # noqa: E402
+app.middleware("http")(correlation_middleware)
+app.middleware("http")(security_headers_middleware)
 
 
 from app.utils.request_auth import safe_error, require_monitor_auth
+
+# Health now in app/api/health.py (extracted from god-file)
 
 
 # --- CSRF defense ---
@@ -216,30 +155,7 @@ async def csrf_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# --- Security headers (defense in depth; nginx also sets some) ---
-_SECURITY_HEADERS = {
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",
-    "Content-Security-Policy": (
-        "default-src 'self'; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self' https://scanner.aldifhr.fun https://fe.aldifhr.fun; "
-        "style-src 'self' 'unsafe-inline'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "frame-ancestors 'none'; "
-        "base-uri 'self'"
-    ),
-    "X-Frame-Options": "DENY",
-}
-
-
-@app.middleware("http")
-async def security_headers_middleware(request: Request, call_next):
-    response = await call_next(request)
-    for k, v in _SECURITY_HEADERS.items():
-        response.headers.setdefault(k, v)
-    return response
+# Security headers now in app/middleware/security.py
 
 
 # --- OpenAPI ---
@@ -358,6 +274,7 @@ async def legacy_redirect_middleware(request: Request, call_next):
     return await call_next(request)
 
 # --- Router includes ---
+app.include_router(health_api.router)  # /healthz + /api/v1/health + /api/v1/health/detailed
 app.include_router(dashboard_api.router, prefix="/api/v1")
 app.include_router(catalog_api.router, prefix="/api/v1")
 app.include_router(auth_api.router, prefix="/api/v1")
@@ -416,82 +333,13 @@ app.include_router(whitelist_api.router, prefix="/api/v1")
 from app.api import queue_dashboard as queue_dashboard_api
 app.include_router(queue_dashboard_api.router)
 
-# --- Prometheus metrics endpoint ---
+# Health/detailed now in app/api/health.py; metrics stays here (gated)
 @app.get("/metrics")
 async def metrics_root(request: Request):
-    # Enterprise: gate metrics - Prometheus scrapes via private network with monitor token,
-    # public internet must not enumerate latency/pool/circuit state.
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     from app.metrics_prometheus import get_metrics
     return get_metrics()
-
-# --- Detailed health with circuit breakers ---
-@app.get("/api/v1/health/detailed")
-async def health_detailed_v1():
-    """Detailed health with source status, circuit breakers, uptime."""
-    from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami, cb_voratoon
-    from app.db import get_pool_stats
-    from app.storage import health as health_store
-    from app.config import settings
-    try:
-        pool = get_pool_stats()
-    except Exception:
-        pool = {"active": -1, "idle": -1}
-    
-    # Get source health
-    hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
-    sources = []
-    for src, row in (hm or {}).items():
-        ok_24h = int(row.get("successes_today") or 0) + int(row.get("failures_today") or 0)
-        err_rate = round(100.0 * int(row.get("failures_today") or 0) / ok_24h, 1) if ok_24h else 0.0
-        sources.append({
-            "name": src,
-            "status": row.get("status", "healthy"),
-            "lastScrape": row.get("last_checked_at") or "",
-            "lastSuccess": row.get("last_success_at") or "",
-            "errorRate24h": err_rate,
-            "consecutiveFailures": row.get("consecutive_failures") or 0,
-            "lastError": row.get("last_error"),
-            "disabledUntil": row.get("disabled_until"),
-        })
-    
-    # Overall status
-    down_count = sum(1 for s in sources if s["status"] == "down")
-    degraded_count = sum(1 for s in sources if s["status"] == "degraded")
-    overall = "down" if down_count > 0 else ("degraded" if degraded_count > 0 else "healthy")
-    
-    import time as _t_up
-    _uptime_s = _t_up.time() - health_store.APP_START_TS if hasattr(health_store, "APP_START_TS") else 0
-    if not _uptime_s:
-        try:
-            from app.api.observability import APP_START_TS as _api_start
-            _uptime_s = _t_up.time() - _api_start
-        except Exception:
-            _uptime_s = 0
-    # uptime % = SLA: 100 - errorRate avg, but for personal VPS keep 99.9 placeholder unless degraded
-    _avg_err = sum(s["errorRate24h"] for s in sources) / len(sources) if sources else 0
-    _uptime_pct = round(100 - _avg_err, 1) if sources else 99.9
-    if _uptime_pct < 99.0:
-        _uptime_pct = 99.0  # floor for display
-    return {
-        "success": True,
-        "data": {
-            "sources": sources,
-            "overall": overall,
-            "uptime": _uptime_pct,
-            "uptime_human": f"{int(_uptime_s//3600)}h {int((_uptime_s%3600)//60)}m" if _uptime_s else "0m",
-            "version": "1.0.0",
-            "circuit_breakers": {
-                "discord": cb_discord.state.value,
-                "db": cb_db.state.value,
-                "ikiru": cb_ikiru.state.value,
-                "shinigami": cb_shinigami.state.value,
-                "voratoon": cb_voratoon.state.value,
-            },
-            "db_pool": pool,
-        }
-    }
 
 # --- Reader alias router REMOVED (MAN-011) ---
 # The /api/reader/* aliases (/reader/rss, /reader/dashboard, /reader/stats,

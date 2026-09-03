@@ -138,6 +138,9 @@ def _validate_settings(s: "Settings") -> None:
     check_monitor_auth() returns True when MONITOR_AUTH_TOKEN is empty, so a
     missing secret would expose every protected endpoint.
     """
+    # P0 #3: forbid AUTH_DISABLED in production - must fail closed, not just warn in utils/auth.py:73
+    if s.AUTH_DISABLED and s.ENVIRONMENT.lower() == "production":
+        raise RuntimeError("BOOT GUARD: AUTH_DISABLED=true forbidden in production (would bypass all auth)")
     if s.ENVIRONMENT.lower() != "production":
         return
     missing = []

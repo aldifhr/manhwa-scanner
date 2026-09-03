@@ -15,9 +15,17 @@ from app.services.resilience import cb_shinigami
 from app.services.rating_utils import normalize_rating
 logger = get_logger("shinigami:api")
 
-BASE = settings.SECONDARY_SOURCE_URL.rstrip("/")  # https://api.shngm.io
-API = f"{BASE}/v1"
-PUBLIC = settings.SECONDARY_PUBLIC_BASE.rstrip("/")  # https://11.shinigami.asia
+# Lazy BASE/API so tests can patch settings.SECONDARY_SOURCE_URL at runtime (was import-time binding)
+def _base() -> str:
+    return settings.SECONDARY_SOURCE_URL.rstrip("/")
+def _api() -> str:
+    return f"{_base()}/v1"
+def _public() -> str:
+    return settings.SECONDARY_PUBLIC_BASE.rstrip("/")
+# Keep module-level constants for backward compat (callers that import BASE/API)
+BASE = _base()  # type: ignore
+API = _api()  # type: ignore
+PUBLIC = _public()  # type: ignore
 TIMEOUT = 10.0
 
 _HEADERS = {
