@@ -92,23 +92,19 @@ export default function DispatchHistoryClient() {
   const [source, setSource] = useState<
     "all" | "ikiru" | "shinigami" | "voratoon"
   >("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   const debouncedSearch = usePacerDebouncedValue(search, 300);
 
+  // reset page when search changes
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: queryKeys.dispatchHistory(debouncedSearch || undefined),
-    // Server-side search + bounded page size: fetching 10k rows per keystroke
-    // was the old behavior. The backend supports `search` filtering, so a
-    // 500-row page covers the on-screen list; the full 10k walk only runs
-    // when no search is active (the page's "all history" list).
-    queryFn: () =>
-      Reader.getDispatchHistory(
-        1,
-        debouncedSearch ? 500 : 10000,
-        debouncedSearch || ""
-      ) as unknown as Promise<DispatchHistoryItem[]>,
+    queryKey: [...queryKeys.dispatchHistory(debouncedSearch || undefined), page],
+    queryFn: () => Reader.getDispatchHistoryPage(page, pageSize, debouncedSearch || ""),
   });
 
-  const items = data ?? [];
+  const items = (data?.results ?? []) as DispatchHistoryItem[];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const filtered = useMemo(() => {
     if (source === "all") return items;
@@ -130,7 +126,7 @@ export default function DispatchHistoryClient() {
           </h1>
         </div>
         <span className="text-xs px-2 py-1 rounded-full bg-surface text-text-muted">
-          {filtered.length} sent
+          {total} sent · page {page}/{totalPages}
         </span>
       </div>
       <p className="text-xs text-text-muted mb-4">
@@ -149,7 +145,10 @@ export default function DispatchHistoryClient() {
             placeholder="Search title..."
             aria-label="Search dispatch history"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
           />
         </div>
@@ -157,7 +156,10 @@ export default function DispatchHistoryClient() {
           {(["all", "ikiru", "shinigami", "voratoon"] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setSource(s)}
+              onClick={() => {
+                setSource(s);
+                setPage(1);
+              }}
               className={[
                 "px-2.5 py-1.5 text-xs rounded-lg border transition-colors",
                 source === s
@@ -202,14 +204,37 @@ export default function DispatchHistoryClient() {
           <span className="text-sm">No chapters sent yet</span>
         </div>
       ) : (
-        <div className="space-y-1.5">
-          {filtered.map((item) => (
-            <Row
-              key={`${item.titleKey}-${item.chapterLabel || item.chapter}-${item.source}-${item.sentAt}`}
-              item={item}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-1.5">
+            {filtered.map((item) => (
+              <Row
+                key={`${item.titleKey}-${item.chapterLabel || item.chapter}-${item.source}-${item.sentAt}`}
+                item={item}
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-xs text-text-muted">
+              Page {page} of {totalPages} · {total} total
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 text-xs rounded-lg border bg-surface border-border text-text-secondary hover:text-text disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Prev
+              </button>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 text-xs rounded-lg border bg-surface border-border text-text-secondary hover:text-text disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </PageShell>
   );

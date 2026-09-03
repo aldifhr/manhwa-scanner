@@ -56,6 +56,48 @@ export const Reader = {
       mapHistory
     ) as unknown as Promise<import("@/lib/types").DispatchHistoryItem[]>;
   },
+  getDispatchHistoryPage: async (
+    page = 1,
+    pageSize = 50,
+    search = ""
+  ): Promise<{
+    results: import("@/lib/types").DispatchHistoryItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> => {
+    const p = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (search) p.set("search", search);
+    const data = await readerFetch<{
+      success: boolean;
+      data: {
+        results: unknown[];
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+      };
+    }>(`/api/v1/dispatch-history?${p}`);
+    const d = data.data as {
+      results: unknown[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+      total_pages?: number;
+    };
+    return {
+      results: (d?.results ?? []).map(mapHistory) as import("@/lib/types").DispatchHistoryItem[],
+      total: d?.total ?? 0,
+      page: d?.page ?? page,
+      pageSize: d?.pageSize ?? pageSize,
+      totalPages: d?.totalPages ?? (d as { total_pages?: number })?.total_pages ?? 1,
+    };
+  },
   getRssFlat: (
     page = 1,
     limit = 1000,
