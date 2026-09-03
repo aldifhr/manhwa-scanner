@@ -24,7 +24,7 @@ logger = get_logger("api:rss")
 router = APIRouter()
 
 _RSS_CACHE: dict[str, tuple[float, dict]] = {}
-_RSS_TTL = 10.0
+_RSS_TTL = 30.0
 
 _rss_new_cache: dict[str, tuple[float, dict]] = {}
 

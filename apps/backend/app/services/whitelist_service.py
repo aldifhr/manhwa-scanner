@@ -149,10 +149,29 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
         if isinstance(_su, str) and _su.strip():
             entry["series_url"] = _su.strip()
 
-    # Enrich missing fields
-    entry = enrich_whitelist_entry(entry, url, source, title)
-
+    # Enrich missing fields — non-blocking: insert immediately, enrich in background
+    # so POST stays 0.02s instead of 0.5s (was 3 sync HTTP fetches to ikiru/voratoon/shinigami).
+    _needs_enrich = not entry.get("description") or not entry.get("cover") or not entry.get("genres")
     res = wl_store.add_whitelist_entries([entry])
+    if _needs_enrich:
+        try:
+            import threading
+            _entry_copy = dict(entry)
+            _url_copy = url
+            _source_copy = source
+            _title_copy = title
+            def _bg_enrich():
+                try:
+                    enriched = enrich_whitelist_entry(dict(_entry_copy), _url_copy, _source_copy, _title_copy)
+                    # Only update if enrich actually added something
+                    if enriched.get("cover") != _entry_copy.get("cover") or enriched.get("description") != _entry_copy.get("description") or enriched.get("genres") != _entry_copy.get("genres"):
+                        # Re-upsert with enriched fields (preserve title_key/source)
+                        wl_store.add_whitelist_entries([enriched])
+                except Exception:
+                    pass
+            threading.Thread(target=_bg_enrich, daemon=True).start()
+        except Exception:
+            pass
     return res
 
 

@@ -177,31 +177,13 @@ def map_result(
     _meta_slug = (series_url or it.get("series_url") or "").rstrip("/").split("/")[-1] if series_url else ""
     _meta = meta_map.get(_meta_slug) or {}
 
-    # Live fallback: fetch from upstream if DB has no meta
+    # Live fallback disabled for RSS — was 8 sync HTTP fetches per request (2.6s bottleneck).
+    # Metadata is enriched via cron/whitelist enrichment, not per-RSS-request.
+    # Keep cache-hit path only (cron pre-warms), no live fetch.
     if not _meta and _meta_slug and src in ("shinigami", "ikiru"):
         _cached_live = _RSS_LIVE_META_CACHE.get(_meta_slug)
         if _cached_live and (_time.monotonic() - _cached_live[0]) < _RSS_LIVE_META_TTL:
             _meta = _cached_live[1]
-        else:
-            if live_cnt_ref[0] < 8:
-                try:
-                    _fetched = None
-                    if src == "shinigami":
-                        from app.scrapers import shinigami as _sh
-                        _fetched = _sh.get_shinigami_series_meta(_meta_slug)
-                    elif src == "ikiru":
-                        from app.scrapers import ikiru as _ik
-                        _fetched = _ik.get_ikiru_series_meta(_meta_slug)
-                    if _fetched:
-                        _meta = _fetched
-                        _RSS_LIVE_META_CACHE[_meta_slug] = (_time.monotonic(), _meta)
-                        if len(_RSS_LIVE_META_CACHE) > _RSS_LIVE_META_MAX:
-                            oldest = sorted(_RSS_LIVE_META_CACHE.items(), key=lambda kv: kv[1][0])[:32]
-                            for k, _ in oldest:
-                                _RSS_LIVE_META_CACHE.pop(k, None)
-                        live_cnt_ref[0] += 1
-                except Exception:
-                    pass
 
     cover = scrub_cover(it.get("cover") or wl.get("cover") or _meta.get("cover") or "")
     origin = normalize_origin(it.get("origin") or wl.get("origin") or _meta.get("origin") or "")
