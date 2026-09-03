@@ -19,15 +19,15 @@ logger = get_logger("services:dispatch")
 class DispatchService:
     """Handle chapter dispatch to Discord with FCFS dedupe."""
 
-    @with_circuit_breaker(cb_db)
     @retry_with_backoff(max_retries=3, base_delay=0.3, max_delay=3.0)
+    @with_circuit_breaker(cb_db)
     def get_target_channels(self) -> list[str]:
         """Load target channels from guild_settings."""
         res = get_supabase().table("guild_settings").select("channel_id").execute()
         return [r["channel_id"] for r in (res.data or []) if r.get("channel_id")]
 
-    @with_circuit_breaker(cb_db)
     @retry_with_backoff(max_retries=3, base_delay=0.3, max_delay=3.0)
+    @with_circuit_breaker(cb_db)
     def get_claimed_keys(self, keys: list[str]) -> set[str]:
         """Return FCFS keys already sent (permanently in dispatch_history)."""
         if not keys:
@@ -35,8 +35,8 @@ class DispatchService:
         res = get_supabase().table("dispatch_history").select("fcfs_key").in_("fcfs_key", keys).execute()
         return {r["fcfs_key"] for r in (res.data or []) if r.get("fcfs_key")}
 
-    @with_circuit_breaker(cb_db)
     @retry_with_backoff(max_retries=3, base_delay=0.3, max_delay=3.0)
+    @with_circuit_breaker(cb_db)
     def get_claimed_urls(self, urls: list[str]) -> set[str]:
         """Return URLs already in dispatch_history."""
         if not urls:
@@ -44,8 +44,8 @@ class DispatchService:
         res = get_supabase().table("dispatch_history").select("chapter_url").in_("chapter_url", urls).execute()
         return {r["chapter_url"] for r in (res.data or []) if r.get("chapter_url")}
 
-    @with_circuit_breaker(cb_discord)
     @retry_with_backoff(max_retries=3, base_delay=0.5, max_delay=5.0)
+    @with_circuit_breaker(cb_discord)
     def send_chapter(self, item: dict, channel_id: str) -> bool:
         """Send a single chapter notification to Discord."""
         cover_url = item.get("cover", "")

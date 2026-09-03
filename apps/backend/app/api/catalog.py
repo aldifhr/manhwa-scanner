@@ -34,9 +34,13 @@ async def catalog_list(request: Request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     page = int_safe(request.query_params.get("page", "1"), 1)
     page_size = int_safe(request.query_params.get("page_size", "20"), 20, max_val=_MAX_CATALOG_EXPORT)
-    search = request.query_params.get("search", "") or request.query_params.get("q", "")
+    search = (request.query_params.get("search", "") or request.query_params.get("q", ""))[:100]
+    if len(request.query_params.get("search", "") or request.query_params.get("q", "") or "") > 100:
+        return JSONResponse(content={"success": False, "error": "search too long (max 100)"}, status_code=400)
     source = request.query_params.get("source", "")
-    title = request.query_params.get("title", "")
+    title = (request.query_params.get("title", "") or "")[:200]
+    if len(request.query_params.get("title", "") or "") > 200:
+        return JSONResponse(content={"success": False, "error": "title too long (max 200)"}, status_code=400)
     type_f = request.query_params.get("type", "").strip().lower()
     origin_f = request.query_params.get("origin", "").strip().upper()
     all_param = request.query_params.get("all") == "true"

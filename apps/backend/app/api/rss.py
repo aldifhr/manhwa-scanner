@@ -89,7 +89,9 @@ async def rss(request: Request):
     source_f = request.query_params.get("source", "")
     origin_f = request.query_params.get("origin", "")
     exclude = request.query_params.get("exclude", "")
-    q = request.query_params.get("q", "")
+    q = (request.query_params.get("q", "") or "")[:100]
+    if len(request.query_params.get("q", "") or "") > 100:
+        return JSONResponse(content={"success": False, "error": "q too long (max 100)"}, status_code=400)
     exclude_origin = request.query_params.get("exclude_origin", "")
     type_f = request.query_params.get("type", "")
     # Custom filters (merged from /rss/custom) — handled in Python post-filter for now
