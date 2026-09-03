@@ -108,7 +108,7 @@ async def analytics_overview(request: Request):
                COUNT(*) as dispatch_count,
                MAX(dh.sent_at) as last_dispatched
         FROM dispatch_history dh
-        LEFT JOIN whitelist w ON w.title_key = dh.title_key AND w.source = dh.source
+        LEFT JOIN whitelist w ON REPLACE(LOWER(w.title_key), '-', ' ') = REPLACE(LOWER(dh.title_key), '-', ' ') AND w.source = dh.source
         WHERE dh.sent_at >= NOW() - INTERVAL '7 days'
         GROUP BY dh.title_key, dh.source, w.title
         ORDER BY dispatch_count DESC
