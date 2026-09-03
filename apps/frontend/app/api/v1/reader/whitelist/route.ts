@@ -8,6 +8,10 @@ import {
   hashSession,
 } from "@/lib/server-api";
 import { rewriteCoverUrl } from "@/lib/utils";
+import {
+  whitelistCache,
+  clearCachesForSession,
+} from "@/lib/cache";
 
 interface CatalogItem {
   title: string;
@@ -76,71 +80,12 @@ interface BackendResponse {
   error?: { code: string; message: string };
 }
 
-// ── In-memory TTL cache (global) ──
-// Whitelist is polled by DashboardHome + the whitelist page. A short TTL
-// absorbs duplicate polls; keyed by session to avoid cross-user leakage.
-const cache: Map<string, { data: unknown; expiry: number }> = ((
-  globalThis as unknown as {
-    __whitelistCache?: Map<string, { data: unknown; expiry: number }>;
-  }
-).__whitelistCache ??= new Map());
-const CACHE_TTL = 10_000;
-const MAX_CACHE = 30;
-
-function getCached(key: string) {
-  const entry = cache.get(key);
-  if (!entry || Date.now() > entry.expiry) {
-    cache.delete(key);
-    return null;
-  }
-  return entry.data;
-}
-
-function setCache(key: string, data: unknown) {
-  cache.set(key, { data, expiry: Date.now() + CACHE_TTL });
-  while (cache.size > MAX_CACHE) {
-    const firstKey = cache.keys().next().value;
-    if (!firstKey) break;
-    cache.delete(firstKey);
-  }
-}
-
 function clearCacheForSession(request: Request) {
   const raw =
     (request.headers.get("cookie") || "").match(
       /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
     )?.[1] || "anon";
-  const session = hashSession(raw);
-  for (const key of cache.keys()) {
-    if (key.startsWith(`whitelist:${session}:`)) cache.delete(key);
-  }
-  // Also clear rss & dashboard & stats caches for this session so isWhitelisted & counts fresh instantly
-  try {
-    const rssCache = (
-      globalThis as unknown as { __rssCache?: Map<string, unknown> }
-    ).__rssCache;
-    if (rssCache)
-      for (const k of rssCache.keys())
-        if (k.startsWith(`rss:${session}:`)) rssCache.delete(k);
-  } catch {
-    /* ignore */
-  }
-  try {
-    const dashCache = (
-      globalThis as unknown as { __dashboardCache?: Map<string, unknown> }
-    ).__dashboardCache;
-    if (dashCache) dashCache.delete(session);
-  } catch {
-    /* ignore */
-  }
-  try {
-    const statsCache = (
-      globalThis as unknown as { __statsCache?: Map<string, unknown> }
-    ).__statsCache;
-    if (statsCache) statsCache.delete(`stats:${session}`);
-  } catch {
-    /* ignore */
-  }
+  clearCachesForSession(hashSession(raw));
 }
 
 export async function GET(request: NextRequest) {
@@ -171,7 +116,7 @@ export async function GET(request: NextRequest) {
     merge === "false" || merge === "0" || merge === "no" ? "false" : "true";
   const q = (request.nextUrl.searchParams.get("q") || "").trim().slice(0, 100);
   const cacheKeyStr = `whitelist:${session}:${page}:${pageSize}:${q}:${mergeParam}`;
-  const cached = getCached(cacheKeyStr);
+  const cached = whitelistCache.get(cacheKeyStr);
   if (cached) return NextResponse.json(cached);
 
   try {
@@ -345,7 +290,7 @@ export async function GET(request: NextRequest) {
           Math.max(1, Math.ceil((total ?? results.length) / Number(pageSize))),
       },
     };
-    setCache(cacheKeyStr, responseBody);
+    whitelistCache.set(cacheKeyStr, responseBody);
     return NextResponse.json(responseBody);
   } catch (err) {
     return catchError(err);

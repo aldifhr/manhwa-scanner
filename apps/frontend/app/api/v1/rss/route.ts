@@ -9,6 +9,7 @@ import {
 } from "@/lib/server-api";
 import { rssItemSchema } from "@/lib/schemas";
 import { normalizeOrigin } from "@/lib/constants";
+import { rssCache } from "@/lib/cache";
 
 // Force this route to be dynamic — Vercel's CDN will otherwise cache the
 // JSON response (the handler below doesn't set Cache-Control: no-store, so
@@ -23,43 +24,6 @@ function rssBaseUrl(): string {
   const override = process.env.RSS_API_URL?.trim();
   if (override) return override.replace(/\/$/, "");
   return `${backendUrl()}/api/v1/rss`;
-}
-
-// ── In-memory TTL cache (global via globalThis so whitelist mutate can clear it) ──
-const cache: Map<string, { data: unknown; expiry: number }> = ((
-  globalThis as unknown as {
-    __rssCache?: Map<string, { data: unknown; expiry: number }>;
-  }
-).__rssCache ??= new Map());
-const CACHE_TTL = 10_000; // 10s — keep /recent near-real-time (cron runs every 10 min, FE SWR 30s)
-const STALE_TTL = 20_000; // stale-while-revalidate window
-const MAX_CACHE = 50;
-
-function getCached(key: string) {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  const now = Date.now();
-  if (now <= entry.expiry) return entry.data;
-  // stale-while-revalidate: serve stale up to STALE_TTL while background refresh happens
-  if (now <= entry.expiry + STALE_TTL) return entry.data;
-  cache.delete(key);
-  return null;
-}
-
-function setCache(key: string, data: unknown) {
-  cache.set(key, { data, expiry: Date.now() + CACHE_TTL });
-  if (cache.size > MAX_CACHE) {
-    // Evict expired entries first, then the oldest, until back under the cap.
-    const now = Date.now();
-    for (const [k, entry] of cache) {
-      if (cache.size <= MAX_CACHE) break;
-      if (now > entry.expiry) cache.delete(k);
-    }
-    for (const [k] of cache) {
-      if (cache.size <= MAX_CACHE) break;
-      cache.delete(k);
-    }
-  }
 }
 
 function cacheKey(
@@ -117,7 +81,7 @@ export async function GET(request: NextRequest) {
   );
   // 10s TTL cache: absorbs repeat page loads + protects the backend from
   // redundant cold-start hits (which caused intermittent 504s).
-  const cached = getCached(key);
+  const cached = rssCache.get(key);
   if (cached) return NextResponse.json(cached);
 
   try {
@@ -239,7 +203,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    setCache(key, body);
+    rssCache.set(key, body);
     return NextResponse.json(body, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });

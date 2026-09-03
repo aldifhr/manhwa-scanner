@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withCsrf } from "@/lib/csrf";
 import { openapi } from "@manhwa-scanner/shared";
 import { parseErrorMessage } from "@/lib/fetchError";
+import { rssCache as sharedRssCache } from "@/lib/cache";
 
 /**
  * Server-side backend URL for FE→backend fetches (proxy/image/auth routes).
@@ -145,37 +146,12 @@ export interface ServerClient {
   setRssCache(key: string, data: unknown): void;
 }
 
-// Shared RSS cache — single locality (sebelumnya duplikat di 2 route files)
-const rssCache: Map<string, { data: unknown; expiry: number }> = ((
-  globalThis as unknown as {
-    __rssCache?: Map<string, { data: unknown; expiry: number }>;
-  }
-).__rssCache ??= new Map());
-const RSS_TTL = 10_000;
-const RSS_STALE = 20_000;
-
+// Shared RSS cache — now re-exported from lib/cache (single source, no duplication)
 function getRssCache(key: string): unknown | null {
-  const e = rssCache.get(key);
-  if (!e) return null;
-  const now = Date.now();
-  if (now <= e.expiry) return e.data;
-  if (now <= e.expiry + RSS_STALE) return e.data;
-  rssCache.delete(key);
-  return null;
+  return sharedRssCache.get(key);
 }
 function setRssCache(key: string, data: unknown) {
-  rssCache.set(key, { data, expiry: Date.now() + RSS_TTL });
-  if (rssCache.size > 50) {
-    const now = Date.now();
-    for (const [k, entry] of rssCache) {
-      if (rssCache.size <= 50) break;
-      if (now > entry.expiry) rssCache.delete(k);
-    }
-    for (const [k] of rssCache) {
-      if (rssCache.size <= 50) break;
-      rssCache.delete(k);
-    }
-  }
+  sharedRssCache.set(key, data);
 }
 
 export function createServerClient(
