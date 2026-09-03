@@ -35,12 +35,16 @@ _INTER_FETCH_DELAY = 0.5
 _WINDOW_HOURS = 24
 
 
-def enrich_recent_chapters(limit: int = 2000) -> dict:
+def enrich_recent_chapters(limit: int = 2000, miss_only: bool = False) -> dict:
     """Re-enrich every recent_chapters row in the 24h window.
 
     Reads rows, runs the shared enrich() (which fills gaps from series_meta /
     source APIs + persists to cache), then upserts the meta columns back to
     recent_chapters. Returns a stats dict for logging. Safe to run repeatedly.
+
+    miss_only=True -> static-data mode: only rows where description/rating/genres
+    are missing (empty). Skips already-complete rows so 403/429 budget is spent
+    only on ikiru rows that actually need a backfill (user: static data only).
     """
     from app.cron import enrich as enrich_mod
 
@@ -50,21 +54,71 @@ def enrich_recent_chapters(limit: int = 2000) -> dict:
     try:
         from datetime import datetime, timezone, timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=_WINDOW_HOURS)).isoformat()
-        rows = (
-            sb.table("recent_chapters")
-            .select("*")
-            .gte("updated_time", cutoff)
-            .limit(limit)
-            .execute()
-            .data
-            or []
-        )
+        if miss_only:
+            # Static-data cron: only rows missing description/rating/genres.
+            # Use raw SQL via psycopg2 so we filter server-side (PostgREST
+            # .or() with IS NULL is awkward). Fall back to Supabase fetch + python filter if conn fails.
+            try:
+                from app.db import get_conn as _gc, put_conn as _pc
+                _conn = _gc()
+                _cur = _conn.cursor()
+                _cur.execute(
+                    """
+                    SELECT * FROM recent_chapters
+                    WHERE updated_time >= %s
+                      AND (
+                        description IS NULL OR description = ''
+                        OR rating IS NULL OR rating = 0
+                        OR genres IS NULL OR genres::text = '[]' OR genres::text = 'null'
+                      )
+                    ORDER BY updated_time DESC
+                    LIMIT %s
+                    """,
+                    (cutoff, limit),
+                )
+                _cols = [d[0] for d in _cur.description] if _cur.description else []
+                rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
+                _pc(_conn)
+            except Exception as _e:
+                logger.warn("enrich_resync miss_only fallback to Supabase", err=str(_e)[:120])
+                rows = (
+                    sb.table("recent_chapters")
+                    .select("*")
+                    .gte("updated_time", cutoff)
+                    .limit(limit)
+                    .execute()
+                    .data
+                    or []
+                )
+                # python-side miss filter
+                def _is_miss(r: dict) -> bool:
+                    d = r.get("description")
+                    ra = r.get("rating")
+                    g = r.get("genres")
+                    if not d:
+                        return True
+                    if ra in (None, 0, "0", ""):
+                        return True
+                    if not g or g == [] or str(g) in ("[]", "null", ""):
+                        return True
+                    return False
+                rows = [r for r in rows if _is_miss(r)]
+        else:
+            rows = (
+                sb.table("recent_chapters")
+                .select("*")
+                .gte("updated_time", cutoff)
+                .limit(limit)
+                .execute()
+                .data
+                or []
+            )
     except Exception as e:
         logger.error("enrich_resync: list failed", exc=e)
         return {"ok": False, "error": str(e)[:160]}
 
     if not rows:
-        return {"ok": True, "updated": 0, "failed": 0, "duration": 0.0, "note": "no rows in window"}
+        return {"ok": True, "updated": 0, "failed": 0, "duration": 0.0, "note": "no rows in window" + (" (miss_only)" if miss_only else "")}
 
     # Map DB rows -> item dicts enrich() understands.
     items = [rc_store._row_to_item(r) for r in rows]
@@ -138,8 +192,120 @@ def enrich_recent_chapters(limit: int = 2000) -> dict:
         "updated": updated,
         "failed": failed,
         "duration": duration,
+        "miss_only": miss_only,
     }
     logger.info("enrich resync done", **stats)
+    return stats
+
+
+def enrich_stale_series_meta(stale_days: int = 7, limit: int = 50) -> dict:
+    """Weekly refresh: re-fetch series_meta rows older than stale_days.
+
+    Checks static data (rating/genres/description/cover/type) for drift.
+    Only updates series_meta when upstream actually changed, so 403/429
+    budget is spent on ~50 stale series/week, not the full 24h window.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    sb = get_supabase()
+    start = time.time()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=stale_days)).isoformat()
+
+    try:
+        # Server-side filter via psycopg2 (PostgREST .lt on timestamptz flaky)
+        try:
+            from app.db import get_conn as _gc2, put_conn as _pc2
+            _conn = _gc2()
+            _cur = _conn.cursor()
+            _cur.execute(
+                """
+                SELECT title_key, source, rating, genres, description, cover, type, updated_at
+                FROM series_meta
+                WHERE updated_at IS NULL OR updated_at < %s
+                ORDER BY updated_at ASC NULLS FIRST
+                LIMIT %s
+                """,
+                (cutoff, limit),
+            )
+            _cols = [d[0] for d in _cur.description] if _cur.description else []
+            rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
+            _pc2(_conn)
+        except Exception:
+            # Fallback: Supabase client
+            rows = (
+                sb.table("series_meta")
+                .select("title_key, source, updated_at")
+                .lt("updated_at", cutoff)
+                .order("updated_at", desc=False)
+                .limit(limit)
+                .execute()
+                .data
+                or []
+            )
+    except Exception as e:
+        logger.error("enrich_stale: list failed", exc=e)
+        return {"ok": False, "error": str(e)[:160]}
+
+    if not rows:
+        return {"ok": True, "updated": 0, "checked": 0, "duration": 0.0, "note": f"no stale >{stale_days}d"}
+
+    # Resolve slug per series via recent_chapters series_url
+    from app.cron.series_meta_sync import _fetch_meta, _slug_for
+
+    updated = 0
+    checked = 0
+    failed = 0
+    for r in rows:
+        tk = str(r.get("title_key") or "").strip()
+        src = str(r.get("source") or "").strip()
+        if not tk or not src:
+            continue
+        slug = _slug_for(src, tk)
+        if not slug:
+            failed += 1
+            continue
+        checked += 1
+        try:
+            meta = _fetch_meta(src, slug)
+        except Exception:
+            meta = {}
+        if not meta:
+            failed += 1
+            time.sleep(1.0)
+            continue
+        # Only UPSERT if something actually changed (avoid bumping updated_at needlessly)
+        old_desc = (r.get("description") or "").strip()
+        old_rating = str(r.get("rating") or "")
+        old_type = str(r.get("type") or "")
+        new_desc = (meta.get("description") or "").strip()
+        new_rating = str(meta.get("rating") or "")
+        new_type = str(meta.get("type") or "")
+        if old_desc == new_desc and old_rating == new_rating and old_type == new_type:
+            time.sleep(1.0)
+            continue
+        try:
+            sb.table("series_meta").upsert(
+                {
+                    "title_key": tk,
+                    "source": src,
+                    "rating": meta.get("rating"),
+                    "genres": meta.get("genres") or [],
+                    "description": meta.get("description") or "",
+                    "cover": meta.get("cover"),
+                    "type": meta.get("type"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="title_key,source",
+            ).execute()
+            updated += 1
+        except Exception as e:
+            logger.warn("enrich_stale: upsert failed", tk=tk, src=src, err=str(e)[:120])
+            failed += 1
+        time.sleep(1.0)
+
+    duration = round(time.time() - start, 1)
+    stats = {"ok": True, "checked": checked, "updated": updated, "failed": failed, "duration": duration, "stale_days": stale_days}
+    logger.info("enrich stale done", **stats)
     return stats
 
 

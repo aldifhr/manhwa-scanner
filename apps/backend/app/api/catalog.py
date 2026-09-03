@@ -34,17 +34,23 @@ async def catalog_list(request: Request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     page = int_safe(request.query_params.get("page", "1"), 1)
     page_size = int_safe(request.query_params.get("page_size", "20"), 20, max_val=_MAX_CATALOG_EXPORT)
-    search = request.query_params.get("search", "") or request.query_params.get("q", "")
+    search = (request.query_params.get("search", "") or request.query_params.get("q", ""))[:100]
+    if len(request.query_params.get("search", "") or request.query_params.get("q", "") or "") > 100:
+        return JSONResponse(content={"success": False, "error": "search too long (max 100)"}, status_code=400)
     source = request.query_params.get("source", "")
-    title = request.query_params.get("title", "")
+    title = (request.query_params.get("title", "") or "")[:200]
+    if len(request.query_params.get("title", "") or "") > 200:
+        return JSONResponse(content={"success": False, "error": "title too long (max 200)"}, status_code=400)
     type_f = request.query_params.get("type", "").strip().lower()
     origin_f = request.query_params.get("origin", "").strip().upper()
     all_param = request.query_params.get("all") == "true"
 
+    import asyncio as _asyncio2
     from app.db import get_supabase
 
     # Push filters to DB instead of loading full whitelist in Python (was O(n) full-scan + N+1 cover_ref).
     # Use count+pagination at DB level; fallback to Python only if DB fails.
+    # P1: wrap sync psycopg2 calls in to_thread so async loop not stalled under burst
     try:
         sb = get_supabase()
         q = sb.table("whitelist").select("*", count="exact")
@@ -66,7 +72,7 @@ async def catalog_list(request: Request):
             # 50k-row table can't exhaust Python memory / produce a giant HTTP
             # body in one request. Callers needing the full catalog should page
             # or use a dedicated export endpoint.
-            res = q.order("created_at", desc=True).limit(_MAX_CATALOG_EXPORT).execute()
+            res = await _asyncio2.to_thread(lambda: q.order("created_at", desc=True).limit(_MAX_CATALOG_EXPORT).execute())
             rows = res.data or []
             total = len(rows)
             paged = rows
@@ -76,7 +82,7 @@ async def catalog_list(request: Request):
         else:
             # Normal paginated: need total count and page slice from DB
             # First get total via count, then paginated rows
-            cnt_res = q.limit(1).execute()
+            cnt_res = await _asyncio2.to_thread(lambda: q.limit(1).execute())
             total = cnt_res.count or 0
             start = (page - 1) * page_size
             # Re-build q for data fetch (count query consumed the builder, need fresh)
@@ -93,7 +99,7 @@ async def catalog_list(request: Request):
             if title:
                 _t = title.replace("%", r"\%").replace("_", r"\_")
                 q2 = q2.ilike("title", f"%{_t}%")
-            paged_res = q2.order("created_at", desc=True).limit(page_size).offset(start).execute()
+            paged_res = await _asyncio2.to_thread(lambda: q2.order("created_at", desc=True).limit(page_size).offset(start).execute())
             paged = paged_res.data or []
             rows = paged  # for total_pages calc below, but total already from count
             total_pages = (total + page_size - 1) // page_size if page_size else 1

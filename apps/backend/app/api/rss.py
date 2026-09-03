@@ -66,6 +66,14 @@ async def rss(request: Request):
     # writes are exposed here, so auth is intentionally not required.
     # Mutating/operational endpoints (whitelist writes, dispatch, rss/new,
     # rss/health) remain behind require_monitor_auth.
+    # P1 cache-share: if cron just wrote new chapters, bust local RSS cache (Redis shared flag)
+    try:
+        from app.tasks import _get_redis as _gr2
+        if _gr2().get("rss:invalidate"):
+            _RSS_CACHE.clear()
+            _gr2().delete("rss:invalidate")
+    except Exception:
+        pass
     cache_key = request.url.query
     cached = _rss_cache_get(cache_key)
     if cached is not None:
@@ -89,7 +97,9 @@ async def rss(request: Request):
     source_f = request.query_params.get("source", "")
     origin_f = request.query_params.get("origin", "")
     exclude = request.query_params.get("exclude", "")
-    q = request.query_params.get("q", "")
+    q = (request.query_params.get("q", "") or "")[:100]
+    if len(request.query_params.get("q", "") or "") > 100:
+        return JSONResponse(content={"success": False, "error": "q too long (max 100)"}, status_code=400)
     exclude_origin = request.query_params.get("exclude_origin", "")
     type_f = request.query_params.get("type", "")
     # Custom filters (merged from /rss/custom) — handled in Python post-filter for now
@@ -115,6 +125,7 @@ async def rss(request: Request):
         exclude_notified = _excl_raw.lower() == "true"
 
     try:
+        import asyncio as _asyncio
         from app.db import get_supabase
         sb = get_supabase()
 
@@ -123,6 +134,13 @@ async def rss(request: Request):
         hours = 24
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+
+        # P1: DB is sync psycopg2 - don't block async event loop (was stall under 100 concurrent)
+        # Push genres/min_rating/max_rating to SQL where possible to avoid 100k-row OOM in Python
+        _q_genres = genres_f
+        _q_min = min_rating
+        _q_max = max_rating
+        _q_status = status_f
 
         rc_q = (
             sb.table("recent_chapters")
@@ -148,7 +166,27 @@ async def rss(request: Request):
             rc_q = rc_q.ilike("title", f"%{_q}%")
         # Fetch up to 1000 for consistent total (fix: limit*page made total vary per page)
         _fetch_limit = 1000
-        rc_rows = rc_q.order("updated_time", desc=True).limit(_fetch_limit).execute().data or []
+        # Pushable filters to DB (P1 OOM fix): genres @> , rating range, status via whitelist join not here but we filter recent_chapters
+        if _q_genres:
+            try:
+                # Supabase PostgREST: genres cs.{a,b} for contains (jsonb) - fallback to Python if unsupported
+                _glist = [g.strip() for g in _q_genres.split(",") if g.strip()]
+                if _glist:
+                    rc_q = rc_q.contains("genres", _glist[:1])  # at least one genre pushed to DB
+            except Exception:
+                pass
+        if _q_min:
+            try:
+                rc_q = rc_q.gte("rating", float(_q_min))
+            except Exception:
+                pass
+        if _q_max:
+            try:
+                rc_q = rc_q.lte("rating", float(_q_max))
+            except Exception:
+                pass
+        # Execute DB in thread so async loop not blocked (P1 DB-blocking fix)
+        rc_rows = (await _asyncio.to_thread(lambda: rc_q.order("updated_time", desc=True).limit(_fetch_limit).execute().data or [])) if True else []
 
         # Exclude chapters already notified (FCFS dispatch_history) so RSS shows
         # only genuinely NEW releases, not backlog re-touched by the scraper

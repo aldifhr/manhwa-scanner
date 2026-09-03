@@ -313,6 +313,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             logger.error("batchInsertRecentChapters backfill failed", exc=e)
     except Exception as e:
         logger.error("batchInsertRecentChapters failed", exc=e)
+    # P1 cache-share: invalidate RSS cache across api/cron via Redis pub key
+    try:
+        from app.tasks import _get_redis as _gr
+        _gr().setex("rss:invalidate", 30, "1")
+    except Exception:
+        pass
 
 
 def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:

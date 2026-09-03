@@ -274,11 +274,11 @@ import secrets as _secrets
 # L2 NOTE: _RESPONSE_SIZE_CAP also defined in main.py — keep in sync
 _RESPONSE_SIZE_CAP = 10 * 1024 * 1024  # 10MB
 
-# SECURITY: unpredictable cache dir path — prevents symlink attacks and
-# cache poisoning via predictable /tmp paths.
+# Deterministic cache dir so api (3000) and cron (3001) share the same image cache (P1 cache-share fix)
+# Random suffix previously made api/cron have different /tmp/.be_ag_<random> dirs -> stale + double fetch 403s.
 _image_cache_dir_env = _os.environ.get("IMAGE_CACHE_DIR")
 if not _image_cache_dir_env:
-    _image_cache_dir_env = _os.path.join(_os.sep, "tmp", f".be_ag_{_secrets.token_hex(8)}")
+    _image_cache_dir_env = _os.path.join(_os.sep, "tmp", "be_ag_cache")
     _os.makedirs(_image_cache_dir_env, exist_ok=True)
 _IMAGE_CACHE_DIR: str = _image_cache_dir_env
 _IMAGE_CACHE_MAX = 2000

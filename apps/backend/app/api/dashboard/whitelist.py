@@ -97,6 +97,10 @@ async def whitelist_post(request: Request):
     source = body.get("source", "ikiru")
     if not title:
         return JSONResponse(content={"error": "Title required"}, status_code=400)
+    if len(title) > 200:
+        return JSONResponse(content={"error": "Title too long (max 200)"}, status_code=400)
+    if url and len(url) > 500:
+        return JSONResponse(content={"error": "URL too long (max 500)"}, status_code=400)
 
     res = post_whitelist(title=title, url=url, source=source, body=body)
     # Audit log disabled (audit.py removed 54a8ec5)

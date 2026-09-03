@@ -188,17 +188,22 @@ _SCHED_THREAD: "threading.Thread | None" = None
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
 _SOURCE_INTERVAL_S = 300          # 5 min per source (RSS)
 _DISPATCH_INTERVAL_S = 60        # 1 min Discord dispatch (user request)
-_ENRICH_INTERVAL_S = 900         # 15 min
+_ENRICH_INTERVAL_S = 900         # 15 min (legacy full refresh)
+_ENRICH_MISSING_INTERVAL_S = 1800  # 30 min static-data backfill (miss_only)
+_ENRICH_REFRESH_INTERVAL_S = 604800  # 7 days stale check (rating/description drift)
 
 
 def _scheduler_loop() -> None:
     from datetime import datetime, timezone
     last_enrich = 0.0
-    last_dispatch = 0.0
+    last_enrich_missing = 0.0
+    last_enrich_refresh = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
-                enrich_interval=_ENRICH_INTERVAL_S)
+                enrich_interval=_ENRICH_INTERVAL_S,
+                enrich_missing_interval=_ENRICH_MISSING_INTERVAL_S,
+                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S)
     # Kick off immediately on startup so freshness doesn't wait 10 min.
     _t0 = __import__("time").monotonic()
     for i, src in enumerate(_RSS_SOURCES):
@@ -247,6 +252,20 @@ def _scheduler_loop() -> None:
                 last_enrich = _now
             except Exception:
                 pass
+        # Static-data backfill: only rows missing description/rating/genres (cheap, runs 30m)
+        if _now - last_enrich_missing >= _ENRICH_MISSING_INTERVAL_S:
+            try:
+                enqueue_cron("enrich-missing")
+                last_enrich_missing = _now
+            except Exception:
+                pass
+        # Weekly stale check: refresh series_meta older than 7d (rating/desc drift)
+        if _now - last_enrich_refresh >= _ENRICH_REFRESH_INTERVAL_S:
+            try:
+                enqueue_cron("enrich-refresh")
+                last_enrich_refresh = _now
+            except Exception:
+                pass
 
 
 def start_cron_scheduler() -> None:
@@ -273,6 +292,8 @@ def get_cron_status() -> dict:
         "source_interval_s": _SOURCE_INTERVAL_S,
         "dispatch_interval_s": _DISPATCH_INTERVAL_S,
         "enrich_interval_s": _ENRICH_INTERVAL_S,
+        "enrich_missing_interval_s": _ENRICH_MISSING_INTERVAL_S,
+        "enrich_refresh_interval_s": _ENRICH_REFRESH_INTERVAL_S,
         "sources": list(_RSS_SOURCES),
         "now": datetime.now(timezone.utc).isoformat(),
     }

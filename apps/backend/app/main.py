@@ -418,7 +418,11 @@ app.include_router(queue_dashboard_api.router)
 
 # --- Prometheus metrics endpoint ---
 @app.get("/metrics")
-async def metrics_root():
+async def metrics_root(request: Request):
+    # Enterprise: gate metrics - Prometheus scrapes via private network with monitor token,
+    # public internet must not enumerate latency/pool/circuit state.
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     from app.metrics_prometheus import get_metrics
     return get_metrics()
 
@@ -583,6 +587,9 @@ if __name__ == "__main__":
     # "Invalid HTTP request received" from bots/probes that hit the raw port
     # with TLS/other-protocol bytes. Binding to loopback closes that surface;
     # Caddy still reaches it locally.
+    # P1 PM2 cluster mode: workers=1 per PM2 instance (pm2 handles clustering, not uvicorn)
+    # limit_max_requests removed in cluster mode - was killing BLPOP mid-job [tasks.py:373]
+    # Use --limit-max-requests 0 so worker not recycled mid-BLPOP
     uvicorn.run(
         app,
         host="127.0.0.1",
@@ -593,6 +600,6 @@ if __name__ == "__main__":
         loop="uvloop",
         access_log=False,
         limit_concurrency=100,
-        limit_max_requests=10000,
+        limit_max_requests=0,
         timeout_keep_alive=30,
     )

@@ -24,9 +24,17 @@ _cron_locks: dict[str, threading.Lock] = {
     "rss-fetch:shinigami": threading.Lock(),
     "rss-fetch:voratoon": threading.Lock(),
     "enrich": threading.Lock(),
+    "enrich-missing": threading.Lock(),
+    "enrich-refresh": threading.Lock(),
 }
 _cron_running = False
-_CRON_ADVISORY_KEY = 424242  # arbitrary stable int for pg_advisory_lock
+# Per-source advisory keys to avoid serializing independent scrapes (P0 #5)
+# hash(action) & 0x7fffffff -> stable 31-bit int for pg_try_advisory_lock
+def _advisory_key(action: str) -> int:
+    import hashlib as _hl
+    return int(_hl.sha256(action.encode()).hexdigest()[:8], 16) & 0x7FFFFFFF
+
+_CRON_ADVISORY_KEY = 424242  # legacy fallback (not used directly, kept for compat)
 
 
 # Lightweight in-memory cron job registry so callers can poll run status
@@ -75,15 +83,17 @@ def _run_pipeline_bg(action: str):
     _has_db_lock = False
     try:
         # Only `rss-fetch` (the slow scrape) takes the cross-process lock.
-        if action == "rss-fetch":
+        # Per-source key so rss-fetch:ikiru doesn't block rss-fetch:shinigami (P0 #5)
+        if action == "rss-fetch" or action.startswith("rss-fetch:"):
             try:
                 from app.db import get_conn, put_conn
                 _db_conn = get_conn()
                 cur = _db_conn.cursor()
-                cur.execute("SELECT pg_try_advisory_lock(%s)", (_CRON_ADVISORY_KEY,))
+                _key = _advisory_key(action)
+                cur.execute("SELECT pg_try_advisory_lock(%s)", (_key,))
                 _has_db_lock = bool(cur.fetchone()[0])
                 if not _has_db_lock:
-                    logger.warn("cron skipped: rss-fetch already running (DB advisory lock)")
+                    logger.warn("cron skipped: rss-fetch already running (DB advisory lock)", action=action)
                     put_conn(_db_conn)
                     _db_conn = None
                     return
@@ -113,6 +123,20 @@ def _run_pipeline_bg(action: str):
             _record_job(action, "done", stats)
             logger.info("cron enrich resync done", **stats)
             return
+        if action == "enrich-missing":
+            from app.cron.enrich_resync import enrich_recent_chapters as _enrich_miss
+            _record_job(action, "running")
+            stats = _enrich_miss(limit=100, miss_only=True)
+            _record_job(action, "done", stats)
+            logger.info("cron enrich-missing done", **stats)
+            return
+        if action == "enrich-refresh":
+            from app.cron.enrich_resync import enrich_stale_series_meta
+            _record_job(action, "running")
+            stats = enrich_stale_series_meta(stale_days=7, limit=50)
+            _record_job(action, "done", stats)
+            logger.info("cron enrich-refresh done", **stats)
+            return
         if action == "health":
             from app.storage import health as hs
             from app.config import settings as _s
@@ -138,7 +162,7 @@ def _run_pipeline_bg(action: str):
         if _has_db_lock and _db_conn:
             try:
                 cur = _db_conn.cursor()
-                cur.execute("SELECT pg_advisory_unlock(%s)", (_CRON_ADVISORY_KEY,))
+                cur.execute("SELECT pg_advisory_unlock(%s)", (_advisory_key(action),))
                 _db_conn.commit()
             except Exception:
                 try:
@@ -172,7 +196,7 @@ async def cron_trigger(request: Request):
     if source and action == "rss-fetch":
         action = f"rss-fetch:{source}"
     
-    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich")
+    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich", "enrich-missing", "enrich-refresh")
     valid_source_actions = ("rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon")
     
     if action not in valid_actions and action not in valid_source_actions:
