@@ -16,7 +16,7 @@ export const excludedTitleSchema = z
     source: z.enum(["ikiru", "shinigami", "voratoon"]).nullable().optional(),
     created_at: z.string().nullable().optional(),
     createdAt: z.string().nullable().optional(),
-    cover: z.string().url().nullable().optional(),
+    cover: z.string().nullable().optional(),
     series_url: z.string().url().nullable().optional(),
     seriesUrl: z.string().url().nullable().optional(),
   }).strict()
@@ -36,7 +36,7 @@ export const whitelistSchema = z
     titleKey: z.string().min(1).optional(),
     title: z.string().min(1).optional(),
     source: z.enum(["ikiru", "shinigami", "voratoon"]).optional(),
-    cover: z.string().url().nullable().optional(),
+    cover: z.string().nullable().optional(),
     series_url: z.string().url().nullable().optional(),
     seriesUrl: z.string().url().nullable().optional(),
   }).strict()
