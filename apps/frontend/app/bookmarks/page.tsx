@@ -109,7 +109,7 @@ export default function BookmarksPage() {
                       href={b.chapter_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 text-xs font-medium rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
+                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
                     >
                       Read
                     </a>
@@ -119,13 +119,13 @@ export default function BookmarksPage() {
                           onClick={() =>
                             handleDelete(b.title_key, b.chapter_number)
                           }
-                          className="px-3 py-1.5 text-xs font-medium rounded bg-red-500/15 text-red-400 border border-red-500/20"
+                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20"
                         >
                           Confirm
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(null)}
-                          className="px-3 py-1.5 text-xs font-medium rounded bg-surface border border-border"
+                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-surface border border-border"
                         >
                           Cancel
                         </button>
@@ -135,7 +135,7 @@ export default function BookmarksPage() {
                         onClick={() =>
                           setDeleteConfirm(`${b.title_key}-${b.chapter_number}`)
                         }
-                        className="px-3 py-1.5 text-xs font-medium rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
+                        className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
                       >
                         Delete
                       </button>
@@ -173,13 +173,13 @@ export default function BookmarksPage() {
                     href={c.chapterUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 text-xs font-medium rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
+                    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
                   >
                     Read
                   </a>
                   <button
                     onClick={() => removeReading(c.titleKey)}
-                    className="px-3 py-1.5 text-xs font-medium rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
+                    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
                   >
                     Remove
                   </button>
