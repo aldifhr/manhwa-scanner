@@ -17,7 +17,6 @@ import EmptyState from "@/components/EmptyState";
 import { Select } from "@/components/ui/Select";
 import { useDebounced } from "@/lib/useDebounced";
 import { decodeHtml } from "@/lib/utils";
-import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 
 function SourceBadge({ source }: { source: string }) {
@@ -225,21 +224,6 @@ export function ExcludeListClient() {
 
   return (
     <PageShell>
-      <div className="flex gap-2 p-1 bg-surface rounded-lg border border-border w-fit">
-        <Link
-          href="/whitelist"
-          className="px-3 py-1.5 text-xs font-medium rounded-md text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
-        >
-          Whitelist
-        </Link>
-        <Link
-          href="/exclude-list"
-          className="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-black"
-        >
-          Exclude
-        </Link>
-      </div>
-
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-tight text-text">
           Exclude List
