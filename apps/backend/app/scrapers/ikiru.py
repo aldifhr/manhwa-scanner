@@ -325,6 +325,24 @@ def get_ikiru_series_meta(slug: str) -> dict | None:
                         result["rating"] = normalize_rating(m.group(1))
             except Exception:
                 pass
+        # HTML fallback for cover (API returns null for The Strongest Girl)
+        if not result.get("cover"):
+            try:
+                from app.scrapers.ikiru import _cf_get as _g2
+                html_url2 = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
+                hr2 = _g2(html_url2)
+                if hr2.status_code == 200:
+                    import re as _re3
+                    # Try series thumb first
+                    m = _re3.search(r'<div[^>]*class="[^"]*thumb[^"]*"[^>]*>.*?<img[^>]*src="([^"]+)"', hr2.text, _re3.I | _re3.S)
+                    if m:
+                        result["cover"] = scrub_cover(m.group(1))
+                    else:
+                        m2 = _re3.search(r'<meta[^>]*property="og:image"[^>]*content="([^"]+)"', hr2.text, _re3.I)
+                        if m2 and "logo-ikiru" not in m2.group(1):
+                            result["cover"] = scrub_cover(m2.group(1))
+            except Exception:
+                pass
         return result
     except Exception as e:
         logger.warn("ikiru series meta failed", slug=slug, err=str(e)[:120])
