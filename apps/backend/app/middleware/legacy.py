@@ -27,6 +27,8 @@ _LEGACY_REDIRECTS = {
     "/api/reader/rss": "/api/v1/rss",
     "/api/reader/rss/new": "/api/v1/rss/new",
     "/api/reader/rss/health": "/api/v1/rss/health",
+    "/api/reader/cover": "/api/v1/reader/cover",
+    "/api/reader/cover-img": "/api/v1/reader/cover-img",
     "/api/redirect/chapter": "/api/v1/redirect/chapter",
 }
 

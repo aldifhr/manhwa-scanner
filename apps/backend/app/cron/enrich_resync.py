@@ -35,16 +35,14 @@ _INTER_FETCH_DELAY = 0.5
 _WINDOW_HOURS = 24
 
 
-def enrich_recent_chapters(limit: int = 2000, miss_only: bool = False) -> dict:
-    """Re-enrich every recent_chapters row in the 24h window.
+def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
+    """Re-enrich recent_chapters rows in the 24h window.
 
-    Reads rows, runs the shared enrich() (which fills gaps from series_meta /
-    source APIs + persists to cache), then upserts the meta columns back to
-    recent_chapters. Returns a stats dict for logging. Safe to run repeatedly.
+    Reads rows in chunks (default 200), runs enrich() per chunk, upserts meta.
+    Chunking keeps each run short (~10-30s) so the worker is never blocked
+    for minutes — other cron jobs (voratoon-cover, enrich-missing) stay responsive.
 
-    miss_only=True -> static-data mode: only rows where description/rating/genres
-    are missing (empty). Skips already-complete rows so 403/429 budget is spent
-    only on ikiru rows that actually need a backfill (user: static data only).
+    miss_only=True -> static-data mode: only rows missing description/rating/genres.
     """
     from app.cron import enrich as enrich_mod
 
@@ -153,7 +151,11 @@ def enrich_recent_chapters(limit: int = 2000, miss_only: bool = False) -> dict:
         _vals: list = []
         _rating = it.get("rating")
         if _rating not in (None, 0):
-            _sets.append("rating=%s"); _vals.append(float(_rating))
+            if isinstance(_rating, (int, float)):
+                _sets.append("rating=%s"); _vals.append(float(_rating))
+            else:
+                # Skip if rating is non-numeric (e.g., row header leaked through)
+                logger.warn("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
         _cover = it.get("cover")
         if _cover:
             _sets.append("cover=%s"); _vals.append(str(_cover))

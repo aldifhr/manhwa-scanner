@@ -54,7 +54,6 @@ export interface GroupedSeries {
   genres?: string[];
   description?: string | null;
   isWhitelisted: boolean;
-  type: string;
   sentAt?: string;
   chapters: GroupedChapter[];
 }
@@ -81,7 +80,6 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
         genres: it.genres,
         description: it.description,
         isWhitelisted: it.isWhitelisted,
-        type: ((): string => { const v = String((it as any).type ?? "").toLowerCase(); return v === "manhwa" || v === "manhua" ? v : "no_type"; })(),
         chapters: [],
         _sources: new Set([it.source]),
       } as any;

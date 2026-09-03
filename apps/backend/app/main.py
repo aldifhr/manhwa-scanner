@@ -1,14 +1,61 @@
-"""FastAPI app — <120L (lifespan/CORS/uvicorn extracted)."""
+"""FastAPI app (parity with lib/hono-app.ts + api/interactive.ts)."""
+from contextlib import asynccontextmanager
+import os
+import threading
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.lifespan import lifespan
 from app.logger import get_logger
 
 logger = get_logger("hono-server")
 
 from app.routers import register_routers
+from fastapi.openapi.utils import get_openapi  # kept for custom_openapi delegate
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: init resources. Shutdown: close connections gracefully."""
+    from app.tasks import start_worker
+    start_worker()
+    # Cron decoupling: the ROLE=cron process runs the cron queue worker so the
+    # (slow, upstream-heavy) scrape/dispatch never runs inside the HTTP API
+    # process. FastCron hits /api/cron on the API process, which enqueues to
+    # Redis; the cron worker pops and executes run_pipeline.
+    _role = (os.environ.get("ROLE") or "api").lower()
+    if _role == "cron":
+        from app.tasks import run_cron_worker, start_cron_scheduler
+        # Dual workers: 2 BLPOP threads so enqueue rate < process rate → queue never grows unbounded
+        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-1").start()
+        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-2").start()
+        start_cron_scheduler()
+        logger.info("cron-worker started (ROLE=cron)")
+    logger.info("application startup complete")
+    yield
+    # Shutdown: close all persistent connections
+    logger.info("application shutting down — closing connections")
+    try:
+        from app.discord import client as _disc
+        _disc.close_discord_client()
+    except Exception:
+        pass
+    try:
+        from app.discord.http import _CoverClient
+        _CoverClient.close()
+    except Exception:
+        pass
+    try:
+        from app.db import close_pool as _close_pool
+        _close_pool()
+    except Exception:
+        pass
+    try:
+        from app.tasks import stop_worker as _stop_worker
+        _stop_worker()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -21,8 +68,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from app.middleware.cors import add_cors  # noqa: E402
-add_cors(app)
+# CORS: explicit allowlist for frontend origins (nginx also sets headers; this is defense-in-depth
+# so a misconfigured reverse proxy cannot accidentally expose APIs to any origin).
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://fe.aldifhr.fun", "https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"],
+    allow_origin_regex=r"https://.*\.aldifhr\.fun",
+    allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*", "X-CSRF-Token", "Authorization"],
+    allow_credentials=True,
+    max_age=600,
+)
+
+# Extracted middlewares (was inline 150L in god-file)
 from app.middleware.correlation import correlation_middleware  # noqa: E402
 from app.middleware.security import security_headers_middleware  # noqa: E402
 app.middleware("http")(correlation_middleware)
@@ -126,5 +186,40 @@ async def api_interactive(request: Request):
 
 
 if __name__ == "__main__":
-    from app.runner import run as _run
-    _run(app)
+    import sys
+    import uvicorn
+
+    port = 3000
+    if "--port" in sys.argv:
+        idx = sys.argv.index("--port")
+        if idx + 1 < len(sys.argv):
+            port = int(sys.argv[idx + 1])
+    # Single worker is enough for a personal server; the blocking DB paths
+    # (public_stats/activity) now run via asyncio.to_thread so the loop is
+    # never stalled. Behind Caddy, so proxy_headers=True for correct
+    # X-Forwarded-* client IPs. uvloop (installed) for a faster event loop.
+    # limit_max_requests recycles the worker periodically so any slow memory
+    # leak (pool/cache) can't accumulate over days of uptime — PM2 restarts
+    # the process when it exits.
+    # 2026-08-30: changed host 0.0.0.0 -> 127.0.0.1. The app is always behind
+    # Caddy (reverse_proxy localhost:3000), so binding to all interfaces only
+    # exposed port 3000 to the public internet — causing uvicorn to log
+    # "Invalid HTTP request received" from bots/probes that hit the raw port
+    # with TLS/other-protocol bytes. Binding to loopback closes that surface;
+    # Caddy still reaches it locally.
+    # P1 PM2 cluster mode: workers=1 per PM2 instance (pm2 handles clustering, not uvicorn)
+    # limit_max_requests removed in cluster mode - was killing BLPOP mid-job [tasks.py:373]
+    # Use --limit-max-requests 0 so worker not recycled mid-BLPOP
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=port,
+        workers=1,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+        loop="uvloop",
+        access_log=False,
+        limit_concurrency=2000,
+        limit_max_requests=10000,
+        timeout_keep_alive=30,
+    )

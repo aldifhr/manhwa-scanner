@@ -72,7 +72,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         title = m.get("title") or m.get("manga_name") or ""
         if not title:
             continue
-        tk = manga_id
+        tk = _ntk(title or "")
         origin = (m.get("country_id") or "").upper()
         cover = m.get("cover_image_url") or m.get("cover_portrait_url") or ""
         rating = _nr(m.get("user_rate"))

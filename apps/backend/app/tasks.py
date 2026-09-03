@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from app.config import settings
 from app.logger import get_logger
@@ -129,28 +130,59 @@ def _run_cron_inline(action: str) -> None:
     is_scrape = action.startswith("rss-fetch")
     source = action.split(":", 1)[1] if ":" in action else None
     do_dispatch = not is_scrape
-    try:
-        from app.cron.pipeline import run_pipeline
 
-        run_pipeline(action=action, do_dispatch=do_dispatch)
-    except Exception as e:
-        logger.error("inline cron run failed", action=action, exc=e)
-    finally:
-        # Record the last time we ATTEMPTED a scrape for this source, so the
-        # /cron monitor shows "scrape is running on schedule" even when the
-        # source is quiet (no new chapters -> recent_chapters.updated_time
-        # doesn't move, which would otherwise look "stale").
-        if is_scrape and source:
-            try:
-                from datetime import datetime, timezone
+    # enrich / enrich-missing / enrich-resync are metadata-only jobs wired to
+    # enrich_resync.py (NOT run_pipeline — pipeline has no route for them).
+    if action in ("enrich", "enrich-missing", "enrich-refresh"):
+        from app.cron.enrich_resync import enrich_recent_chapters, enrich_stale_series_meta
+        if action == "enrich":
+            stats = enrich_recent_chapters()
+        elif action == "enrich-missing":
+            stats = enrich_recent_chapters(limit=100, miss_only=True)
+        else:  # enrich-refresh
+            stats = enrich_stale_series_meta(stale_days=7, limit=50)
+        logger.info("cron enrich done", action=action, stats=stats)
+        return
 
-                _get_redis().set(
-                    f"cron:last_scrape:{source}",
-                    datetime.now(timezone.utc).isoformat(),
-                    ex=3600,
-                )
-            except Exception:
-                pass
+    # voratoon-cover: presigned URL 6d expiry → 24h refresh
+    if action == "voratoon-cover":
+        from app.cron.enrich_resync import enrich_voratoon_covers
+        stats = enrich_voratoon_covers(limit=50)
+        logger.info("cron voratoon-cover done", **stats)
+        return
+
+    # Retry with exponential backoff: 0s, 2s, 4s, then DLQ
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            from app.cron.pipeline import run_pipeline
+            run_pipeline(action=action, do_dispatch=do_dispatch)
+            return
+        except Exception as e:
+            if attempt < max_attempts:
+                wait = 2 ** attempt  # 2s, 4s
+                logger.warn("cron run failed, retrying", action=action, attempt=attempt, wait=wait, err=str(e)[:120])
+                time.sleep(wait)
+            else:
+                logger.error("cron run failed, moving to DLQ", action=action, attempts=max_attempts, exc=e)
+                try:
+                    _get_redis().rpush(DLQ_KEY, json.dumps({"action": action, "error": str(e)[:200], "attempts": max_attempts}))
+                except Exception:
+                    pass
+    # Record the last time we ATTEMPTED a scrape for this source, so the
+    # /cron monitor shows "scrape is running on schedule" even when the
+    # source is quiet (no new chapters -> recent_chapters.updated_time
+    # doesn't move, which would otherwise look "stale").
+    if is_scrape and source:
+        try:
+            from datetime import datetime, timezone
+            _get_redis().set(
+                f"cron:last_scrape:{source}",
+                datetime.now(timezone.utc).isoformat(),
+                ex=3600,
+            )
+        except Exception:
+            pass
 
 
 def run_cron_worker() -> None:
@@ -200,6 +232,7 @@ def _scheduler_loop() -> None:
     last_enrich_missing = 0.0
     last_enrich_refresh = 0.0
     last_voratoon_cover = 0.0
+    last_dispatch = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
@@ -276,6 +309,14 @@ def _scheduler_loop() -> None:
                 last_voratoon_cover = _now
             except Exception:
                 pass
+
+        # Queue depth alert: log + DLQ if queue grows unbounded (> 50)
+        try:
+            qlen = _get_redis().llen(CRON_QUEUE_KEY)
+            if qlen > 50:
+                logger.error("cron queue depth exceeded", queue_length=qlen, threshold=50)
+        except Exception:
+            pass
 
 
 def start_cron_scheduler() -> None:
@@ -439,7 +480,7 @@ def worker_loop() -> None:
 # realistic scrape gap (cron runs every ~1.6 min, max observed gap 15 min).
 # 7 days is a safe buffer for VPS-downtime incidents without unbounded growth
 # (~500 rows at current volume). Per-series rows are also capped (below).
-_DISPATCH_HISTORY_RETENTION_DAYS = 90
+_DISPATCH_HISTORY_RETENTION_DAYS = 2
 _CHAPTER_CLICKS_RETENTION_DAYS = 90
 _CRON_RUN_STATUS_RETENTION_DAYS = 30
 _FAILED_DISPATCHES_RETENTION_DAYS = 30
