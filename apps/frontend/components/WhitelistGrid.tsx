@@ -142,7 +142,7 @@ export function WhitelistGrid() {
             { value: "All", label: "Type: All" },
             { value: "manhwa", label: "Manhwa (KR)" },
             { value: "manhua", label: "Manhua (CN)" },
-            { value: "manga", label: "Manga (JP)" },
+            { value: "no_type", label: "No Type" },
           ]}
         />
 

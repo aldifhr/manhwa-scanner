@@ -23,8 +23,11 @@ export function useWhitelistFilters(
       )
         return false;
       if (sourceFilter !== "All" && item.source !== sourceFilter) return false;
-      if (typeFilter !== "All" && (item.type || "") !== typeFilter)
-        return false;
+      if (typeFilter !== "All") {
+        const raw = String(item.type || "").toLowerCase().trim();
+        const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
+        if (t !== typeFilter.toLowerCase()) return false;
+      }
       if (
         originFilter !== "All" &&
         normalizeOrigin(item.origin) !== normalizeOrigin(originFilter)

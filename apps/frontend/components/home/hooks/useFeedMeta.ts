@@ -15,8 +15,8 @@ export function useFeedMeta(
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of all) {
-      const t = String(c.type || "").toLowerCase();
-      if (!t) continue;
+      const raw = String(c.type || "").toLowerCase().trim();
+      const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
       map[t] = (map[t] || 0) + 1;
     }
     return map;

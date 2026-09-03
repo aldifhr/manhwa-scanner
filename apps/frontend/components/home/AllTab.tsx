@@ -154,8 +154,13 @@ function AllTabInner() {
     if (optimisticExcluded.size > 0)
       f = f.filter((c) => !optimisticExcluded.has(c.titleKey));
     if (sourceFilter) f = f.filter((c) => (c.source || "") === sourceFilter);
-    if (typeFilter)
-      f = f.filter((c) => String(c.type || "").toLowerCase() === typeFilter);
+    if (typeFilter) {
+      f = f.filter((c) => {
+        const raw = String(c.type || "").toLowerCase().trim();
+        const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
+        return t === typeFilter;
+      });
+    }
     if (countryFilter === "__unknown__")
       f = f.filter(
         (c) =>

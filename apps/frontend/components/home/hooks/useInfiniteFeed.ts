@@ -38,14 +38,14 @@ export function useInfiniteFeed(opts: {
       PAGE_SIZE,
       sourceFilter || null,
       whitelistParam,
-      typeFilter || null
+      (typeFilter && typeFilter !== "no_type" ? typeFilter : null)
     ),
     queryFn: () =>
       Reader.getRssFlatPage(1, PAGE_SIZE, {
         exclude,
         whitelist: whitelistParam,
         source: sourceFilter || null,
-        type: typeFilter || null,
+        type: typeFilter && typeFilter !== "no_type" ? typeFilter : null,
       }),
     refetchInterval: 30_000,
   });
@@ -71,7 +71,7 @@ export function useInfiniteFeed(opts: {
         exclude,
         whitelist: whitelistParam,
         source: sourceFilter || null,
-        type: typeFilter || null,
+        type: typeFilter && typeFilter !== "no_type" ? typeFilter : null,
       });
       setAllItems((prev) => {
         const seen = new Set(prev.map((c) => chapterKey(c)));
@@ -146,8 +146,8 @@ export function useInfiniteFeed(opts: {
     if (scrolled >= threshold) {
       const next = page + 1;
       queryClient.prefetchQuery({
-        queryKey: queryKeys.rssFeedFlat(exclude, PAGE_SIZE, sourceFilter || null, whitelistParam, typeFilter || null),
-        queryFn: () => Reader.getRssFlatPage(next, PAGE_SIZE, { exclude, whitelist: whitelistParam, source: sourceFilter || null, type: typeFilter || null }),
+        queryKey: queryKeys.rssFeedFlat(exclude, PAGE_SIZE, sourceFilter || null, whitelistParam, typeFilter && typeFilter !== "no_type" ? typeFilter : null),
+        queryFn: () => Reader.getRssFlatPage(next, PAGE_SIZE, { exclude, whitelist: whitelistParam, source: sourceFilter || null, type: typeFilter && typeFilter !== "no_type" ? typeFilter : null }),
         staleTime: 15_000,
       });
     }

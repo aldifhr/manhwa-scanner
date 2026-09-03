@@ -27,6 +27,20 @@ export interface FlatChapter {
 
 export const KNOWN_ORIGINS = ["korean", "japanese", "chinese"] as const;
 
+export const KNOWN_TYPES = ["manhwa", "manhua"] as const;
+export const NO_TYPE = "no_type" as const;
+
+export function normalizeType(t: unknown): string {
+  const v = String(t ?? "").trim().toLowerCase();
+  if ((KNOWN_TYPES as readonly string[]).includes(v)) return v;
+  return NO_TYPE;
+}
+export function typeLabel(t: string): string {
+  if (t === "manhwa") return "Manhwa";
+  if (t === "manhua") return "Manhua";
+  return "No Type";
+}
+
 export function resolveSeriesUrl(c: FlatChapter): string {
   return c.seriesUrl || c.chapterUrl;
 }
