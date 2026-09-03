@@ -191,6 +191,7 @@ _DISPATCH_INTERVAL_S = 60        # 1 min Discord dispatch (user request)
 _ENRICH_INTERVAL_S = 900         # 15 min (legacy full refresh)
 _ENRICH_MISSING_INTERVAL_S = 1800  # 30 min static-data backfill (miss_only)
 _ENRICH_REFRESH_INTERVAL_S = 604800  # 7 days stale check (rating/description drift)
+_VORATOON_COVER_INTERVAL_S = 86400  # 24h voratoon presigned cover refresh (6d expiry)
 
 
 def _scheduler_loop() -> None:
@@ -198,12 +199,14 @@ def _scheduler_loop() -> None:
     last_enrich = 0.0
     last_enrich_missing = 0.0
     last_enrich_refresh = 0.0
+    last_voratoon_cover = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
                 enrich_interval=_ENRICH_INTERVAL_S,
                 enrich_missing_interval=_ENRICH_MISSING_INTERVAL_S,
-                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S)
+                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S,
+                voratoon_cover_interval=_VORATOON_COVER_INTERVAL_S)
     # Kick off immediately on startup so freshness doesn't wait 10 min.
     _t0 = __import__("time").monotonic()
     for i, src in enumerate(_RSS_SOURCES):
@@ -266,6 +269,13 @@ def _scheduler_loop() -> None:
                 last_enrich_refresh = _now
             except Exception:
                 pass
+        # Voratoon cover refresh: private bucket presigned 6d expiry -> 24h
+        if _now - last_voratoon_cover >= _VORATOON_COVER_INTERVAL_S:
+            try:
+                enqueue_cron("voratoon-cover")
+                last_voratoon_cover = _now
+            except Exception:
+                pass
 
 
 def start_cron_scheduler() -> None:
@@ -294,6 +304,7 @@ def get_cron_status() -> dict:
         "enrich_interval_s": _ENRICH_INTERVAL_S,
         "enrich_missing_interval_s": _ENRICH_MISSING_INTERVAL_S,
         "enrich_refresh_interval_s": _ENRICH_REFRESH_INTERVAL_S,
+        "voratoon_cover_interval_s": _VORATOON_COVER_INTERVAL_S,
         "sources": list(_RSS_SOURCES),
         "now": datetime.now(timezone.utc).isoformat(),
     }

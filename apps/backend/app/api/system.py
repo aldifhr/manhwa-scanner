@@ -26,6 +26,7 @@ _cron_locks: dict[str, threading.Lock] = {
     "enrich": threading.Lock(),
     "enrich-missing": threading.Lock(),
     "enrich-refresh": threading.Lock(),
+    "voratoon-cover": threading.Lock(),
 }
 _cron_running = False
 # Per-source advisory keys to avoid serializing independent scrapes (P0 #5)
@@ -137,6 +138,13 @@ def _run_pipeline_bg(action: str):
             _record_job(action, "done", stats)
             logger.info("cron enrich-refresh done", **stats)
             return
+        if action == "voratoon-cover":
+            from app.cron.enrich_resync import enrich_voratoon_covers
+            _record_job(action, "running")
+            stats = enrich_voratoon_covers(limit=50)
+            _record_job(action, "done", stats)
+            logger.info("cron voratoon-cover done", **stats)
+            return
         if action == "health":
             from app.storage import health as hs
             from app.config import settings as _s
@@ -196,7 +204,7 @@ async def cron_trigger(request: Request):
     if source and action == "rss-fetch":
         action = f"rss-fetch:{source}"
     
-    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich", "enrich-missing", "enrich-refresh")
+    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover")
     valid_source_actions = ("rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon")
     
     if action not in valid_actions and action not in valid_source_actions:

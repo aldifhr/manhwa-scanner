@@ -309,6 +309,89 @@ def enrich_stale_series_meta(stale_days: int = 7, limit: int = 50) -> dict:
     return stats
 
 
+def enrich_voratoon_covers(limit: int = 50) -> dict:
+    """24h voratoon cover refresh — private bucket presigned 6d expiry.
+
+    Whitelist voratoon covers are X-Amz presigned, must be re-fetched daily
+    or proxy 403 (screenshot CoverDewalibis...). Only source=voratoon,
+    WHERE cover LIKE '%X-Amz-%' OR updated_at < now()-1d.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    sb = get_supabase()
+    start = time.time()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+
+    try:
+        from app.db import get_conn as _gc3, put_conn as _pc3
+        _conn = _gc3()
+        _cur = _conn.cursor()
+        _cur.execute(
+            """
+            SELECT title_key, source, cover, series_url, updated_at
+            FROM whitelist
+            WHERE source='voratoon'
+              AND (cover LIKE '%%X-Amz-%%' OR updated_at IS NULL OR updated_at < %s)
+            ORDER BY updated_at ASC NULLS FIRST
+            LIMIT %s
+            """,
+            (cutoff, limit),
+        )
+        _cols = [d[0] for d in _cur.description] if _cur.description else []
+        rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
+        _pc3(_conn)
+    except Exception as e:
+        logger.error("voratoon cover: list failed", exc=e)
+        return {"ok": False, "error": str(e)[:160]}
+
+    if not rows:
+        return {"ok": True, "updated": 0, "checked": 0, "duration": 0.0, "note": "no voratoon stale"}
+
+    from app.scrapers.voratoon import fetch_series_detail as _fetch_vt
+    from app.utils.cover_scrub import scrub_cover as _scrub
+
+    updated = 0
+    checked = 0
+    failed = 0
+    for r in rows:
+        tk = str(r.get("title_key") or "").strip()
+        su = str(r.get("series_url") or "").strip()
+        if not tk:
+            continue
+        slug = None
+        if su and "/series/" in su:
+            slug = su.split("/series/")[-1].split("/")[0].split("?")[0]
+        if not slug:
+            slug = tk
+        checked += 1
+        try:
+            detail = _fetch_vt(slug)
+            data = (detail or {}).get("data", {}) if isinstance(detail, dict) else {}
+            raw_cover = data.get("coverImage") or data.get("cover") or ""
+            if not raw_cover:
+                # fallback: try series list search
+                raw_cover = r.get("cover") or ""
+            new_cover = _scrub(raw_cover) if raw_cover else ""
+            # scrub returns proxy?url=presigned for voratoon private - keep it
+            if new_cover and new_cover != r.get("cover"):
+                sb.table("whitelist").update({"cover": new_cover, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("title_key", tk).eq("source", "voratoon").execute()
+                # also sync series_meta
+                try:
+                    sb.table("series_meta").upsert({"title_key": tk, "source": "voratoon", "cover": new_cover, "updated_at": datetime.now(timezone.utc).isoformat()}, on_conflict="title_key,source").execute()
+                except Exception:
+                    pass
+                updated += 1
+        except Exception as e:
+            logger.warn("voratoon cover: fetch failed", tk=tk, err=str(e)[:120])
+            failed += 1
+        time.sleep(0.75)
+
+    duration = round(time.time() - start, 1)
+    stats = {"ok": True, "checked": checked, "updated": updated, "failed": failed, "duration": duration}
+    logger.info("voratoon cover refresh done", **stats)
+    return stats
+
+
 if __name__ == "__main__":
     import os
     os.environ.setdefault("PYTHONPATH", ".")
