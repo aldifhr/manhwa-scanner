@@ -19,7 +19,8 @@ export const excludedTitleSchema = z
     cover: z.string().nullable().optional(),
     series_url: z.string().url().nullable().optional(),
     seriesUrl: z.string().url().nullable().optional(),
-  }).strict()
+  })
+  .passthrough()
   .transform((r) => ({
     id: (r.title_key as string) || (r.titleKey as string) || (r.id as string) || "",
     titleKey: (r.title_key as string) || (r.titleKey as string) || (r.id as string) || "",
@@ -39,7 +40,7 @@ export const whitelistSchema = z
     cover: z.string().nullable().optional(),
     series_url: z.string().url().nullable().optional(),
     seriesUrl: z.string().url().nullable().optional(),
-  }).strict()
+  })
   .passthrough()
   .transform((r) => ({
     ...r,
@@ -53,7 +54,7 @@ export const rssItemSchema = z
     titleKey: z.string().min(1).optional(),
     chapter_url: z.string().url().optional(),
     chapterUrl: z.string().url().optional(),
-  }).strict()
+  })
   .passthrough()
   .transform((r) => ({
     ...r,

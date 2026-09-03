@@ -121,30 +121,10 @@ export interface ExcludedTitleItem {
   seriesUrl?: string | null;
 }
 
-// RSS flat types
-export interface RssFlatItem {
-  title: string;
-  titleKey: string;
-  canonicalTitleKey?: string;
-  isSent?: boolean;
-  chapter: string;
-  chapterLabel: string;
-  chapterNumber: number;
-  url: string;
-  chapterUrl: string;
-  source: string;
-  cover: string;
-  origin: string;
-  type?: string | null;
-  seriesUrl: string;
-  status?: string | null;
-  rating?: string | number | null;
-  genres?: string[];
-  description?: string | null;
-  isWhitelisted: boolean;
-  createdAt: string;
-  sentAt: string;
-}
+import type { FlatChapter } from "@/lib/feed";
+
+// RSS flat types — canonical is lib/feed.ts FlatChapter (deep module Feed)
+export type RssFlatItem = FlatChapter;
 
 export interface RssFlatPage {
   results: RssFlatItem[];
