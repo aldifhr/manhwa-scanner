@@ -26,6 +26,7 @@ interface AllCardItem {
   source: string;
   cover: string;
   origin: string;
+  type?: string | null;
   seriesUrl: string;
   rating?: string | number | null;
   genres?: string[];
@@ -160,7 +161,7 @@ function AllCard({
         {/* Badge row */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           <SourceChip source={item.source} />
-          <OriginFlag origin={item.origin} />
+          {item.type && <OriginFlag origin={item.origin} />}
           {(() => {
             const lbl = getChapterLabel(item);
             return lbl === "?" ? null : (

@@ -134,7 +134,9 @@ function GroupedSeriesCard({
         {/* Badge row */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           <SourceChip source={series.chapters[0]?.source} />
-          <OriginFlag origin={series.origin} />
+          {(series as unknown as { type?: string | null }).type && (
+            <OriginFlag origin={series.origin} />
+          )}
           <Badge
             variant="secondary"
             className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/80 border-0"

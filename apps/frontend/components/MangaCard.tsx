@@ -133,20 +133,18 @@ function MangaCard({
             </div>
           )}
 
-          {/* Top-left cluster: origin flag + type (rating moved below cover) */}
-          {(origin && getOriginFlag(origin)) || type ? (
+          {/* Top-left cluster: origin flag — only when type exists (no type = no flag) */}
+          {origin && type && getOriginFlag(origin) ? (
             <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
-              {origin && getOriginFlag(origin) && (
-                <span className="shadow-[0_2px_6px_rgba(0,0,0,0.4)] rounded-[3px] overflow-hidden block">
-                  <img
-                    src={getOriginFlag(origin)}
-                    alt={origin}
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    className="w-5 h-auto block"
-                  />
-                </span>
-              )}
+              <span className="shadow-[0_2px_6px_rgba(0,0,0,0.4)] rounded-[3px] overflow-hidden block">
+                <img
+                  src={getOriginFlag(origin)}
+                  alt={origin}
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  className="w-5 h-auto block"
+                />
+              </span>
             </div>
           ) : null}
           {/* Source badge(s) — top-right */}
