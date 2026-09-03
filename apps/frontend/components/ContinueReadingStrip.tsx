@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { BookOpen } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
@@ -99,6 +99,54 @@ export function ContinueReadingStrip() {
         .slice(0, 10),
     [entries]
   );
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef({ startX: 0, scrollLeft: 0, moved: false });
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setIsDragging(true);
+    dragRef.current = { startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
+  }, []);
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const el = scrollerRef.current;
+    if (!el) return;
+    const x = e.pageX - el.offsetLeft;
+    const walk = x - dragRef.current.startX;
+    if (Math.abs(walk) > 5) dragRef.current.moved = true;
+    el.scrollLeft = dragRef.current.scrollLeft - walk;
+  }, [isDragging]);
+  const onMouseUp = useCallback(() => setIsDragging(false), []);
+  const onMouseLeave = useCallback(() => setIsDragging(false), []);
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setIsDragging(true);
+    dragRef.current = { startX: e.touches[0].pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
+  }, []);
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    const x = e.touches[0].pageX - el.offsetLeft;
+    const walk = x - dragRef.current.startX;
+    if (Math.abs(walk) > 5) dragRef.current.moved = true;
+    el.scrollLeft = dragRef.current.scrollLeft - walk;
+  }, [isDragging]);
+  const onTouchEnd = useCallback(() => setIsDragging(false), []);
+
+  // Prevent click on cards when drag moved
+  const onClickCapture = useCallback((e: React.MouseEvent) => {
+    if (dragRef.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current.moved = false;
+    }
+  }, []);
+
   if (entries.size === 0) return null;
   return (
     <PageShell>
@@ -114,9 +162,21 @@ export function ContinueReadingStrip() {
           Clear all
         </button>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+      <div
+        ref={scrollerRef}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseLeave}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onClickCapture={onClickCapture}
+        className={`flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory select-none ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
+        style={{ scrollbarWidth: "none" } as React.CSSProperties}
+      >
         {sorted.map((entry, i) => (
-          <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }}>
+          <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }} className={isDragging ? "pointer-events-none" : ""}>
             <ContinueReadingCard entry={entry} onRemove={removeReading} />
           </motion.div>
         ))}
