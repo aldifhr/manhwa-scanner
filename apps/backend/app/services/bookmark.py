@@ -15,20 +15,24 @@ def save_bookmark(
     session_hash: str,
     source: str = "",
     position_pct: float = 0.0,
+    title: str = "",
+    cover: str = "",
 ) -> dict:
     """Save a bookmark for a chapter."""
     try:
         from app.db import q
         q("""
-            INSERT INTO chapter_bookmarks (title_key, chapter_number, chapter_url, session_hash, source, position_pct, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO chapter_bookmarks (title_key, chapter_number, chapter_url, session_hash, source, position_pct, title, cover, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (title_key, chapter_number, session_hash) DO UPDATE SET
                 position_pct = EXCLUDED.position_pct,
                 chapter_url = EXCLUDED.chapter_url,
+                title = COALESCE(NULLIF(EXCLUDED.title,''), chapter_bookmarks.title),
+                cover = COALESCE(NULLIF(EXCLUDED.cover,''), chapter_bookmarks.cover),
                 updated_at = EXCLUDED.updated_at
         """, [
             title_key, chapter_number, chapter_url, session_hash, source,
-            position_pct, datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc).isoformat()
+            position_pct, title, cover, datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc).isoformat()
         ])
         return {"status": "ok"}
     except Exception as e:
@@ -41,9 +45,13 @@ def get_bookmarks(session_hash: str, limit: int = 100) -> list[dict]:
     try:
         from app.db import q
         return q("""
-            SELECT title_key, chapter_number, chapter_url, source, position_pct, updated_at
-            FROM chapter_bookmarks
-            WHERE session_hash = %s
+            SELECT b.title_key, b.chapter_number, b.chapter_url, b.source, b.position_pct, b.updated_at,
+                   COALESCE(NULLIF(b.title,''), w.title, b.title_key) as title,
+                   COALESCE(NULLIF(b.cover,''), w.cover, rc.cover) as cover
+            FROM chapter_bookmarks b
+            LEFT JOIN whitelist w ON REPLACE(LOWER(w.title_key), '-', ' ') = REPLACE(LOWER(b.title_key), '-', ' ') AND w.source = b.source
+            LEFT JOIN LATERAL (SELECT cover FROM recent_chapters rc WHERE REPLACE(LOWER(rc.title_key), '-', ' ') = REPLACE(LOWER(b.title_key), '-', ' ') ORDER BY updated_time DESC LIMIT 1) rc ON true
+            WHERE b.session_hash = %s
             ORDER BY updated_at DESC
             LIMIT %s
         """, [session_hash, limit])

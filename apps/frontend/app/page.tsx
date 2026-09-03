@@ -11,10 +11,13 @@ import {
   Star,
   ArrowClockwise,
   BookOpen,
+  BookBookmark,
   Compass,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
+import { saveBookmark } from "@/lib/api";
+import { toast } from "sonner";
 import { PageShell } from "@/components/PageShell";
 import EmptyState from "@/components/EmptyState";
 import { ErrorFallback } from "@/components/ErrorFallback";
@@ -254,8 +257,8 @@ function HomeGroupedCard({ series }: { series: GroupedSeries }) {
                     ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
                     : "bg-white/10 text-white/80 hover:bg-white/20";
             return (
+              <span key={ch.key} className="inline-flex items-center gap-1">
               <a
-                key={ch.key}
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -281,6 +284,22 @@ function HomeGroupedCard({ series }: { series: GroupedSeries }) {
                 <span className="capitalize">{ch.source}</span>
                 Ch. {label}
               </a>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    const num = Number(String(label).replace(/[^0-9.]/g, "")) || 0;
+                    await saveBookmark({ title_key: series.titleKey, chapter_number: num || 1, chapter_url: href, source: ch.source, title: series.title, cover: series.cover });
+                    toast.success("Bookmarked Ch. " + label);
+                  } catch (err) { toast.error(err instanceof Error ? err.message : "Bookmark failed"); }
+                }}
+                title={`Bookmark Ch. ${label}`}
+                className="p-1 rounded-md bg-white/5 hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-colors"
+              >
+                <BookBookmark size={12} weight="fill" />
+              </button>
+              </span>
             );
           })}
           {series.chapters.every(

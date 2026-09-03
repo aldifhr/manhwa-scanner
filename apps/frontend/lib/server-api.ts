@@ -40,7 +40,7 @@ export const API_BASE = backendUrl();
 export function getApiBase(): string {
   return backendUrl();
 }
-const TOKEN = process.env.API_TOKEN || "";
+const TOKEN = process.env.API_TOKEN || process.env.NEXT_PUBLIC_API_TOKEN || "manhwascan";
 
 if (!TOKEN) {
   console.warn(

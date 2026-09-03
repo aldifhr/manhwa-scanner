@@ -360,6 +360,8 @@ export interface BookmarkEntry {
   source: string;
   position_pct: number;
   updated_at: string;
+  title?: string;
+  cover?: string | null;
 }
 
 export async function getBookmarks(): Promise<BookmarkEntry[]> {
@@ -375,23 +377,31 @@ export async function saveBookmark(data: {
   chapter_url: string;
   source?: string;
   position_pct?: number;
+  title?: string;
+  cover?: string | null;
 }): Promise<void> {
-  const res = await fetch("/api/v1/bookmarks", {
+  const res = await fetch("/api/v1/bookmarks", withCsrf({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }));
+  if (!res.ok) {
+    const body = await res.json().catch(()=>({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
 }
 
 export async function deleteBookmark(
   titleKey: string,
   chapterNumber: number
 ): Promise<void> {
-  const res = await fetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, {
+  const res = await fetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, withCsrf({
     method: "DELETE",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }));
+  if (!res.ok) {
+    const body = await res.json().catch(()=>({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
 }
 
 /* ── A/B Testing removed — /ab-tests page deleted per CONTEXT.md 2026-09-02 ── */

@@ -4,6 +4,7 @@ import { PageShell } from "@/components/PageShell";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getBookmarks, deleteBookmark, type BookmarkEntry } from "@/lib/api";
+import { rewriteCoverUrl, decodeHtml } from "@/lib/utils";
 import { useContinueReading } from "@/lib/continueReading";
 
 export default function BookmarksPage() {
@@ -71,13 +72,20 @@ export default function BookmarksPage() {
             </div>
           ) : bookmarks && bookmarks.length > 0 ? (
             <div className="space-y-3">
-              {bookmarks.map((b) => (
+              {bookmarks.map((b) => {
+                const cover = rewriteCoverUrl(b.cover || null);
+                return (
                 <div
                   key={`${b.title_key}-${b.chapter_number}`}
-                  className="bg-surface rounded-lg p-4 border border-border flex items-center justify-between"
+                  className="bg-surface rounded-lg p-4 border border-border flex items-center gap-4"
                 >
+                  {cover ? (
+                    <img src={cover} alt={decodeHtml(b.title || b.title_key)} className="w-14 h-20 object-cover rounded-md bg-white/5 shrink-0" loading="lazy" />
+                  ) : (
+                    <div className="w-14 h-20 rounded-md bg-white/5 shrink-0 flex items-center justify-center text-white/30 text-xs">No cover</div>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{b.title_key}</p>
+                    <p className="font-medium truncate">{decodeHtml(b.title || b.title_key)}</p>
                     <p className="text-sm text-text-muted">
                       Chapter {b.chapter_number} • {b.source} •{" "}
                       {new Date(b.updated_at).toLocaleDateString()}
@@ -134,7 +142,7 @@ export default function BookmarksPage() {
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           ) : (
             <div className="text-center py-12 text-text-muted">

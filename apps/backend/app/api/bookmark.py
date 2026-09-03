@@ -42,6 +42,8 @@ async def bookmark_create(request: Request):
         chapter_url = body.get("chapter_url", "")
         source = body.get("source", "")
         position_pct = float(body.get("position_pct", 0.0))
+        title = body.get("title", "")
+        cover = body.get("cover", "")
         
         if not title_key or not chapter_number:
             return JSONResponse(content={"success": False, "error": "title_key and chapter_number required"}, status_code=400)
@@ -49,7 +51,7 @@ async def bookmark_create(request: Request):
         from app.api.continue_reading import _get_session_hash
         session_hash = _get_session_hash(request)
         
-        result = save_bookmark(title_key, chapter_number, chapter_url, session_hash, source, position_pct)
+        result = save_bookmark(title_key, chapter_number, chapter_url, session_hash, source, position_pct, title, cover)
         return JSONResponse(content={"success": True, "data": result})
     except Exception as e:
         logger.warn("bookmark create failed", err=str(e)[:120])
