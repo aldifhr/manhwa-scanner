@@ -75,31 +75,29 @@ export function useFeedActions() {
 
   const addGroupMutation = useMutation({
     mutationFn: async (series: GroupedSeries) => {
-      const sources = [
-        ...new Set(series.chapters.map((c) => c.source).filter(Boolean)),
-      ];
-      if (sources.length === 0) throw new Error("No source");
-      const optKeys = sources.map((s) => `${series.titleKey}:${s}`);
+      // Use per-chapter titleKey (dedup merges dash/space/uuid) so optimistic keys match flat rows
+      const chapterKeys = series.chapters.map((c: any) => `${(c.titleKey || series.titleKey)}:${c.source}`);
+      const optKeys = [...new Set(chapterKeys)];
+      // Group by source for backend calls (title_key per source should use that source's actual titleKey)
+      const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
+      for (const c of series.chapters as any[]) {
+        if (!bySource.has(c.source)) bySource.set(c.source, { titleKey: c.titleKey || series.titleKey, seriesUrl: c.seriesUrl || series.seriesUrl });
+      }
       const results = await Promise.all(
-        sources.map((s) => {
-          const newestForSource = series.chapters
-            .filter((c) => c.source === s)
-            .sort((a, b) => b.chapterNumber - a.chapterNumber)[0];
-          const sourceSeriesUrl =
-            newestForSource?.seriesUrl || series.seriesUrl || "";
-          return addWhitelistEntry({
+        [...bySource.entries()].map(([s, v]) =>
+          addWhitelistEntry({
             title: series.title,
-            seriesUrl: sourceSeriesUrl || undefined,
+            seriesUrl: v.seriesUrl || undefined,
             source: s,
-            title_key: series.titleKey,
+            title_key: v.titleKey,
             cover: series.cover,
             status: series.status,
             rating: series.rating,
             origin: series.origin,
             genres: series.genres,
             description: series.description ?? undefined,
-          });
-        })
+          })
+        )
       );
       return { results, optKeys };
     },

@@ -44,6 +44,7 @@ import { useUiStore } from "@/lib/uiStore";
 import { useUiUrlSync } from "@/lib/useUiUrlSync";
 import { useDebounced } from "@/lib/useDebounced";
 import { PageShell } from "@/components/PageShell";
+function normalizeTitleKey(k: string){ return (k||"").toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim(); }
 import { usePinnedSet } from "./hooks/usePinnedSet";
 import { useInfiniteFeed } from "./hooks/useInfiniteFeed";
 import { useFeedActions } from "./hooks/useFeedActions";
@@ -168,14 +169,16 @@ function AllTabInner() {
         (c) =>
           !(
             c.isWhitelisted ||
-            optimisticWhitelist.has(`${c.titleKey}:${c.source}`)
+            optimisticWhitelist.has(`${c.titleKey}:${c.source}`) ||
+            optimisticWhitelist.has(`${normalizeTitleKey(c.titleKey)}:${c.source}`)
           )
       );
     if (feed === "wl")
       f = f.filter(
         (c) =>
           c.isWhitelisted ||
-          optimisticWhitelist.has(`${c.titleKey}:${c.source}`)
+          optimisticWhitelist.has(`${c.titleKey}:${c.source}`) ||
+          optimisticWhitelist.has(`${normalizeTitleKey(c.titleKey)}:${c.source}`)
       );
     const q = searchQuery.trim().toLowerCase();
     if (q) f = f.filter((c) => (c.title || "").toLowerCase().includes(q));

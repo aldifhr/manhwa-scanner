@@ -31,6 +31,7 @@ interface GroupedChapter {
   chapter: string;
   chapterLabel: string;
   chapterNumber: number;
+  titleKey: string;
   url: string;
   chapterUrl: string;
   source: string;
@@ -86,6 +87,7 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
     }
     g!.chapters.push({
       key: `${tk}:${it.source}:${it.chapter}`,
+      titleKey: tk,
       chapter: it.chapter,
       chapterLabel: it.chapterLabel,
       chapterNumber: it.chapterNumber,
