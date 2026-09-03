@@ -139,6 +139,31 @@ class Logger:
         # file sinks (proper logging; level gates which handlers receive it)
         if _file_handler is not None or _err_handler is not None:
             _file_logger.log(_LEVELS[level], line)
+        # persistent DB journal for error/warn (best-effort, non-blocking)
+        if level in ("error", "warn"):
+            try:
+                import threading as _th
+
+                def _bg_insert():
+                    try:
+                        from app.storage.error_logs import insert_error
+
+                        stack = rec.get("traceback") or None
+                        insert_error(
+                            level=level,
+                            source=self.scope,
+                            message=rec.get("msg", "")[:2000],
+                            stack=stack,
+                            path=rec.get("path") or fields.get("path"),
+                            correlation_id=cid,
+                            meta={k: v for k, v in rec.items() if k not in ("level", "time", "scope", "msg", "cid", "traceback", "error_type", "error_msg")},
+                        )
+                    except Exception:
+                        pass
+
+                _th.Thread(target=_bg_insert, daemon=True).start()
+            except Exception:
+                pass
 
     # ── leveled methods ──
     def debug(self, msg="", **fields):
