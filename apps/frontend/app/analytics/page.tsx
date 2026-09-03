@@ -41,7 +41,9 @@ export default function AnalyticsPage() {
   const retentionQ = useQuery({
     queryKey: queryKeys.analyticsRetention,
     queryFn: getAnalyticsRetention,
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const overview = overviewQ.data as AnalyticsOverview | null;
