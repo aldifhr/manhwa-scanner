@@ -24,6 +24,8 @@ _cron_locks: dict[str, threading.Lock] = {
     "rss-fetch:shinigami": threading.Lock(),
     "rss-fetch:voratoon": threading.Lock(),
     "enrich": threading.Lock(),
+    "enrich-missing": threading.Lock(),
+    "enrich-refresh": threading.Lock(),
 }
 _cron_running = False
 _CRON_ADVISORY_KEY = 424242  # arbitrary stable int for pg_advisory_lock
@@ -113,6 +115,20 @@ def _run_pipeline_bg(action: str):
             _record_job(action, "done", stats)
             logger.info("cron enrich resync done", **stats)
             return
+        if action == "enrich-missing":
+            from app.cron.enrich_resync import enrich_recent_chapters as _enrich_miss
+            _record_job(action, "running")
+            stats = _enrich_miss(limit=100, miss_only=True)
+            _record_job(action, "done", stats)
+            logger.info("cron enrich-missing done", **stats)
+            return
+        if action == "enrich-refresh":
+            from app.cron.enrich_resync import enrich_stale_series_meta
+            _record_job(action, "running")
+            stats = enrich_stale_series_meta(stale_days=7, limit=50)
+            _record_job(action, "done", stats)
+            logger.info("cron enrich-refresh done", **stats)
+            return
         if action == "health":
             from app.storage import health as hs
             from app.config import settings as _s
@@ -172,7 +188,7 @@ async def cron_trigger(request: Request):
     if source and action == "rss-fetch":
         action = f"rss-fetch:{source}"
     
-    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich")
+    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich", "enrich-missing", "enrich-refresh")
     valid_source_actions = ("rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon")
     
     if action not in valid_actions and action not in valid_source_actions:
