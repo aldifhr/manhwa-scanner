@@ -91,15 +91,9 @@ async def put_continue_reading(request: Request):
         from app.db import get_supabase
         sb = get_supabase()
         if is_batch:
-            # Batch upsert: merge all entries
-            # Fetch existing to merge
-            try:
-                existing_res = sb.table("continue_reading").select("entries").eq("session_hash", sid_hash).execute()
-                existing = existing_res.data[0].get("entries", {}) if existing_res.data else {}
-            except Exception:
-                existing = {}
-            # Normalize batch entries (handle both titleKey and title_key)
-            merged = dict(existing)
+            # Batch upsert: REPLACE entire entries with FE's clean map (handles deletes)
+            # FE sends Object.fromEntries([...entries]) → {titleKey: entry} for all remaining
+            merged: dict = {}
             for k, v in body.items():
                 if not isinstance(v, dict):
                     continue
