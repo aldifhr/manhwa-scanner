@@ -204,18 +204,14 @@ def _build_embed(
         zip(chapters, chapter_urls),
         key=lambda x: float(m.group(1)) if (m := _CHAPTER_NUM_RE.search(x[0])) else 0,
     )
-    from urllib.parse import quote as _quote
-    # Use redirect URL for tracking clicks (must match reading_stats router: /api/v1/redirect/chapter)
-    _redirect_base = "https://scanner.aldifhr.fun/api/v1/redirect/chapter"
     _chapter_links = []
     for _ch, _url in _chapters_sorted:
         if _url:
-            _tracked_url = f"{_redirect_base}?url={_quote(_url, safe='')}"
-            _chapter_links.append(f"[ch {_ch}]({_tracked_url})")
+            _chapter_links.append(f"[ch {_ch}]({_url})")
         else:
             _chapter_links.append(f"ch {_ch}")
     _latest_url = _chapters_sorted[-1][1] if _chapters_sorted else ""
-    _latest_tracked = f"{_redirect_base}?url={_quote(_latest_url, safe='')}" if _latest_url else ""
+    _latest_tracked = _latest_url
     _multi = len(_chapters_sorted) > 1
     _chapter_value = ", ".join(_chapter_links) if _multi else (_chapter_links[0] if _chapter_links else "—")
 
