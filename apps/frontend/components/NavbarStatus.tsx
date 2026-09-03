@@ -88,10 +88,10 @@ export default function NavbarStatus({
       href="/health"
       title="System status"
       aria-label="System status"
-      className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+      className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm font-medium leading-none text-white/70 hover:text-white hover:bg-white/5 transition-colors"
     >
       {dot}
-      <span className="text-xs font-medium">{LABEL[agg]}</span>
+      <span className="leading-none">{LABEL[agg]}</span>
     </Link>
   );
 }
