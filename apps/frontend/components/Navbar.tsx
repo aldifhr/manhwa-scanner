@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOut, X } from "@phosphor-icons/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { isNavActive, NAV } from "@/lib/nav";
 import { NavItem } from "@/components/Nav/NavItem";
 import { useAuth } from "@/components/Nav/useAuth";
@@ -60,34 +61,34 @@ export default function Navbar() {
       </nav>
 
       {/* Mobile drawer */}
-      {open && (
-        <div className="fixed inset-0 z-[60] md:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 top-0 h-full w-[82%] max-w-[320px] bg-zinc-950 border-l border-white/10 flex flex-col shadow-2xl animate-[slideIn_0.2s_ease]">
-            <div className="flex items-center justify-between h-14 px-4 border-b border-white/10 shrink-0">
-              <span className="font-bold text-white">Menu</span>
-              <button onClick={() => setOpen(false)} aria-label="Close menu" className="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
-                <X size={18} />
-              </button>
-            </div>
+      <AnimatePresence>
+        {open && (
+          <div className="fixed inset-0 z-[60] md:hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
+            <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className="absolute right-0 top-0 h-full w-[82%] max-w-[320px] bg-zinc-950 border-l border-white/10 flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between h-14 px-4 border-b border-white/10 shrink-0">
+                <span className="font-bold text-white">Menu</span>
+                <button onClick={() => setOpen(false)} aria-label="Close menu" className="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
 
-            <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-              {NAV.map(({ href, label, icon }) => (
-                <NavItem key={href} href={href} label={label} icon={icon} active={isNavActive(href, pathname)} variant="mobile" onPrefetch={prefetch} onClick={() => setOpen(false)} />
-              ))}
-            </div>
+              <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+                {NAV.map(({ href, label, icon }) => (
+                  <NavItem key={href} href={href} label={label} icon={icon} active={isNavActive(href, pathname)} variant="mobile" onPrefetch={prefetch} onClick={() => setOpen(false)} />
+                ))}
+              </div>
 
-            <div className="p-3 border-t border-white/10 space-y-3 bg-black/20">
-              <NavbarStatus variant="mobile" />
-              <button onClick={() => { setOpen(false); logout(); }} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-colors">
-                <SignOut size={18} /> Logout
-              </button>
-            </div>
+              <div className="p-3 border-t border-white/10 space-y-3 bg-black/20">
+                <NavbarStatus variant="mobile" />
+                <button onClick={() => { setOpen(false); logout(); }} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-colors">
+                  <SignOut size={18} /> Logout
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-
-      <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+        )}
+      </AnimatePresence>
     </>
   );
 }
