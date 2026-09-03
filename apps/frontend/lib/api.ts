@@ -229,9 +229,15 @@ export interface RetentionData {
 }
 
 export async function getAnalyticsRetention(): Promise<RetentionData | null> {
-  const { readerFetch } = await import("@/lib/reader/transport");
-  const data = await readerFetch<{ success: boolean; data: RetentionData }>("/api/v1/analytics/retention");
-  return (data.data ?? null) as RetentionData | null;
+  try {
+    const { readerFetch } = await import("@/lib/reader/transport");
+    const data = await readerFetch<{ success: boolean; data: RetentionData }>("/api/v1/analytics/retention");
+    return (data.data ?? null) as RetentionData | null;
+  } catch (e) {
+    // 404 until BE deployed — don't spam console, just hide card
+    if ((e as Error)?.message?.includes("404")) return null;
+    throw e;
+  }
 }
 
 /* ── Custom RSS Feed (GET /api/rss/custom) ── */
