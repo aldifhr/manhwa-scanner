@@ -69,7 +69,6 @@ export default function AnalyticsPage() {
   const popular = overview.popular_series?.slice(0, 10) ?? [];
   const genres = overview.top_genres?.slice(0, 10) ?? [];
   const velocity = [...(overview.chapter_velocity ?? [])].reverse();
-  const growth = [...(overview.whitelist_growth ?? [])].reverse().slice(-30);
 
   const baseOpts = {
     chart: { background: "transparent", toolbar: { show: false }, fontFamily: "inherit" },
@@ -120,17 +119,6 @@ export default function AnalyticsPage() {
     dataLabels: { enabled: false },
   };
 
-  const growthOpts = {
-    ...baseOpts,
-    chart: { ...baseOpts.chart, type: "bar" as const },
-    plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
-    colors: ["#52525b"],
-    xaxis: { categories: growth.map((g) => g.date.slice(5)), labels: { show: false }, axisTicks: { show: false }, axisBorder: { show: false } },
-    yaxis: { labels: { style: { colors: "#71717a" } } },
-    dataLabels: { enabled: false },
-    grid: { show: false },
-  };
-
   return (
     <PageShell>
       <div className="flex items-center justify-between">
@@ -138,9 +126,8 @@ export default function AnalyticsPage() {
         <span className="text-xs text-text-muted">{overview.generated_at ? new Date(overview.generated_at).toLocaleString() : ""}</span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatCard label="Dispatches (7d)" value={overview.chapter_velocity?.reduce((a, b) => a + (b.total_dispatches ?? 0), 0) ?? 0} sub={`${overview.chapter_velocity?.length ?? 0} days`} />
-        <StatCard label="Whitelist growth (30d)" value={overview.whitelist_growth?.reduce((a, b) => a + (b.new_entries ?? 0), 0) ?? 0} sub="new series" />
         <StatCard label="Active readers (24h)" value={engagement?.active_sessions_24h ?? 0} sub="sessions" />
         <StatCard label="Failed (7d)" value={overview.failed_dispatch_stats?.still_failed ?? 0} sub={`${overview.failed_dispatch_stats?.total_failed ?? 0} total`} />
       </div>
@@ -207,14 +194,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="bg-surface rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold mb-2">Whitelist growth (30d)</h2>
-        {growth.length ? (
-          <Chart options={growthOpts as any} series={[{ name: "new", data: growth.map((g) => g.new_entries) }]} type="bar" height={200} />
-        ) : (
-          <p className="text-xs text-text-muted">No data</p>
-        )}
-      </div>
+
     </PageShell>
   );
 }
