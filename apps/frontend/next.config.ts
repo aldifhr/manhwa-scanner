@@ -1,22 +1,8 @@
 import path from "path";
 import type { NextConfig } from "next";
+import { getCsp } from "./lib/security/headers";
 
-// Mirrors the SECURITY_HEADERS block in middleware.ts. Applied at the routing
-// layer to ALL responses (including static assets) so security headers are
-// never absent on any path.
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`, // Next.js App Router needs inline RSC hydration; dev needs 'unsafe-eval' for HMR
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https:", // voratoon presigned S3 direct + proxied covers
-  "font-src 'self'",
-  "connect-src 'self'", // SW fetches only same-origin (proxy/cache) URLs
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "upgrade-insecure-requests",
-].join("; ");
+const csp = getCsp(process.env.NODE_ENV === "development");
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../../"),
@@ -34,6 +20,38 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "cvr.voratoon.id" },
       { protocol: "https", hostname: "voratoon.com" },
     ],
+  },
+  async rewrites() {
+    return [
+      // Generic fallback: any /api/reader/* without explicit mapping goes to /api/v1/reader/*
+      // Must be last in the list so explicit rewrites win.
+      // Explicit legacy -> canonical v1 mappings
+      { source: "/api/reader/stats", destination: "/api/v1/stats" },
+      { source: "/api/reader/queue", destination: "/api/v1/queue" },
+      {
+        source: "/api/reader/dashboard",
+        destination: "/api/v1/dashboard/snapshot",
+      },
+      {
+        source: "/api/reader/catalog/resolve",
+        destination: "/api/v1/catalog/resolve",
+      },
+      {
+        source: "/api/reader/cron/status",
+        destination: "/api/v1/cron/status",
+      },
+      {
+        source: "/api/reader/activity/heatmap",
+        destination: "/api/v1/analytics/engagement",
+      },
+      {
+        source: "/api/reader/auth-refresh",
+        destination: "/api/v1/auth/login",
+      },
+      { source: "/api/reader/cover-img", destination: "/api/v1/reader/cover" },
+      // Catch-all for remaining /api/reader/* -> /api/v1/reader/*
+      { source: "/api/reader/:path*", destination: "/api/v1/reader/:path*" },
+    ];
   },
   async headers() {
     return [

@@ -1,4 +1,4 @@
-// Shared fetch error parser — single source for reader/transport, api-client, server-api
+// Shared fetch error parser — single source for reader/transport + server-api
 export function parseErrorMessage(status: number, text: string): string {
   let msg = `HTTP ${status}`;
   try {

@@ -1,34 +1,7 @@
 import { NextResponse } from "next/server";
 import { backendUrl, authHeaders, TIMEOUT } from "@/lib/server-api";
 import { rewriteCoverUrl } from "@/lib/utils";
-
-// ── In-memory TTL cache (global so whitelist mutate can clear it) ──
-// Stats fans out 4 upstream requests per call and is polled (DashboardHome/
-// stats page). A short TTL absorbs duplicate polls without staling the data.
-const cache: Map<string, { data: unknown; expiry: number }> = ((
-  globalThis as unknown as {
-    __statsCache?: Map<string, { data: unknown; expiry: number }>;
-  }
-).__statsCache ??= new Map());
-const CACHE_TTL = 15_000;
-const MAX_CACHE = 20;
-
-function getCached(key: string) {
-  const entry = cache.get(key);
-  if (!entry || Date.now() > entry.expiry) {
-    cache.delete(key);
-    return null;
-  }
-  return entry.data;
-}
-
-function setCache(key: string, data: unknown) {
-  cache.set(key, { data, expiry: Date.now() + CACHE_TTL });
-  if (cache.size > MAX_CACHE) {
-    const firstKey = cache.keys().next().value;
-    if (firstKey) cache.delete(firstKey);
-  }
-}
+import { statsCache } from "@/lib/cache";
 
 interface BackendStatsData {
   total: number;
@@ -108,7 +81,7 @@ export async function GET(request: Request) {
       /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
     )?.[1] || "anon";
   const cacheKeyStr = `stats:${session}`;
-  const cached = getCached(cacheKeyStr);
+  const cached = statsCache.get(cacheKeyStr);
   if (cached) return NextResponse.json(cached);
 
   try {
@@ -267,7 +240,7 @@ export async function GET(request: Request) {
     };
 
     const body = { success: true, data };
-    setCache(cacheKeyStr, body);
+    statsCache.set(cacheKeyStr, body);
     return NextResponse.json(body);
   } catch (err) {
     console.error("[stats] upstream request failed", err);

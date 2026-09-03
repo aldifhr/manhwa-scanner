@@ -1,21 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { COOKIE_NAME } from "@/lib/auth";
-
-// Security headers applied to every response the middleware handles, and
-// mirrored in next.config.ts (source: "/(.*)") so static assets are covered too.
-// NOTE: script-src / style-src keep 'unsafe-inline' because Next.js App Router
-// injects inline RSC hydration scripts — a strict nonce-free CSP would break
-// hydration. 'self' + same-origin proxied images is otherwise locked down.
-const SECURITY_HEADERS: Record<string, string> = {
-  "Content-Security-Policy":
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests",
-  "X-Frame-Options": "DENY",
-  "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy":
-    "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-};
+import { getSecurityHeaders } from "@/lib/security/headers";
 
 // Endpoints that must NEVER be behind the auth gate (login page, auth API,
 // anonymous proxy routes, service worker, PWA manifest, static icons).
@@ -70,6 +56,14 @@ const PUBLIC_PREFIX = [
   "/api/v1/health/detailed",
   "/api/v1/debug",
   "/debug",
+  // Legacy backward-compat (rewritten via next.config.ts rewrites -> /api/v1/*)
+  "/api/reader/rss",
+  "/api/reader/rss/new",
+  "/api/reader/proxy",
+  "/api/reader/cover",
+  "/api/reader/cover-img",
+  "/api/reader/activity",
+  "/api/cron",
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -83,23 +77,9 @@ function isPublicPath(pathname: string): boolean {
 }
 
 function applySecurityHeaders(res: NextResponse): NextResponse {
-  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
-    if (
-      k === "Content-Security-Policy" &&
-      process.env.NODE_ENV === "development"
-    ) {
-      // Dev mode: add 'unsafe-eval' for Next.js React Refresh (HMR).
-      // Production CSP skips this to keep script-injection surface minimal.
-      res.headers.set(
-        k,
-        v.replace(
-          "script-src 'self' 'unsafe-inline'",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-        )
-      );
-    } else {
-      res.headers.set(k, v);
-    }
+  const headers = getSecurityHeaders(process.env.NODE_ENV === "development");
+  for (const [k, v] of Object.entries(headers)) {
+    res.headers.set(k, v);
   }
   return res;
 }

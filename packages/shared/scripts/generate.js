@@ -1,21 +1,30 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendOpenapi = path.resolve(
   __dirname,
-  "../../apps/backend/openapi.json"
+  "../../../apps/backend/openapi.json"
 );
 const sharedOpenapi = path.resolve(__dirname, "../openapi.json");
 const schemasPath = path.resolve(__dirname, "../src/schemas.ts");
 
 if (fs.existsSync(backendOpenapi)) {
-  fs.copyFileSync(backendOpenapi, sharedOpenapi);
-  console.log(
-    "generate: copied apps/backend/openapi.json -> packages/shared/openapi.json"
-  );
-  // Also emit a minimal zod summary for CI
+  // Verify sync before overwriting — CI can diff
+  const needsCopy =
+    !fs.existsSync(sharedOpenapi) ||
+    fs.readFileSync(backendOpenapi, "utf8") !==
+      fs.readFileSync(sharedOpenapi, "utf8");
+  if (needsCopy) {
+    fs.copyFileSync(backendOpenapi, sharedOpenapi);
+    console.log(
+      "generate: copied apps/backend/openapi.json -> packages/shared/openapi.json"
+    );
+  } else {
+    console.log("generate: openapi.json already in sync");
+  }
   try {
     const raw = JSON.parse(fs.readFileSync(sharedOpenapi, "utf8"));
     const paths = Object.keys(raw.paths ?? {}).length;
@@ -46,6 +55,22 @@ if (!idx.includes('from "./schemas')) {
   console.log("generate: wired schemas export in index.ts");
 }
 
+// Try to generate typed client via openapi-typescript (if installed)
+try {
+  const outDir = path.resolve(__dirname, "../src/generated");
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  execSync("npx --yes openapi-typescript ./openapi.json -o ./src/generated/openapi.ts", {
+    cwd: path.resolve(__dirname, ".."),
+    stdio: "inherit",
+  });
+  console.log("generate: emitted src/generated/openapi.ts via openapi-typescript");
+} catch (e) {
+  console.warn(
+    "generate: openapi-typescript not available or failed, skip type gen — " +
+      (e && e.message ? e.message : String(e))
+  );
+}
+
 console.log(
-  "generate: done — FE can now import { excludedTitleSchema } from '@manhwa-scanner/shared'"
+  "generate: done — FE can now import { excludedTitleSchema } from '@manhwa-scanner/shared' and types from './generated/openapi.js'"
 );

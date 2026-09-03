@@ -9,6 +9,18 @@ select = ["E", "F", "B", "E722"]   # E722 = bare except
 ignore = ["E501", "B008"]          # long lines, fastapi endpoint decorator
 
 [tool.ruff.lint.per-file-ignores]
-# Scrapers legitimately swallow network errors
-"app/scrapers/*" = ["B"]
-"app/cron/*" = ["B"]
+# Scrapers legitimately swallow network errors — narrow to B904 (try/except without logging)
+"app/scrapers/*" = ["B904"]
+"app/cron/*" = ["B904"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["tests"]
