@@ -173,6 +173,18 @@ _CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/cron"}
 
 
 @app.middleware("http")
+async def correlation_middleware(request: Request, call_next):
+    """CID: set X-Request-Id -> logger cid for grepable traces (was never set)."""
+    import uuid as _uuid
+    from app.logger import set_correlation_id
+    cid = request.headers.get("x-request-id") or request.headers.get("x-correlation-id") or _uuid.uuid4().hex[:16]
+    set_correlation_id(cid)
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = cid
+    return response
+
+
+@app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
     """Track Prometheus metrics for all requests."""
     import time
@@ -469,11 +481,12 @@ async def health_detailed_v1():
             _uptime_s = _t_up.time() - _api_start
         except Exception:
             _uptime_s = 0
-    # uptime % = SLA: 100 - errorRate avg, but for personal VPS keep 99.9 placeholder unless degraded
+    # Real uptime from process start, not fake 99% placeholder (was floor 99.0)
+    import time as _t2
+    _uptime_s_real = _t2.time() - getattr(health_store, "APP_START_TS", _t_up.time() - _uptime_s) if _uptime_s else 0
+    # SLA: error-budget based, no floor - degraded shows <99
     _avg_err = sum(s["errorRate24h"] for s in sources) / len(sources) if sources else 0
-    _uptime_pct = round(100 - _avg_err, 1) if sources else 99.9
-    if _uptime_pct < 99.0:
-        _uptime_pct = 99.0  # floor for display
+    _uptime_pct = round(max(0, 100 - _avg_err), 1) if sources else 100.0
     return {
         "success": True,
         "data": {

@@ -705,9 +705,7 @@ async def reader_proxy(request: Request):
 
 # --- Metrics (internal-only: counts per table) ---
 # Canonical JSON metrics is GET /api/metrics in app/api/system.py (cron-gated).
-# This alias is kept for backward compat (monitor-gated); both return same shape
-# but system.py is preferred. Prometheus scrapes GET /metrics (open).
-@router.get("/metrics")
+# This route now only serves /internal/metrics to dedup /metrics (was duplicate).
 @router.get("/internal/metrics")
 async def metrics_observability(request: Request):
     if not require_monitor_auth(request):

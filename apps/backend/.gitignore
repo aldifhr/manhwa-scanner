@@ -9,3 +9,6 @@ logs/*.log.*
 # artifacts, not the suite itself.
 .pytest_cache/
 logs/be-ag-py.log.1
+
+.coverage
+
