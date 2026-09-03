@@ -70,7 +70,6 @@ export default function AnalyticsPage() {
   const genres = overview.top_genres?.slice(0, 10) ?? [];
   const velocity = [...(overview.chapter_velocity ?? [])].reverse();
   const growth = [...(overview.whitelist_growth ?? [])].reverse().slice(-30);
-  const mostRead = engagement?.most_read_series?.slice(0, 8) ?? [];
 
   const baseOpts = {
     chart: { background: "transparent", toolbar: { show: false }, fontFamily: "inherit" },
@@ -208,41 +207,13 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-surface rounded-lg border border-border p-4">
-          <h2 className="text-sm font-semibold mb-2">Whitelist growth (30d)</h2>
-          {growth.length ? (
-            <Chart options={growthOpts as any} series={[{ name: "new", data: growth.map((g) => g.new_entries) }]} type="bar" height={200} />
-          ) : (
-            <p className="text-xs text-text-muted">No data</p>
-          )}
-        </div>
-
-        <div className="bg-surface rounded-lg border border-border p-4">
-          <h2 className="text-sm font-semibold mb-2">Most read (continue-reading)</h2>
-          {engagementError ? (
-            <p className="text-xs text-amber-400">Engagement unavailable: {engagementError.message.slice(0, 120)}</p>
-          ) : mostRead.length ? (
-            <Chart
-              options={
-                {
-                  ...baseOpts,
-                  chart: { ...baseOpts.chart, type: "bar" as const },
-                  plotOptions: { bar: { horizontal: true, barHeight: "55%", borderRadius: 4 } },
-                  colors: GENRE_COLORS,
-                  xaxis: { categories: mostRead.map((r) => (r.title_key ?? "").slice(0, 18)), labels: { style: { colors: "#a1a1aa", fontSize: "11px" } } },
-                  yaxis: { labels: { style: { colors: "#a1a1aa", fontSize: "11px" } } },
-                  dataLabels: { enabled: false },
-                } as any
-              }
-              series={[{ name: "readers", data: mostRead.map((r) => r.reader_count) }]}
-              type="bar"
-              height={280}
-            />
-          ) : (
-            <p className="text-xs text-text-muted">No reading data yet</p>
-          )}
-        </div>
+      <div className="bg-surface rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold mb-2">Whitelist growth (30d)</h2>
+        {growth.length ? (
+          <Chart options={growthOpts as any} series={[{ name: "new", data: growth.map((g) => g.new_entries) }]} type="bar" height={200} />
+        ) : (
+          <p className="text-xs text-text-muted">No data</p>
+        )}
       </div>
     </PageShell>
   );
