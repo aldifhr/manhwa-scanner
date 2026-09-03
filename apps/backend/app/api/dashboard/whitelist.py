@@ -99,9 +99,9 @@ async def whitelist_post(request: Request):
         return JSONResponse(content={"error": "Title required"}, status_code=400)
 
     res = post_whitelist(title=title, url=url, source=source, body=body)
-    # Audit log
-    from app.services.audit import log_action, AuditAction
-    log_action(AuditAction.WHITELIST_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title, details={"source": source, "status": res.get("status")})
+    # Audit log disabled (audit.py removed 54a8ec5)
+    # from app.services.audit import log_action, AuditAction
+    # log_action(AuditAction.WHITELIST_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title, details={"source": source, "status": res.get("status")})
     return JSONResponse(content=res)
 
 
@@ -138,9 +138,9 @@ async def whitelist_delete(request: Request):
             title=title,
             url=url,
         )
-        # Audit log
-        from app.services.audit import log_action, AuditAction
-        log_action(AuditAction.WHITELIST_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key or title, details={"source": source, "status": result.get("status")})
+        # Audit log disabled
+        # from app.services.audit import log_action, AuditAction
+        # log_action(AuditAction.WHITELIST_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key or title, details={"source": source, "status": result.get("status")})
         # Map not_found -> 404 so the FE gets a real signal instead of 200 ok.
         if result.get("status") == "not_found":
             return JSONResponse(content=result, status_code=404)

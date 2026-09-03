@@ -176,9 +176,9 @@ async def post_excluded(request: Request):
             _rss_mod.invalidate_rss_cache()
         except Exception:
             pass
-        # Audit log
-        from app.services.audit import log_action, AuditAction
-        log_action(AuditAction.EXCLUDE_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
+        # Audit log disabled
+        # from app.services.audit import log_action, AuditAction
+        # log_action(AuditAction.EXCLUDE_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
         return JSONResponse(content={"success": True, "data": res})
     except Exception as e:
         logger.error("post_excluded failed", exc=e)
@@ -210,9 +210,9 @@ async def delete_excluded(request: Request):
             _rss_mod.invalidate_rss_cache()
         except Exception:
             pass
-        # Audit log
-        from app.services.audit import log_action, AuditAction
-        log_action(AuditAction.EXCLUDE_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
+        # Audit log disabled
+        # from app.services.audit import log_action, AuditAction
+        # log_action(AuditAction.EXCLUDE_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
         return JSONResponse(content={"success": True, "data": res})
     except Exception as e:
         logger.error("delete_excluded failed", exc=e)
