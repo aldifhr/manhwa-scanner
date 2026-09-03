@@ -53,7 +53,7 @@ async def get_continue_reading(request: Request):
 
 @router.put("/continue-reading")
 async def put_continue_reading(request: Request):
-    """Update continue-reading entry for current user."""
+    """Update continue-reading entry for current user. Supports single entry or batch map."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
 
@@ -65,38 +65,83 @@ async def put_continue_reading(request: Request):
     if not isinstance(body, dict):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
 
-    title_key = body.get("titleKey") or body.get("title_key") or ""
-    if not title_key:
-        return JSONResponse(content={"success": False, "error": "titleKey required"}, status_code=400)
+    # Empty batch (FE initial empty sync) -> no-op success
+    if len(body) == 0:
+        return JSONResponse(content={"success": True, "data": {}})
 
     sid_hash = _get_session_hash(request)
     if not sid_hash:
         return JSONResponse(content={"success": False, "error": "no session"}, status_code=401)
 
-    entry = {
-        "titleKey": title_key,
-        "chapter": body.get("lastChapter") or body.get("chapter", ""),
-        "chapterNumber": body.get("chapterNumber", 0),
-        "chapterUrl": body.get("chapterUrl", ""),
-        "seriesUrl": body.get("seriesUrl", ""),
-        "source": body.get("source", ""),
-        "title": body.get("title", ""),
-        "cover": body.get("cover", None),
-        "origin": body.get("origin", ""),
-        "isRead": body.get("isRead", True),
-        "readAt": time.time(),
-        "updatedAt": time.time(),
-    }
+    # Batch mode: body is {titleKey: entry, ...} (FE sends clean map)
+    # Detect batch by checking if any value looks like an entry dict with titleKey/chapterUrl
+    is_batch = False
+    if body and all(isinstance(v, dict) and (v.get("titleKey") or v.get("title_key") or v.get("chapterUrl")) for v in body.values()):
+        # Also ensure top-level doesn't look like a single entry (single entry has titleKey at top level)
+        if not (body.get("titleKey") or body.get("title_key") or body.get("chapterUrl")):
+            is_batch = True
+    # Fallback: if body has no titleKey at top level but has multiple keys, treat as batch
+    if not is_batch and len(body) > 1 and not (body.get("titleKey") or body.get("title_key")):
+        # Heuristic: batch map has 2+ entries, each with titleKey
+        sample = next(iter(body.values())) if body else None
+        if isinstance(sample, dict) and sample.get("titleKey"):
+            is_batch = True
 
     try:
         from app.db import get_supabase
         sb = get_supabase()
+        if is_batch:
+            # Batch upsert: merge all entries
+            # Fetch existing to merge
+            try:
+                existing_res = sb.table("continue_reading").select("entries").eq("session_hash", sid_hash).execute()
+                existing = existing_res.data[0].get("entries", {}) if existing_res.data else {}
+            except Exception:
+                existing = {}
+            # Normalize batch entries (handle both titleKey and title_key)
+            merged = dict(existing)
+            for k, v in body.items():
+                if not isinstance(v, dict):
+                    continue
+                tk = v.get("titleKey") or v.get("title_key") or k
+                if not tk:
+                    continue
+                merged[tk] = {
+                    "titleKey": tk,
+                    "title": v.get("title", ""),
+                    "cover": v.get("cover"),
+                    "source": v.get("source", ""),
+                    "lastChapter": v.get("lastChapter") or v.get("chapter", ""),
+                    "chapterUrl": v.get("chapterUrl", ""),
+                    "seriesUrl": v.get("seriesUrl", ""),
+                    "origin": v.get("origin", ""),
+                    "updatedAt": v.get("updatedAt") or time.time(),
+                }
+            sb.table("continue_reading").upsert(
+                {"session_hash": sid_hash, "entries": merged, "updated_at": time.time()},
+                on_conflict="session_hash",
+            ).execute()
+            return JSONResponse(content={"success": True, "data": merged})
+        # Single entry mode
+        title_key = body.get("titleKey") or body.get("title_key") or ""
+        if not title_key:
+            return JSONResponse(content={"success": False, "error": "titleKey required"}, status_code=400)
+        entry = {
+            "titleKey": title_key,
+            "chapter": body.get("lastChapter") or body.get("chapter", ""),
+            "chapterNumber": body.get("chapterNumber", 0),
+            "chapterUrl": body.get("chapterUrl", ""),
+            "seriesUrl": body.get("seriesUrl", ""),
+            "source": body.get("source", ""),
+            "title": body.get("title", ""),
+            "cover": body.get("cover", None),
+            "origin": body.get("origin", ""),
+            "isRead": body.get("isRead", True),
+            "readAt": time.time(),
+            "updatedAt": time.time(),
+        }
         sb.table("continue_reading").upsert(
-            {
-                "session_hash": sid_hash,
-                "entries": {title_key: entry},
-                "updated_at": time.time(),
-            },
+            {"session_hash": sid_hash, "entries": {title_key: entry}, "updated_at": time.time()},
             on_conflict="session_hash",
         ).execute()
         return JSONResponse(content={"success": True, "data": entry})

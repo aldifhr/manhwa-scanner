@@ -2,10 +2,12 @@
 
 import { useMemo, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { BookOpen } from "@phosphor-icons/react";
+import { BookOpen, BookBookmark } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
 import { decodeHtml } from "@/lib/utils";
 import { PageShell } from "@/components/PageShell";
+import { useQuery } from "@tanstack/react-query";
+import { getBookmarks } from "@/lib/api";
 
 function CoverImage({ src, alt }: { src: string | null; alt: string }) {
   if (!src) {
@@ -47,9 +49,11 @@ function SourcePill({ source }: { source: string }) {
 function ContinueReadingCard({
   entry,
   onRemove,
+  isBookmarked,
 }: {
   entry: ReturnType<typeof useContinueReading>["entries"] extends Map<string, infer V> ? V : never;
   onRemove?: (titleKey: string) => void;
+  isBookmarked?: boolean;
 }) {
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
@@ -57,8 +61,13 @@ function ContinueReadingCard({
         <div className="relative overflow-hidden rounded-xl card-hover border border-white/10 hover:border-white/15 bg-white/5">
           <CoverImage src={entry.cover} alt={decodeHtml(entry.title)} />
           <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          <div className="absolute top-2.5 left-2.5">
+          <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
             <SourcePill source={entry.source} />
+            {isBookmarked && (
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <BookBookmark size={10} weight="fill" /> BM
+              </span>
+            )}
           </div>
           <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black via-black/70 to-transparent pt-6 p-2.5">
             <p className="text-[11px] font-bold tracking-wide text-white">Ch. {entry.lastChapter}</p>
@@ -83,7 +92,7 @@ function ContinueReadingCard({
           {decodeHtml(entry.title)}
         </h3>
         <p className="text-[10px] text-white/45 mt-1 tracking-wide">
-          {entry.origin} • {entry.source}
+          {entry.origin} • {entry.source} {isBookmarked && <span className="text-amber-300">• Bookmarked</span>}
         </p>
       </div>
     </div>
@@ -92,6 +101,20 @@ function ContinueReadingCard({
 
 export function ContinueReadingStrip() {
   const { entries, removeReading, clearAll } = useContinueReading();
+  const { data: bookmarks } = useQuery({
+    queryKey: ["bookmarks"],
+    queryFn: getBookmarks,
+    staleTime: 60_000,
+  });
+  const bookmarkSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const b of bookmarks ?? []) {
+      const k = `${b.title_key}:${b.chapter_number}`;
+      s.add(k);
+      s.add(b.title_key);
+    }
+    return s;
+  }, [bookmarks]);
   const sorted = useMemo(
     () =>
       [...entries.values()]
@@ -175,11 +198,14 @@ export function ContinueReadingStrip() {
         className={`flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory select-none ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
         style={{ scrollbarWidth: "none" } as React.CSSProperties}
       >
-        {sorted.map((entry, i) => (
-          <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }} className={isDragging ? "pointer-events-none" : ""}>
-            <ContinueReadingCard entry={entry} onRemove={removeReading} />
-          </motion.div>
-        ))}
+        {sorted.map((entry, i) => {
+          const isBM = bookmarkSet.has(`${entry.titleKey}:${entry.lastChapter}`) || bookmarkSet.has(entry.titleKey);
+          return (
+            <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }} className={isDragging ? "pointer-events-none" : ""}>
+              <ContinueReadingCard entry={entry} onRemove={removeReading} isBookmarked={isBM} />
+            </motion.div>
+          );
+        })}
       </div>
       </div>
     </PageShell>
