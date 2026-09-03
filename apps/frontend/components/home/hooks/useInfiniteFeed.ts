@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useThrottledCallback } from "@tanstack/react-pacer";
 import { Reader } from "@/lib/reader";
 import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
@@ -137,26 +138,24 @@ export function useInfiniteFeed(opts: {
     [hasMore]
   );
 
-  // prefetch next page when scrolled past 80%
-  useEffect(() => {
+  // prefetch next page when scrolled past 80% — THROTTLE (may drop intermediate scrolls)
+  const throttledPrefetch = useThrottledCallback(() => {
     if (!hasMore || loadingMore) return;
-    const onScroll = () => {
-      const scrolled = window.scrollY + window.innerHeight;
-      const threshold = document.documentElement.scrollHeight * 0.8;
-      if (scrolled >= threshold) {
-        const next = page + 1;
-        queryClient.prefetchQuery({
-          queryKey: queryKeys.rssFeedFlat(exclude, PAGE_SIZE, sourceFilter || null, whitelistParam, typeFilter || null),
-          queryFn: () => Reader.getRssFlatPage(next, PAGE_SIZE, { exclude, whitelist: whitelistParam, source: sourceFilter || null, type: typeFilter || null }),
-          staleTime: 15_000,
-        });
-        // also trigger loadMore if intersection observer hasn't fired yet
-        // (prefetch only caches, real append still via sentinel)
-      }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [hasMore, loadingMore, page, queryClient, sourceFilter, typeFilter, whitelistParam]);
+    const scrolled = window.scrollY + window.innerHeight;
+    const threshold = document.documentElement.scrollHeight * 0.8;
+    if (scrolled >= threshold) {
+      const next = page + 1;
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.rssFeedFlat(exclude, PAGE_SIZE, sourceFilter || null, whitelistParam, typeFilter || null),
+        queryFn: () => Reader.getRssFlatPage(next, PAGE_SIZE, { exclude, whitelist: whitelistParam, source: sourceFilter || null, type: typeFilter || null }),
+        staleTime: 15_000,
+      });
+    }
+  }, { wait: 300 });
+  useEffect(() => {
+    window.addEventListener("scroll", throttledPrefetch, { passive: true });
+    return () => window.removeEventListener("scroll", throttledPrefetch);
+  }, [throttledPrefetch]);
 
   return {
     allItems,

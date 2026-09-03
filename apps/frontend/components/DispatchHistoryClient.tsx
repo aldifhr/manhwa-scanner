@@ -12,7 +12,7 @@ import {
 import type { DispatchHistoryItem } from "@/lib/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { timeAgo } from "@/lib/timeAgo";
-import { useDebounced } from "@/lib/useDebounced";
+import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
 import { SourceBadge } from "@/components/ui/SourceBadge";
 import { getOriginFlag } from "@/lib/constants";
 import {
@@ -92,7 +92,7 @@ export default function DispatchHistoryClient() {
   const [source, setSource] = useState<
     "all" | "ikiru" | "shinigami" | "voratoon"
   >("all");
-  const debouncedSearch = useDebounced(search, 300);
+  const debouncedSearch = usePacerDebouncedValue(search, 300);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.dispatchHistory(debouncedSearch || undefined),

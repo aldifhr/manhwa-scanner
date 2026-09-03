@@ -42,7 +42,8 @@ import {
 } from "@/lib/groupChapters";
 import { useUiStore } from "@/lib/uiStore";
 import { useUiUrlSync } from "@/lib/useUiUrlSync";
-import { useDebounced } from "@/lib/useDebounced";
+import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
+import { usePacerThrottledScroll } from "@/lib/usePacerThrottles";
 import { PageShell } from "@/components/PageShell";
 function normalizeTitleKey(k: string){ return (k||"").toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim(); }
 import { usePinnedSet } from "./hooks/usePinnedSet";
@@ -87,7 +88,7 @@ function AllTabInner() {
 
   // Debounced search input
   const [localSearch, setLocalSearch] = useState(searchQuery);
-  const debouncedLocalSearch = useDebounced(localSearch, 300);
+  const debouncedLocalSearch = usePacerDebouncedValue(localSearch, 300);
   useEffect(() => {
     if (debouncedLocalSearch !== searchQuery)
       setSearchQuery(debouncedLocalSearch);
@@ -196,6 +197,7 @@ function AllTabInner() {
 
   const deepLinkRef = useRef<HTMLDivElement | null>(null);
   const scrollKey = "alltab_scroll";
+  const initialScrollOffset = typeof window !== "undefined" ? Number(localStorage.getItem(scrollKey) || "0") : undefined;
 
   const { grouped, flatDisplay, newSeriesKeys } = useFeedGrouping(filtered, {
     pinnedSet,
@@ -253,24 +255,13 @@ function AllTabInner() {
     }
   }, []);
 
+  const throttledSaveScroll = usePacerThrottledScroll(() => {
+    localStorage.setItem(scrollKey, String(window.scrollY));
+  }, 250);
   useEffect(() => {
-    let ticking = false;
-    let lastWrite = 0;
-    function onScroll() {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        ticking = false;
-        const now = Date.now();
-        if (now - lastWrite >= 250) {
-          lastWrite = now;
-          localStorage.setItem(scrollKey, String(window.scrollY));
-        }
-      });
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    window.addEventListener("scroll", throttledSaveScroll, { passive: true });
+    return () => window.removeEventListener("scroll", throttledSaveScroll);
+  }, [throttledSaveScroll]);
 
   // Derive counts from `filtered` (same data as displayed) — consistent with grouped.length
   const filteredDistinctTotal = useMemo(
@@ -487,6 +478,7 @@ function AllTabInner() {
       ) : (
         <VirtualizedList
           items={flatDisplay}
+          initialScrollOffset={initialScrollOffset}
           gap={12}
           estimateSize={180}
           scrollToTitleKey={deepLinkSeries}

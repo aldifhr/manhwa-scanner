@@ -8,7 +8,7 @@ import type { WhitelistRouteItem } from "@/lib/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { MangaCardSkeleton } from "@/components/MangaCard";
 import { MagnifyingGlass } from "@phosphor-icons/react";
-import { useDebounced } from "@/lib/useDebounced";
+import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/EmptyState";
 import { ErrorFallback } from "@/components/ErrorFallback";
@@ -32,7 +32,7 @@ export function WhitelistGrid() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [originFilter, setOriginFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearch = useDebounced(searchTerm, 300);
+  const debouncedSearch = usePacerDebouncedValue(searchTerm, 300);
   const [sort, setSort] = useState<"title" | "rating" | "recent">("recent");
 
   const items = data ?? [];
