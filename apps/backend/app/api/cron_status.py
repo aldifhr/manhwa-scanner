@@ -19,7 +19,7 @@ from app.utils.request_auth import safe_error
 
 router = APIRouter()
 
-_CRON_WORKER_URL = "http://127.0.0.1:3001/api/cron/status"
+_CRON_WORKER_URL = "http://127.0.0.1:3001/api/v1/cron/status"
 
 
 @router.get("/cron/status")
