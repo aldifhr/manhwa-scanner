@@ -288,29 +288,21 @@ async def analytics_retention(request: Request):
     """, fallback=[])
     disp_map = {normalize_title_key(r.get("title_key") or ""): int(r.get("cnt") or 0) for r in disp}
 
-    # Read sessions per title 30d (from continue_reading jsonb)
-    # continue_reading.entries is jsonb per session_hash, need to unnest
-    read = _safe("""
-        SELECT normalize_title_key(key) as nk, COUNT(*) as readers
-        FROM continue_reading, jsonb_object_keys(entries) as key
-        WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '30 days'
-        GROUP BY nk
-    """, fallback=[])
-    # Fallback if normalize_title_key SQL func not exists -> do in Python
-    if not read:
-        # Python fallback: fetch all entries and count in Python
-        try:
-            rows = _safe("SELECT entries FROM continue_reading WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '30 days'", fallback=[])
-            from collections import Counter
-            cnt = Counter()
-            for r in rows:
-                ents = r.get("entries") or {}
-                if isinstance(ents, dict):
-                    for k in ents.keys():
-                        cnt[normalize_title_key(k)] += 1
-            read = [{"nk": k, "readers": v} for k, v in cnt.items()]
-        except Exception:
-            read = []
+    # Read sessions per title 30d (from continue_reading jsonb) — do in Python
+    # (SQL normalize_title_key() does not exist in Postgres; avoid noisy warn)
+    read = []
+    try:
+        rows = _safe("SELECT entries FROM continue_reading WHERE to_timestamp(updated_at) >= NOW() - INTERVAL '30 days'", fallback=[])
+        from collections import Counter
+        cnt = Counter()
+        for r in rows:
+            ents = r.get("entries") or {}
+            if isinstance(ents, dict):
+                for k in ents.keys():
+                    cnt[normalize_title_key(k)] += 1
+        read = [{"nk": k, "readers": v} for k, v in cnt.items()]
+    except Exception:
+        read = []
     read_map = {r.get("nk") or r.get("normalize_title_key") or "": int(r.get("readers") or r.get("count") or 0) for r in read}
 
     # Build per-title retention
