@@ -148,6 +148,7 @@ async def fetch_rss_data(
             sm_rows = []
 
     wl_map: dict[tuple[str, str], dict] = {}
+    wl_title_set: set[str] = set()
     for w in wl_rows:
         tk = str(w.get("title_key", "") or "")
         src = str(w.get("source", "") or "")
@@ -155,6 +156,10 @@ async def fetch_rss_data(
             nk = normalize_title_key(tk)
             wl_map[(nk, src)] = w
             wl_map[(tk, src)] = w
+        # Title-based set for cross-source UUID vs slug matching (Full-time Hunter)
+        t_norm = normalize_title_key(w.get("title") or tk)
+        if t_norm:
+            wl_title_set.add(t_norm)
 
     # meta_map parallel chunks
     meta_map: dict[str, dict] = {}
@@ -230,7 +235,7 @@ async def fetch_rss_data(
     filtered = [it for it in rc_rows if _passes(it)]
 
     live_cnt_ref = [0]
-    results = [map_result(it, wl_map, meta_map, live_cnt_ref, sm_map, dh_sent) for it in filtered]
+    results = [map_result(it, wl_map, meta_map, live_cnt_ref, sm_map, dh_sent, wl_title_set) for it in filtered]
 
     if whitelist_only or subscribed_only:
         results = [r for r in results if r["isWhitelisted"]]

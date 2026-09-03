@@ -154,6 +154,7 @@ def map_result(
     live_cnt_ref: list[int],
     sm_map: dict[tuple[str, str], dict] | None = None,
     dh_sent: set[tuple[str, float]] | None = None,
+    wl_title_set: set[str] | None = None,
 ) -> dict:
     """Map a recent_chapters row to the RSS response format.
 
@@ -172,6 +173,17 @@ def map_result(
     slug = _slug_key(tk)
 
     is_wl = (tk, src) in wl_map or (nk, src) in wl_map
+    # Title-based fallback: handles shinigami UUID vs voratoon slug for same series (Full-time Hunter)
+    _title_norm = normalize_title_key(it.get("title") or "")
+    if _title_norm:
+        if wl_title_set is not None:
+            if _title_norm in wl_title_set:
+                is_wl = True
+        elif not is_wl:
+            for (wtk, wsrc), wrow in wl_map.items():
+                if normalize_title_key(wrow.get("title") or wtk) == _title_norm:
+                    is_wl = True
+                    break
 
     series_url = it.get("series_url") or wl.get("series_url") or ""
     _meta_slug = (series_url or it.get("series_url") or "").rstrip("/").split("/")[-1] if series_url else ""

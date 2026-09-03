@@ -57,8 +57,8 @@ export function useFeedActions() {
     },
     onMutate: (item) => setAddingKey(item.titleKey),
     onSuccess: ({ result, optKey }) => {
-      if (result.status === "added")
-        setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
+      // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
+      setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
@@ -66,7 +66,7 @@ export function useFeedActions() {
         result.status === "already_exists"
           ? "Already in whitelist"
           : "Added to whitelist",
-        result.status === "added" ? "success" : "error"
+        "success"
       );
     },
     onError: (err) =>
@@ -104,16 +104,12 @@ export function useFeedActions() {
     },
     onMutate: (series) => setAddingKey(series.titleKey),
     onSuccess: ({ results, optKeys }) => {
-      const added = results.some((r) => r.status === "added");
-      if (added)
-        setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
+      // Bandel fix: already_exists also counts as added for optimistic
+      setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
-      toast(
-        added ? "Added to whitelist" : "Already in whitelist",
-        added ? "success" : "error"
-      );
+      toast("Added to whitelist", "success");
     },
     onError: (err) =>
       toast(err instanceof Error ? err.message : "Failed to add", "error"),
