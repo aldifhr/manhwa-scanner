@@ -115,7 +115,8 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             it["rating"] = s.get("rating")
             it["genres"] = s.get("genres") or s.get("genre") or []
             it["description"] = _strip_html(s.get("description", ""))
-            it["origin"] = normalize_origin(ikiru_origin or it.get("origin", ""))
+            # no type -> no origin (hide flag) — don't fallback to KR
+            it["origin"] = normalize_origin(ikiru_origin) if _types else ""
 
     # ── Shinigami enrich (parallelized) ──
     def _fetch_shin(mid: str) -> tuple[str, dict | None]:
