@@ -108,6 +108,12 @@ class DispatchService:
         except Exception as e:
             logger.warn("update_latest_chapter failed", err=str(e)[:120])
 
+    # Facade for storage claim (storage leaky fix - dispatch owns orchestration)
+    def claim_for_dispatch(self, whitelist: list[dict] | None = None, hours: int = 24, limit: int = 500) -> list[dict]:
+        """Delegate to storage but owned by dispatch service (single seam)."""
+        from app.storage.recent_chapters import claim_recent_chapters_for_dispatch
+        return claim_recent_chapters_for_dispatch(whitelist=whitelist, hours=hours, limit=limit)
+
 
 # Singleton
 dispatch_service = DispatchService()

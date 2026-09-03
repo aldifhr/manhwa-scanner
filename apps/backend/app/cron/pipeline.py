@@ -100,7 +100,9 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             _use_claimed = False
             try:
                 _wl_for_claim = load_whitelist_cached()
-                _claimed = recent_chapters.claim_recent_chapters_for_dispatch(whitelist=_wl_for_claim, hours=24, limit=500)
+                # Single seam via dispatch_service (was direct storage call)
+                from app.services.dispatch_service import dispatch_service as _ds_claim
+                _claimed = _ds_claim.claim_for_dispatch(whitelist=_wl_for_claim, hours=24, limit=500)
                 if _claimed:
                     items = _claimed
                     enriched_all = enrich(items, persist_cache=False)
