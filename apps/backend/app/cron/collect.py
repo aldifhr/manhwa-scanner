@@ -1,8 +1,7 @@
-"""Source collection: scrape ikiru + shinigami, filter whitelist.
+"""Source collection: scrape ikiru + shinigami + voratoon, filter whitelist.
 
-This module has been consolidated: heavy scraping and enrichment logic now
-lives in app/services/scraper_service.py. The public symbols here remain
-exported (via pipeline.py) for backward compatibility.
+Canonical implementation — app/services/scraper_service.py now delegates here
+(single source of truth, was duplicate 1092L vs 164L).
 """
 from __future__ import annotations
 
