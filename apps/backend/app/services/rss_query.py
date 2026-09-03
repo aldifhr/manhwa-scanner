@@ -173,14 +173,24 @@ def map_result(
     slug = _slug_key(tk)
 
     is_wl = (tk, src) in wl_map or (nk, src) in wl_map
-    # Title-based fallback: handles shinigami UUID vs voratoon slug for same series (Full-time Hunter)
+    # Title-based fallback: only for slug sources (ikiru/voratoon) and source-aware.
+    # shinigami uses UUID model, must not fallback via title (UUID vs slug mismatch).
+    # This prevents "semua verified" when any title matches across different sources.
     _title_norm = normalize_title_key(it.get("title") or "")
-    if _title_norm:
+    if _title_norm and src in ("ikiru", "voratoon"):
         if wl_title_set is not None:
+            # wl_title_set is built without source, keep but only for slug sources
             if _title_norm in wl_title_set:
-                is_wl = True
+                # verify at least one WL entry for this title has same slug source family
+                for (wtk, wsrc) in wl_map:
+                    if wsrc in ("ikiru", "voratoon") and normalize_title_key(wtk) == _title_norm:
+                        is_wl = True
+                        break
+                # if no slug-source WL, don't mark
         elif not is_wl:
             for (wtk, wsrc), wrow in wl_map.items():
+                if wsrc not in ("ikiru", "voratoon"):
+                    continue
                 if normalize_title_key(wrow.get("title") or wtk) == _title_norm:
                     is_wl = True
                     break

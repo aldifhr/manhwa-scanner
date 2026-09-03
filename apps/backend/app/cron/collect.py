@@ -112,28 +112,40 @@ def collect_recent_chapters(
             _sources_to_run.append(_src)
 
     if _sources_to_run:
+        # Sequential fix: collect shinigami+voratoon first (UUID vs slug), then ikiru with exclude_keys.
+        # Previously all 3 ran concurrently, so ikiru's _exclude_keys snapshot saw empty `items` (race)
+        # and voratoon/ikiru slug duplicates were never excluded. Now phase1 completes before ikiru.
+        _phase1 = [s for s in ("shinigami", "voratoon") if s in _sources_to_run]
+        _phase2 = [s for s in ("ikiru",) if s in _sources_to_run]
         _t0_map: dict[str, float] = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(_sources_to_run)) as _executor:
-            _futures: dict = {}
-            for _src in _sources_to_run:
-                _t0_map[_src] = _health_start(_src)
-                logger.info("collect start", source=_src)
-                _futures[_executor.submit(_try_collect, _src)] = _src
-            for _future in concurrent.futures.as_completed(_futures, timeout=_SOURCE_TIMEOUT):
-                _src = _futures[_future]
-                _t0 = _t0_map.get(_src, _health_start(_src))
-                try:
-                    _collected_src, _src_items = _future.result(timeout=5)
-                    items.extend(_src_items)
-                    _health_end(_src, _t0, True)
-                    rt_ms = int((_t.time() - _t0) * 1000)
-                    logger.info("collect done", source=_src, count=len(_src_items), response_time_ms=rt_ms)
-                except concurrent.futures.TimeoutError:
-                    _health_end(_src, _t0, False, f"timeout after {_SOURCE_TIMEOUT}s")
-                    logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
-                except Exception as e:
-                    _health_end(_src, _t0, False, str(e)[:300])
-                    logger.warn("collect failed", source=_src, err=str(e)[:200])
+
+        def _run_phase(sources: list[str]):
+            if not sources:
+                return
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(sources)) as _executor:
+                _futures: dict = {}
+                for _src in sources:
+                    _t0_map[_src] = _health_start(_src)
+                    logger.info("collect start", source=_src)
+                    _futures[_executor.submit(_try_collect, _src)] = _src
+                for _future in concurrent.futures.as_completed(_futures, timeout=_SOURCE_TIMEOUT):
+                    _src = _futures[_future]
+                    _t0 = _t0_map.get(_src, _health_start(_src))
+                    try:
+                        _collected_src, _src_items = _future.result(timeout=5)
+                        items.extend(_src_items)
+                        _health_end(_src, _t0, True)
+                        rt_ms = int((_t.time() - _t0) * 1000)
+                        logger.info("collect done", source=_src, count=len(_src_items), response_time_ms=rt_ms)
+                    except concurrent.futures.TimeoutError:
+                        _health_end(_src, _t0, False, f"timeout after {_SOURCE_TIMEOUT}s")
+                        logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
+                    except Exception as e:
+                        _health_end(_src, _t0, False, str(e)[:300])
+                        logger.warn("collect failed", source=_src, err=str(e)[:200])
+
+        _run_phase(_phase1)
+        _run_phase(_phase2)
     else:
         for _src in ("ikiru", "shinigami", "voratoon"):
             _hm[_src] = {"status": "disabled", "response_time_ms": 0, "successes_today": 0, "failures_today": 0, "consecutive_failures": 0, "last_success_at": None, "last_checked_at": _now_iso, "last_error": "cooldown"}

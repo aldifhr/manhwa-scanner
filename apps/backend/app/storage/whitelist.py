@@ -53,7 +53,17 @@ class WhitelistRow(BaseModel):
     def _norm_tk(cls, v):
         if not v:
             return ""
-        return normalize_title_key(str(v))
+        raw = str(v).strip()
+        # NOTE: shinigami uses UUID model (series_id) as title_key — valid for source=shinigami
+        # ikiru/voratoon use slug (normalized title). Don't blindly reject UUID here;
+        # source-aware check is done in model_validator. Keep raw for shinigami, normalize for others.
+        # For now return raw lowercased for UUID pattern, normalized for slug.
+        import re as _re
+        if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", raw, _re.I):
+            return raw.lower()
+        if _re.match(r"^[0-9a-f]{8} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{12}$", raw, _re.I):
+            return raw.lower().replace(" ", "-")
+        return normalize_title_key(raw)
 
     @field_validator("source", mode="before")
     @classmethod
