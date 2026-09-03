@@ -32,7 +32,7 @@ module.exports = {
       instances: 1,
       autorestart: true,
       watch: false,
-      env: { NODE_ENV: "production", PORT: "5175" },
+      env: { NODE_ENV: "production", PORT: "5175", API_TOKEN: "manhwascan", BACKEND_URL: "http://127.0.0.1:3000" },
     },
   ],
 };

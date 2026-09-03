@@ -17,6 +17,7 @@ import {
 import { useContinueReading } from "@/lib/continueReading";
 import { saveBookmark } from "@/lib/api";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
 import EmptyState from "@/components/EmptyState";
 import { ErrorFallback } from "@/components/ErrorFallback";
@@ -431,12 +432,14 @@ export default function HomePage() {
             </button>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
-            {sortedContinueReading.map((entry) => (
-              <ContinueReadingCard
+            {sortedContinueReading.map((entry, i) => (
+              <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }}>
+                <ContinueReadingCard
                 key={entry.titleKey}
                 entry={entry}
                 onRemove={removeReading}
-              />
+                />
+              </motion.div>
             ))}
           </div>
         </div>
@@ -538,14 +541,10 @@ export default function HomePage() {
       ) : (
         <div className="flex flex-col gap-3">
           {grouped.map((series, i) => (
-            <div
-              key={series.titleKey}
-              className="animate-fade-up"
-              style={{ animationDelay: `${Math.min(i, 20) * 30}ms` }}
-            >
-              <HomeGroupedCard series={series} />
-            </div>
-          ))}
+              <motion.div key={series.titleKey + String(i)} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.04, duration: 0.3 }}>
+                <HomeGroupedCard series={series} />
+              </motion.div>
+            ))}
         </div>
       )}
     </PageShell>

@@ -94,7 +94,7 @@ export const rssItemSchema = z
         .catch(() => undefined),
       source: z.string().catch(""),
       cover: z
-        .string()
+        .string().url()
         .nullish()
         .catch(() => undefined),
       origin: z

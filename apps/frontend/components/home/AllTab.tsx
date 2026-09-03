@@ -9,6 +9,7 @@ import {
   Suspense,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { queryKeys } from "@/lib/queryKeys";
 import { normalizeOrigin } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ import {
   type GroupedSeries,
 } from "@/lib/groupChapters";
 import { useUiStore } from "@/lib/uiStore";
+import { useUiUrlSync } from "@/lib/useUiUrlSync";
 import { useDebounced } from "@/lib/useDebounced";
 import { PageShell } from "@/components/PageShell";
 import { usePinnedSet } from "./hooks/usePinnedSet";
@@ -62,6 +64,7 @@ function AllTabInner() {
   const { readItems, toggleRead, toggleReadAll, markAllRead } = useReadItems();
   const searchParams = useSearchParams();
   const deepLinkSeries = searchParams.get("series");
+  useUiUrlSync();
 
   // Zustand selectors: subscribe only to needed slices
   const feed = useUiStore((s) => s.feed);
@@ -427,7 +430,7 @@ function AllTabInner() {
           />
         )
       ) : groupMode ? (
-        <div className="flex flex-col gap-3">
+        <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}>
           {grouped.map((series, i) => {
             const isRead =
               series.chapters.length > 0 &&
@@ -439,12 +442,11 @@ function AllTabInner() {
               );
             const isDeepMatch = i === groupedDeepLinkIndex;
             return (
-              <div
+              <motion.div
                 key={`${series.titleKey}-${i}`}
                 data-title-key={series.titleKey}
                 ref={isDeepMatch ? deepLinkRef : undefined}
-                className="animate-fade-in-up"
-                style={{ animationDelay: `${Math.min(i, 20) * 25}ms` }}
+                variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3 } } }}
               >
                 <GroupedSeriesCard
                   series={series}
@@ -475,10 +477,10 @@ function AllTabInner() {
                     (c) => c.isSent === true || sentKeys.has(c.key)
                   )}
                 />
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       ) : (
         <VirtualizedList
           items={flatDisplay}

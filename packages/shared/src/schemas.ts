@@ -10,16 +10,16 @@ function dual<T extends z.ZodTypeAny>(snake: string, camel: string, base: T) {
 export const excludedTitleSchema = z
   .object({
     id: z.string().nullable().optional(),
-    title_key: z.string().nullable().optional(),
-    titleKey: z.string().nullable().optional(),
+    title_key: z.string().min(1).nullable().optional(),
+    titleKey: z.string().min(1).nullable().optional(),
     title: z.string().nullable().optional(),
-    source: z.string().nullable().optional(),
+    source: z.enum(["ikiru", "shinigami", "voratoon"]).nullable().optional(),
     created_at: z.string().nullable().optional(),
     createdAt: z.string().nullable().optional(),
-    cover: z.string().nullable().optional(),
-    series_url: z.string().nullable().optional(),
-    seriesUrl: z.string().nullable().optional(),
-  })
+    cover: z.string().url().nullable().optional(),
+    series_url: z.string().url().nullable().optional(),
+    seriesUrl: z.string().url().nullable().optional(),
+  }).strict()
   .transform((r) => ({
     id: (r.title_key as string) || (r.titleKey as string) || (r.id as string) || "",
     titleKey: (r.title_key as string) || (r.titleKey as string) || (r.id as string) || "",
@@ -32,14 +32,14 @@ export const excludedTitleSchema = z
 
 export const whitelistSchema = z
   .object({
-    title_key: z.string().optional(),
-    titleKey: z.string().optional(),
-    title: z.string().optional(),
-    source: z.string().optional(),
-    cover: z.string().nullable().optional(),
-    series_url: z.string().nullable().optional(),
-    seriesUrl: z.string().nullable().optional(),
-  })
+    title_key: z.string().min(1).optional(),
+    titleKey: z.string().min(1).optional(),
+    title: z.string().min(1).optional(),
+    source: z.enum(["ikiru", "shinigami", "voratoon"]).optional(),
+    cover: z.string().url().nullable().optional(),
+    series_url: z.string().url().nullable().optional(),
+    seriesUrl: z.string().url().nullable().optional(),
+  }).strict()
   .passthrough()
   .transform((r) => ({
     ...r,
@@ -49,11 +49,11 @@ export const whitelistSchema = z
 
 export const rssItemSchema = z
   .object({
-    title_key: z.string().optional(),
-    titleKey: z.string().optional(),
-    chapter_url: z.string().optional(),
-    chapterUrl: z.string().optional(),
-  })
+    title_key: z.string().min(1).optional(),
+    titleKey: z.string().min(1).optional(),
+    chapter_url: z.string().url().optional(),
+    chapterUrl: z.string().url().optional(),
+  }).strict()
   .passthrough()
   .transform((r) => ({
     ...r,

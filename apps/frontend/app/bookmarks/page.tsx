@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getBookmarks, deleteBookmark, type BookmarkEntry } from "@/lib/api";
 import { rewriteCoverUrl, decodeHtml } from "@/lib/utils";
+import { motion } from "framer-motion";
 import { useContinueReading } from "@/lib/continueReading";
 
 export default function BookmarksPage() {
@@ -71,13 +72,15 @@ export default function BookmarksPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
             </div>
           ) : bookmarks && bookmarks.length > 0 ? (
-            <div className="space-y-3">
+            <motion.div className="space-y-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}>
               {bookmarks.map((b) => {
                 const cover = rewriteCoverUrl(b.cover || null);
                 return (
-                <div
+                <motion.div
                   key={`${b.title_key}-${b.chapter_number}`}
                   className="bg-surface rounded-lg p-4 border border-border flex items-center gap-4"
+                  variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                  transition={{ duration: 0.25 }}
                 >
                   {cover ? (
                     <img src={cover} alt={decodeHtml(b.title || b.title_key)} className="w-14 h-20 object-cover rounded-md bg-white/5 shrink-0" loading="lazy" />
@@ -141,9 +144,9 @@ export default function BookmarksPage() {
                       </button>
                     )}
                   </div>
-                </div>
+                </motion.div>
               )})}
-            </div>
+            </motion.div>
           ) : (
             <div className="text-center py-12 text-text-muted">
               <p>No bookmarks yet</p>
@@ -153,11 +156,13 @@ export default function BookmarksPage() {
             </div>
           )
         ) : continueList.length > 0 ? (
-          <div className="space-y-3">
+          <motion.div className="space-y-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}>
             {continueList.map((c) => (
-              <div
+              <motion.div
                 key={c.titleKey}
                 className="bg-surface rounded-lg p-4 border border-border flex items-center justify-between"
+                variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                transition={{ duration: 0.25 }}
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{c.title}</p>
@@ -184,9 +189,9 @@ export default function BookmarksPage() {
                     Remove
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         ) : (
           <div className="text-center py-12 text-text-muted">
             <p>No continue reading yet</p>
