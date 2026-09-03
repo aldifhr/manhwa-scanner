@@ -115,12 +115,13 @@ export function useContinueReading(
     }
     store.save(entries);
     if (!hasHydrated.current) return;
+    if (entries.size === 0) return; // don't sync empty (would 400)
     const id = setTimeout(() => {
       const clean = Object.fromEntries(
         [...entries].filter(([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim())
       );
-      if (Object.keys(clean).length === 0 && entries.size > 0) {
-        store.clear();
+      if (Object.keys(clean).length === 0) {
+        if (entries.size > 0) store.clear();
         return;
       }
       doPush(clean as Record<string, ContinueReadingEntry>);
