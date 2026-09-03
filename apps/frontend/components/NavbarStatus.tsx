@@ -41,7 +41,7 @@ const DOT_CLASS: Record<Agg, string> = {
  * Reuses the shared dashboardSnapshot query (auto-refresh 30s), so it never
  * doubles network traffic. The status DOT uses color (green/amber/red) for
  * at-a-glance health; the rest of the UI stays black & white per theme rules.
- * Clicking it opens /health.
+ * Clicking it opens /status.
  */
 export default function NavbarStatus({
   variant = "desktop",
@@ -71,7 +71,7 @@ export default function NavbarStatus({
   if (variant === "mobile") {
     return (
       <Link
-        href="/health"
+        href="/status"
         className="flex items-center justify-between w-full px-4 py-3 rounded-lg text-base font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors"
       >
         <span className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export default function NavbarStatus({
 
   return (
     <Link
-      href="/health"
+      href="/status"
       title="System status"
       aria-label="System status"
       className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm font-medium leading-none text-white/70 hover:text-white hover:bg-white/5 transition-colors"

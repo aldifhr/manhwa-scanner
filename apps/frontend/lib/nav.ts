@@ -4,7 +4,6 @@ import {
   Books,
   EyeSlash,
   Clock,
-  Pulse,
   BookBookmark,
   ChartBar,
 } from "@phosphor-icons/react";
@@ -16,7 +15,6 @@ export const NAV = [
   { href: "/whitelist", label: "Whitelist", icon: Books },
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash },
   { href: "/dispatch-history", label: "History", icon: Clock },
-  { href: "/health", label: "Health", icon: Pulse },
   { href: "/bookmarks", label: "Bookmarks", icon: BookBookmark },
   { href: "/analytics", label: "Analytics", icon: ChartBar },
 ] as const;
