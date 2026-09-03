@@ -103,11 +103,14 @@ async def analytics_overview(request: Request):
             return fallback if fallback is not None else []
 
     popular_series = _safe("""
-        SELECT dh.title_key, dh.source, COUNT(*) as dispatch_count,
+        SELECT dh.title_key, dh.source,
+               COALESCE(NULLIF(w.title,''), dh.title_key) AS title,
+               COUNT(*) as dispatch_count,
                MAX(dh.sent_at) as last_dispatched
         FROM dispatch_history dh
+        LEFT JOIN whitelist w ON w.title_key = dh.title_key AND w.source = dh.source
         WHERE dh.sent_at >= NOW() - INTERVAL '7 days'
-        GROUP BY dh.title_key, dh.source
+        GROUP BY dh.title_key, dh.source, w.title
         ORDER BY dispatch_count DESC
         LIMIT 20
     """)

@@ -159,15 +159,20 @@ export default function AnalyticsPage() {
           <h2 className="text-sm font-semibold">Popular series (7d)</h2>
           {overview.popular_series?.length ? (
             <div className="space-y-2">
-              {overview.popular_series.slice(0, 10).map((s) => (
+              {overview.popular_series.slice(0, 10).map((s: any) => {
+                const title = (s.title && s.title !== s.title_key ? s.title : s.title_key) as string;
+                const isUuid = /^[0-9a-f ]{8} [0-9a-f]{4}/i.test(s.title_key) || /^[0-9a-f-]{36}$/i.test(s.title_key);
+                const label = isUuid ? title.slice(0, 22) : (title || s.title_key).slice(0, 22);
+                return (
                 <BarRow
                   key={`${s.title_key}:${s.source}`}
-                  label={`${s.title_key.slice(0, 22)} · ${s.source}`}
+                  label={`${label} · ${s.source}`}
                   value={s.dispatch_count}
                   max={maxDispatch}
                   color={SOURCE_COLOR[s.source] ?? "bg-accent"}
                 />
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-xs text-text-muted">No data</p>
