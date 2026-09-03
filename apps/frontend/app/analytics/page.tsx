@@ -31,12 +31,12 @@ export default function AnalyticsPage() {
   const overviewQ = useQuery({
     queryKey: queryKeys.analyticsOverview,
     queryFn: getAnalyticsOverview,
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
   });
   const engagementQ = useQuery({
     queryKey: queryKeys.analyticsEngagement,
     queryFn: getAnalyticsEngagement,
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
   });
 
   const overview = overviewQ.data as AnalyticsOverview | null;
@@ -123,7 +123,16 @@ export default function AnalyticsPage() {
     <PageShell>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Analytics</h1>
-        <span className="text-xs text-text-muted">{overview.generated_at ? new Date(overview.generated_at).toLocaleString() : ""}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-muted">{overview.generated_at ? new Date(overview.generated_at).toLocaleString() : ""} · auto 15s</span>
+          <button
+            onClick={() => { overviewQ.refetch(); engagementQ.refetch(); }}
+            disabled={overviewQ.isFetching || engagementQ.isFetching}
+            className="px-2.5 py-1 rounded-md border border-border text-xs hover:bg-white/5 disabled:opacity-50"
+          >
+            {overviewQ.isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
