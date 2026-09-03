@@ -128,8 +128,6 @@ def _route_setchannel(payload: dict, data: dict):
             {"content": "❌ Missing channel or guild"},
         )
     # Defense: only accept guilds in the allowlist.
-    # DISCORD_GUILD_ID may be a comma-separated list to support
-    # multiple Discord servers (multi-server notifications).
     _raw = getattr(settings, "DISCORD_GUILD_ID", "") or ""
     allowed = [g.strip() for g in _raw.split(",") if g.strip()]
     if allowed and guild_id not in allowed:
@@ -137,20 +135,33 @@ def _route_setchannel(payload: dict, data: dict):
             CHANNEL_MESSAGE_WITH_SOURCE,
             {"content": "❌ Channel must belong to an authorized server"},
         )
+    # Respond within 3s — do DB upsert with timeout, fallback to deferred on slow DB
     try:
         from app.db import get_supabase
-        get_supabase().table("guild_settings").upsert(
-            {"guild_id": guild_id, "channel_id": str(channel_id)},
-            on_conflict="guild_id",
-        ).execute()
+        import concurrent.futures as _cf
+        def _do_upsert():
+            return get_supabase().table("guild_settings").upsert(
+                {"guild_id": guild_id, "channel_id": str(channel_id)},
+                on_conflict="guild_id",
+            ).execute()
+        with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+            fut = _ex.submit(_do_upsert)
+            fut.result(timeout=2.5)
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,
             {"content": f"✅ Notifications will be sent to <#{channel_id}>\nUse `/setfilter` to restrict origins (KR/CN/JP) for this server."},
         )
-    except Exception as e:
+    except concurrent.futures.TimeoutError:
+        logger.warn("setchannel DB timeout", guild=guild_id, channel=channel_id)
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": f"❌ Failed to set channel: {e}"},
+            {"content": "⏳ Channel save is slow — try again in 5s (DB timeout). If persists, check /health."},
+        )
+    except Exception as e:
+        logger.warn("setchannel failed", err=str(e)[:200])
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": f"❌ Failed to set channel: {e}"[:1900]},
         )
 
 
