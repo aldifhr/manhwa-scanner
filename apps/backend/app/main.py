@@ -27,9 +27,10 @@ async def lifespan(app: FastAPI):
     _role = (os.environ.get("ROLE") or "api").lower()
     if _role == "cron":
         from app.tasks import run_cron_worker, start_cron_scheduler
-        # Dual workers: 2 BLPOP threads so enqueue rate < process rate → queue never grows unbounded
+        # Triple workers: 3 BLPOP threads so enqueue rate < process rate → queue never grows unbounded
         threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-1").start()
         threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-2").start()
+        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-3").start()
         start_cron_scheduler()
         logger.info("cron-worker started (ROLE=cron)")
     logger.info("application startup complete")
