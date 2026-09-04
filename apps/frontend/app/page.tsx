@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "@/lib/utils";
 import { Reader } from "@/lib/reader";
 import {
@@ -409,10 +409,13 @@ function GroupedSkeleton() {
 }
 
 export default function HomePage() {
+  const [isPending, startTransition] = useTransition();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.homeFeed,
     queryFn: fetchFeed,
     staleTime: staleTimes.rss,
+    gcTime: 300_000,
+    placeholderData: keepPreviousData,
   });
 
   const { optimisticWhitelist, addingKey, handleAddGroup } = useFeedActions();
@@ -460,27 +463,28 @@ export default function HomePage() {
   );
 
   const rawResults = (data?.data?.results ?? []) as unknown[];
+  const deferredResults = useDeferredValue(rawResults);
 
   // Get latest timestamp from results
   const latestTimestamp = useMemo(() => {
-    if (rawResults.length === 0) return null;
-    const times = rawResults
+    if (deferredResults.length === 0) return null;
+    const times = deferredResults
       .map((r: any) => r?.updated_time || r?.sent_at || r?.updatedAt)
       .filter(Boolean)
       .map((t: string) => new Date(t).getTime());
     return times.length > 0 ? Math.max(...times) : null;
-  }, [rawResults]);
+  }, [deferredResults]);
 
-  // grouped by titleKey — same seam as /recent AllTab
+  // grouped by titleKey — same seam as /recent AllTab (deferred + transition biar gak block main thread pas 1k row)
   const grouped = useMemo(() => {
-    if (rawResults.length === 0) return [];
+    if (deferredResults.length === 0) return [];
     const isGrouped =
-      typeof (rawResults[0] as Record<string, unknown>)?.chapters !==
+      typeof (deferredResults[0] as Record<string, unknown>)?.chapters !==
         "undefined" &&
-      Array.isArray((rawResults[0] as { chapters?: unknown[] })?.chapters);
-    if (isGrouped) return rawResults as unknown as GroupedSeries[];
-    return groupChapters(rawResults as unknown as FlatChapter[]);
-  }, [rawResults]);
+      Array.isArray((deferredResults[0] as { chapters?: unknown[] })?.chapters);
+    if (isGrouped) return deferredResults as unknown as GroupedSeries[];
+    return groupChapters(deferredResults as unknown as FlatChapter[]);
+  }, [deferredResults]);
 
   const totalSent = snapshot?.overview?.totalChaptersSent ?? 0;
   const totalTracked = snapshot?.overview?.totalMangaTracked ?? 0;
