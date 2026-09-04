@@ -1,8 +1,10 @@
 "use client";
 
 import { PageShell } from "@/components/PageShell";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { getHealthDetailed } from "@/lib/api";
+import { readerFetch } from "@/lib/reader/transport";
+import { useState } from "react";
 
 interface SourceHealth {
   name: string;
@@ -50,6 +52,23 @@ export default function HealthDashboard() {
     queryKey: ["health-detailed"],
     queryFn: getHealthDetailed,
     refetchInterval: 30000,
+  });
+  const queryClient = useQueryClient();
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+  const refreshMutation = useMutation({
+    mutationFn: async () => {
+      const res = await readerFetch<{
+        success: boolean;
+        data: { refreshed: number };
+      }>("/api/v1/health/refresh-voratoon", { method: "POST" });
+      return res;
+    },
+    onSuccess: (res) => {
+      setRefreshMsg(`Refreshed ${res.data?.refreshed ?? 0} covers`);
+      queryClient.invalidateQueries({ queryKey: ["health-detailed"] });
+      setTimeout(() => setRefreshMsg(null), 3000);
+    },
+    onError: (e) => setRefreshMsg((e as Error).message.slice(0, 80)),
   });
 
   if (isLoading) {
@@ -149,13 +168,27 @@ export default function HealthDashboard() {
         {/* Voratoon Cover Expiry */}
         {health.voratoon_covers && health.voratoon_covers.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              Voratoon Covers — expiry countdown
-              <span className="text-xs font-normal text-text-muted">
-                ({health.voratoon_covers.length} whitelist • auto-refresh 5d /
-                expiring &lt;24h)
-              </span>
-            </h2>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                Voratoon Covers — expiry countdown
+                <span className="text-xs font-normal text-text-muted">
+                  ({health.voratoon_covers.length} whitelist • auto-refresh 5d /
+                  expiring &lt;24h)
+                </span>
+              </h2>
+              <button
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50 transition-colors"
+              >
+                {refreshMutation.isPending
+                  ? "Refreshing..."
+                  : "Refresh expiring now"}
+              </button>
+            </div>
+            {refreshMsg && (
+              <p className="text-xs text-amber-300">{refreshMsg}</p>
+            )}
             <div className="grid gap-2">
               {health.voratoon_covers.map((c) => {
                 const hours = c.hours_remaining ?? 0;

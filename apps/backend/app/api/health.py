@@ -85,6 +85,19 @@ def _parse_voratoon_expiry(cover: str) -> tuple[str | None, float | None]:
         return None, None
 
 
+@router.post("/health/refresh-voratoon")
+async def refresh_voratoon(request: Request):
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        from app.cron.enrich_whitelist import enrich_all_whitelist
+        # force refresh voratoon expiring soon (5d window) — reuse same logic
+        count = enrich_all_whitelist(refresh_days=5)
+        return JSONResponse(content={"success": True, "data": {"refreshed": count}})
+    except Exception as e:
+        return JSONResponse(content=safe_error(e), status_code=500)
+
+
 @router.get("/health/detailed")
 async def health_detailed(request: Request):
     from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami, cb_voratoon
