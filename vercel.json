@@ -2,8 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm --filter manhwa-reader build",
-  "outputDirectory": "apps/frontend/.next",
-  "framework": "nextjs",
-  "rewrites": [],
-  "headers": []
+  "framework": "nextjs"
 }
