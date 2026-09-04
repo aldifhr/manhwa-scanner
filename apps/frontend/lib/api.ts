@@ -302,22 +302,51 @@ export interface BookmarkEntry {
   cover?: string | null;
 }
 
+function readLocalBookmarksFallback(): BookmarkEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("local_bookmarks_fallback");
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as BookmarkEntry[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getBookmarks(): Promise<BookmarkEntry[]> {
+  let server: BookmarkEntry[] = [];
   try {
     const { readerFetch } = await import("@/lib/reader/transport");
     const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>(
       "/api/v1/bookmarks"
     );
-    return body.data || [];
+    server = body.data || [];
   } catch (e) {
     // 404 until BE deployed — don't spam console, just hide bookmark badge
     if (
       (e as Error)?.message?.includes("404") ||
       (e as Error)?.message?.includes("not_found")
-    )
-      return [];
-    throw e;
+    ) {
+      server = [];
+    } else {
+      throw e;
+    }
   }
+  // Merge server + localStorage fallback (POST fallback saat BE 404)
+  const local = readLocalBookmarksFallback();
+  if (local.length === 0) return server;
+  if (server.length === 0) return local;
+  const map = new Map<string, BookmarkEntry>();
+  for (const b of server) map.set(`${b.title_key}:${b.chapter_number}`, b);
+  for (const b of local) {
+    const k = `${b.title_key}:${b.chapter_number}`;
+    if (!map.has(k)) map.set(k, b);
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  );
 }
 
 export async function saveBookmark(data: {
