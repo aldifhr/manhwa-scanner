@@ -11,9 +11,96 @@ from app.logger import get_logger
 logger = get_logger("enrich")
 
 
+def _is_voratoon_expiring_soon(cover: str, hours: int = 24) -> bool:
+    """Check if presigned voratoon cover expires within hours."""
+    if not cover or "cvr.voratoon.id" not in cover:
+        return False
+    import re as _re
+    from datetime import datetime as _dt, timezone as _tz
+    import time as _time
+    m = _re.search(r"X-Amz-Date=([^&]+).*?X-Amz-Expires=(\d+)", cover)
+    if not m:
+        return False
+    try:
+        d = m.group(1)
+        exp = int(m.group(2))
+        dt = _dt.strptime(d, "%Y%m%dT%H%M%SZ").replace(tzinfo=_tz.utc)
+        expiry = dt.timestamp() + exp
+        return _time.time() > expiry - hours * 3600
+    except Exception:
+        return False
+
+
 def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None = None) -> dict | None:
     """Fetch metadata from source API. Returns dict of updates or None."""
     updates: dict = {}
+
+    if source == "voratoon":
+        # voratoon slug == title_key lowercased
+        slug = title_key.lower() if title_key else ""
+        if series_url and "/series/" in series_url:
+            slug = series_url.rstrip("/").split("/")[-1].lower()
+        if not slug:
+            return None
+        from app.scrapers import voratoon as _vt
+        from app.utils.cover_scrub import scrub_cover as _scrub
+        # 1) coba direct /series/{slug}, 2) fallback filter slug==slug
+        data = None
+        try:
+            data = _vt.fetch_series_detail(slug)
+        except Exception:
+            data = None
+        # fetch_series_detail returns {"id":..., "data": {...}} atau None
+        # kalau None, coba filter list
+        if not data:
+            try:
+                import httpx as _hx
+                from app.config import settings as _st
+                base = _st.VORATOON_API_URL.rstrip("/")
+                url = f"{base}/series"
+                params = {"take": 1, "page": 1, "includeMeta": "true", "takeChapter": 1, "filter": f"slug=={slug}"}
+                r = _hx.get(url, params=params, timeout=30.0)
+                r.raise_for_status()
+                j = r.json()
+                arr = j.get("data") or []
+                if arr:
+                    data = arr[0]
+            except Exception:
+                pass
+        if not data:
+            return None
+        inner = data.get("data", data) if isinstance(data, dict) else {}
+        cover = _scrub(inner.get("coverImage") or "")
+        if cover:
+            updates["cover"] = cover
+        rating = inner.get("rating")
+        if rating not in (None, "", 0):
+            try:
+                updates["rating"] = float(rating)
+            except Exception:
+                pass
+        genres = inner.get("genres") or []
+        # genres bisa [{data:{name}}] atau [str]
+        gnames = []
+        for g in genres:
+            if isinstance(g, dict):
+                n = g.get("data", {}).get("name") if isinstance(g.get("data"), dict) else g.get("name")
+                if n:
+                    gnames.append(n)
+            elif isinstance(g, str) and g:
+                gnames.append(g)
+        if gnames:
+            updates["genres"] = gnames
+        syn = inner.get("synopsis") or ""
+        if syn:
+            updates["description"] = syn[:2000]
+        fmt = (inner.get("format") or "").lower()
+        if fmt:
+            updates["type"] = fmt
+            updates["origin"] = "CN" if fmt == "manhua" else "KR"
+        if updates:
+            updates["source"] = "voratoon"
+        return updates if updates else None
 
     if source == "ikiru":
         from app.scrapers import ikiru
@@ -107,6 +194,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
     from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
     refresh_cutoff = (now - timedelta(days=refresh_days)).isoformat()
+    voratoon_cutoff = (now - timedelta(days=5)).isoformat()
 
     updated = 0
     skipped = 0
@@ -116,6 +204,14 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         src = r.get("source", "")
         su = r.get("series_url")
 
+        # voratoon presigned cover expiry — force refresh kalau sisa <24h
+        is_expiring = False
+        if src == "voratoon":
+            is_expiring = _is_voratoon_expiring_soon(r.get("cover") or "", hours=24)
+
+        # voratoon pakai window 5 hari (cover 6 hari), lainnya pakai refresh_days (7)
+        effective_cutoff = voratoon_cutoff if src == "voratoon" else refresh_cutoff
+
         all_present = (
             r.get("genres") and r.get("description") and r.get("rating")
             and r.get("status") and r.get("cover") and r.get("origin")
@@ -123,16 +219,19 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         enriched_at = r.get("metadata_enriched_at")
         _ea_str = str(enriched_at) if enriched_at is not None else None
 
-        if all_present:
+        # kalau voratoon expiring soon, jangan skip — paksa refresh
+        if is_expiring:
+            refreshed += 1
+        elif all_present:
             # Complete — only refresh if older than the refresh window.
-            if _ea_str and _ea_str >= refresh_cutoff:
+            if _ea_str and _ea_str >= effective_cutoff:
                 skipped += 1
                 continue
             refreshed += 1
         else:
             # Incomplete — but if we enriched very recently, don't hammer the
             # upstream API again (it may have returned partial data).
-            if _ea_str and _ea_str >= refresh_cutoff:
+            if _ea_str and _ea_str >= effective_cutoff:
                 skipped += 1
                 continue
 
@@ -141,6 +240,12 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
             if updates:
                 updates["metadata_enriched_at"] = now.isoformat()
                 sb.table("whitelist").update(updates).eq("title_key", tk).eq("source", src).execute()
+                # voratoon: sync fresh cover ke recent_chapters juga biar RSS/feed gak expired
+                if src == "voratoon" and updates.get("cover"):
+                    try:
+                        sb.table("recent_chapters").update({"cover": updates["cover"]}).eq("title_key", tk).eq("source", "voratoon").execute()
+                    except Exception:
+                        pass
                 updated += 1
         except Exception as e:
             logger.warn("enrich failed", title_key=tk, err=str(e)[:120])
