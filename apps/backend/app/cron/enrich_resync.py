@@ -186,14 +186,29 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
             )
             updated += 1
         except Exception as e:
+            err_s = str(e).lower()
+            if "already closed" in err_s or "cursor" in err_s and "closed" in err_s:
+                logger.warn("enrich_resync: abort — pool closed during shutdown", cu=cu[:40])
+                failed += 1
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                put_conn(conn)
+                return {"ok": False, "error": "pool closed — aborted mid-batch", "updated": updated, "failed": failed}
             logger.warn("enrich_resync: update failed", cu=cu[:60], err=str(e)[:120])
             failed += 1
         time.sleep(_INTER_FETCH_DELAY)
     try:
         conn.commit()
     except Exception as e:
-        logger.warn("enrich_resync: commit failed", err=str(e)[:120])
-    put_conn(conn)
+        err_s = str(e).lower()
+        if "already closed" not in err_s:
+            logger.warn("enrich_resync: commit failed", err=str(e)[:120])
+    try:
+        put_conn(conn)
+    except Exception:
+        pass
 
     duration = round(time.time() - start, 1)
     stats = {
