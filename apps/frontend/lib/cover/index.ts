@@ -17,15 +17,12 @@ function putCover(key: string, val: string | null): string | null {
 }
 
 // Hosts that must be served direct (presigned S3 / CORS-open, proxy would 403/502)
-// ikiru covers are public wp-content, no presign — direct is faster & avoids 502 from VPS
 const DIRECT_HOSTS = new Set([
   "cvr.voratoon.id",
   "cdn.voratoon.com",
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",
-  "07.ikiru.wtf",
-  "ikiru.wtf",
 ]);
 
 export function isDirectAllowed(hostname: string): boolean {

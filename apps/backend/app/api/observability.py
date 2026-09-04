@@ -683,11 +683,14 @@ async def reader_proxy(request: Request):
         # once, cache it, and serve from cache on every subsequent request — so
         # Discord's retry (or its CDN) gets an instant 200 from our cache.
         # SECURITY: cap response size to prevent upstream from exhausting memory.
-        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-            r = await client.get(
-                url,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; IkiruBot/1.0)"},
-            )
+        # ikiru hotlink protection: needs Referer from its own host, else 403
+        # also follow redirects (ikiru CDN 302) and spoof browser UA
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"}
+        if "ikiru.wtf" in url:
+            headers["Referer"] = "https://07.ikiru.wtf/"
+            headers["Accept"] = "image/avif,image/webp,image/apng,*/*"
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            r = await client.get(url, headers=headers)
         if r.status_code == 200:
             content = r.content[:_RESPONSE_SIZE_CAP]
             _cache_put(url, content)
