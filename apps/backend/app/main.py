@@ -129,7 +129,7 @@ async def metrics_root(request: Request):
 async def api_openapi(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    return JSONResponse(content=custom_openapi())
+    return JSONResponse(content=custom_openapi(request.app))
 
 
 # --- Uniform JSON error responses (no HTML leaks to the FE) ---

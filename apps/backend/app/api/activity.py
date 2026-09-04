@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.logger import get_logger
+from app.utils.request_auth import int_safe
 
 logger = get_logger("api:activity")
 router = APIRouter()
