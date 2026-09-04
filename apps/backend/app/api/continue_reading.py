@@ -112,7 +112,7 @@ async def put_continue_reading(request: Request):
                     "updatedAt": v.get("updatedAt") or time.time(),
                 }
             sb.table("continue_reading").upsert(
-                {"session_hash": sid_hash, "entries": merged, "updated_at": time.time()},
+                {"session_hash": sid_hash, "entries": merged, "updated_at": datetime.now(timezone.utc).isoformat()},
                 on_conflict="session_hash",
             ).execute()
             return JSONResponse(content={"success": True, "data": merged})
@@ -135,7 +135,7 @@ async def put_continue_reading(request: Request):
             "updatedAt": time.time(),
         }
         sb.table("continue_reading").upsert(
-            {"session_hash": sid_hash, "entries": {title_key: entry}, "updated_at": time.time()},
+            {"session_hash": sid_hash, "entries": {title_key: entry}, "updated_at": datetime.now(timezone.utc).isoformat()},
             on_conflict="session_hash",
         ).execute()
         return JSONResponse(content={"success": True, "data": entry})
@@ -240,7 +240,7 @@ async def mark_as_read(request: Request):
             {
                 "session_hash": sid_hash,
                 "entries": entries,
-                "updated_at": time.time(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             },
             on_conflict="session_hash",
         ).execute()
