@@ -329,22 +329,58 @@ export async function saveBookmark(data: {
   title?: string;
   cover?: string | null;
 }): Promise<void> {
-  const { readerFetch } = await import("@/lib/reader/transport");
-  await readerFetch("/api/v1/bookmarks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  try {
+    const { readerFetch } = await import("@/lib/reader/transport");
+    await readerFetch("/api/v1/bookmarks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  } catch (e) {
+    // 404 until BE deployed → fallback to localStorage so Bookmark button doesn't throw
+    if ((e as Error)?.message?.includes("404")) {
+      try {
+        const key = "local_bookmarks_fallback";
+        const raw = localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        arr.push({ ...data, updated_at: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(arr.slice(-100)));
+      } catch {}
+      return;
+    }
+    throw e;
+  }
 }
 
 export async function deleteBookmark(
   titleKey: string,
   chapterNumber: number
 ): Promise<void> {
-  const { readerFetch } = await import("@/lib/reader/transport");
-  await readerFetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, {
-    method: "DELETE",
-  });
+  try {
+    const { readerFetch } = await import("@/lib/reader/transport");
+    await readerFetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, {
+      method: "DELETE",
+    });
+  } catch (e) {
+    if ((e as Error)?.message?.includes("404")) {
+      try {
+        const key = "local_bookmarks_fallback";
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const arr = JSON.parse(raw) as (typeof raw)[];
+          const filtered = (
+            arr as unknown as { title_key: string; chapter_number: number }[]
+          ).filter(
+            (b) =>
+              !(b.title_key === titleKey && b.chapter_number === chapterNumber)
+          );
+          localStorage.setItem(key, JSON.stringify(filtered));
+        }
+      } catch {}
+      return;
+    }
+    throw e;
+  }
 }
 
 /* ── A/B Testing removed — /ab-tests page deleted per CONTEXT.md 2026-09-02 ── */

@@ -18,6 +18,12 @@ export async function DELETE(
         cache: "no-store",
       }
     );
+    if (res.status === 404) {
+      return NextResponse.json({
+        success: true,
+        data: { _localFallback: true },
+      });
+    }
     const body = await res
       .json()
       .catch(() => ({ success: false, error: `Upstream ${res.status}` }));
