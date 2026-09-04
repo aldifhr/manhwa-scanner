@@ -135,23 +135,22 @@ def _route_setchannel(payload: dict, data: dict):
             CHANNEL_MESSAGE_WITH_SOURCE,
             {"content": "❌ Channel must belong to an authorized server"},
         )
-    # Respond within 3s — do DB upsert with timeout, fallback to deferred on slow DB
+    # Respond within 3s — do DB upsert in thread, fallback to deferred on slow DB
     try:
         from app.db import get_supabase
-        import concurrent.futures as _cf
         def _do_upsert():
             return get_supabase().table("guild_settings").upsert(
                 {"guild_id": guild_id, "channel_id": str(channel_id)},
                 on_conflict="guild_id",
             ).execute()
-        with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
-            fut = _ex.submit(_do_upsert)
-            fut.result(timeout=2.5)
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=1) as _ex:
+            _ex.submit(_do_upsert).result(timeout=2.5)
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,
             {"content": f"✅ Notifications will be sent to <#{channel_id}>\nUse `/setfilter` to restrict origins (KR/CN/JP) for this server."},
         )
-    except concurrent.futures.TimeoutError:
+    except TimeoutError:
         logger.warn("setchannel DB timeout", guild=guild_id, channel=channel_id)
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,

@@ -2,7 +2,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/cron"}
+_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/cron", "/api/v1/reader/whitelist", "/api/v1/whitelist"}
 
 
 async def csrf_middleware(request: Request, call_next):

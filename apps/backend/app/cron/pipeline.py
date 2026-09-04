@@ -66,6 +66,11 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         recent_chapters.prune_older_than(24)
     except Exception as e:
         logger.warn("collect: recent_chapters prune failed", err=str(e)[:160])
+    # Prune dispatch_history to 24h window as well (user: "jangan 2 hari")
+    try:
+        recent_chapters.prune_dispatch_history_older_than(24)
+    except Exception as e:
+        logger.warn("collect: dispatch_history prune failed", err=str(e)[:160])
 
     # Parse source from action string (e.g., "rss-fetch:ikiru" → source="ikiru")
     source = None

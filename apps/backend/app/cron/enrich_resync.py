@@ -7,7 +7,7 @@ Why this exists (decoupled from the per-10-min chapter fetch):
   the _SOURCE_TIMEOUT budget.
 - Collect now already carries rating/cover/description from the list response,
   so the fetch path is fast (~30s) WITHOUT hitting the source APIs.
-- This job runs on its own schedule (e.g. every 15-30 min via FastCron action
+- This job runs on its own schedule (e.g. every 15-30 min via cron action
   "enrich") and patiently re-enriches every recent_chapters row in the 24h
   window: it fills status + genres (and refreshes rating/description/cover)
   from series_meta / source APIs, with a polite inter-fetch delay so we stay
@@ -150,12 +150,17 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
         _sets: list[str] = []
         _vals: list = []
         _rating = it.get("rating")
-        if _rating not in (None, 0):
+        if _rating not in (None, 0, ""):
             if isinstance(_rating, (int, float)):
                 _sets.append("rating=%s"); _vals.append(float(_rating))
             else:
-                # Skip if rating is non-numeric (e.g., row header leaked through)
-                logger.warn("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
+                # enrich() may return string ratings (e.g. "9", "7.67") — try parse
+                try:
+                    _parsed = float(str(_rating).strip())
+                    if _parsed > 0:
+                        _sets.append("rating=%s"); _vals.append(_parsed)
+                except (ValueError, TypeError):
+                    logger.warn("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
         _cover = it.get("cover")
         if _cover:
             _sets.append("cover=%s"); _vals.append(str(_cover))

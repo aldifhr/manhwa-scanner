@@ -74,6 +74,16 @@ async def rss(request: Request):
             _gr2().delete("rss:invalidate")
     except Exception:
         pass
+    return await _rss_impl(request)
+
+
+@router.get("/reader/rss")
+async def rss_reader(request: Request):
+    """Alias for FE compatibility — /api/v1/reader/rss → /api/v1/rss."""
+    return await _rss_impl(request)
+
+
+async def _rss_impl(request: Request):
     cache_key = request.url.query
     cached = _rss_cache_get(cache_key)
     if cached is not None:
@@ -101,6 +111,9 @@ async def rss(request: Request):
     if len(request.query_params.get("q", "") or "") > 100:
         return JSONResponse(content={"success": False, "error": "q too long (max 100)"}, status_code=400)
     exclude_origin = request.query_params.get("exclude_origin", "")
+    # Default: exclude Japanese manga unless user explicitly requests JP or sets exclude_origin
+    if not origin_f and not exclude_origin:
+        exclude_origin = "JP"
     type_f = request.query_params.get("type", "")
     # Custom filters (merged from /rss/custom) — handled in Python post-filter for now
     genres_f = request.query_params.get("genres", "")

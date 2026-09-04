@@ -37,6 +37,12 @@ async def dispatch_history(request: Request):
         return JSONResponse(content=safe_error(e), status_code=500)
 
 
+@router.get("/reader/dispatch-history")
+async def dispatch_history_reader(request: Request):
+    """Alias for FE compatibility — /api/v1/reader/dispatch-history → /api/v1/dispatch-history."""
+    return await dispatch_history(request)
+
+
 @router.get("/reader/whitelist")
 async def get_whitelist_reader(request: Request):
     """Backward-compat alias for the FE (fe.aldifhr.fun) which calls
@@ -80,6 +86,12 @@ async def whitelist_get(request: Request):
     except Exception as e:
         logger.warn("whitelist failed", err=str(e))
         return JSONResponse(content=safe_error(e), status_code=500)
+
+
+@router.post("/reader/whitelist")
+async def whitelist_post_reader(request: Request):
+    """Alias for FE compatibility — /api/v1/reader/whitelist → /api/v1/whitelist."""
+    return await whitelist_post(request)
 
 
 @router.post("/whitelist")

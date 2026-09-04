@@ -6,7 +6,7 @@ Why this exists (decoupled from the per-minute chapter collect):
 - The per-minute collect pipeline now runs with fetch_meta=False (fast path:
   just scrape new chapters + insert). RSS joins series_meta, so chapters
   still show rating/desc even though the row itself has no meta columns.
-- This job runs on its own schedule (e.g. every 6h via FastCron action
+- This job runs on its own schedule (e.g. every 6h via cron action
   "sync-meta") and patiently fetches + upserts series_meta for every distinct
   (title_key, source), with a long inter-fetch delay so we stay well under
   shinigami's 429 / ikiru's Cloudflare 403 thresholds. No timeout pressure.

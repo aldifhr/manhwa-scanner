@@ -28,6 +28,26 @@ def prune_older_than(hours: int = 24) -> int:
         logger.error("prune_older_than failed", exc=e)
         return 0
 
+
+def prune_dispatch_history_older_than(hours: int = 24) -> int:
+    """Delete dispatch_history rows older than `hours`.
+
+    Keeps dispatch history strictly within the rolling window.
+    Called at the start of every cron run so backlog never accumulates.
+    Returns the number of deleted rows.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    try:
+        sb = get_supabase()
+        res = sb.table("dispatch_history").delete().lt("sent_at", cutoff).execute()
+        n = len(res.data or [])
+        if n:
+            logger.info("pruned dispatch_history older than window", hours=hours, deleted=n)
+        return n
+    except Exception as e:
+        logger.error("prune_dispatch_history_older_than failed", exc=e)
+        return 0
+
 def _norm_chapter_num(v) -> str | None:
     """Canonical string form of a chapter number (46 vs 46.0 -> '46')."""
     try:
@@ -131,6 +151,10 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             _norm = normalize_origin(_src)
         if not _norm:
             _norm = "KR" if _src in ("ikiru", "shinigami") else ""
+        # Derive type from origin if type is missing (shinigami often has origin but no type)
+        if not row.get("type") and _norm:
+            _origin_to_type = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
+            row["type"] = _origin_to_type.get(_norm, "")
         # Ensure every allowed column is present so the upsert payload is
         # complete. Missing keys cause Supabase (pooler/transaction mode) to
         # reject the whole chunk with "row missing columns" — which silently

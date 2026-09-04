@@ -3,7 +3,7 @@ from app.api import dashboard as dashboard_api, catalog as catalog_api, auth as 
 from app.api.cron_status import router as _cron_status_router
 
 def register_core(app):
-    app.include_router(health_api.router)
+    app.include_router(health_api.router, prefix="/api/v1")
     app.include_router(dashboard_api.router, prefix="/api/v1")
     app.include_router(catalog_api.router, prefix="/api/v1")
     app.include_router(auth_api.router, prefix="/api/v1")

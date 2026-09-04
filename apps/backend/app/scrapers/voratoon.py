@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import httpx
+import time
+import random
 
 from app.config import settings
 from app.logger import get_logger
@@ -183,19 +185,29 @@ def collect_voratoon() -> list[dict]:
             }
             if filt:
                 params["filter"] = filt
-            try:
-                r = httpx.get(
-                    url,
-                    params=params,
-                    timeout=TIMEOUT,
-                    # Disable brotli: httpx's brotli decoder is not safe under
-                    # concurrent fetches (race -> DecodingError, dropped combos).
-                    headers={"Accept-Encoding": "gzip, deflate"},
-                )
-                r.raise_for_status()
-                payload = r.json()
-            except Exception as e:
-                logger.error("voratoon series list failed", exc=e)
+            # Retry loop with exponential backoff for 429
+            payload = None
+            for attempt in range(3):
+                try:
+                    r = httpx.get(
+                        url,
+                        params=params,
+                        timeout=TIMEOUT,
+                        headers={"Accept-Encoding": "gzip, deflate"},
+                    )
+                    if r.status_code == 429:
+                        retry_after = r.headers.get("retry-after")
+                        wait = float(retry_after) if retry_after else (2 ** attempt + random.uniform(0, 1))
+                        logger.warn("voratoon 429 rate limited", attempt=attempt, wait=round(wait, 2))
+                        time.sleep(wait)
+                        continue
+                    r.raise_for_status()
+                    payload = r.json()
+                    break
+                except Exception as e:
+                    logger.error("voratoon series list failed", exc=e)
+                    break
+            if payload is None:
                 break
             series_list = payload.get("data", [])
             if not series_list:

@@ -16,7 +16,6 @@ export const NAV = [
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash },
   { href: "/dispatch-history", label: "History", icon: Clock },
   { href: "/bookmarks", label: "Bookmarks", icon: BookBookmark },
-  { href: "/analytics", label: "Analytics", icon: ChartBar },
 ] as const;
 
 /** Sidebar / nav active-state helper (single source of truth).

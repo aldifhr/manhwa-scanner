@@ -109,7 +109,7 @@ def enqueue_cron(action: str) -> None:
     Cloudflare, the RSS API process is unaffected.
 
     Graceful degradation: if Redis is down we run the pipeline directly in
-    the API process (old behaviour) so FastCron-triggered crons still work
+    the API process (old behaviour) so external cron-triggered crons still work
     without Redis.
     """
     payload = {"action": action}
@@ -189,8 +189,8 @@ def run_cron_worker() -> None:
     """Blocking worker for the cron queue (ROLE=cron process only).
 
     Pops cron jobs and runs run_pipeline. At-least-once: a job removed only
-    after it succeeds; on crash the job is retried by FastCron's next tick
-    (FastCron is the scheduler; this worker is just the executor).
+    after it succeeds; on crash the job is retried by the scheduler
+    (internal scheduler enqueues; this worker executes).
     """
     logger.info("cron worker started")
     while not _stop.is_set():
@@ -212,16 +212,16 @@ def run_cron_worker() -> None:
 
 
 # Internal scheduler: fires the 3 source crons (+ enrich) on a fixed interval so
-# the pipeline runs autonomously WITHOUT depending on FastCron (or any external
-# trigger). FastCron can still coexist — enqueue_cron() is idempotent per Redis
+# the pipeline runs autonomously WITHOUT depending on any external trigger.
+# The scheduler can still coexist — enqueue_cron() is idempotent per Redis
 # list, and the per-action DB advisory lock in run_pipeline de-dupes concurrent
 # runs, so a double-fire just becomes a no-op skip.
 _SCHED_THREAD: "threading.Thread | None" = None
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
-_SOURCE_INTERVAL_S = 300          # 5 min per source (RSS)
-_DISPATCH_INTERVAL_S = 60        # 1 min Discord dispatch (user request)
-_ENRICH_INTERVAL_S = 900         # 15 min (legacy full refresh)
-_ENRICH_MISSING_INTERVAL_S = 1800  # 30 min static-data backfill (miss_only)
+_SOURCE_INTERVAL_S = 600          # 10 min per source (RSS fetch takes ~100s)
+_DISPATCH_INTERVAL_S = 300        # 5 min Discord dispatch (job takes ~226s)
+_ENRICH_INTERVAL_S = 1800        # 30 min (legacy full refresh)
+_ENRICH_MISSING_INTERVAL_S = 3600  # 1 hour static-data backfill (miss_only)
 _ENRICH_REFRESH_INTERVAL_S = 604800  # 7 days stale check (rating/description drift)
 _VORATOON_COVER_INTERVAL_S = 86400  # 24h voratoon presigned cover refresh (6d expiry)
 
@@ -281,7 +281,7 @@ def _scheduler_loop() -> None:
                     _stop.wait(20)
             logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
             last_source = _now
-        # Periodic enrich so metadata stays fresh without FastCron.
+        # Periodic enrich so metadata stays fresh without external triggers.
         if _now - last_enrich >= _ENRICH_INTERVAL_S:
             try:
                 enqueue_cron("enrich")

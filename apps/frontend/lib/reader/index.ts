@@ -5,6 +5,7 @@ import type {
   QueueDepth,
   DashboardSnapshot,
   ExcludedTitleItem,
+  DispatchHistoryItem,
 } from "@/lib/types";
 import { readerFetch, paginatedGet } from "./transport";
 import { mapWhitelist, mapHistory, mapRss, mapExcluded } from "./mapper";
@@ -91,7 +92,7 @@ export const Reader = {
       total_pages?: number;
     };
     return {
-      results: (d?.results ?? []).map(mapHistory) as import("@/lib/types").DispatchHistoryItem[],
+      results: (d?.results ?? []).map((r) => mapHistory(r) as unknown as DispatchHistoryItem),
       total: d?.total ?? 0,
       page: d?.page ?? page,
       pageSize: d?.pageSize ?? pageSize,

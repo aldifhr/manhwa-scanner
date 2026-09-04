@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     start_worker()
     # Cron decoupling: the ROLE=cron process runs the cron queue worker so the
     # (slow, upstream-heavy) scrape/dispatch never runs inside the HTTP API
-    # process. FastCron hits /api/cron on the API process, which enqueues to
+    # process. External cron hits /api/cron on the API process, which enqueues to
     # Redis; the cron worker pops and executes run_pipeline.
     _role = (os.environ.get("ROLE") or "api").lower()
     if _role == "cron":
@@ -173,15 +173,30 @@ async def api_interactive(request: Request):
     """Discord interaction endpoint — verifies Ed25519 signature and routes."""
     from app.discord import client as _disc
     from app.discord.router import handle_interaction
+    from app.logger import get_logger
+    logger = get_logger("discord:interactive")
 
     signature = request.headers.get("x-signature-ed25519", "")
     timestamp = request.headers.get("x-signature-timestamp", "")
     body = await request.body()
 
-    if not _disc.verify_interaction(body, signature, timestamp):
+    logger.info("interaction received",
+        sig_len=len(signature),
+        ts=timestamp,
+        ts_len=len(timestamp),
+        body_len=len(body),
+        body_preview=body[:80].decode(errors="replace"))
+
+    if not _disc.verify_interaction_v2(body, signature, timestamp):
+        logger.warn("interaction signature rejected",
+            sig_len=len(signature),
+            ts_len=len(timestamp),
+            body_len=len(body))
         return JSONResponse(content={"error": "invalid signature"}, status_code=401)
 
+    logger.info("interaction verified, routing...")
     status_code, response_body = handle_interaction(body)
+    logger.info("interaction handled", status=status_code, response_preview=str(response_body)[:120])
     return JSONResponse(content=response_body, status_code=status_code)
 
 

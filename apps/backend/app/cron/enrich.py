@@ -12,6 +12,7 @@ import re
 from app.cron.collect import _parse_types
 from app.logger import get_logger
 from app.scrapers import ikiru, shinigami
+from app.scrapers.shinigami import _country_to_type
 from app.storage import metadata as meta_store
 from app.utils.origin import normalize_origin
 
@@ -116,7 +117,11 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             it["genres"] = s.get("genres") or s.get("genre") or []
             it["description"] = _strip_html(s.get("description", ""))
             # no type -> no origin (hide flag) — don't fallback to KR
-            it["origin"] = normalize_origin(ikiru_origin) if _types else ""
+            # Only override origin if we have a new value; preserve existing DB origin
+            if _types and ikiru_origin:
+                it["origin"] = normalize_origin(ikiru_origin)
+            elif not it.get("origin"):
+                it["origin"] = ""
 
     # ── Shinigami enrich (parallelized) ──
     def _fetch_shin(mid: str) -> tuple[str, dict | None]:
@@ -158,6 +163,7 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             "genres": genres,
             "description": s.get("description") or s.get("synopsis") or "",
             "origin": _shin_origin,
+            "type": _country_to_type(s.get("country_id")) or s.get("type") or "",
         }
         return mid, mapped
 
@@ -189,6 +195,9 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
                 it["genres"] = s.get("genres", [])
             it["description"] = _strip_html(s.get("description", "")) or it.get("description", "")
             it["origin"] = normalize_origin(shin_origin or it.get("origin", ""))
+            # Update type from cached shinigami data if available
+            if not it.get("type") and s.get("type"):
+                it["type"] = s["type"]
 
     # Final safety: ensure every item's origin is a canonical country code
     for it in items:

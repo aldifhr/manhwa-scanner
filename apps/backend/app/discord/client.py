@@ -39,12 +39,55 @@ def verify_interaction(raw_body: bytes, signature: str, timestamp: str) -> bool:
         logger.warn("DISCORD_PUBLIC_KEY not set — refusing")
         return False
     try:
-        return verify_key(
+        logger.info("verify_interaction", sig_len=len(signature), ts_len=len(timestamp), body_len=len(raw_body))
+        result = verify_key(
             raw_body,
             signature,
             timestamp,
             settings.DISCORD_PUBLIC_KEY,
         )
+        if not result:
+            logger.warn("verify_interaction returned False", sig_len=len(signature))
+        return result
+    except Exception as e:
+        logger.error("verify_interaction error", exc=e)
+        return False
+
+
+def _decode_discord_public_key(pk: str) -> bytes:
+    """Decode Discord public key — handles both hex and base64url formats."""
+    try:
+        # Try hex first (what discord_interactions.verify_key expects)
+        decoded = bytes.fromhex(pk)
+        if len(decoded) == 32:
+            return decoded
+    except ValueError:
+        pass
+    # Try base64url (what Discord Portal actually shows)
+    import base64
+    try:
+        decoded = base64.urlsafe_b64decode(pk + "==")
+        if len(decoded) == 32:
+            return decoded
+    except Exception:
+        pass
+    raise ValueError(f"Unable to decode Discord public key (len={len(pk)})")
+
+
+def verify_interaction_v2(raw_body: bytes, signature: str, timestamp: str) -> bool:
+    """Verify Ed25519 signature from Discord — handles base64url PK format."""
+    if not settings.DISCORD_PUBLIC_KEY:
+        logger.warn("DISCORD_PUBLIC_KEY not set — refusing")
+        return False
+    try:
+        pk_bytes = _decode_discord_public_key(settings.DISCORD_PUBLIC_KEY)
+        from nacl.signing import VerifyKey
+        vk = VerifyKey(pk_bytes)
+        # Discord sends signature as hex (64 bytes = 128 hex chars)
+        sig_bytes = bytes.fromhex(signature)
+        vk.verify(timestamp.encode() + raw_body, sig_bytes)
+        logger.info("verify_interaction OK", sig_len=len(signature))
+        return True
     except Exception as e:
         logger.error("verify_interaction error", exc=e)
         return False

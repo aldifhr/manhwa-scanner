@@ -17,7 +17,7 @@ def token_matches(provided: str, *, role: str = "both") -> bool:
     """Return True if `provided` matches a configured secret (constant-time).
 
     `role` restricts WHICH secret is allowed:
-      - "cron"    → only CRON_SECRET (FastCron's ?token= secret)
+      - "cron"    → only CRON_SECRET (cron's ?token= secret)
       - "monitor" → only MONITOR_AUTH_TOKEN (dashboard JWT / Bearer)
       - "both"    → either (legacy callers that don't distinguish)
 
@@ -32,7 +32,7 @@ def token_matches(provided: str, *, role: str = "both") -> bool:
     if not provided:
         return False
     if role == "cron":
-        candidates = [c for c in (settings.CRON_SECRET, settings.FASTCRON_API_KEY) if c]
+        candidates = [c for c in (settings.CRON_SECRET) if c]
     elif role == "monitor":
         candidates = [settings.MONITOR_AUTH_TOKEN]
     else:  # both (legacy)
@@ -143,7 +143,7 @@ def require_role(allowed: set[str], authorization: str = "", token_param: str = 
 def check_cron_auth(token_param: str = "") -> bool:
     """Auth for the /api/cron trigger — CRON_SECRET ONLY.
 
-    This is a SEPARATE role from the dashboard: FastCron hits
+    This is a SEPARATE role from the dashboard: external cron hits
     /api/cron?token=CRON_SECRET. The CRON_SECRET is the most-exposed
     secret (it lives in a query string, visible to access logs / referrers),
     so it must NOT grant dashboard/CRUD privileges. We accept ONLY

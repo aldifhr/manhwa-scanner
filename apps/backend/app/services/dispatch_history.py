@@ -75,6 +75,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
     urls = [normalize_shinigami_url(u) or u for u in raw_urls]
     rc_map = {}
     wl_map = {}
+    # Store title per title_key from recent_chapters as fallback
+    rc_title_map: dict[str, str] = {}
     # BUG4: recent_chapters is pruned to 24h but dispatch_history retains 90d,
     # so chapter_url joins often miss. Build a series-level metadata map from
     # recent_chapters by (title_key, source) — that table carries genres/
@@ -100,6 +102,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
                 )
                 for _row in (_rc.data or []):
                     rc_map[(_tk, _src)] = _row
+                    if _row.get("title"):
+                        rc_title_map[_tk] = str(_row["title"])
         except Exception:
             pass
     if urls:
@@ -125,7 +129,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
     try:
         _sm = (
             sb.table("series_meta")
-            .select("title_key, source, genres, description, rating, cover, type")
+            .select("title_key, source, title, genres, description, rating, cover, type")
             .in_("title_key", [r.get("title_key") or "" for r in rows if r.get("title_key")])
             .execute()
         )
@@ -172,6 +176,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
         title = (
             rc.get("title")
             or wl.get("title")
+            or rc_title_map.get(_tk)
             or r.get("title_key")
             or r.get("chapter_title")
             or "Untitled"

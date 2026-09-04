@@ -261,7 +261,7 @@ def map_result(
     _type = normalize_type(sm.get("type") or it.get("type") or wl.get("type") or _meta.get("type") or None)
     # origin no type -> "" (hide flag) — FE AllCard now hides flag when type null, BE also empty
     _raw_origin = it.get("origin") or wl.get("origin") or _meta.get("origin") or ""
-    origin = normalize_origin(_raw_origin) if _type else ""
+    origin = normalize_origin(_raw_origin)
 
     return {
         "id": slug,

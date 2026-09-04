@@ -12,7 +12,7 @@ logger = get_logger("api:bookmark")
 router = APIRouter()
 
 
-@router.get("/api/v1/bookmarks")
+@router.get("/bookmarks")
 async def bookmarks_list(request: Request):
     """Get all bookmarks for current session."""
     if not require_monitor_auth(request):
@@ -29,7 +29,7 @@ async def bookmarks_list(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.post("/api/v1/bookmarks")
+@router.post("/bookmarks")
 async def bookmark_create(request: Request):
     """Create or update a bookmark."""
     if not require_monitor_auth(request):
@@ -58,7 +58,7 @@ async def bookmark_create(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.delete("/api/v1/bookmarks/{title_key}/{chapter_number}")
+@router.delete("/bookmarks/{title_key}/{chapter_number}")
 async def bookmark_delete(request: Request, title_key: str, chapter_number: float):
     """Delete a bookmark."""
     if not require_monitor_auth(request):

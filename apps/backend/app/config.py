@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     DISCORD_OAUTH_REDIRECT_URI: str = "https://scanner.aldifhr.fun/api/auth/discord/callback"
     OUTBOUND_WEBHOOK_URLS: str = ""
     DISCORD_GUILD_ID: str = ""
+    DISCORD_APPLICATION_ID: str = ""
     ERROR_WEBHOOK_URL: str = ""
     ADMIN_REPORT_CHANNEL_ID: str = ""
 
@@ -46,7 +47,8 @@ class Settings(BaseSettings):
 
     # Cron
     CRON_SECRET: str = ""
-    FASTCRON_API_KEY: str = ""  # Legacy/rotation support — either secret works
+    # Legacy API key (kept for rotation support)
+    FASTCRON_API_KEY: str = ""  # Legacy — either secret works
     MONITOR_AUTH_TOKEN: str = ""
     # Member login password (write-limited: can add whitelist / exclude,
     # cannot delete / retry / clear / access settings). Separate from admin.
@@ -55,8 +57,8 @@ class Settings(BaseSettings):
     # MUST be set explicitly — never defaults to MONITOR_AUTH_TOKEN (which is
     # exposed in query strings). Boot guard in _validate_settings enforces this.
     AUTH_SECRET: str = ""
-    # Kill switch: set "false" to halt all FastCron runs (returns 503, run skipped).
-    # Used to pause cron without deleting code or touching FastCron dashboard.
+    # Kill switch: set "false" to halt all cron runs (returns 503, run skipped).
+    # Used to pause cron without deleting code.
     CRON_ENABLED: str = "true"
     # Dev/test only: disable monitor auth entirely. NEVER set true in production.
     AUTH_DISABLED: bool = False

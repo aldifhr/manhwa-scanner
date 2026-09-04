@@ -29,7 +29,11 @@ def _proxy_cover(cover: str | None) -> str | None:
     """
     if not cover or not isinstance(cover, str):
         return cover
-    if "/api/reader/cover-img" in cover:
+    cover = cover.strip()
+    if not cover:
+        return cover
+    # Already proxied — return as-is
+    if "/api/v1/reader/cover-img" in cover or "/api/reader/cover-img" in cover:
         return cover
     public_base = (_PUBLIC_BASE or "https://scanner.aldifhr.fun").rstrip("/")
     # Voratoon covers are stored as a same-origin /api/reader/proxy?url=<enc
@@ -41,6 +45,8 @@ def _proxy_cover(cover: str | None) -> str | None:
         _inner = _pqs(_up(cover).query).get("url", [""])[0]
         if _inner:
             cover = _uq(_inner)
+    # Direct URLs (ikiru, shinigami, voratoon assets) — wrap in public cover-img proxy
+    # so Discord can fetch without auth and bypass hotlink protection
     return f"{public_base}/api/v1/reader/cover-img?url={_urlquote(cover, safe='')}"
 
 
@@ -247,6 +253,6 @@ def _build_embed(
     }
     if desc:
         embed["description"] = desc
-    if cover and (cover.startswith("http") or cover.startswith("/api/reader/") or cover.startswith("/api/v1/reader/")):
+    if cover and (cover.startswith("http") or cover.startswith("/api/reader/") or cover.startswith("/api/v1/reader/") or cover.strip()):
         embed["thumbnail"] = {"url": _proxy_cover(cover)}
     return embed

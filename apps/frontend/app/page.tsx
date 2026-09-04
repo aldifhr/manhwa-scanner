@@ -387,6 +387,16 @@ export default function HomePage() {
 
   const rawResults = (data?.data?.results ?? []) as unknown[];
 
+  // Get latest timestamp from results
+  const latestTimestamp = useMemo(() => {
+    if (rawResults.length === 0) return null;
+    const times = rawResults
+      .map((r: any) => r?.updated_time || r?.sent_at || r?.updatedAt)
+      .filter(Boolean)
+      .map((t: string) => new Date(t).getTime());
+    return times.length > 0 ? Math.max(...times) : null;
+  }, [rawResults]);
+
   // grouped by titleKey — same seam as /recent AllTab
   const grouped = useMemo(() => {
     if (rawResults.length === 0) return [];
@@ -518,7 +528,11 @@ export default function HomePage() {
         <EmptyState
           icon={<MagnifyingGlass />}
           message="No updates today"
-          subMessage="Check again later or view all in Recent"
+          subMessage={
+            latestTimestamp
+              ? `Last update: ${new Date(latestTimestamp).toLocaleString()}`
+              : 'Check again later or view all in Recent'
+          }
           action={
             <Link
               href="/recent"
