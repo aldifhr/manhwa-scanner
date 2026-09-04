@@ -136,7 +136,7 @@ def _run_cron_inline(action: str) -> None:
     if action in ("enrich", "enrich-missing", "enrich-refresh"):
         from app.cron.enrich_resync import enrich_recent_chapters, enrich_stale_series_meta
         if action == "enrich":
-            stats = enrich_recent_chapters()
+            stats = enrich_recent_chapters(limit=100)
         elif action == "enrich-missing":
             stats = enrich_recent_chapters(limit=100, miss_only=True)
         else:  # enrich-refresh
@@ -220,7 +220,7 @@ _SCHED_THREAD: "threading.Thread | None" = None
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
 _SOURCE_INTERVAL_S = 600          # 10 min per source (RSS fetch takes ~100s)
 _DISPATCH_INTERVAL_S = 300        # 5 min Discord dispatch (job takes ~226s)
-_ENRICH_INTERVAL_S = 1800        # 30 min (legacy full refresh)
+_ENRICH_INTERVAL_S = 3600        # 60 min (reduce RAM peak from 130k voratoon dict)
 _ENRICH_MISSING_INTERVAL_S = 3600  # 1 hour static-data backfill (miss_only)
 _ENRICH_REFRESH_INTERVAL_S = 604800  # 7 days stale check (rating/description drift)
 _VORATOON_COVER_INTERVAL_S = 86400  # 24h voratoon presigned cover refresh (6d expiry)
