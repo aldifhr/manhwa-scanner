@@ -17,12 +17,15 @@ function putCover(key: string, val: string | null): string | null {
 }
 
 // Hosts that must be served direct (presigned S3 / CORS-open, proxy would 403/502)
+// ikiru covers are public wp-content, no presign — direct is faster & avoids 502 from VPS
 const DIRECT_HOSTS = new Set([
   "cvr.voratoon.id",
   "cdn.voratoon.com",
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",
+  "07.ikiru.wtf",
+  "ikiru.wtf",
 ]);
 
 export function isDirectAllowed(hostname: string): boolean {
@@ -50,7 +53,10 @@ export function resolveCoverUrl(
     if (inner.includes("cvr.voratoon.id")) {
       return putCover(cover, cover);
     }
-    return putCover(cover, `/api/v1/reader/proxy?url=${encodeURIComponent(inner)}`);
+    return putCover(
+      cover,
+      `/api/v1/reader/proxy?url=${encodeURIComponent(inner)}`
+    );
   }
   if (cover.includes("/api/v1/reader/cover-img?")) {
     try {
@@ -61,8 +67,12 @@ export function resolveCoverUrl(
         if (inner.includes("cvr.voratoon.id")) {
           return putCover(cover, cover);
         }
-        const canonical = param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
-        return putCover(cover, `${canonical}?${param}=${encodeURIComponent(inner)}`);
+        const canonical =
+          param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
+        return putCover(
+          cover,
+          `${canonical}?${param}=${encodeURIComponent(inner)}`
+        );
       }
     } catch {
       /* fall through */
@@ -91,11 +101,16 @@ export function resolveCoverUrl(
       if (path.startsWith("/api/v1/reader/cover-img?")) {
         try {
           const u = new URL(cover);
-          const inner = u.searchParams.get("url") || u.searchParams.get("series");
+          const inner =
+            u.searchParams.get("url") || u.searchParams.get("series");
           if (inner) {
             const param = u.searchParams.has("url") ? "url" : "series";
-            const canonical = param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
-            return putCover(cover, `${canonical}?${param}=${encodeURIComponent(inner)}`);
+            const canonical =
+              param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
+            return putCover(
+              cover,
+              `${canonical}?${param}=${encodeURIComponent(inner)}`
+            );
           }
         } catch {
           /* fall through */
@@ -104,7 +119,8 @@ export function resolveCoverUrl(
       return putCover(cover, path);
     }
     const httpPrefix = `http://${host}/api/v1/reader/`;
-    if (cover.startsWith(httpPrefix)) return putCover(cover, cover.slice(`http://${host}`.length));
+    if (cover.startsWith(httpPrefix))
+      return putCover(cover, cover.slice(`http://${host}`.length));
   }
   if (cover.includes("/api/v1/reader/")) {
     try {
@@ -112,11 +128,16 @@ export function resolveCoverUrl(
       if (u.pathname.startsWith("/api/v1/reader/")) {
         const path = u.pathname + u.search;
         if (path.startsWith("/api/v1/reader/cover-img?")) {
-          const inner = u.searchParams.get("url") || u.searchParams.get("series");
+          const inner =
+            u.searchParams.get("url") || u.searchParams.get("series");
           if (inner) {
             const param = u.searchParams.has("url") ? "url" : "series";
-            const canonical = param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
-            return putCover(cover, `${canonical}?${param}=${encodeURIComponent(inner)}`);
+            const canonical =
+              param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
+            return putCover(
+              cover,
+              `${canonical}?${param}=${encodeURIComponent(inner)}`
+            );
           }
         }
         return putCover(cover, path);
@@ -138,7 +159,7 @@ export function resolveCoverUrl(
     }
     try {
       const h = new URL(raw).hostname;
-      if (h === "cvr.voratoon.id" || h === "cdn.voratoon.com" || h === "assets.shngm.id") {
+      if (isDirectAllowed(h)) {
         return putCover(cover, raw);
       }
     } catch {}
@@ -151,7 +172,10 @@ export function resolveCoverUrl(
     try {
       const u = new URL(cover, "https://example.com");
       const inner = u.searchParams.get("url");
-      if (inner && (cover.startsWith("http://") || cover.startsWith("https://"))) {
+      if (
+        inner &&
+        (cover.startsWith("http://") || cover.startsWith("https://"))
+      ) {
         rawUrl = inner;
       } else if (inner) {
         rawUrl = decodeURIComponent(inner);
