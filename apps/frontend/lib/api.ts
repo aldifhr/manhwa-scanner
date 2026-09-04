@@ -186,6 +186,15 @@ export async function getHealthDetailed(): Promise<{
   version: string;
   circuit_breakers: Record<string, string>;
   db_pool: Record<string, number>;
+  voratoon_covers?: Array<{
+    title_key: string;
+    title: string;
+    cover: string;
+    expiry: string;
+    hours_remaining: number;
+    expiring_soon: boolean;
+    expired: boolean;
+  }>;
 }> {
   const { readerFetch } = await import("@/lib/reader/transport");
   const body = await readerFetch<{ success: boolean; data: unknown }>(
@@ -207,6 +216,15 @@ export async function getHealthDetailed(): Promise<{
     version: string;
     circuit_breakers: Record<string, string>;
     db_pool: Record<string, number>;
+    voratoon_covers?: Array<{
+      title_key: string;
+      title: string;
+      cover: string;
+      expiry: string;
+      hours_remaining: number;
+      expiring_soon: boolean;
+      expired: boolean;
+    }>;
   };
 }
 
@@ -303,11 +321,16 @@ export interface BookmarkEntry {
 }
 
 export async function getBookmarks(): Promise<BookmarkEntry[]> {
-  const { readerFetch } = await import("@/lib/reader/transport");
-  const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>(
-    "/api/v1/bookmarks"
-  );
-  return body.data || [];
+  try {
+    const { readerFetch } = await import("@/lib/reader/transport");
+    const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>(
+      "/api/v1/bookmarks"
+    );
+    return body.data || [];
+  } catch (e) {
+    if ((e as Error)?.message?.includes("404")) return [];
+    throw e;
+  }
 }
 
 export async function saveBookmark(data: {

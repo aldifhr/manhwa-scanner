@@ -15,9 +15,10 @@ import {
   MagnifyingGlass,
   Plus,
   CheckCircle,
+  BookBookmark,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
-import { saveBookmark } from "@/lib/api";
+import { saveBookmark, getBookmarks } from "@/lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
@@ -145,11 +146,13 @@ function HomeGroupedCard({
   isWhitelisted,
   adding,
   onAdd,
+  isBookmarked,
 }: {
   series: GroupedSeries;
   isWhitelisted?: boolean;
   adding?: boolean;
   onAdd?: () => void;
+  isBookmarked?: boolean;
 }) {
   const origin = normalizeOrigin(series.origin);
   const flag = getOriginFlag(origin);
@@ -237,6 +240,11 @@ function HomeGroupedCard({
                 </span>
               );
             })()}
+          {isBookmarked && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <BookBookmark size={10} weight="fill" /> BM
+            </span>
+          )}
         </div>
 
         {/* Description */}
@@ -408,6 +416,22 @@ export default function HomePage() {
   });
 
   const { optimisticWhitelist, addingKey, handleAddGroup } = useFeedActions();
+
+  const { data: bookmarks } = useQuery({
+    queryKey: ["bookmarks"],
+    queryFn: getBookmarks,
+    staleTime: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const bookmarkSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const b of bookmarks ?? []) {
+      s.add(b.title_key);
+      s.add(`${b.title_key}:${b.chapter_number}`);
+    }
+    return s;
+  }, [bookmarks]);
 
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: queryKeys.dashboardSnapshot,
@@ -614,12 +638,21 @@ export default function HomePage() {
               ) ||
               optimisticWhitelist.has(s.titleKey);
             const adding = addingKey === s.titleKey;
+            const isBM =
+              bookmarkSet.has(s.titleKey) ||
+              s.chapters.some(
+                (c: { titleKey: string; chapterNumber: number }) =>
+                  bookmarkSet.has(
+                    `${c.titleKey || s.titleKey}:${c.chapterNumber}`
+                  ) || bookmarkSet.has(c.titleKey || s.titleKey)
+              );
             return (
               <HomeGroupedCard
                 series={s}
                 isWhitelisted={isWL}
                 adding={adding}
                 onAdd={() => handleAddGroup(s)}
+                isBookmarked={isBM}
               />
             );
           }}
@@ -636,6 +669,14 @@ export default function HomePage() {
               ) ||
               optimisticWhitelist.has(series.titleKey);
             const adding = addingKey === series.titleKey;
+            const isBM =
+              bookmarkSet.has(series.titleKey) ||
+              series.chapters.some(
+                (c: { titleKey: string; chapterNumber: number }) =>
+                  bookmarkSet.has(
+                    `${c.titleKey || series.titleKey}:${c.chapterNumber}`
+                  ) || bookmarkSet.has(c.titleKey || series.titleKey)
+              );
             return (
               <motion.div
                 key={series.titleKey + String(i)}
@@ -648,6 +689,7 @@ export default function HomePage() {
                   isWhitelisted={isWL}
                   adding={adding}
                   onAdd={() => handleAddGroup(series)}
+                  isBookmarked={isBM}
                 />
               </motion.div>
             );

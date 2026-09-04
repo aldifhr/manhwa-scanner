@@ -63,6 +63,28 @@ async def api_health(request: Request):
         return JSONResponse(content=safe_error(e), status_code=500)
 
 
+def _parse_voratoon_expiry(cover: str) -> tuple[str | None, float | None]:
+    """Parse X-Amz-Date/X-Amz-Expires from presigned voratoon cover. Returns (expiry_iso, hours_remaining) or (None, None)."""
+    if not cover or "cvr.voratoon.id" not in cover:
+        return None, None
+    import re as _re
+    import time as _time
+    from datetime import datetime as _dt, timezone as _tz
+    m = _re.search(r"X-Amz-Date=([^&]+).*?X-Amz-Expires=(\d+)", cover)
+    if not m:
+        return None, None
+    try:
+        d = m.group(1)
+        exp = int(m.group(2))
+        dt = _dt.strptime(d, "%Y%m%dT%H%M%SZ").replace(tzinfo=_tz.utc)
+        expiry_ts = dt.timestamp() + exp
+        expiry_iso = _dt.fromtimestamp(expiry_ts, tz=_tz.utc).isoformat()
+        hours_remaining = (expiry_ts - _time.time()) / 3600
+        return expiry_iso, round(hours_remaining, 1)
+    except Exception:
+        return None, None
+
+
 @router.get("/health/detailed")
 async def health_detailed(request: Request):
     from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami, cb_voratoon
@@ -101,6 +123,30 @@ async def health_detailed(request: Request):
             _uptime_s = 0
     _avg_err = sum(s["errorRate24h"] for s in sources) / len(sources) if sources else 0
     _uptime_pct = round(max(0, 100 - _avg_err), 1) if sources else 100.0
+    # voratoon whitelist cover expiry countdown (reuse _is_voratoon_expiring_soon logic)
+    voratoon_covers: list[dict] = []
+    try:
+        from app.db import get_supabase as _gsb2
+        _rows = _gsb2().table("whitelist").select("title_key, title, cover").eq("source", "voratoon").limit(100).execute().data or []
+        for _r in _rows:
+            _cover = _r.get("cover") or ""
+            if "cvr.voratoon.id" not in _cover:
+                continue
+            expiry_iso, hours_remaining = _parse_voratoon_expiry(_cover)
+            if expiry_iso is None:
+                continue
+            voratoon_covers.append({
+                "title_key": _r.get("title_key", ""),
+                "title": _r.get("title", ""),
+                "cover": _cover,
+                "expiry": expiry_iso,
+                "hours_remaining": hours_remaining,
+                "expiring_soon": (hours_remaining is not None and hours_remaining < 24),
+                "expired": (hours_remaining is not None and hours_remaining < 0),
+            })
+        voratoon_covers.sort(key=lambda x: x["hours_remaining"] if x["hours_remaining"] is not None else 9999)
+    except Exception:
+        voratoon_covers = []
     return {
         "success": True,
         "data": {
@@ -117,5 +163,6 @@ async def health_detailed(request: Request):
                 "voratoon": cb_voratoon.state.value,
             },
             "db_pool": pool,
+            "voratoon_covers": voratoon_covers,
         }
     }
