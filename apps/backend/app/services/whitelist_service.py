@@ -247,35 +247,30 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
     except Exception as _e:
         logger.warn("delete_whitelist: match query failed", err=str(_e)[:160])
 
-    # Apply source filter if provided.
-    if _src:
-        # Re-fetch matched rows' sources to filter (cheap; matched_ids is small).
-        _keep: set[str] = set()
+    # Apply source filter if provided — bulk (1 query, bukan N)
+    if _src and matched_ids:
         try:
-            for mid in matched_ids:
-                r = sb.table("whitelist").select("id, source").eq("id", mid).execute()
-                for x in (r.data or []):
-                    if (x.get("source") or "") == _src:
-                        _keep.add(x["id"])
-            matched_ids = _keep
+            r = sb.table("whitelist").select("id, source").in_("id", list(matched_ids)).eq("source", _src).execute()
+            matched_ids = {x["id"] for x in (r.data or [])}
         except Exception as _e:
             logger.warn("delete_whitelist: source filter failed", err=str(_e)[:120])
+            matched_ids = set()
 
+    # Atomic: whitelist + recent_chapters dalam 1 tx (1 conn, 1 commit)
     deleted = 0
-    if matched_ids:
-        try:
-            rr = sb.table("whitelist").delete().in_("id", list(matched_ids)).execute()
-            deleted += len(rr.data or [])
-        except Exception as _e:
-            logger.warn("delete_whitelist: whitelist delete failed", err=str(_e)[:160])
-
-    # Also delete matching recent_chapters rows (FE reader source).
-    # Match by title_key (space/dash variants) OR title ILIKE OR url, plus source.
     rc_deleted = 0
     conn = None
+    cur = None
     try:
-        conn = get_conn()
+        from app.db_adapter import get_conn as _gc, put_conn as _pc
+        conn = _gc()
         cur = conn.cursor()
+        if matched_ids:
+            # whitelist delete via raw SQL dalam tx yang sama (bukan builder commit terpisah)
+            ph = ", ".join(["%s"] * len(matched_ids))
+            cur.execute(f"DELETE FROM whitelist WHERE id IN ({ph}) RETURNING id", list(matched_ids))
+            deleted = len(cur.fetchall() or [])
+        # recent_chapters delete dalam tx yang sama
         _conds = []
         _params: list = []
         if _tk:
@@ -296,15 +291,20 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
                 _params.append(_src)
             cur.execute(f"DELETE FROM recent_chapters WHERE {_where}", _params)
             rc_deleted = cur.rowcount
-            conn.commit()
+        conn.commit()
     except Exception as _e:
-        logger.warn("delete_whitelist: recent_chapters delete failed", err=str(_e)[:160])
+        logger.warn("delete_whitelist: atomic delete failed", err=str(_e)[:160])
         if conn:
             try:
                 conn.rollback()
             except Exception:
                 pass
     finally:
+        if cur is not None:
+            try:
+                cur.close()
+            except Exception:
+                pass
         if conn:
             try:
                 put_conn(conn)

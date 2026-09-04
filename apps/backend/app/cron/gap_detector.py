@@ -133,8 +133,11 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
         for g in gaps:
             tk, src = g["title_key"], g["source"]
             key = f"{tk[:30]} ({src})"
-            # per-series savepoint isolation
+            # per-series savepoint isolation — sanitize (hash int -> safe, tapi validate)
             sp_name = f"sp_gap_{abs(hash(key)) % 100000}"
+            import re as _re_sp
+            if not _re_sp.match(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$", sp_name):
+                sp_name = "sp_gap_fallback"
             try:
                 cur.execute(f"SAVEPOINT {sp_name}")
             except Exception:
