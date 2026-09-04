@@ -4,6 +4,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
 from app.logger import get_logger
 from app.utils.request_auth import require_monitor_auth
 from app.services.bookmark import save_bookmark, get_bookmarks, get_bookmark, delete_bookmark
@@ -14,6 +17,17 @@ router = APIRouter()
 # simple in-memory rate limit: 10 POST / min per session_hash
 _bookmark_rl: dict[str, list[float]] = {}
 import time as _rl_time
+
+
+class BookmarkCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title_key: str = Field(..., min_length=1, max_length=200)
+    chapter_number: float = Field(..., gt=0, description="Chapter number >0")
+    chapter_url: str = Field(..., min_length=1, max_length=2000)
+    source: Literal["ikiru", "shinigami", "voratoon", ""] = Field(default="")
+    position_pct: float = Field(default=0.0, ge=0, le=100)
+    title: str = Field(default="", max_length=500)
+    cover: str = Field(default="", max_length=2000)
 
 
 @router.get("/bookmarks")
@@ -74,23 +88,22 @@ async def bookmark_create(request: Request):
     
     try:
         body = await request.json()
-        title_key = body.get("title_key", "")
-        chapter_number = float(body.get("chapter_number", 0))
-        chapter_url = body.get("chapter_url", "")
-        source = body.get("source", "")
-        position_pct = float(body.get("position_pct", 0.0))
-        title = body.get("title", "")
-        cover = body.get("cover", "")
-        
-        if not title_key or not chapter_number:
-            return JSONResponse(content={"success": False, "error": "title_key and chapter_number required"}, status_code=400)
-        
+        try:
+            data = BookmarkCreate.model_validate(body)
+        except Exception as ve:
+            # Pydantic validation -> 422 dengan detail (gak silent drop kayak dulu)
+            from pydantic import ValidationError as _VE
+            if isinstance(ve, _VE):
+                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            raise
         from app.api.continue_reading import _get_session_hash
         session_hash = _get_session_hash(request)
-        
-        result = save_bookmark(title_key, chapter_number, chapter_url, session_hash, source, position_pct, title, cover)
+        result = save_bookmark(data.title_key, data.chapter_number, data.chapter_url, session_hash, data.source, data.position_pct, data.title, data.cover)
         return JSONResponse(content={"success": True, "data": result})
     except Exception as e:
+        # jangan swallow ValidationError yang udah di-handle
+        if "validation_error" in str(e):
+            raise
         logger.warn("bookmark create failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 

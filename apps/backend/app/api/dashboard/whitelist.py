@@ -1,6 +1,9 @@
 """Auto-split from dashboard.py — whitelist routes."""
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal, Optional
+
 from app.logger import get_logger
 from app.services.whitelist_service import (
     get_dispatch_history,
@@ -14,6 +17,42 @@ from app.utils.request_auth import require_monitor_auth, require_role_auth, int_
 
 logger = get_logger("api:whitelist")
 router = APIRouter()
+
+
+class WhitelistCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    title: str = Field(..., min_length=1, max_length=200)
+    source: Literal["ikiru", "shinigami", "voratoon"] = Field(default="ikiru")
+    title_key: Optional[str] = Field(default=None, max_length=200)
+    titleKey: Optional[str] = Field(default=None, max_length=200)
+    cover: Optional[str] = Field(default=None, max_length=2000)
+    rating: Optional[float | str] = None
+    origin: Optional[Literal["KR", "CN"]] = None
+    type: Optional[Literal["manhwa", "manhua", "manga"]] = None
+    genres: Optional[list[str]] = None
+    description: Optional[str] = Field(default=None, max_length=5000)
+    status: Optional[str] = Field(default=None, max_length=50)
+    url: Optional[str] = Field(default=None, max_length=500)
+    seriesUrl: Optional[str] = Field(default=None, max_length=500)
+    series_url: Optional[str] = Field(default=None, max_length=500)
+
+
+class WhitelistPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    title_key: Optional[str] = Field(default=None, max_length=200)
+    titleKey: Optional[str] = Field(default=None, max_length=200)
+    title: Optional[str] = Field(default=None, max_length=200)
+    source: Optional[Literal["ikiru", "shinigami", "voratoon", ""]] = None
+    url: Optional[str] = Field(default=None, max_length=500)
+    seriesUrl: Optional[str] = Field(default=None, max_length=500)
+    series_url: Optional[str] = Field(default=None, max_length=500)
+    status: Optional[str] = Field(default=None, max_length=50)
+    rating: Optional[float | str] = None
+    cover: Optional[str] = Field(default=None, max_length=2000)
+    origin: Optional[Literal["KR", "CN"]] = None
+    type: Optional[Literal["manhwa", "manhua", "manga"]] = None
+    genres: Optional[list[str]] = None
+    description: Optional[str] = Field(default=None, max_length=5000)
 
 
 @router.get("/dispatch-history")
@@ -104,17 +143,21 @@ async def whitelist_post(request: Request):
         return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
-    title = body.get("title")
-    url = body.get("url")
-    source = body.get("source", "ikiru")
-    if not title:
-        return JSONResponse(content={"error": "Title required"}, status_code=400)
-    if len(title) > 200:
-        return JSONResponse(content={"error": "Title too long (max 200)"}, status_code=400)
-    if url and len(url) > 500:
-        return JSONResponse(content={"error": "URL too long (max 500)"}, status_code=400)
-
-    res = post_whitelist(title=title, url=url, source=source, body=body)
+    try:
+        data = WhitelistCreate.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    # normalize aliases: title_key/titleKey -> title_key, seriesUrl/series_url/url -> url
+    title = data.title
+    url = data.url or data.seriesUrl or data.series_url
+    source = data.source
+    # build body dict for service (include all validated fields, keep original keys for service compat)
+    body_dict = body  # service reads many aliases, keep original but validated
+    # also ensure status/type are passed (previously silent drop)
+    res = post_whitelist(title=title, url=url, source=source, body=body_dict)
     # Audit log disabled (audit.py removed 54a8ec5)
     # from app.services.audit import log_action, AuditAction
     # log_action(AuditAction.WHITELIST_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title, details={"source": source, "status": res.get("status")})
@@ -175,20 +218,34 @@ async def whitelist_patch(request: Request):
         return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
-    title_key = body.get("title_key") or ""
+    try:
+        data = WhitelistPatch.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE2
+        if isinstance(ve, _VE2):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    # resolve title_key from aliases
+    title_key = data.title_key or data.titleKey or ""
     if not title_key:
-        url = body.get("url") or ""
+        url = data.url or data.seriesUrl or data.series_url or ""
         if url:
             title_key = url.rstrip("/").split("/")[-1]
-        elif body.get("title"):
-            title_key = body["title"].lower().replace(" ", "-")
+        elif data.title:
+            title_key = data.title.lower().replace(" ", "-")
     if not title_key:
         return JSONResponse(content={"success": False, "error": "title_key required"}, status_code=400)
-    source = body.get("source") or ""
-    updatable = ("status", "rating", "cover", "origin", "genres", "description", "title", "series_url")
+    source = data.source or ""
+    # updatable now includes type (previously silent drop)
+    updatable = ("status", "rating", "cover", "origin", "genres", "description", "title", "series_url", "type")
+    # map aliases to canonical keys
+    alias_map = {"seriesUrl": "series_url", "titleKey": "title_key"}
+    body_aliased = {}
+    for k, v in body.items():
+        body_aliased[alias_map.get(k, k)] = v
     updates = {}
     for f in updatable:
-        v = body.get(f)
+        v = body_aliased.get(f)
         if v is not None and v != "":
             updates[f] = v
     try:
