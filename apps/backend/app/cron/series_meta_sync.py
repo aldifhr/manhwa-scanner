@@ -46,7 +46,7 @@ def _slug_for(source: str, title_key: str) -> str | None:
 
     series_meta only stores the title_key + source, not the upstream slug.
     We look it up from recent_chapters (series_url last path segment) which
-    collect already populated.
+    collect already populated. N+1 version kept for compat; bulk path in sync_series_meta avoids it.
     """
     sb = get_supabase()
     try:
@@ -76,11 +76,12 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
     sb = get_supabase()
     start = time.time()
 
-    # Distinct series currently known.
+    # Distinct series — bulk fetch series_url sekali (hindari N+1 _slug_for per series)
     try:
         rows = (
             sb.table("recent_chapters")
-            .select("title_key, source")
+            .select("title_key, source, series_url")
+            .limit(5000)
             .execute()
             .data
             or []
@@ -89,20 +90,29 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
         logger.error("sync_series_meta: list failed", exc=e)
         return {"ok": False, "error": str(e)[:160]}
 
-    seen: set[tuple[str, str]] = set()
-    series: list[tuple[str, str]] = []
+    # Build distinct map (title_key, source) -> slug (dari series_url)
+    slug_map: dict[tuple[str, str], str] = {}
     for r in rows:
         tk = str(r.get("title_key") or "").strip()
         src = str(r.get("source") or "").strip()
-        if tk and src and (tk, src) not in seen:
-            seen.add((tk, src))
-            series.append((tk, src))
-    series = series[:limit]
+        if not tk or not src:
+            continue
+        key = (tk, src)
+        if key in slug_map:
+            continue
+        su = (r.get("series_url") or "").rstrip("/")
+        slug = su.split("/")[-1] if su else ""
+        # fallback: title_key itself is slug for voratoon/ikiru
+        if not slug:
+            slug = tk
+        slug_map[key] = slug
+
+    series = list(slug_map.items())[:limit]
 
     updated = 0
     failed = 0
-    for tk, src in series:
-        slug = _slug_for(src, tk)
+    payloads: list[dict] = []
+    for (tk, src), slug in series:
         if not slug:
             failed += 1
             continue
@@ -111,27 +121,38 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
         except Exception:
             meta = {}
         if meta:
-            try:
-                sb.table("series_meta").upsert(
-                    {
-                        "title_key": tk,
-                        "source": src,
-                        "rating": meta.get("rating"),
-                        "genres": meta.get("genres") or [],
-                        "description": meta.get("description") or "",
-                        "cover": meta.get("cover"),
-                        "type": meta.get("type"),
-                        "updated_at": "now()",
-                    },
-                    on_conflict="title_key,source",
-                ).execute()
-                updated += 1
-            except Exception as e:
-                logger.warn("sync_series_meta: upsert failed", tk=tk, src=src, err=str(e)[:120])
-                failed += 1
+            payloads.append(
+                {
+                    "title_key": tk,
+                    "source": src,
+                    "rating": meta.get("rating"),
+                    "genres": meta.get("genres") or [],
+                    "description": meta.get("description") or "",
+                    "cover": meta.get("cover"),
+                    "type": meta.get("type"),
+                    "updated_at": "now()",
+                }
+            )
         else:
             failed += 1
         time.sleep(_INTER_FETCH_DELAY)
+
+    # Bulk upsert (1 round-trip, bukan N)
+    if payloads:
+        try:
+            sb.table("series_meta").upsert(payloads, on_conflict="title_key,source").execute()
+            updated = len(payloads)
+        except Exception as e:
+            logger.warn("sync_series_meta: bulk upsert failed", err=str(e)[:160])
+            # fallback per-row
+            for p in payloads:
+                try:
+                    sb.table("series_meta").upsert(p, on_conflict="title_key,source").execute()
+                    updated += 1
+                except Exception as se:
+                    logger.warn("sync_series_meta: upsert failed", tk=p.get("title_key"), src=p.get("source"), err=str(se)[:120])
+                    failed += 1
+            updated = updated - failed if updated else 0
 
     duration = round(time.time() - start, 1)
     stats = {
