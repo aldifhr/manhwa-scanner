@@ -61,6 +61,9 @@ export function buildEntryFromChapter(ch: {
 let globalLastPushed = "";
 let globalLastPushTime = 0;
 let consecutiveFailures = 0;
+let globalHasFetchedRemote = false;
+let globalFetchPromise: Promise<Record<string, ContinueReadingEntry>> | null =
+  null;
 
 export function useContinueReading(
   store: ContinueReadingStore = localStorageStore,
@@ -77,7 +80,6 @@ export function useContinueReading(
     () => new Map()
   );
   const hasHydrated = useRef(false);
-  const hasFetchedRemote = useRef(false);
 
   useEffect(() => {
     const loaded = store.load();
@@ -90,15 +92,16 @@ export function useContinueReading(
   }, [store]);
 
   useEffect(() => {
-    if (hasFetchedRemote.current) {
+    if (globalHasFetchedRemote) {
       hasHydrated.current = true;
       return;
     }
-    hasFetchedRemote.current = true;
+    globalHasFetchedRemote = true;
     let cancelled = false;
     (async () => {
       try {
-        const remote = await doFetch();
+        if (!globalFetchPromise) globalFetchPromise = doFetch();
+        const remote = await globalFetchPromise;
         if (cancelled || !remote || typeof remote !== "object") return;
         setEntries((prev) => {
           const next = new Map(prev);
@@ -115,7 +118,12 @@ export function useContinueReading(
           return changed ? next : prev;
         });
       } catch {
-        /* backend not yet implemented — keep local only */
+        /* backend 502 / not yet implemented — keep local only, reset global so retry after 60s bisa */
+        globalHasFetchedRemote = false;
+        globalFetchPromise = null;
+        setTimeout(() => {
+          globalHasFetchedRemote = false;
+        }, 60000);
       } finally {
         if (!cancelled) hasHydrated.current = true;
       }
