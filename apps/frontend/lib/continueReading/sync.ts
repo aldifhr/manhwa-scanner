@@ -3,7 +3,9 @@ import type { ContinueReadingEntry } from "./index";
 
 const SYNC_ENDPOINT = "/api/v1/continue-reading";
 
-export async function fetchRemote(): Promise<Record<string, ContinueReadingEntry>> {
+export async function fetchRemote(): Promise<
+  Record<string, ContinueReadingEntry>
+> {
   const res = await fetch(SYNC_ENDPOINT, { cache: "no-store" });
   if (!res.ok) return {};
   const body = await res.json().catch(() => null);
@@ -12,13 +14,20 @@ export async function fetchRemote(): Promise<Record<string, ContinueReadingEntry
   return remote;
 }
 
-export async function pushRemote(clean: Record<string, ContinueReadingEntry>): Promise<void> {
-  await fetch(
+export async function pushRemote(
+  clean: Record<string, ContinueReadingEntry>
+): Promise<void> {
+  const res = await fetch(
     SYNC_ENDPOINT,
     withCsrf({
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(clean),
     })
-  ).catch(() => {});
+  ).catch(() => null as unknown as Response);
+  if (!res || !res.ok) {
+    const err = new Error(`push failed ${res?.status ?? "network"}`);
+    (err as unknown as { status?: number }).status = res?.status;
+    throw err;
+  }
 }

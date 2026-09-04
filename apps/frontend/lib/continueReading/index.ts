@@ -57,6 +57,11 @@ export function buildEntryFromChapter(ch: {
   };
 }
 
+// Global dedupe & circuit breaker — semua instance share, biar gak spam per-card
+let globalLastPushed = "";
+let globalLastPushTime = 0;
+let consecutiveFailures = 0;
+
 export function useContinueReading(
   store: ContinueReadingStore = localStorageStore,
   sync: {
@@ -73,7 +78,6 @@ export function useContinueReading(
   );
   const hasHydrated = useRef(false);
   const hasFetchedRemote = useRef(false);
-  const lastPushedRef = useRef<string>("");
 
   useEffect(() => {
     const loaded = store.load();
@@ -130,6 +134,9 @@ export function useContinueReading(
     if (!hasHydrated.current) return;
     if (entries.size === 0) return; // don't sync empty (would 400)
     if (typeof document !== "undefined" && document.hidden) return; // jangan spam pas tab hidden
+    // circuit breaker: kalau 3× 502 berturut, pause 60s
+    if (consecutiveFailures >= 3 && Date.now() - globalLastPushTime < 60000)
+      return;
     const clean = Object.fromEntries(
       [...entries].filter(
         ([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim()
@@ -139,14 +146,28 @@ export function useContinueReading(
       if (entries.size > 0) store.clear();
       return;
     }
-    // dedupe: jangan push kalau payload sama kayak push terakhir
+    // dedupe global: jangan push kalau payload sama kayak push terakhir
     const payloadStr = JSON.stringify(clean);
-    if (payloadStr === lastPushedRef.current) return;
+    if (payloadStr === globalLastPushed) return;
+    // debounce 8s + jitter biar gak thundering herd dari banyak card
+    const delay = 8000 + Math.random() * 2000;
     const id = setTimeout(() => {
-      if (payloadStr === lastPushedRef.current) return;
-      lastPushedRef.current = payloadStr;
-      doPush(clean as Record<string, ContinueReadingEntry>);
-    }, 5000);
+      if (payloadStr === globalLastPushed) return;
+      if (consecutiveFailures >= 3 && Date.now() - globalLastPushTime < 60000)
+        return;
+      globalLastPushed = payloadStr;
+      globalLastPushTime = Date.now();
+      doPush(clean as Record<string, ContinueReadingEntry>).then(
+        () => {
+          consecutiveFailures = 0;
+        },
+        () => {
+          consecutiveFailures += 1;
+          // rollback dedupe biar retry bisa coba lagi setelah backoff
+          if (consecutiveFailures < 3) globalLastPushed = "";
+        }
+      );
+    }, delay);
     return () => clearTimeout(id);
   }, [entries, store, doPush]);
 
