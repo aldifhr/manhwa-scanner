@@ -371,6 +371,22 @@ def complete_dispatch_claim(
         logger.error("complete_dispatch_claim unclaim failed", exc=e)
 
 
+def clean_orphan_dispatch_claims() -> int:
+    """Reaper: delete dispatch_claims orphans where chapter_url no longer in recent_chapters (pruned 24h).
+    Prevents claim table bloat → queue depth stale pending forever. Run daily via cron."""
+    try:
+        from app.db import q as _q
+        # Use NOT EXISTS to handle NULLs and allow index on chapter_url
+        rows = _q("DELETE FROM dispatch_claims WHERE NOT EXISTS (SELECT 1 FROM recent_chapters rc WHERE rc.chapter_url = dispatch_claims.chapter_url) RETURNING chapter_url", [])
+        deleted = len(rows or [])
+        if deleted:
+            logger.info("clean_orphan_dispatch_claims done", deleted=deleted)
+        return deleted
+    except Exception as e:
+        logger.error("clean_orphan_dispatch_claims failed", exc=e)
+        return 0
+
+
 # Re-export retry logic (lives in dispatch_retry.py)
 from app.services.dispatch_retry import retry_failed_dispatches, MAX_RETRY_ATTEMPTS, RETRY_COOLDOWN_S
 
@@ -384,6 +400,7 @@ __all__ = [
     "unclaim_stale",
     "claim_and_record",
     "complete_dispatch_claim",
+    "clean_orphan_dispatch_claims",
     "retry_failed_dispatches",
     "MAX_RETRY_ATTEMPTS",
     "RETRY_COOLDOWN_S",

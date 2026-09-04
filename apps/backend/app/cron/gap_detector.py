@@ -199,42 +199,64 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                     continue
 
                 fresh_stamp = datetime.now(timezone.utc).isoformat()
-                inserted_this = 0
-                for num, url, title, rel in chapters:
-                    if not (lo < num <= hi):
+                # bulk: filter range + dedup URLs + single SELECT for existing + single cover fetch
+                candidates = [(num, url, title) for num, url, title, rel in chapters if lo < num <= hi and not (url.startswith("https://x/") or url.startswith("http://x/"))]
+                # dedup by url
+                seen_urls: set[str] = set()
+                uniq_candidates: list[tuple] = []
+                for num, url, title in candidates:
+                    if url not in seen_urls:
+                        seen_urls.add(url)
+                        uniq_candidates.append((num, url, title))
+                # single cover fetch per gap (was per chapter N+1)
+                cur.execute("SELECT cover FROM whitelist WHERE title_key=%s AND source=%s", (tk, src))
+                wrow = cur.fetchone()
+                cover_val = (wrow[0] if wrow else "") or ""
+                # bulk existing check 1×
+                existing_urls: set[str] = set()
+                if uniq_candidates:
+                    urls = [url for _, url, _ in uniq_candidates]
+                    # chunk IN 500 to avoid placeholder limit
+                    for i in range(0, len(urls), 500):
+                        chunk = urls[i:i+500]
+                        ph = ", ".join(["%s"] * len(chunk))
+                        cur.execute(f"SELECT chapter_url FROM recent_chapters WHERE chapter_url IN ({ph})", chunk)
+                        for r in cur.fetchall():
+                            existing_urls.add(r[0])
+                # build bulk inserts for non-existing
+                to_insert: list[dict] = []
+                for num, url, title in uniq_candidates:
+                    if url in existing_urls:
                         continue
-                    if url.startswith("https://x/") or url.startswith("http://x/"):
-                        continue
-                    cur.execute(
-                        "SELECT 1 FROM recent_chapters WHERE chapter_url=%s",
-                        (url,),
-                    )
-                    if cur.fetchone():
-                        continue
-                    cur.execute("SELECT cover FROM whitelist WHERE title_key=%s AND source=%s", (tk, src))
-                    wrow = cur.fetchone()
-                    ins = {
+                    to_insert.append({
                         "chapter_url": url,
                         "title_key": tk_norm,
                         "title": title or tk.replace("-", " ").title(),
                         "chapter": str(int(num)) if num == int(num) else str(num),
                         "chapter_num": num,
                         "source": src,
-                        "cover": (wrow[0] if wrow else "") or "",
+                        "cover": cover_val,
                         "series_url": series_url,
                         "updated_time": fresh_stamp,
                         "origin": "KR",
                         "description": "",
-                    }
-                    cols = ", ".join(ins.keys())
-                    ph = ", ".join(["%s"] * len(ins))
+                    })
+                inserted_this = 0
+                if to_insert:
+                    # bulk VALUES 1× (was N× INSERT)
+                    cols = ", ".join(to_insert[0].keys())
+                    ph_row = "(" + ", ".join(["%s"] * len(to_insert[0])) + ")"
+                    ph_all = ", ".join([ph_row] * len(to_insert))
+                    vals: list = []
+                    for ins in to_insert:
+                        vals.extend(list(ins.values()))
                     cur.execute(
-                        f"""INSERT INTO recent_chapters ({cols}) VALUES ({ph})
+                        f"""INSERT INTO recent_chapters ({cols}) VALUES {ph_all}
                             ON CONFLICT (chapter_url) DO UPDATE
                             SET cover = EXCLUDED.cover, updated_time = EXCLUDED.updated_time""",
-                        list(ins.values()),
+                        vals,
                     )
-                    inserted_this += 1
+                    inserted_this = len(to_insert)
                 inserted += inserted_this
 
                 # dispatch everything in the gap range (existing rows included)
