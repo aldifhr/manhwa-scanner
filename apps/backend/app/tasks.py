@@ -219,7 +219,7 @@ def run_cron_worker() -> None:
 _SCHED_THREAD: "threading.Thread | None" = None
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
 _SOURCE_INTERVAL_S = 600          # 10 min per source (RSS fetch takes ~100s)
-_DISPATCH_INTERVAL_S = 300        # 5 min Discord dispatch (job takes ~226s)
+_DISPATCH_INTERVAL_S = 120        # 2 min Discord dispatch
 _ENRICH_INTERVAL_S = 3600        # 60 min (reduce RAM peak from 130k voratoon dict)
 _ENRICH_MISSING_INTERVAL_S = 3600  # 1 hour static-data backfill (miss_only)
 _ENRICH_REFRESH_INTERVAL_S = 604800  # 7 days stale check (rating/description drift)

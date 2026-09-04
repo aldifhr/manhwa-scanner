@@ -241,7 +241,8 @@ async def cleanup(request: Request):
         logger.info("cleanup done", deleted=deleted)
         return JSONResponse(content={"success": True, "data": {"deleted_old": deleted}})
     except Exception as e:
-        return JSONResponse(content={"success": False, "error": str(e)[:300]}, status_code=500)
+        logger.warn("cleanup failed", err=str(e)[:160])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
 @router.get("/metrics")
@@ -267,4 +268,5 @@ async def metrics(request: Request):
             },
         })
     except Exception as e:
-        return JSONResponse(content={"success": False, "error": str(e)[:300]}, status_code=500)
+        logger.warn("cleanup failed", err=str(e)[:160])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)

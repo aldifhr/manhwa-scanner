@@ -689,8 +689,18 @@ async def reader_proxy(request: Request):
         if "ikiru.wtf" in url:
             headers["Referer"] = "https://07.ikiru.wtf/"
             headers["Accept"] = "image/avif,image/webp,image/apng,*/*"
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        from urllib.parse import urljoin as _urljoin
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
             r = await client.get(url, headers=headers)
+            _hops = 0
+            while r.is_redirect and _hops < 3:
+                loc = r.headers.get("location", "")
+                _next = _urljoin(str(r.url), loc)
+                _p_next = urlparse(_next)
+                if _p_next.scheme not in ("http", "https") or f"{_p_next.hostname}:{_p_next.port or (443 if _p_next.scheme == 'https' else 80)}" not in allowed:
+                    return FastResponse(status_code=403)
+                r = await client.get(_next, headers=headers)
+                _hops += 1
         if r.status_code == 200:
             content = r.content[:_RESPONSE_SIZE_CAP]
             _cache_put(url, content)
