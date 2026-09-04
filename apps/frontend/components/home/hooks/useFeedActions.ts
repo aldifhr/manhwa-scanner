@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   addWhitelistEntry,
+  removeWhitelistEntry,
   addExcludedTitle,
   removeExcludedTitle,
 } from "@/lib/api";
@@ -56,17 +57,42 @@ export function useFeedActions() {
       };
     },
     onMutate: (item) => setAddingKey(item.titleKey),
-    onSuccess: ({ result, optKey }) => {
+    onSuccess: ({ result, optKey, item }) => {
       // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
       setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      const isExists = result.status === "already_exists";
       toast(
-        result.status === "already_exists"
-          ? "Already in whitelist"
-          : "Added to whitelist",
-        "success"
+        isExists ? "Already in whitelist" : `Added ${item.title} to whitelist`,
+        {
+          type: "success",
+          duration: 5000,
+          action: isExists
+            ? undefined
+            : {
+                label: "Undo",
+                onClick: () => {
+                  setOptimisticWhitelist((prev) => {
+                    const n = new Set(prev);
+                    n.delete(optKey);
+                    return n;
+                  });
+                  const [tk, src] = optKey.split(":");
+                  if (tk && src)
+                    removeWhitelistEntry({ title_key: tk, source: src }).catch(
+                      () => {}
+                    );
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.whitelist,
+                  });
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.homeFeed,
+                  });
+                },
+              },
+        }
       );
     },
     onError: (err) =>
@@ -77,12 +103,21 @@ export function useFeedActions() {
   const addGroupMutation = useMutation({
     mutationFn: async (series: GroupedSeries) => {
       // Use per-chapter titleKey (dedup merges dash/space/uuid) so optimistic keys match flat rows
-      const chapterKeys = series.chapters.map((c: any) => `${(c.titleKey || series.titleKey)}:${c.source}`);
+      const chapterKeys = series.chapters.map(
+        (c: any) => `${c.titleKey || series.titleKey}:${c.source}`
+      );
       const optKeys = [...new Set(chapterKeys)];
       // Group by source for backend calls (title_key per source should use that source's actual titleKey)
-      const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
+      const bySource = new Map<
+        string,
+        { titleKey: string; seriesUrl: string }
+      >();
       for (const c of series.chapters as any[]) {
-        if (!bySource.has(c.source)) bySource.set(c.source, { titleKey: c.titleKey || series.titleKey, seriesUrl: c.seriesUrl || series.seriesUrl });
+        if (!bySource.has(c.source))
+          bySource.set(c.source, {
+            titleKey: c.titleKey || series.titleKey,
+            seriesUrl: c.seriesUrl || series.seriesUrl,
+          });
       }
       const results = await Promise.all(
         [...bySource.entries()].map(([s, v]) =>
@@ -103,13 +138,40 @@ export function useFeedActions() {
       return { results, optKeys };
     },
     onMutate: (series) => setAddingKey(series.titleKey),
-    onSuccess: ({ results, optKeys }) => {
+    onSuccess: ({ results, optKeys }, series) => {
       // Bandel fix: already_exists also counts as added for optimistic
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
-      toast("Added to whitelist", "success");
+      toast(`Added ${series.title} to whitelist`, {
+        type: "success",
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            // rollback optimistic + BE delete per source
+            setOptimisticWhitelist((prev) => {
+              const n = new Set(prev);
+              for (const k of optKeys) n.delete(k);
+              return n;
+            });
+            // fire delete per source (best-effort)
+            const bySource = new Map<string, string>();
+            for (const k of optKeys) {
+              const [tk, src] = k.split(":");
+              if (src && !bySource.has(src)) bySource.set(src, tk);
+            }
+            for (const [src, tk] of bySource) {
+              removeWhitelistEntry({ title_key: tk, source: src }).catch(
+                () => {}
+              );
+            }
+            queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
+            queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+          },
+        },
+      });
     },
     onError: (err) =>
       toast(err instanceof Error ? err.message : "Failed to add", "error"),
@@ -197,8 +259,14 @@ export function useFeedActions() {
     onSettled: () => setExcludingKey(null),
   });
 
-  const rateLimitedAdd = useRateLimitedCallback((item: FlatChapter) => addMutation.mutate(item), { limit: 5, window: 10_000 });
-  const rateLimitedAddGroup = useRateLimitedCallback((series: GroupedSeries) => addGroupMutation.mutate(series), { limit: 5, window: 10_000 });
+  const rateLimitedAdd = useRateLimitedCallback(
+    (item: FlatChapter) => addMutation.mutate(item),
+    { limit: 5, window: 10_000 }
+  );
+  const rateLimitedAddGroup = useRateLimitedCallback(
+    (series: GroupedSeries) => addGroupMutation.mutate(series),
+    { limit: 5, window: 10_000 }
+  );
   const handleAdd = useCallback(
     (item: FlatChapter) => rateLimitedAdd(item),
     [rateLimitedAdd]
