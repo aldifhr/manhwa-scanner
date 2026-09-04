@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const res = await fetch(`${backendUrl()}/api/v1/bookmarks`, {
+    const qs = new URL(request.url).search;
+    const res = await fetch(`${backendUrl()}/api/v1/bookmarks${qs}`, {
       headers: authHeaders(request),
       signal: AbortSignal.timeout(TIMEOUT.DEFAULT),
       cache: "no-store",

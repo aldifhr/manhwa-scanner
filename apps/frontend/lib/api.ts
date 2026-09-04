@@ -320,17 +320,61 @@ export interface BookmarkEntry {
   cover?: string | null;
 }
 
-export async function getBookmarks(): Promise<BookmarkEntry[]> {
+export async function getBookmarks(
+  page = 1,
+  pageSize = 50
+): Promise<BookmarkEntry[]> {
   try {
     const { readerFetch } = await import("@/lib/reader/transport");
-    const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>(
-      "/api/v1/bookmarks"
-    );
-    return body.data || [];
+    const qs =
+      page !== 1 || pageSize !== 50
+        ? `?page=${page}&page_size=${pageSize}`
+        : "";
+    const body = await readerFetch<{
+      success: boolean;
+      data: BookmarkEntry[] | { results: BookmarkEntry[] };
+    }>(`/api/v1/bookmarks${qs}`);
+    const d = body.data as unknown;
+    if (Array.isArray(d)) return d as BookmarkEntry[];
+    if (
+      d &&
+      typeof d === "object" &&
+      "results" in (d as Record<string, unknown>)
+    ) {
+      return (
+        ((d as { results: BookmarkEntry[] }).results as BookmarkEntry[]) || []
+      );
+    }
+    return [];
   } catch (e) {
     if ((e as Error)?.message?.includes("404")) return [];
     throw e;
   }
+}
+
+export async function getBookmarksPaginated(
+  page = 1,
+  pageSize = 50
+): Promise<{ results: BookmarkEntry[]; total: number; hasMore: boolean }> {
+  const { readerFetch } = await import("@/lib/reader/transport");
+  const body = await readerFetch<{
+    success: boolean;
+    data: { results: BookmarkEntry[]; total: number; hasMore: boolean };
+  }>(`/api/v1/bookmarks?page=${page}&page_size=${pageSize}`);
+  const d = body.data as unknown;
+  if (Array.isArray(d))
+    return {
+      results: d as BookmarkEntry[],
+      total: (d as BookmarkEntry[]).length,
+      hasMore: false,
+    };
+  return (
+    (d as { results: BookmarkEntry[]; total: number; hasMore: boolean }) || {
+      results: [],
+      total: 0,
+      hasMore: false,
+    }
+  );
 }
 
 export async function saveBookmark(data: {

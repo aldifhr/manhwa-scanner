@@ -116,7 +116,7 @@ export function ContinueReadingStrip() {
   const { entries, removeReading, clearAll } = useContinueReading();
   const { data: bookmarks } = useQuery({
     queryKey: ["bookmarks"],
-    queryFn: getBookmarks,
+    queryFn: () => getBookmarks(),
     staleTime: 60_000,
     retry: false,
     refetchOnWindowFocus: false,

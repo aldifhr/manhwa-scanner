@@ -40,8 +40,8 @@ def save_bookmark(
         return {"status": "error", "error": str(e)[:200]}
 
 
-def get_bookmarks(session_hash: str, limit: int = 100) -> list[dict]:
-    """Get all bookmarks for a session."""
+def get_bookmarks(session_hash: str, limit: int = 100, offset: int = 0) -> list[dict]:
+    """Get bookmarks for a session with pagination."""
     try:
         from app.db import q
         return q("""
@@ -53,8 +53,8 @@ def get_bookmarks(session_hash: str, limit: int = 100) -> list[dict]:
             LEFT JOIN LATERAL (SELECT cover FROM recent_chapters rc WHERE REPLACE(LOWER(rc.title_key), '-', ' ') = REPLACE(LOWER(b.title_key), '-', ' ') ORDER BY updated_time DESC LIMIT 1) rc ON true
             WHERE b.session_hash = %s
             ORDER BY updated_at DESC
-            LIMIT %s
-        """, [session_hash, limit])
+            LIMIT %s OFFSET %s
+        """, [session_hash, limit, offset])
     except Exception as e:
         logger.error("get_bookmarks failed", exc=e)
         return []

@@ -55,6 +55,25 @@ export default function HealthDashboard() {
   });
   const queryClient = useQueryClient();
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+  const { data: errorLogsData } = useQuery({
+    queryKey: ["error-logs", "latest3"],
+    queryFn: async () => {
+      const res = await readerFetch<{
+        success: boolean;
+        data: {
+          results: {
+            id: string;
+            level: string;
+            source: string;
+            message: string;
+            created_at: string;
+          }[];
+        };
+      }>("/api/v1/logs/errors?page=1&page_size=3");
+      return res.data?.results ?? [];
+    },
+    refetchInterval: 60000,
+  });
   const refreshMutation = useMutation({
     mutationFn: async () => {
       const res = await readerFetch<{
@@ -247,6 +266,48 @@ export default function HealthDashboard() {
             </div>
           </div>
         )}
+
+        {/* Latest Errors */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Latest Errors</h2>
+            <a
+              href="/error-logs"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            >
+              View all →
+            </a>
+          </div>
+          {!errorLogsData || errorLogsData.length === 0 ? (
+            <p className="text-sm text-white/40 border border-dashed border-white/10 rounded-lg p-4 text-center">
+              No errors — clean!
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {errorLogsData.map((log) => (
+                <div
+                  key={log.id}
+                  className="bg-surface rounded-lg p-3 border border-border"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span
+                      className={`px-2 py-0.5 rounded font-bold ${log.level === "error" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}
+                    >
+                      {log.level}
+                    </span>
+                    <span className="text-white/50 truncate">{log.source}</span>
+                    <span className="ml-auto text-white/30 text-[11px]">
+                      {new Date(log.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/80 mt-1 break-words line-clamp-2">
+                    {log.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </PageShell>
   );

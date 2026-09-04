@@ -3,8 +3,12 @@
 import { PageShell } from "@/components/PageShell";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { getBookmarks, deleteBookmark, type BookmarkEntry } from "@/lib/api";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getBookmarksPaginated,
+  deleteBookmark,
+  type BookmarkEntry,
+} from "@/lib/api";
 import { rewriteCoverUrl, decodeHtml } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useContinueReading } from "@/lib/continueReading";
@@ -12,24 +16,32 @@ import { BookOpen, BookmarkSimple } from "@phosphor-icons/react";
 
 export default function BookmarksPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-
+  const queryClient = useQueryClient();
   const {
-    data: bookmarks,
+    data: bookmarkPages,
     isLoading,
     refetch,
-  } = useQuery({
-    queryKey: ["bookmarks"],
-    queryFn: getBookmarks,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["bookmarks", "paginated"],
+    queryFn: ({ pageParam }) => getBookmarksPaginated(pageParam as number, 50),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.length + 1 : undefined,
     retry: false,
     refetchOnWindowFocus: false,
   });
+  const bookmarks = (bookmarkPages?.pages.flatMap((p) => p.results) ??
+    []) as BookmarkEntry[];
 
   const { entries: continueEntries, removeReading } = useContinueReading();
 
   const handleDelete = async (titleKey: string, chapterNumber: number) => {
     try {
       await deleteBookmark(titleKey, chapterNumber);
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ["bookmarks", "paginated"] });
     } catch (err) {
       console.error("Failed to delete bookmark:", err);
     }
@@ -101,22 +113,115 @@ export default function BookmarksPage() {
             </Link>
           </motion.div>
         ) : (
-          <motion.div
-            className="space-y-3"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: {},
-              visible: { transition: { staggerChildren: 0.05 } },
-            }}
-          >
-            {unified.map((item) => {
-              if (item.type === "bookmark") {
-                const b = item.data as BookmarkEntry;
-                const cover = rewriteCoverUrl(b.cover || null);
+          <>
+            <motion.div
+              className="space-y-3"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.05 } },
+              }}
+            >
+              {unified.map((item) => {
+                if (item.type === "bookmark") {
+                  const b = item.data as BookmarkEntry;
+                  const cover = rewriteCoverUrl(b.cover || null);
+                  return (
+                    <motion.div
+                      key={`b-${b.title_key}-${b.chapter_number}`}
+                      className="bg-surface rounded-lg p-4 border border-border flex items-center gap-4"
+                      variants={{
+                        hidden: { opacity: 0, y: 8 },
+                        visible: { opacity: 1, y: 0 },
+                      }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      {cover ? (
+                        <img
+                          src={cover}
+                          alt={decodeHtml(b.title || b.title_key)}
+                          className="w-14 h-20 object-cover rounded-md bg-white/5 shrink-0"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-14 h-20 rounded-md bg-white/5 shrink-0 flex items-center justify-center text-white/30 text-xs">
+                          No cover
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate flex items-center gap-1.5">
+                          {decodeHtml(b.title || b.title_key)}{" "}
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/20 leading-none">
+                            Bookmark
+                          </span>
+                        </p>
+                        <p className="text-sm text-text-muted">
+                          Chapter {b.chapter_number} · {b.source} ·{" "}
+                          {new Date(b.updated_at).toLocaleDateString()}
+                        </p>
+                        {b.position_pct > 0 && (
+                          <div className="mt-2">
+                            <div className="h-1.5 bg-surface-active rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-accent"
+                                style={{ width: `${b.position_pct}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-text-muted mt-1">
+                              {b.position_pct.toFixed(0)}% read
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <a
+                          href={b.chapter_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
+                        >
+                          Read
+                        </a>
+                        {deleteConfirm ===
+                        `${b.title_key}-${b.chapter_number}` ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() =>
+                                handleDelete(b.title_key, b.chapter_number)
+                              }
+                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(null)}
+                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-surface border border-border"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              setDeleteConfirm(
+                                `${b.title_key}-${b.chapter_number}`
+                              )
+                            }
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                }
+                const c = item.data;
+                const cover = rewriteCoverUrl(c.cover || null);
                 return (
                   <motion.div
-                    key={`b-${b.title_key}-${b.chapter_number}`}
+                    key={`c-${c.titleKey}`}
                     className="bg-surface rounded-lg p-4 border border-border flex items-center gap-4"
                     variants={{
                       hidden: { opacity: 0, y: 8 },
@@ -127,7 +232,7 @@ export default function BookmarksPage() {
                     {cover ? (
                       <img
                         src={cover}
-                        alt={decodeHtml(b.title || b.title_key)}
+                        alt={decodeHtml(c.title)}
                         className="w-14 h-20 object-cover rounded-md bg-white/5 shrink-0"
                         loading="lazy"
                       />
@@ -138,128 +243,48 @@ export default function BookmarksPage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate flex items-center gap-1.5">
-                        {decodeHtml(b.title || b.title_key)}{" "}
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/20 leading-none">
-                          Bookmark
+                        {decodeHtml(c.title)}{" "}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/60 border border-white/10 leading-none">
+                          Continue
                         </span>
                       </p>
-                      <p className="text-sm text-text-muted">
-                        Chapter {b.chapter_number} · {b.source} ·{" "}
-                        {new Date(b.updated_at).toLocaleDateString()}
+                      <p className="text-sm text-text-muted truncate">
+                        {c.lastChapter} · {c.source} ·{" "}
+                        {new Date(c.updatedAt).toLocaleDateString()}
                       </p>
-                      {b.position_pct > 0 && (
-                        <div className="mt-2">
-                          <div className="h-1.5 bg-surface-active rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-accent"
-                              style={{ width: `${b.position_pct}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-text-muted mt-1">
-                            {b.position_pct.toFixed(0)}% read
-                          </p>
-                        </div>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 ml-4">
                       <a
-                        href={b.chapter_url}
+                        href={c.chapterUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
                       >
                         Read
                       </a>
-                      {deleteConfirm ===
-                      `${b.title_key}-${b.chapter_number}` ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() =>
-                              handleDelete(b.title_key, b.chapter_number)
-                            }
-                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(null)}
-                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-surface border border-border"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            setDeleteConfirm(
-                              `${b.title_key}-${b.chapter_number}`
-                            )
-                          }
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      )}
+                      <button
+                        onClick={() => removeReading(c.titleKey)}
+                        className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
+                      >
+                        Remove
+                      </button>
                     </div>
                   </motion.div>
                 );
-              }
-              const c = item.data;
-              const cover = rewriteCoverUrl(c.cover || null);
-              return (
-                <motion.div
-                  key={`c-${c.titleKey}`}
-                  className="bg-surface rounded-lg p-4 border border-border flex items-center gap-4"
-                  variants={{
-                    hidden: { opacity: 0, y: 8 },
-                    visible: { opacity: 1, y: 0 },
-                  }}
-                  transition={{ duration: 0.25 }}
+              })}
+            </motion.div>
+            {hasNextPage && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="px-4 py-2 text-sm rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50"
                 >
-                  {cover ? (
-                    <img
-                      src={cover}
-                      alt={decodeHtml(c.title)}
-                      className="w-14 h-20 object-cover rounded-md bg-white/5 shrink-0"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-14 h-20 rounded-md bg-white/5 shrink-0 flex items-center justify-center text-white/30 text-xs">
-                      No cover
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate flex items-center gap-1.5">
-                      {decodeHtml(c.title)}{" "}
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/60 border border-white/10 leading-none">
-                        Continue
-                      </span>
-                    </p>
-                    <p className="text-sm text-text-muted truncate">
-                      {c.lastChapter} · {c.source} ·{" "}
-                      {new Date(c.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <a
-                      href={c.chapterUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-accent/15 text-accent border border-accent/20 hover:bg-accent/25 transition-colors"
-                    >
-                      Read
-                    </a>
-                    <button
-                      onClick={() => removeReading(c.titleKey)}
-                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium leading-none rounded bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </motion.div>
+                  {isFetchingNextPage ? "Loading..." : "Load more"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </PageShell>
