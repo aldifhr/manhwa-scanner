@@ -189,6 +189,7 @@ def exclude_all_by_source(source: str) -> dict:
             .table("recent_chapters")
             .select("title_key, title, series_url, cover")
             .eq("source", src)
+            .limit(2000)
             .execute()
         )
         seen: dict[str, dict] = {}

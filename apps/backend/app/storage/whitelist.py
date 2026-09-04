@@ -122,6 +122,7 @@ def load_whitelist(force: bool = False) -> list[dict]:
             .table("whitelist")
             .select("*")
             .order("created_at", desc=True)
+            .limit(5000)
             .execute()
         )
         return [_norm_row(r) for r in (res.data or [])]

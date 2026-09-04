@@ -402,9 +402,10 @@ class _Query:
         if upsert:
             if self._on_conflict:
                 oc = self._on_conflict
-                if not _ID_RE.match(oc.replace(",", "").replace(" ", "")):
+                parts = [p.strip() for p in oc.split(",") if p.strip()]
+                if not parts or not all(_ID_RE.match(p) for p in parts):
                     raise ValueError(f"invalid on_conflict spec: {oc!r}")
-                ucols = [c for c in cols if c not in oc.split(",")]
+                ucols = [c for c in cols if c not in parts]
                 if ucols:
                     upd = ", ".join(f"{c} = EXCLUDED.{c}" for c in ucols)
                     sql += f" ON CONFLICT ({oc}) DO UPDATE SET {upd}"
