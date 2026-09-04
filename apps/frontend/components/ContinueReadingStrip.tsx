@@ -51,13 +51,23 @@ function ContinueReadingCard({
   onRemove,
   isBookmarked,
 }: {
-  entry: ReturnType<typeof useContinueReading>["entries"] extends Map<string, infer V> ? V : never;
+  entry: ReturnType<typeof useContinueReading>["entries"] extends Map<
+    string,
+    infer V
+  >
+    ? V
+    : never;
   onRemove?: (titleKey: string) => void;
   isBookmarked?: boolean;
 }) {
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
-      <a href={entry.chapterUrl} target="_blank" rel="noopener noreferrer" className="block">
+      <a
+        href={entry.chapterUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block"
+      >
         <div className="relative overflow-hidden rounded-xl card-hover border border-white/10 hover:border-white/15 bg-white/5">
           <CoverImage src={entry.cover} alt={decodeHtml(entry.title)} />
           <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -70,7 +80,9 @@ function ContinueReadingCard({
             )}
           </div>
           <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black via-black/70 to-transparent pt-6 p-2.5">
-            <p className="text-[11px] font-bold tracking-wide text-white">Ch. {entry.lastChapter}</p>
+            <p className="text-[11px] font-bold tracking-wide text-white">
+              Ch. {entry.lastChapter}
+            </p>
           </div>
         </div>
       </a>
@@ -92,7 +104,8 @@ function ContinueReadingCard({
           {decodeHtml(entry.title)}
         </h3>
         <p className="text-[10px] text-white/45 mt-1 tracking-wide">
-          {entry.origin} • {entry.source} {isBookmarked && <span className="text-amber-300">• Bookmarked</span>}
+          {entry.origin} • {entry.source}{" "}
+          {isBookmarked && <span className="text-amber-300">• Bookmarked</span>}
         </p>
       </div>
     </div>
@@ -105,6 +118,8 @@ export function ContinueReadingStrip() {
     queryKey: ["bookmarks"],
     queryFn: getBookmarks,
     staleTime: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
   const bookmarkSet = useMemo(() => {
     const s = new Set<string>();
@@ -118,7 +133,10 @@ export function ContinueReadingStrip() {
   const sorted = useMemo(
     () =>
       [...entries.values()]
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
         .slice(0, 10),
     [entries]
   );
@@ -130,35 +148,49 @@ export function ContinueReadingStrip() {
     const el = scrollerRef.current;
     if (!el) return;
     setIsDragging(true);
-    dragRef.current = { startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
+    dragRef.current = {
+      startX: e.pageX - el.offsetLeft,
+      scrollLeft: el.scrollLeft,
+      moved: false,
+    };
   }, []);
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    const el = scrollerRef.current;
-    if (!el) return;
-    const x = e.pageX - el.offsetLeft;
-    const walk = x - dragRef.current.startX;
-    if (Math.abs(walk) > 5) dragRef.current.moved = true;
-    el.scrollLeft = dragRef.current.scrollLeft - walk;
-  }, [isDragging]);
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const el = scrollerRef.current;
+      if (!el) return;
+      const x = e.pageX - el.offsetLeft;
+      const walk = x - dragRef.current.startX;
+      if (Math.abs(walk) > 5) dragRef.current.moved = true;
+      el.scrollLeft = dragRef.current.scrollLeft - walk;
+    },
+    [isDragging]
+  );
   const onMouseUp = useCallback(() => setIsDragging(false), []);
   const onMouseLeave = useCallback(() => setIsDragging(false), []);
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     const el = scrollerRef.current;
     if (!el) return;
     setIsDragging(true);
-    dragRef.current = { startX: e.touches[0].pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
+    dragRef.current = {
+      startX: e.touches[0].pageX - el.offsetLeft,
+      scrollLeft: el.scrollLeft,
+      moved: false,
+    };
   }, []);
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging) return;
-    const el = scrollerRef.current;
-    if (!el) return;
-    const x = e.touches[0].pageX - el.offsetLeft;
-    const walk = x - dragRef.current.startX;
-    if (Math.abs(walk) > 5) dragRef.current.moved = true;
-    el.scrollLeft = dragRef.current.scrollLeft - walk;
-  }, [isDragging]);
+  const onTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!isDragging) return;
+      const el = scrollerRef.current;
+      if (!el) return;
+      const x = e.touches[0].pageX - el.offsetLeft;
+      const walk = x - dragRef.current.startX;
+      if (Math.abs(walk) > 5) dragRef.current.moved = true;
+      el.scrollLeft = dragRef.current.scrollLeft - walk;
+    },
+    [isDragging]
+  );
   const onTouchEnd = useCallback(() => setIsDragging(false), []);
 
   // Prevent click on cards when drag moved
@@ -175,38 +207,52 @@ export function ContinueReadingStrip() {
     <PageShell>
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
-        <BookOpen size={18} className="text-white" weight="fill" />
-        <h2 className="text-lg sm:text-xl font-bold text-white">Continue Reading</h2>
-        <span className="text-xs text-white/50">({entries.size})</span>
-        <button
-          onClick={clearAll}
-          className="ml-auto text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          <BookOpen size={18} className="text-white" weight="fill" />
+          <h2 className="text-lg sm:text-xl font-bold text-white">
+            Continue Reading
+          </h2>
+          <span className="text-xs text-white/50">({entries.size})</span>
+          <button
+            onClick={clearAll}
+            className="ml-auto text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            Clear all
+          </button>
+        </div>
+        <div
+          ref={scrollerRef}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseLeave}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onClickCapture={onClickCapture}
+          className={`flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory select-none ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
+          style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
-          Clear all
-        </button>
-      </div>
-      <div
-        ref={scrollerRef}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseLeave}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onClickCapture={onClickCapture}
-        className={`flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory select-none ${isDragging ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-        style={{ scrollbarWidth: "none" } as React.CSSProperties}
-      >
-        {sorted.map((entry, i) => {
-          const isBM = bookmarkSet.has(`${entry.titleKey}:${entry.lastChapter}`) || bookmarkSet.has(entry.titleKey);
-          return (
-            <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }} className={isDragging ? "pointer-events-none" : ""}>
-              <ContinueReadingCard entry={entry} onRemove={removeReading} isBookmarked={isBM} />
-            </motion.div>
-          );
-        })}
-      </div>
+          {sorted.map((entry, i) => {
+            const isBM =
+              bookmarkSet.has(`${entry.titleKey}:${entry.lastChapter}`) ||
+              bookmarkSet.has(entry.titleKey);
+            return (
+              <motion.div
+                key={entry.titleKey}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04, duration: 0.25 }}
+                className={isDragging ? "pointer-events-none" : ""}
+              >
+                <ContinueReadingCard
+                  entry={entry}
+                  onRemove={removeReading}
+                  isBookmarked={isBM}
+                />
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
     </PageShell>
   );

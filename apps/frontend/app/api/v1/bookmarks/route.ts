@@ -10,6 +10,13 @@ export async function GET(request: NextRequest) {
       signal: AbortSignal.timeout(TIMEOUT.DEFAULT),
       cache: "no-store",
     });
+    // Graceful fallback when BE not yet deployed (404) → return empty list instead of 404 spam
+    if (res.status === 404) {
+      return NextResponse.json(
+        { success: true, data: [] },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
     const body = await res
       .json()
       .catch(() => ({ success: false, error: `Upstream ${res.status}` }));

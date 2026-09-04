@@ -48,12 +48,15 @@ export async function addWhitelistEntry(data: {
   if (data.title_key) body.title_key = data.title_key;
   if (data.cover) body.cover = data.cover;
   if (data.status) body.status = data.status;
-  if (data.rating !== null && data.rating !== undefined) body.rating = data.rating;
+  if (data.rating !== null && data.rating !== undefined)
+    body.rating = data.rating;
   if (data.origin) body.origin = data.origin;
   if (data.type) body.type = data.type;
   if (data.genres && data.genres.length > 0) body.genres = data.genres;
   if (data.description) body.description = data.description;
-  return Reader.addWhitelistEntry(body) as Promise<{ status: "added" | "already_exists" }>;
+  return Reader.addWhitelistEntry(body) as Promise<{
+    status: "added" | "already_exists";
+  }>;
 }
 
 export async function removeWhitelistEntry(data: {
@@ -78,7 +81,9 @@ export async function addExcludedTitle(data: {
   cover?: string | null;
   series_url?: string | null;
 }): Promise<{ status: "ok" | "error" }> {
-  return Reader.addExcludedTitle(data as Record<string, unknown>) as Promise<{ status: "ok" | "error" }>;
+  return Reader.addExcludedTitle(data as Record<string, unknown>) as Promise<{
+    status: "ok" | "error";
+  }>;
 }
 
 export async function removeExcludedTitle(data: {
@@ -88,7 +93,9 @@ export async function removeExcludedTitle(data: {
   return Reader.removeExcludedTitle(data as Record<string, unknown>);
 }
 
-export async function bulkExcludeBySource(source: string): Promise<{ excluded: number }> {
+export async function bulkExcludeBySource(
+  source: string
+): Promise<{ excluded: number }> {
   return Reader.bulkExcludeBySource(source);
 }
 
@@ -181,7 +188,9 @@ export async function getHealthDetailed(): Promise<{
   db_pool: Record<string, number>;
 }> {
   const { readerFetch } = await import("@/lib/reader/transport");
-  const body = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/health/detailed");
+  const body = await readerFetch<{ success: boolean; data: unknown }>(
+    "/api/v1/health/detailed"
+  );
   return (body as unknown as { data: unknown }).data as unknown as {
     sources: Array<{
       name: string;
@@ -224,14 +233,28 @@ export interface RetentionData {
   total_whitelisted: number;
   retained_titles: number;
   churned_titles: number;
-  top_retained: { title_key: string; title: string; dispatched_30d: number; read_sessions: number; retention_pct: number }[];
-  top_churned: { title_key: string; title: string; dispatched_30d: number; read_sessions: number; retention_pct: number }[];
+  top_retained: {
+    title_key: string;
+    title: string;
+    dispatched_30d: number;
+    read_sessions: number;
+    retention_pct: number;
+  }[];
+  top_churned: {
+    title_key: string;
+    title: string;
+    dispatched_30d: number;
+    read_sessions: number;
+    retention_pct: number;
+  }[];
 }
 
 export async function getAnalyticsRetention(): Promise<RetentionData | null> {
   try {
     const { readerFetch } = await import("@/lib/reader/transport");
-    const data = await readerFetch<{ success: boolean; data: RetentionData }>("/api/v1/analytics/retention");
+    const data = await readerFetch<{ success: boolean; data: RetentionData }>(
+      "/api/v1/analytics/retention"
+    );
     return (data.data ?? null) as RetentionData | null;
   } catch (e) {
     // 404 until BE deployed — don't spam console, just hide card
@@ -280,9 +303,21 @@ export interface BookmarkEntry {
 }
 
 export async function getBookmarks(): Promise<BookmarkEntry[]> {
-  const { readerFetch } = await import("@/lib/reader/transport");
-  const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>("/api/v1/bookmarks");
-  return body.data || [];
+  try {
+    const { readerFetch } = await import("@/lib/reader/transport");
+    const body = await readerFetch<{ success: boolean; data: BookmarkEntry[] }>(
+      "/api/v1/bookmarks"
+    );
+    return body.data || [];
+  } catch (e) {
+    // 404 until BE deployed — don't spam console, just hide bookmark badge
+    if (
+      (e as Error)?.message?.includes("404") ||
+      (e as Error)?.message?.includes("not_found")
+    )
+      return [];
+    throw e;
+  }
 }
 
 export async function saveBookmark(data: {
@@ -302,7 +337,10 @@ export async function saveBookmark(data: {
   });
 }
 
-export async function deleteBookmark(titleKey: string, chapterNumber: number): Promise<void> {
+export async function deleteBookmark(
+  titleKey: string,
+  chapterNumber: number
+): Promise<void> {
   const { readerFetch } = await import("@/lib/reader/transport");
   await readerFetch(`/api/v1/bookmarks/${titleKey}/${chapterNumber}`, {
     method: "DELETE",
