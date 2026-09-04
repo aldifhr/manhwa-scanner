@@ -13,6 +13,8 @@ import {
   BookOpen,
   Compass,
   MagnifyingGlass,
+  Plus,
+  CheckCircle,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
 import { saveBookmark } from "@/lib/api";
@@ -26,6 +28,7 @@ import { groupChapters, type GroupedSeries } from "@/lib/groupChapters";
 import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
 import { queryKeys, staleTimes } from "@/lib/queryKeys";
 import type { FlatChapter } from "@/components/home/AllTab";
+import { useFeedActions } from "@/components/home/hooks/useFeedActions";
 
 interface FeedResponse {
   success: boolean;
@@ -137,7 +140,17 @@ function ContinueReadingCard({
   );
 }
 
-function HomeGroupedCard({ series }: { series: GroupedSeries }) {
+function HomeGroupedCard({
+  series,
+  isWhitelisted,
+  adding,
+  onAdd,
+}: {
+  series: GroupedSeries;
+  isWhitelisted?: boolean;
+  adding?: boolean;
+  onAdd?: () => void;
+}) {
   const origin = normalizeOrigin(series.origin);
   const flag = getOriginFlag(origin);
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
@@ -258,47 +271,59 @@ function HomeGroupedCard({ series }: { series: GroupedSeries }) {
                     : "bg-white/10 text-white/80 hover:bg-white/20";
             return (
               <span key={ch.key} className="inline-flex items-center gap-1">
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() =>
-                  trackChapter({
-                    title: series.title,
-                    titleKey: series.titleKey,
-                    cover: series.cover,
-                    source: ch.source,
-                    chapter:
-                      (ch as unknown as { chapter?: string }).chapter ??
-                      ch.chapterLabel,
-                    chapterLabel: ch.chapterLabel,
-                    chapterNumber: ch.chapterNumber,
-                    chapterUrl: href !== "#" ? href : ch.chapterUrl || ch.url,
-                    seriesUrl: series.seriesUrl,
-                    origin: series.origin,
-                  })
-                }
-                title={`${ch.source} · Ch. ${label}`}
-                className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md transition-colors whitespace-nowrap ${chipColor}`}
-              >
-                <span className="capitalize">{ch.source}</span>
-                Ch. {label}
-              </a>
-              <button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  try {
-                    const num = Number(String(label).replace(/[^0-9.]/g, "")) || 0;
-                    await saveBookmark({ title_key: series.titleKey, chapter_number: num || 1, chapter_url: href, source: ch.source, title: series.title, cover: series.cover });
-                    toast.success("Bookmarked Ch. " + label);
-                  } catch (err) { toast.error(err instanceof Error ? err.message : "Bookmark failed"); }
-                }}
-                title={`Bookmark Ch. ${label}`}
-                className="inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-medium leading-none rounded-md bg-white/5 hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-colors"
-              >
-                Bookmark
-              </button>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    trackChapter({
+                      title: series.title,
+                      titleKey: series.titleKey,
+                      cover: series.cover,
+                      source: ch.source,
+                      chapter:
+                        (ch as unknown as { chapter?: string }).chapter ??
+                        ch.chapterLabel,
+                      chapterLabel: ch.chapterLabel,
+                      chapterNumber: ch.chapterNumber,
+                      chapterUrl: href !== "#" ? href : ch.chapterUrl || ch.url,
+                      seriesUrl: series.seriesUrl,
+                      origin: series.origin,
+                    })
+                  }
+                  title={`${ch.source} · Ch. ${label}`}
+                  className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md transition-colors whitespace-nowrap ${chipColor}`}
+                >
+                  <span className="capitalize">{ch.source}</span>
+                  Ch. {label}
+                </a>
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                      const num =
+                        Number(String(label).replace(/[^0-9.]/g, "")) || 0;
+                      await saveBookmark({
+                        title_key: series.titleKey,
+                        chapter_number: num || 1,
+                        chapter_url: href,
+                        source: ch.source,
+                        title: series.title,
+                        cover: series.cover,
+                      });
+                      toast.success("Bookmarked Ch. " + label);
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error ? err.message : "Bookmark failed"
+                      );
+                    }
+                  }}
+                  title={`Bookmark Ch. ${label}`}
+                  className="inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-medium leading-none rounded-md bg-white/5 hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-colors"
+                >
+                  Bookmark
+                </button>
               </span>
             );
           })}
@@ -322,6 +347,29 @@ function HomeGroupedCard({ series }: { series: GroupedSeries }) {
             >
               View Series
             </a>
+          )}
+        </div>
+
+        {/* Actions — Add WL */}
+        <div className="flex items-center gap-2 mt-3">
+          {isWhitelisted ? (
+            <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-green-500/15 text-green-400 border border-green-500/20 font-medium ml-auto">
+              <CheckCircle size={13} weight="fill" />
+              Added
+            </span>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAdd?.();
+              }}
+              disabled={adding}
+              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+            >
+              <Plus size={13} weight="bold" />
+              {adding ? "..." : "Add WL"}
+            </button>
           )}
         </div>
       </div>
@@ -358,6 +406,8 @@ export default function HomePage() {
     queryFn: fetchFeed,
     staleTime: staleTimes.rss,
   });
+
+  const { optimisticWhitelist, addingKey, handleAddGroup } = useFeedActions();
 
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: queryKeys.dashboardSnapshot,
@@ -443,11 +493,16 @@ export default function HomePage() {
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
             {sortedContinueReading.map((entry, i) => (
-              <motion.div key={entry.titleKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }}>
-                <ContinueReadingCard
+              <motion.div
                 key={entry.titleKey}
-                entry={entry}
-                onRemove={removeReading}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04, duration: 0.25 }}
+              >
+                <ContinueReadingCard
+                  key={entry.titleKey}
+                  entry={entry}
+                  onRemove={removeReading}
                 />
               </motion.div>
             ))}
@@ -531,7 +586,7 @@ export default function HomePage() {
           subMessage={
             latestTimestamp
               ? `Last update: ${new Date(latestTimestamp).toLocaleString()}`
-              : 'Check again later or view all in Recent'
+              : "Check again later or view all in Recent"
           }
           action={
             <Link
@@ -548,17 +603,55 @@ export default function HomePage() {
           items={grouped}
           gap={12}
           estimateSize={184}
-          renderItem={(series) => (
-            <HomeGroupedCard series={series as GroupedSeries} />
-          )}
+          renderItem={(series) => {
+            const s = series as GroupedSeries;
+            const isWL =
+              s.isWhitelisted ||
+              s.chapters.some((c: { titleKey: string; source: string }) =>
+                optimisticWhitelist.has(
+                  `${c.titleKey || s.titleKey}:${c.source}`
+                )
+              ) ||
+              optimisticWhitelist.has(s.titleKey);
+            const adding = addingKey === s.titleKey;
+            return (
+              <HomeGroupedCard
+                series={s}
+                isWhitelisted={isWL}
+                adding={adding}
+                onAdd={() => handleAddGroup(s)}
+              />
+            );
+          }}
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {grouped.map((series, i) => (
-              <motion.div key={series.titleKey + String(i)} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 12) * 0.04, duration: 0.3 }}>
-                <HomeGroupedCard series={series} />
+          {grouped.map((series, i) => {
+            const isWL =
+              series.isWhitelisted ||
+              series.chapters.some((c: { titleKey: string; source: string }) =>
+                optimisticWhitelist.has(
+                  `${c.titleKey || series.titleKey}:${c.source}`
+                )
+              ) ||
+              optimisticWhitelist.has(series.titleKey);
+            const adding = addingKey === series.titleKey;
+            return (
+              <motion.div
+                key={series.titleKey + String(i)}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i, 12) * 0.04, duration: 0.3 }}
+              >
+                <HomeGroupedCard
+                  series={series}
+                  isWhitelisted={isWL}
+                  adding={adding}
+                  onAdd={() => handleAddGroup(series)}
+                />
               </motion.div>
-            ))}
+            );
+          })}
         </div>
       )}
     </PageShell>
