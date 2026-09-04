@@ -160,7 +160,10 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
                     if _parsed > 0:
                         _sets.append("rating=%s"); _vals.append(_parsed)
                 except (ValueError, TypeError):
-                    logger.warn("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
+                    if str(_rating).strip().lower() == "rating":
+                        logger.debug("enrich_resync: skip header rating", chapter_url=cu)
+                    else:
+                        logger.warn("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
         _cover = it.get("cover")
         if _cover:
             _sets.append("cover=%s"); _vals.append(str(_cover))
