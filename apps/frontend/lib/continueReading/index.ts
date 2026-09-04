@@ -2,7 +2,11 @@
 // Storage + sync extracted to store.ts / sync.ts for DI + testability.
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { localStorageStore, MAX_ENTRIES, type ContinueReadingStore } from "./store";
+import {
+  localStorageStore,
+  MAX_ENTRIES,
+  type ContinueReadingStore,
+} from "./store";
 import { fetchRemote, pushRemote } from "./sync";
 
 export interface ContinueReadingEntry {
@@ -55,12 +59,21 @@ export function buildEntryFromChapter(ch: {
 
 export function useContinueReading(
   store: ContinueReadingStore = localStorageStore,
-  sync: { fetchRemote?: typeof fetchRemote; pushRemote?: typeof pushRemote } = {}
+  sync: {
+    fetchRemote?: typeof fetchRemote;
+    pushRemote?: typeof pushRemote;
+  } = {}
 ) {
-  const { fetchRemote: doFetch = fetchRemote, pushRemote: doPush = pushRemote } = sync;
-  const [entries, setEntries] = useState<Map<string, ContinueReadingEntry>>(() => new Map());
+  const {
+    fetchRemote: doFetch = fetchRemote,
+    pushRemote: doPush = pushRemote,
+  } = sync;
+  const [entries, setEntries] = useState<Map<string, ContinueReadingEntry>>(
+    () => new Map()
+  );
   const hasHydrated = useRef(false);
   const hasFetchedRemote = useRef(false);
+  const lastPushedRef = useRef<string>("");
 
   useEffect(() => {
     const loaded = store.load();
@@ -116,16 +129,24 @@ export function useContinueReading(
     store.save(entries);
     if (!hasHydrated.current) return;
     if (entries.size === 0) return; // don't sync empty (would 400)
+    if (typeof document !== "undefined" && document.hidden) return; // jangan spam pas tab hidden
+    const clean = Object.fromEntries(
+      [...entries].filter(
+        ([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim()
+      )
+    );
+    if (Object.keys(clean).length === 0) {
+      if (entries.size > 0) store.clear();
+      return;
+    }
+    // dedupe: jangan push kalau payload sama kayak push terakhir
+    const payloadStr = JSON.stringify(clean);
+    if (payloadStr === lastPushedRef.current) return;
     const id = setTimeout(() => {
-      const clean = Object.fromEntries(
-        [...entries].filter(([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim())
-      );
-      if (Object.keys(clean).length === 0) {
-        if (entries.size > 0) store.clear();
-        return;
-      }
+      if (payloadStr === lastPushedRef.current) return;
+      lastPushedRef.current = payloadStr;
       doPush(clean as Record<string, ContinueReadingEntry>);
-    }, 1500);
+    }, 5000);
     return () => clearTimeout(id);
   }, [entries, store, doPush]);
 
