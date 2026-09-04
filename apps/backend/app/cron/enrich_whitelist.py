@@ -36,10 +36,14 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
     updates: dict = {}
 
     if source == "voratoon":
-        # voratoon slug == title_key lowercased
-        slug = title_key.lower() if title_key else ""
+        import re as _re2
+        # voratoon slug == title_key lowercased, normalize spaces -> dashes
+        slug_raw = title_key.lower() if title_key else ""
         if series_url and "/series/" in series_url:
-            slug = series_url.rstrip("/").split("/")[-1].lower()
+            slug_raw = series_url.rstrip("/").split("/")[-1].lower()
+        # normalize: spaces/underscores -> dash, keep alnum+dash
+        slug = _re2.sub(r"[^a-z0-9-]", "-", slug_raw.strip().replace(" ", "-").replace("_", "-"))
+        slug = _re2.sub(r"-+", "-", slug).strip("-")
         if not slug:
             return None
         from app.scrapers import voratoon as _vt
@@ -204,10 +208,31 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         src = r.get("source", "")
         su = r.get("series_url")
 
-        # voratoon presigned cover expiry — force refresh kalau sisa <24h
+        # voratoon presigned cover expiry — force refresh kalau sisa <24h atau cover mismatched slug
         is_expiring = False
         if src == "voratoon":
-            is_expiring = _is_voratoon_expiring_soon(r.get("cover") or "", hours=24)
+            _cover_raw = r.get("cover") or ""
+            is_expiring = _is_voratoon_expiring_soon(_cover_raw, hours=24)
+            if not is_expiring and _cover_raw and "cvr.voratoon.id" in _cover_raw:
+                import re as _re3
+                from urllib.parse import unquote as _unq
+                # decode proxy wrapper if needed
+                _check_cover = _cover_raw
+                if "/api/v1/reader/proxy?url=" in _cover_raw:
+                    try:
+                        _inner = _cover_raw.split("url=")[-1].split("&")[0]
+                        _check_cover = _unq(_unq(_inner))
+                    except Exception:
+                        pass
+                # expected slug for this row (normalize spaces->dash)
+                _exp_raw = (r.get("title_key") or "").lower()
+                _su = r.get("series_url") or ""
+                if _su and "/series/" in _su:
+                    _exp_raw = _su.rstrip("/").split("/")[-1].lower()
+                _exp_slug = _re3.sub(r"[^a-z0-9-]", "-", _exp_raw.strip().replace(" ", "-").replace("_", "-"))
+                _exp_slug = _re3.sub(r"-+", "-", _exp_slug).strip("-")
+                if _exp_slug and _exp_slug not in _check_cover:
+                    is_expiring = True
 
         # voratoon pakai window 5 hari (cover 6 hari), lainnya pakai refresh_days (7)
         effective_cutoff = voratoon_cutoff if src == "voratoon" else refresh_cutoff
