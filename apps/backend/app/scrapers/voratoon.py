@@ -16,7 +16,7 @@ logger = get_logger("scraper:voratoon")
 def _base_url() -> str:
     return settings.VORATOON_API_URL.rstrip("/")
 BASE_URL = _base_url()
-TIMEOUT = 30.0
+TIMEOUT = 60.0
 
 
 def _parse_chapter_number(index: int | None) -> float:
