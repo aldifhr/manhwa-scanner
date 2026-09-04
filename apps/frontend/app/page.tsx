@@ -213,7 +213,7 @@ function HomeGroupedCard({
         </a>
 
         <div className="flex flex-wrap items-center gap-1 mt-1">
-          {flag && (
+          {flag && (series as unknown as { type?: string | null }).type && (
             <img
               src={flag}
               alt={origin}
