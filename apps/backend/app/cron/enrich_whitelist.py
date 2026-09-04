@@ -250,5 +250,44 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         except Exception as e:
             logger.warn("enrich failed", title_key=tk, err=str(e)[:120])
 
+    # --- refresh voratoon covers di excluded_titles & chapter_bookmarks (expire 6 hari, sama) ---
+    try:
+        # excluded_titles: whitelist-excluded tapi cover tetap presigned
+        ex_rows = sb.table("excluded_titles").select("title_key, cover, source").eq("source", "voratoon").limit(100).execute().data or []
+        for er in ex_rows:
+            if not _is_voratoon_expiring_soon(er.get("cover") or "", hours=24):
+                continue
+            slug = er.get("title_key") or ""
+            if not slug:
+                continue
+            upd = enrich_whitelist_entry(slug, "voratoon", None)
+            if upd and upd.get("cover"):
+                try:
+                    sb.table("excluded_titles").update({"cover": upd["cover"]}).eq("title_key", slug).eq("source", "voratoon").execute()
+                    updated += 1
+                except Exception:
+                    pass
+        # chapter_bookmarks: per-chapter bookmark cover juga presigned
+        try:
+            from app.db import q as _q2
+            bm_rows = _q2("SELECT DISTINCT title_key, cover FROM chapter_bookmarks WHERE source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%' LIMIT 100", [])
+            for br in bm_rows or []:
+                if not _is_voratoon_expiring_soon(br.get("cover") or "", hours=24):
+                    continue
+                slug = br.get("title_key") or ""
+                if not slug:
+                    continue
+                upd = enrich_whitelist_entry(slug, "voratoon", None)
+                if upd and upd.get("cover"):
+                    try:
+                        _q2("UPDATE chapter_bookmarks SET cover=%s, updated_at=%s WHERE title_key=%s AND source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%'", [upd["cover"], now.isoformat(), slug])
+                        updated += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warn("voratoon extra refresh failed", err=str(e)[:120])
+
     logger.info("enrich_all_whitelist done", updated=updated, refreshed=refreshed, skipped=skipped, total=len(rows))
     return updated
