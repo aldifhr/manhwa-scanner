@@ -185,29 +185,33 @@ export default function HealthDashboard() {
         </div>
 
         {/* Voratoon Cover Expiry */}
-        {health.voratoon_covers && health.voratoon_covers.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                Voratoon Covers — expiry countdown
-                <span className="text-xs font-normal text-text-muted">
-                  ({health.voratoon_covers.length} whitelist • auto-refresh 5d /
-                  expiring &lt;24h)
-                </span>
-              </h2>
-              <button
-                onClick={() => refreshMutation.mutate()}
-                disabled={refreshMutation.isPending}
-                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50 transition-colors"
-              >
-                {refreshMutation.isPending
-                  ? "Refreshing..."
-                  : "Refresh expiring now"}
-              </button>
-            </div>
-            {refreshMsg && (
-              <p className="text-xs text-amber-300">{refreshMsg}</p>
-            )}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              Voratoon Covers — expiry countdown
+              <span className="text-xs font-normal text-text-muted">
+                ({health.voratoon_covers?.length ?? 0} whitelist • auto-refresh
+                5d / expiring &lt;24h)
+              </span>
+            </h2>
+            <button
+              onClick={() => refreshMutation.mutate()}
+              disabled={refreshMutation.isPending}
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50 transition-colors"
+            >
+              {refreshMutation.isPending
+                ? "Refreshing..."
+                : "Refresh expiring now"}
+            </button>
+          </div>
+          {refreshMsg && <p className="text-xs text-amber-300">{refreshMsg}</p>}
+          {!health.voratoon_covers || health.voratoon_covers.length === 0 ? (
+            <p className="text-sm text-white/40 border border-dashed border-white/10 rounded-lg p-4 text-center">
+              No voratoon covers — whitelist voratoon kosong atau semua fresh
+              (gak ada yang expiring &lt;24h). Tombol Refresh tetep bisa
+              dipencet buat force refresh mismatched cover kayak The Regressor.
+            </p>
+          ) : (
             <div className="grid gap-2">
               {health.voratoon_covers.map((c) => {
                 const hours = c.hours_remaining ?? 0;
@@ -264,8 +268,8 @@ export default function HealthDashboard() {
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Latest Errors */}
         <div className="space-y-3">
