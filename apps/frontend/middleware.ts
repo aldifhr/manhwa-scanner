@@ -35,6 +35,7 @@ const PUBLIC_EXACT = new Set<string>([
   "/bookmarks",
   "/about",
   "/login",
+  "/register",
   "/sw.js",
   "/manifest.json",
   "/icon.svg",

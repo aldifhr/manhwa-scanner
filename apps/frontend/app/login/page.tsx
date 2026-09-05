@@ -25,6 +25,7 @@ function sanitizeRedirect(raw: string | null): string {
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,10 +37,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const body: Record<string, string> = { password };
+      if (email.trim()) body.email = email.trim().toLowerCase();
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -116,6 +119,23 @@ export default function LoginPage() {
           )}
 
           <div>
+            <label className="block text-[13px] font-medium text-text-secondary mb-2">
+              Email{" "}
+              <span className="text-text-muted font-normal">
+                (opsional — untuk member register, kosongkan untuk admin)
+              </span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-bg border border-border rounded-lg px-3.5 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+              placeholder="you@email.com (member) atau kosong (admin)"
+              autoComplete="email"
+              autoFocus
+            />
+          </div>
+          <div>
             <label
               htmlFor="password"
               className="block text-[13px] font-medium text-text-secondary mb-2"
@@ -131,7 +151,6 @@ export default function LoginPage() {
                 className="w-full bg-bg border border-border rounded-lg px-3.5 py-2.5 pr-10 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all duration-150"
                 placeholder="Enter password"
                 autoComplete="current-password"
-                autoFocus
                 required
               />
               <button
@@ -166,8 +185,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Minimal footer */}
-        <p className="text-center text-text-muted text-xs mt-8 tracking-wide">
+        <p className="text-center text-xs text-text-muted mt-4">
+          Belum punya akun?{" "}
+          <a href="/register" className="text-accent hover:underline">
+            Register member
+          </a>
+        </p>
+        <p className="text-center text-text-muted text-xs mt-2 tracking-wide">
           secured access only
         </p>
       </div>

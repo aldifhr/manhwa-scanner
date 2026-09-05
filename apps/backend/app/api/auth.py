@@ -1,17 +1,18 @@
-"""Auth endpoint: POST /api/auth?action=login|refresh.
+"""Auth endpoint: POST /api/auth?action=login|refresh|register.
 
-Sets the `ikiru_dashboard_session` JWT cookie used by the FE gate and
-forwarded to monitor/cron endpoints. Password is validated against
-MONITOR_AUTH_TOKEN (the same secret used for ?token= auth).
+Sets the `ikiru_dashboard_session` JWT cookie used by the FE gate.
 
 Actions:
-  - login   : password -> issue JWT (admin/member role)
-  - refresh : valid dashboard JWT cookie -> re-issue JWT (exp +7d)
-               no/invalid/expired cookie -> 401 (never 400)
+  - login    : password or email+password -> issue JWT (admin/member)
+  - register : email+password -> create app_users (member) + issue JWT
+  - refresh  : valid JWT cookie -> re-issue (exp +7d)
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
+import os
+import re
 import secrets as _secrets
 import time
 
@@ -64,6 +65,19 @@ def _get_session_cookie(request: Request) -> str | None:
     return None
 
 
+def _hash_password(pw: str) -> str:
+    salt = os.urandom(16).hex()
+    dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 100_000).hex()
+    return f"{salt}${dk}"
+
+def _verify_password(pw: str, h: str) -> bool:
+    try:
+        salt, dk = h.split("$", 1)
+        nd = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 100_000).hex()
+        return hmac.compare_digest(dk, nd)
+    except Exception:
+        return False
+
 def _set_session_cookies(resp: JSONResponse, token: str) -> None:
     resp.set_cookie(
         key=_COOKIE_SESSION,
@@ -111,6 +125,36 @@ async def auth_handler(request: Request):
         _set_session_cookies(resp, new_token)
         return resp
 
+    # ---- Register: email+password -> app_users (member) ----
+    if action == "register":
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"success": False, "error": "Invalid body"}, status_code=400)
+        email = str(body.get("email", "")).strip().lower() if isinstance(body, dict) else ""
+        password = str(body.get("password", "")).strip() if isinstance(body, dict) else ""
+        if not email or not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+            return JSONResponse({"success": False, "error": "Email invalid"}, status_code=400)
+        if len(password) < 6:
+            return JSONResponse({"success": False, "error": "Password min 6 char"}, status_code=400)
+        from app.db import get_supabase
+        sb = get_supabase()
+        try:
+            existing = sb.table("app_users").select("id").eq("email", email).execute()
+            if existing.data:
+                return JSONResponse({"success": False, "error": "Email already registered"}, status_code=409)
+        except Exception:
+            pass
+        ph = _hash_password(password)
+        try:
+            sb.table("app_users").insert({"email": email, "password_hash": ph, "role": "member"}).execute()
+        except Exception as e:
+            return JSONResponse({"success": False, "error": str(e)[:120]}, status_code=500)
+        token = _issue_jwt("member")
+        resp = JSONResponse({"success": True, "data": {"ok": True, "role": "member"}})
+        _set_session_cookies(resp, token)
+        return resp
+
     # ---- Login: password -> JWT ----
     if action != "login":
         return JSONResponse({"success": False, "error": "Unknown action"}, status_code=400)
@@ -120,7 +164,25 @@ async def auth_handler(request: Request):
     except Exception:
         return JSONResponse({"success": False, "error": "Invalid body"}, status_code=400)
 
-    password = body.get("password", "") if isinstance(body, dict) else ""
+    password = str(body.get("password", "")).strip() if isinstance(body, dict) else ""
+    email = str(body.get("email", "")).strip().lower() if isinstance(body, dict) else ""
+    # email+password login for registered members (DB)
+    if email and password:
+        from app.db import get_supabase
+        sb = get_supabase()
+        try:
+            r = sb.table("app_users").select("password_hash,role").eq("email", email).maybe_single().execute()
+            row = getattr(r, "data", None)
+            if row and _verify_password(password, row.get("password_hash") or ""):
+                role = row.get("role") or "member"
+                token = _issue_jwt(role)
+                resp = JSONResponse({"success": True, "data": {"ok": True, "role": role}})
+                _set_session_cookies(resp, token)
+                return resp
+        except Exception:
+            pass
+        return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
+
     if not password:
         return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
 

@@ -3,17 +3,18 @@ import { backendUrl } from "@/lib/server-api";
 
 export async function POST(request: Request) {
   try {
-    const { password } = await request.json();
+    const { password, email } = await request.json();
     if (!password) {
       return NextResponse.json({ error: "Password required" }, { status: 400 });
     }
+    const payload: Record<string, string> = { password };
+    if (email) payload.email = String(email).toLowerCase().trim();
 
-    // Validate password against backend DASHBOARD_PASSWORD
     const BACKEND_URL = backendUrl();
     const res = await fetch(`${BACKEND_URL}/api/v1/auth?action=login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15000),
     });
 
