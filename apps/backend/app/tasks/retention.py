@@ -8,6 +8,7 @@ _DISPATCH_HISTORY_RETENTION_DAYS = 2
 _CRON_RUN_STATUS_RETENTION_DAYS = 30
 _FAILED_DISPATCHES_RETENTION_DAYS = 30
 _RETENTION_MAX_PER_SERIES = 500
+_SERIES_META_RETENTION_DAYS = 14  # ponytail: series_meta inactive 2 minggu auto-hapus
 
 
 def _retention_loop(stop_event) -> None:
@@ -70,6 +71,23 @@ def _retention_loop(stop_event) -> None:
                     logger.info("retention: pruned error_logs", deleted=_pruned, days=7)
             except Exception as e:
                 logger.warn("retention: error_logs cleanup failed", err=str(e)[:120])
+            # ponytail: series_meta 14d inactive auto-hapus (bukan whitelist)
+            try:
+                from datetime import datetime, timedelta, timezone
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=_SERIES_META_RETENTION_DAYS)).isoformat()
+                # keep if in whitelist or recent_chapters last 14d
+                _wl = _sb.table("whitelist").select("title_key").execute()
+                _wl_keys = {r.get("title_key") for r in (_wl.data or []) if r.get("title_key")}
+                _rc = _sb.table("recent_chapters").select("title_key").gte("updated_time", cutoff).execute()
+                _rc_keys = {r.get("title_key") for r in (_rc.data or []) if r.get("title_key")}
+                keep = _wl_keys | _rc_keys
+                q = _sb.table("series_meta").select("title_key").lt("updated_at", cutoff).execute()
+                to_del = [r.get("title_key") for r in (q.data or []) if r.get("title_key") and r.get("title_key") not in keep]
+                if to_del:
+                    _sb.table("series_meta").delete().in_("title_key", to_del).execute()
+                    logger.info("retention: pruned series_meta", deleted=len(to_del), days=_SERIES_META_RETENTION_DAYS)
+            except Exception as e:
+                logger.warn("retention: series_meta cleanup failed", err=str(e)[:120])
             logger.info("retention prune done",
                         dispatch_history_days=_DISPATCH_HISTORY_RETENTION_DAYS,
                         cron_run_status_days=_CRON_RUN_STATUS_RETENTION_DAYS,
