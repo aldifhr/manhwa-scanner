@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { withCsrf } from "@/lib/csrf";
 import { openapi } from "@manhwa-scanner/shared";
-import { parseErrorMessage } from "@/lib/fetchError";
-import { rssCache as sharedRssCache } from "@/lib/cache";
 
 /**
  * Server-side backend URL for FE→backend fetches (proxy/image/auth routes).
@@ -41,7 +39,8 @@ export const API_BASE = backendUrl();
 export function getApiBase(): string {
   return backendUrl();
 }
-const TOKEN = process.env.API_TOKEN || process.env.NEXT_PUBLIC_API_TOKEN || "manhwascan";
+const TOKEN =
+  process.env.API_TOKEN || process.env.NEXT_PUBLIC_API_TOKEN || "manhwascan";
 
 if (!TOKEN) {
   console.warn(
@@ -122,98 +121,8 @@ export function catchError(err: unknown) {
   const isTimeout =
     msg.includes("Timeout") ||
     (err instanceof Error && err.name === "TimeoutError");
-  // Surface short, non-leaky reason so FE can show actionable error instead of generic 502
   const detail = isTimeout
     ? "Upstream timed out"
     : `Upstream request failed${msg ? `: ${msg.slice(0, 200)}` : ""}`;
   return errorResponse(detail, isTimeout ? 504 : 502);
-}
-
-// Deep module: ServerClient — seam untuk semua server→backend fetches
-// Interface adalah test surface; di balik seam: backendUrl locality, authHeaders, TIMEOUT, rssCache, zod, 401.
-export type FetchImpl = typeof fetch;
-
-export interface ServerClient {
-  base: string;
-  headers: Record<string, string>;
-  fetchJson<T>(
-    path: string,
-    init?: RequestInit,
-    fetchImpl?: FetchImpl
-  ): Promise<T>;
-  proxyImage(url: string, fetchImpl?: FetchImpl): Promise<Response>;
-  getRssCache(key: string): unknown | null;
-  setRssCache(key: string, data: unknown): void;
-}
-
-// Shared RSS cache — now re-exported from lib/cache (single source, no duplication)
-function getRssCache(key: string): unknown | null {
-  return sharedRssCache.get(key);
-}
-function setRssCache(key: string, data: unknown) {
-  sharedRssCache.set(key, data);
-}
-
-export function createServerClient(
-  request: Request,
-  opts?: { fetchImpl?: FetchImpl }
-): ServerClient {
-  const base = backendUrl(); // captured once — HMR-safe locality
-  const headers = authHeaders(request); // captured once
-  const fetchImpl = opts?.fetchImpl ?? fetch;
-  return {
-    base,
-    headers,
-    fetchJson: async <T>(
-      path: string,
-      init?: RequestInit,
-      impl: FetchImpl = fetchImpl
-    ): Promise<T> => {
-      const res = await impl(`${base}${path}`, {
-        ...init,
-        headers: {
-          ...headers,
-          ...(init?.headers as Record<string, string> | undefined),
-        },
-        signal: init?.signal ?? AbortSignal.timeout(TIMEOUT.DEFAULT),
-      } as RequestInit);
-      if (!res.ok) {
-        const text = await res.text().catch(() => res.statusText);
-        const msg = parseErrorMessage(res.status, text);
-        if (res.status === 401) throw new Error(`UNAUTHORIZED: ${msg}`);
-        throw new Error(msg);
-      }
-      return res.json() as Promise<T>;
-    },
-    proxyImage: async (
-      url: string,
-      impl: FetchImpl = fetchImpl
-    ): Promise<Response> => {
-      const target = new URL(`${base}/api/v1/reader/proxy`);
-      target.searchParams.set("url", url);
-      return impl(target.toString(), {
-        headers,
-        signal: AbortSignal.timeout(TIMEOUT.COVER),
-        cache: "no-store",
-      });
-    },
-    getRssCache,
-    setRssCache,
-  };
-}
-
-// In-memory adapter for tests — 2nd adapter = real seam
-export function createInMemoryServerClient(
-  overrides?: Partial<ServerClient>
-): ServerClient {
-  const store = new Map<string, unknown>();
-  return {
-    base: "http://test",
-    headers: {},
-    fetchJson: async <T>(): Promise<T> => ({ success: true, data: {} }) as T,
-    proxyImage: async () => new Response(null, { status: 200 }),
-    getRssCache: (k) => store.get(k) ?? null,
-    setRssCache: (k, v) => store.set(k, v),
-    ...overrides,
-  };
 }
