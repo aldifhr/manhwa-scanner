@@ -58,8 +58,7 @@ class WhitelistPatch(BaseModel):
 @router.get("/dispatch-history")
 async def dispatch_history(request: Request):
     """Flat list of all dispatched (notified) chapters from dispatch_history."""
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    # ponytail: GET public for anon/member dashboard, POST/DELETE stays admin-only
     try:
         page = int_safe(request.query_params.get("page", "1"), 1)
         _ps_raw = request.query_params.get("page_size", "50")
@@ -84,22 +83,8 @@ async def dispatch_history_reader(request: Request):
 
 @router.get("/reader/whitelist")
 async def get_whitelist_reader(request: Request):
-    """Backward-compat alias for the FE (fe.aldifhr.fun) which calls
-    /api/reader/whitelist (Node-era path).
-
-    Security: this serves the SAME protected data as GET /api/whitelist, so it
-    requires the monitor Bearer token (or ?token= / dashboard session cookie),
-    exactly like whitelist_get. An unauthenticated caller gets 401 — the same
-    data was previously world-readable through this alias.
-
-    merge (default true): collapses cross-source duplicates (ikiru+voratoon+
-    shinigami for the same title) into a single canonical entry. Pass
-    ?merge=false to get one flat row per whitelist entry (no grouping by
-    title) — used by the /whitelist management page.
-    cursor: keyset pagination — pass ?cursor=<created_at> from previous page's nextCursor.
-    """
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    """Backward-compat alias — public GET for anon dashboard, same as /whitelist."""
+    # ponytail: public GET, no auth
     page = request.query_params.get("page", "1")
     page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
     _merge_raw = (request.query_params.get("merge") or "true").lower()
@@ -110,8 +95,7 @@ async def get_whitelist_reader(request: Request):
 
 @router.get("/whitelist")
 async def whitelist_get(request: Request):
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    # ponytail: public GET for anon/member dashboard
     try:
         source = request.query_params.get("source", "")
         title = request.query_params.get("title") or request.query_params.get("q", "")
@@ -135,7 +119,7 @@ async def whitelist_post_reader(request: Request):
 
 @router.post("/whitelist")
 async def whitelist_post(request: Request):
-    if not require_role_auth(request, {"admin", "member"}):
+    if not require_role_auth(request, {"admin"}):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
@@ -257,7 +241,7 @@ async def whitelist_patch(request: Request):
 
 @router.post("/reader/whitelist/normalize-urls")
 async def whitelist_normalize_urls(request: Request):
-    if not require_role_auth(request, {"admin", "member"}):
+    if not require_role_auth(request, {"admin"}):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()

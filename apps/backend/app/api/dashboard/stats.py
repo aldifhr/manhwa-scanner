@@ -28,8 +28,7 @@ def _normalize(title_key: str) -> str:
 
 @router.get("/sources/health")
 async def sources_health(request: Request):
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    # ponytail: public GET for navbar Operation Stale dot
     _now = time.monotonic()
     if _SRC_HEALTH_CACHE[0] is not None and (_now - _SRC_HEALTH_CACHE[0]) < _SRC_HEALTH_TTL:
         return JSONResponse(content=_SRC_HEALTH_CACHE[1])
@@ -63,8 +62,7 @@ async def sources_health(request: Request):
 
 @router.get("/dashboard-snapshot")
 async def dashboard_snapshot(request: Request):
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    # ponytail: public GET for anon dashboard
     # 15s in-memory cache — frontend polls every 30-60s, so this absorbs
     # duplicate bursts and cuts Supabase query volume by ~60%.
     now = time.monotonic()

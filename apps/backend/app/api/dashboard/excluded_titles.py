@@ -25,9 +25,8 @@ _LIST_TTL = 15.0
 
 @router.get("/excluded-titles")
 async def get_excluded(request: Request):
-    """Return ALL excluded titles. Enrichment is optional — never filters rows."""
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    """Return ALL excluded titles. Public GET for anon/member dashboard."""
+    # ponytail: public GET, no auth
     _now = time.monotonic()
     if _LIST_CACHE[0] is not None and (_now - _LIST_CACHE[0]) < _LIST_TTL:
         return JSONResponse(content=_LIST_CACHE[1])
@@ -146,7 +145,7 @@ async def get_excluded(request: Request):
 
 @router.post("/excluded-titles")
 async def post_excluded(request: Request):
-    if not require_role_auth(request, {"admin", "member"}):
+    if not require_role_auth(request, {"admin"}):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         try:
@@ -221,7 +220,7 @@ async def delete_excluded(request: Request):
 
 @router.post("/excluded-titles/bulk")
 async def post_excluded_bulk(request: Request):
-    if not require_role_auth(request, {"admin", "member"}):
+    if not require_role_auth(request, {"admin"}):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         try:
