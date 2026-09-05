@@ -128,7 +128,7 @@ function AllCard({
       className={cn(
         "group relative rounded-2xl border border-white/10 bg-white/5 transition-all hover:border-white/20 hover:shadow-lg hover:shadow-black/30",
         isRead && "opacity-50",
-        "flex flex-row! gap-4 p-4"
+        "flex flex-row! gap-3 sm:gap-4 p-3 sm:p-4"
       )}
     >
       <a
@@ -152,7 +152,7 @@ function AllCard({
             className="focus-visible:ring-2 focus-visible:ring-accent rounded"
             title="Open series"
           >
-            <h3 className="text-[15px] font-semibold leading-snug truncate text-white group-hover:text-white/80 transition-colors">
+            <h3 className="text-[14px] sm:text-[15px] font-semibold leading-snug truncate text-white group-hover:text-white/80 transition-colors">
               {decodeHtml(item.title)}
             </h3>
           </a>
@@ -205,7 +205,7 @@ function AllCard({
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 mt-auto pt-3">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-auto pt-3">
           {showReadButton && (
             <button
               onClick={(e) => {
@@ -214,7 +214,7 @@ function AllCard({
               }}
               aria-pressed={isRead}
               aria-label={isRead ? "Mark as unread" : "Mark as read"}
-              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-accent min-h-0 min-w-0"
             >
               {isRead ? <Check size={13} weight="bold" /> : null}
               {isRead ? "Read" : "Mark read"}
@@ -229,7 +229,7 @@ function AllCard({
                 }}
                 disabled={excluding}
                 title="Remove from excluded (show again in feed)"
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-0 min-w-0"
               >
                 <Eye size={13} weight="bold" />
                 {excluding ? "..." : "Show"}
@@ -242,7 +242,7 @@ function AllCard({
                 }}
                 disabled={excluding}
                 title="Exclude this title from the RSS feed permanently"
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-0 min-w-0"
               >
                 <EyeSlash size={13} weight="bold" />
                 {excluding ? "..." : "Exclude"}
@@ -261,7 +261,7 @@ function AllCard({
                   onAdd();
                 }}
                 disabled={adding}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto min-h-0 min-w-0"
               >
                 <Plus size={13} weight="bold" />
                 {adding ? "..." : "Add WL"}

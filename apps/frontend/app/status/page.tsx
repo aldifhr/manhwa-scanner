@@ -115,10 +115,10 @@ export default function HealthDashboard() {
   return (
     <PageShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Health Dashboard</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-text-muted">Overall:</span>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-xl sm:text-2xl font-bold">Health Dashboard</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs sm:text-sm text-text-muted">Overall:</span>
             <span
               className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[health.overall]} text-white`}
             >
@@ -128,7 +128,7 @@ export default function HealthDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-surface rounded-lg p-4 border border-border">
             <p className="text-sm text-text-muted">Uptime</p>
             <p className="text-2xl font-bold">{health.uptime.toFixed(1)}%</p>
@@ -156,15 +156,17 @@ export default function HealthDashboard() {
           {health.sources.map((source) => (
             <div
               key={source.name}
-              className="bg-surface rounded-lg p-4 border border-border flex items-center justify-between"
+              className="bg-surface rounded-lg p-3 sm:p-4 border border-border flex items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                 <div
-                  className={`w-3 h-3 rounded-full ${statusColors[source.status]}`}
+                  className={`w-3 h-3 rounded-full shrink-0 ${statusColors[source.status]}`}
                 />
-                <div>
-                  <p className="font-medium capitalize">{source.name}</p>
-                  <p className="text-sm text-text-muted">
+                <div className="min-w-0">
+                  <p className="font-medium capitalize text-sm sm:text-base truncate">
+                    {source.name}
+                  </p>
+                  <p className="text-xs sm:text-sm text-text-muted truncate">
                     Last scrape:{" "}
                     {source.lastScrape
                       ? new Date(source.lastScrape).toLocaleString()
@@ -172,10 +174,10 @@ export default function HealthDashboard() {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-text-muted">24h Error Rate</p>
+              <div className="text-right shrink-0">
+                <p className="text-xs sm:text-sm text-text-muted">24h Error</p>
                 <p
-                  className={`font-bold ${source.errorRate24h > 10 ? "text-red-400" : "text-green-400"}`}
+                  className={`font-bold text-sm sm:text-base ${source.errorRate24h > 10 ? "text-red-400" : "text-green-400"}`}
                 >
                   {source.errorRate24h.toFixed(1)}%
                 </p>
@@ -197,7 +199,7 @@ export default function HealthDashboard() {
             <button
               onClick={() => refreshMutation.mutate()}
               disabled={refreshMutation.isPending}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50 transition-colors min-h-0 min-w-0"
             >
               {refreshMutation.isPending
                 ? "Refreshing..."
@@ -273,11 +275,13 @@ export default function HealthDashboard() {
 
         {/* Latest Errors */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Latest Errors</h2>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-base sm:text-lg font-semibold">
+              Latest Errors
+            </h2>
             <a
               href="/error-logs"
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors min-h-0 min-w-0"
             >
               View all →
             </a>

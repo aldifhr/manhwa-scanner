@@ -183,10 +183,13 @@ body {
   }
 }
 
-/* Touch target minimum 44px */
-button,
-a {
+/* Touch target minimum 44px — exclude compact pill buttons (min-h-0 overrides) */
+button:not(.min-h-0),
+a:not(.min-h-0) {
   min-height: 44px;
+}
+button:not(.min-w-0),
+a:not(.min-w-0) {
   min-width: 44px;
 }
 
