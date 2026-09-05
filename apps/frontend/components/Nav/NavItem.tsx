@@ -40,7 +40,7 @@ export function NavItem({
         href={href}
         onClick={onClick}
         onMouseEnter={() => onPrefetch?.(href)}
-        className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${active ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/5"}`}
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-colors border ${active ? "bg-[var(--gold-accent)] text-black border-transparent shadow-[0_2px_10px_var(--gold-accent-soft)]" : "text-white/60 hover:text-white hover:bg-white/5 border-transparent"}`}
         aria-current={active ? "page" : undefined}
       >
         <Icon size={20} weight={active ? "fill" : "regular"} />
@@ -53,10 +53,10 @@ export function NavItem({
       href={href}
       onClick={onClick}
       onMouseEnter={() => onPrefetch?.(href)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${active ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/5"}`}
+      className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border ${active ? "bg-[var(--gold-accent)] text-black border-transparent shadow-[0_2px_10px_var(--gold-accent-soft)]" : "text-white/60 hover:text-white hover:bg-white/5 border-transparent hover:border-white/10"}`}
       aria-current={active ? "page" : undefined}
     >
-      <Icon size={16} weight={active ? "fill" : "regular"} />
+      <Icon size={15} weight={active ? "fill" : "regular"} />
       {label}
     </Link>
   );

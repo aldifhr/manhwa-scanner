@@ -17,7 +17,10 @@ export const SkeletonGrid = ({
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-3 space-y-2">
+          <div
+            key={i}
+            className="rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] p-3 space-y-2"
+          >
             <div className="relative w-full aspect-2/3 rounded-lg overflow-hidden">
               <div className="skeleton absolute inset-0 rounded-lg" />
             </div>
@@ -37,7 +40,10 @@ export const SkeletonGrid = ({
     return (
       <div className="flex flex-col gap-3">
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="flex gap-4 p-4 rounded-2xl border border-white/10 bg-white/5">
+          <div
+            key={i}
+            className="flex gap-4 p-4 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)]"
+          >
             <div className="relative shrink-0 w-20 h-28 rounded-lg overflow-hidden">
               <div className="skeleton absolute inset-0 rounded-lg" />
             </div>
@@ -69,7 +75,7 @@ export const SkeletonGrid = ({
         {Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
-            className="flex items-start gap-4 p-4 rounded-2xl border border-white/10 bg-white/5"
+            className="flex items-start gap-4 p-4 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)]"
           >
             <div className="relative shrink-0 w-20 h-28 rounded-lg overflow-hidden">
               <div className="skeleton absolute inset-0 rounded-lg" />

@@ -44,11 +44,11 @@ export function Cover({
       <div
         className={cn(
           sizeClass[size],
-          "rounded-lg bg-white/5 ring-1 ring-white/10 flex items-center justify-center",
+          "rounded-lg bg-[var(--gold-surface)] ring-1 ring-[var(--gold-border)] flex items-center justify-center",
           className
         )}
       >
-        <BookOpen size={22} className="text-white/40" />
+        <BookOpen size={22} className="text-white/25" />
       </div>
     );
   }
@@ -71,9 +71,9 @@ export function Cover({
       onLoad={() => setImgLoaded(true)}
       className={cn(
         sizeClass[size],
-        "object-cover rounded-lg bg-white/5 ring-1 ring-white/10 transition-all duration-500",
+        "object-cover rounded-lg bg-[var(--gold-surface)] ring-1 ring-[var(--gold-border)] transition-all duration-500",
         imgLoaded ? "blur-0 scale-100" : "blur-md scale-105",
-        "group-hover:scale-105",
+        "group-hover:scale-[1.02]",
         className
       )}
     />
