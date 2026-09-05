@@ -5,6 +5,7 @@ import { safeUrl } from "@/lib/utils";
 import { ContextMenu } from "@/components/ui/ContextMenu";
 import { useLongPress } from "@/lib/hooks/useLongPress";
 import { useContinueReading } from "@/lib/continueReading";
+import { useReadItems } from "./useReadItems";
 import {
   SeriesShell,
   SeriesTitle,
@@ -82,6 +83,7 @@ function GroupedSeriesCard({
   );
   const seriesHref = safeUrl(series.seriesUrl) || "#";
   const { trackChapter } = useContinueReading();
+  const { readItems, toggleRead } = useReadItems();
 
   return (
     <>
@@ -118,6 +120,8 @@ function GroupedSeriesCard({
           seriesUrl={series.seriesUrl}
           origin={series.origin}
           trackChapter={trackChapter}
+          readUrls={readItems}
+          onToggleRead={toggleRead}
         />
         <Synopsis text={series.description} />
         <CardActions
@@ -129,7 +133,7 @@ function GroupedSeriesCard({
           onAdd={onAdd}
           isRead={isRead}
           onToggleRead={onToggleRead}
-          showRead={true}
+          showRead={false}
           showAdd={true}
         />
       </SeriesShell>

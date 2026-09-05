@@ -149,11 +149,6 @@ export default function LoginPage() {
               />
             </div>
           )}
-          {mode === "admin" && (
-            <p className="text-xs text-text-muted bg-bg border border-border rounded-lg px-3 py-2">
-              Login admin pakai <b>MONITOR_AUTH_TOKEN</b> — tanpa email.
-            </p>
-          )}
           <div>
             <label
               htmlFor="password"

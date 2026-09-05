@@ -247,6 +247,25 @@ export function CardActions({
   showRead?: boolean;
   showAdd?: boolean;
 }) {
+  // ponytail: adminOnly gate for Add WL — member/anon cuma bookmark, keep hook inside component for SSR safety
+  const isAdmin =
+    typeof document !== "undefined" &&
+    (() => {
+      const m = document.cookie.match(
+        /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
+      );
+      if (!m?.[1]) return false;
+      try {
+        const p = JSON.parse(
+          atob(m[1].split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+        );
+        return p?.role === "admin";
+      } catch {
+        return false;
+      }
+    })();
+  const showAddEff = showAdd && isAdmin;
+  const showExcludeEff = !isWhitelisted && isAdmin;
   return (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-auto pt-3">
       {showRead && onToggleRead && (
@@ -262,7 +281,7 @@ export function CardActions({
           {isRead ? "Read" : "Mark read"}
         </button>
       )}
-      {!isWhitelisted &&
+      {showExcludeEff &&
         (isExcluded ? (
           <button
             onClick={(e) => {
@@ -293,7 +312,7 @@ export function CardActions({
           <CheckCircle size={13} weight="fill" /> Verified
         </span>
       ) : (
-        showAdd && (
+        showAddEff && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -318,6 +337,8 @@ export function ChapterChips({
   seriesUrl,
   origin,
   trackChapter,
+  readUrls,
+  onToggleRead,
 }: {
   chapters: {
     key: string;
@@ -335,6 +356,8 @@ export function ChapterChips({
   seriesUrl: string;
   origin: string;
   trackChapter: (e: any) => void;
+  readUrls?: Set<string>;
+  onToggleRead?: (url: string) => void;
 }) {
   if (chapters.every((c) => getChapterLabel(c) === "?")) {
     return (
@@ -357,6 +380,12 @@ export function ChapterChips({
         if (label === "?") return null;
         const chHref = safeUrl(ch.chapterUrl || ch.url) || "#";
         const src = ch.source?.toLowerCase();
+        const isRead = !!(
+          readUrls &&
+          (readUrls.has(ch.url) ||
+            readUrls.has(ch.chapterUrl) ||
+            readUrls.has(chHref))
+        );
         const chipColor =
           src === "shinigami"
             ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
@@ -366,30 +395,46 @@ export function ChapterChips({
                 ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
                 : "bg-white/10 text-white/80 hover:bg-white/20 border-[var(--gold-border)]";
         return (
-          <a
-            key={ch.key}
-            href={chHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() =>
-              trackChapter({
-                title: seriesTitle,
-                titleKey: seriesTitleKey,
-                cover: seriesCover,
-                source: ch.source,
-                chapter: ch.chapter,
-                chapterLabel: ch.chapterLabel,
-                chapterNumber: ch.chapterNumber,
-                chapterUrl: chHref !== "#" ? chHref : ch.chapterUrl || ch.url,
-                seriesUrl,
-                origin,
-              })
-            }
-            title={`${ch.source} · Ch. ${label}${ch.sentAt ? ` · ${new Date(ch.sentAt).toLocaleDateString()}` : ""}`}
-            className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors whitespace-nowrap ${chipColor}`}
-          >
-            <span className="capitalize">{ch.source}</span> Ch. {label}
-          </a>
+          <span key={ch.key} className="inline-flex items-center gap-1">
+            <a
+              href={chHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                trackChapter({
+                  title: seriesTitle,
+                  titleKey: seriesTitleKey,
+                  cover: seriesCover,
+                  source: ch.source,
+                  chapter: ch.chapter,
+                  chapterLabel: ch.chapterLabel,
+                  chapterNumber: ch.chapterNumber,
+                  chapterUrl: chHref !== "#" ? chHref : ch.chapterUrl || ch.url,
+                  seriesUrl,
+                  origin,
+                })
+              }
+              title={`${ch.source} · Ch. ${label}${ch.sentAt ? ` · ${new Date(ch.sentAt).toLocaleDateString()}` : ""}`}
+              className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors whitespace-nowrap ${chipColor} ${isRead ? "opacity-50" : ""}`}
+            >
+              <span className="capitalize">{ch.source}</span> Ch. {label}{" "}
+              {isRead ? "✓" : ""}
+            </a>
+            {onToggleRead && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleRead(
+                    chHref !== "#" ? chHref : ch.chapterUrl || ch.url
+                  );
+                }}
+                title={isRead ? "Mark unread" : "Mark read"}
+                className={`inline-flex items-center justify-center w-6 h-6 rounded-full border text-[10px] ${isRead ? "bg-white/10 border-white/20 text-white/60 hover:bg-white/15" : "bg-white/5 border-[var(--gold-border)] text-white/40 hover:text-white hover:bg-white/10"}`}
+              >
+                {isRead ? <EyeSlash size={12} /> : <Eye size={12} />}
+              </button>
+            )}
+          </span>
         );
       })}
     </div>

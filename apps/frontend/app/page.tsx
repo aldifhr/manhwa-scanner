@@ -18,6 +18,7 @@ import {
   BookBookmark,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
+import { useReadItems } from "@/components/home/useReadItems";
 import { saveBookmark, getBookmarks } from "@/lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -147,6 +148,23 @@ function HomeGroupedCard({
   const [hasRetried, setHasRetried] = useState(false);
   const [imgErrorFinal, setImgErrorFinal] = useState(false);
   const { trackChapter } = useContinueReading();
+  const { readItems, toggleRead } = useReadItems();
+  const isAdmin =
+    typeof document !== "undefined" &&
+    (() => {
+      const m = document.cookie.match(
+        /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
+      );
+      if (!m?.[1]) return false;
+      try {
+        const p = JSON.parse(
+          atob(m[1].split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+        );
+        return p?.role === "admin";
+      } catch {
+        return false;
+      }
+    })();
 
   return (
     <div className="group relative flex gap-4 p-4 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] transition-all hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]">
