@@ -27,7 +27,7 @@ export default function Navbar() {
       return;
     }
     // fallback for old sessions without ikiru_role cookie — probe backend
-    fetch("/api/v1/auth/me", { cache: "no-store" })
+    fetch("/api/v1/auth/me", { cache: "no-store", credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         const role = j?.data?.role;
