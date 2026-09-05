@@ -120,7 +120,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             if _use_claimed:
                 to_dispatch = enriched_all
             else:
-                to_dispatch = filter_whitelisted(enriched_all, whitelist) if whitelist else []
+                to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
             channels = channel_ids or _load_channels()
             # When the deep-queue claim path (_use_claimed) was used, the URLs
             # were ALREADY written to dispatch_claims by
@@ -132,7 +132,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             # claim+guard; dispatch() still writes dispatch_history on success
             # so FCFS dedupe across future runs keeps working.
             _dispatch_force = bool(_use_claimed)
-            sent = dispatch(to_dispatch, channels, instance_id, dry_run=dry_run, force=_dispatch_force) if to_dispatch else 0
+            sent = dispatch_mod.dispatch(to_dispatch, channels, instance_id, dry_run=dry_run, force=_dispatch_force) if to_dispatch else 0
             # Drain the failed-dispatches queue (transient Discord failures)
             # on every dispatch run, so a hiccup doesn't lose notifications.
             retry_stats: dict = {}
