@@ -29,7 +29,6 @@ import { getSecurityHeaders } from "@/lib/security/headers";
 const PUBLIC_EXACT = new Set<string>([
   "/",
   "/recent",
-  "/whitelist",
   "/bookmarks",
   "/about",
   "/login",
@@ -74,7 +73,6 @@ const PUBLIC_GET_PREFIX = [
   "/api/v1/stats",
   "/api/v1/queue",
   "/api/v1/dashboard",
-  "/api/v1/bookmarks",
   "/api/reader/whitelist",
 ];
 
@@ -134,6 +132,9 @@ export function middleware(request: NextRequest) {
   const needsAdmin =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/status") ||
+    pathname.startsWith("/whitelist") ||
+    pathname.startsWith("/dispatch-history") ||
+    pathname.startsWith("/exclude-list") ||
     (isMutating &&
       (pathname.startsWith("/api/v1/reader/whitelist") ||
         pathname.startsWith("/api/v1/whitelist") ||
