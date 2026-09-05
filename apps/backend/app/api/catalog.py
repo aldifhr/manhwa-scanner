@@ -1,4 +1,4 @@
-"""Catalog API (formerly part of the compat layer).
+"""Catalog API — ponytail: whitelist catalog (distinct from /rss recent_chapters feed), keep separate until unified query covers both.
 
 Exposes the Node-backend-shaped catalog endpoints that fe-ag expects.
 """
