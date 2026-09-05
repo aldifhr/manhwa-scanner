@@ -70,28 +70,24 @@ export default function NavbarStatus({
 
   if (variant === "mobile") {
     return (
-      <Link
-        href="/status"
-        className="flex items-center justify-between w-full px-4 py-3 rounded-lg text-base font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors"
-      >
+      <div className="flex items-center justify-between w-full px-4 py-3 rounded-lg text-base font-medium text-white/70">
         <span className="flex items-center gap-2">
           {dot}
           System Status
         </span>
         <span className="text-xs text-white/50">{LABEL[agg]}</span>
-      </Link>
+      </div>
     );
   }
 
   return (
-    <Link
-      href="/status"
+    <span
       title="System status"
       aria-label="System status"
-      className="hidden md:inline-flex w-fit shrink-0 items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm font-medium leading-none text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+      className="hidden md:inline-flex w-fit shrink-0 items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm font-medium leading-none text-white/70"
     >
       {dot}
       <span className="leading-none">{LABEL[agg]}</span>
-    </Link>
+    </span>
   );
 }
