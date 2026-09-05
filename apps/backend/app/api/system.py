@@ -198,10 +198,18 @@ async def cron_trigger(request: Request):
     if action not in valid_actions and action not in valid_source_actions:
         return JSONResponse(content={"success": False, "error": f"unknown action: {action}"}, status_code=400)
     # Decoupled: enqueue to Redis cron queue; the ROLE=cron worker executes.
-    # Keeps the slow scrape/dispatch off the HTTP path. Falls back to inline
-    # execution if Redis is unavailable.
+    # Keeps the slow scrape/dispatch off the HTTP path. If Redis is down, the
+    # API returns 503 (Service Unavailable) instead of running inline — running
+    # a 60-90s scrape inline would block the HTTP thread and 502 other users.
+    # The ROLE=cron worker still falls back inline, so cron survives Redis outages.
     from app.tasks import enqueue_cron
-    enqueue_cron(action)
+    try:
+        enqueue_cron(action)
+    except Exception as e:
+        return JSONResponse(
+            content={"success": False, "error": f"cron queue unavailable: {e!s:.120}"},
+            status_code=503,
+        )
     return JSONResponse(content={"success": True, "data": {"status": "enqueued", "action": action}}, status_code=202)
 
 

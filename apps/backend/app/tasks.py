@@ -13,6 +13,7 @@ dead-letter list so they don't block the main queue.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 
@@ -108,17 +109,25 @@ def enqueue_cron(action: str) -> None:
     the HTTP request path entirely — if the scraper stalls or ikiru hits
     Cloudflare, the RSS API process is unaffected.
 
-    Graceful degradation: if Redis is down we run the pipeline directly in
-    the API process (old behaviour) so external cron-triggered crons still work
-    without Redis.
+    Graceful degradation: if Redis is down the cron worker runs the pipeline
+    inline (old behaviour). The API process does NOT fall back inline — it
+    raises so the caller returns 503 instead of blocking the HTTP thread for
+    60-90s (which would 502 other users).
     """
     payload = {"action": action}
     try:
         _get_redis().rpush(CRON_QUEUE_KEY, json.dumps(payload))
         logger.info("enqueued cron job", action=action)
     except Exception as e:
-        logger.warn("enqueue cron failed (redis down), running inline", err=str(e)[:120], action=action)
-        _run_cron_inline(action)
+        _role = (os.environ.get("ROLE") or "api").lower()
+        if _role == "cron":
+            # CRON WORKER: safe to run inline (no HTTP threads to block)
+            logger.warn("enqueue cron failed (redis down), running inline", err=str(e)[:120], action=action)
+            _run_cron_inline(action)
+        else:
+            # API PROCESS: do NOT block HTTP threads — raise so caller returns 503
+            logger.warn("enqueue cron failed (redis down), API mode — returning error", err=str(e)[:120], action=action)
+            raise
 
 
 def _run_cron_inline(action: str) -> None:
