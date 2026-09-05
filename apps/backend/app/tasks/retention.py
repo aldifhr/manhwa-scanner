@@ -5,7 +5,6 @@ import logging
 logger = logging.getLogger("tasks.retention")
 
 _DISPATCH_HISTORY_RETENTION_DAYS = 2
-_CHAPTER_CLICKS_RETENTION_DAYS = 90
 _CRON_RUN_STATUS_RETENTION_DAYS = 30
 _FAILED_DISPATCHES_RETENTION_DAYS = 30
 _RETENTION_MAX_PER_SERIES = 500
@@ -20,11 +19,6 @@ def _retention_loop(stop_event) -> None:
             from datetime import datetime, timedelta, timezone
             cutoff = (datetime.now(timezone.utc) - timedelta(days=_DISPATCH_HISTORY_RETENTION_DAYS)).isoformat()
             _sb.table("dispatch_history").delete().lt("sent_at", cutoff).execute()
-            try:
-                _clicks_cutoff = (datetime.now(timezone.utc) - timedelta(days=_CHAPTER_CLICKS_RETENTION_DAYS)).isoformat()
-                _sb.table("chapter_clicks").delete().lt("clicked_at", _clicks_cutoff).execute()
-            except Exception as e:
-                logger.warn("retention: chapter_clicks cleanup failed", err=str(e)[:120])
             try:
                 _cron_cutoff = (datetime.now(timezone.utc) - timedelta(days=_CRON_RUN_STATUS_RETENTION_DAYS)).isoformat()
                 _sb.table("cron_run_status").delete().lt("created_at", _cron_cutoff).execute()
@@ -78,7 +72,6 @@ def _retention_loop(stop_event) -> None:
                 logger.warn("retention: error_logs cleanup failed", err=str(e)[:120])
             logger.info("retention prune done",
                         dispatch_history_days=_DISPATCH_HISTORY_RETENTION_DAYS,
-                        chapter_clicks_days=_CHAPTER_CLICKS_RETENTION_DAYS,
                         cron_run_status_days=_CRON_RUN_STATUS_RETENTION_DAYS,
                         failed_dispatches_days=_FAILED_DISPATCHES_RETENTION_DAYS)
         except Exception as e:
