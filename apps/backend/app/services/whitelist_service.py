@@ -319,60 +319,33 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
             logger.warn("delete_whitelist: source filter failed", err=str(_e)[:120])
             matched_ids = set()
 
-    # Atomic: whitelist + recent_chapters dalam 1 tx (1 conn, 1 commit)
+    # Delete via Supabase client (atomic per table, separate calls)
     deleted = 0
     rc_deleted = 0
-    conn = None
-    cur = None
     try:
-        from app.db_adapter import get_conn as _gc, put_conn as _pc
-        conn = _gc()
-        cur = conn.cursor()
         if matched_ids:
-            # whitelist delete via raw SQL dalam tx yang sama (bukan builder commit terpisah)
-            ph = ", ".join(["%s"] * len(matched_ids))
-            cur.execute(f"DELETE FROM whitelist WHERE id IN ({ph}) RETURNING id", list(matched_ids))
-            deleted = len(cur.fetchall() or [])
-        # recent_chapters delete dalam tx yang sama
-        _conds = []
-        _params: list = []
+            r = sb.table("whitelist").delete().in_("id", list(matched_ids)).execute()
+            deleted = len(r.data or [])
+    except Exception as _e:
+        logger.warn("delete_whitelist: whitelist delete failed", err=str(_e)[:160])
+
+    # recent_chapters delete
+    try:
+        _del = sb.table("recent_chapters").delete()
         if _tk:
-            _conds.append("title_key=%s OR title_key=%s")
-            _params.extend([_tk, _tk.replace("-", " ")])
+            _del = _del.or_(f"title_key.eq.{_tk},title_key.eq.{_tk.replace('-', ' ')}")
         if _title:
             _esc_t = _title.replace("%", r"\%").replace("_", r"\_")
-            _conds.append("title ILIKE %s")
-            _params.append(f"%{_esc_t}%")
+            _del = _del.or_(f"title.ilike.*{_esc_t}*")
         if _url:
             _esc_u = _url.replace("%", r"\%").replace("_", r"\_")
-            _conds.append("series_url ILIKE %s OR url ILIKE %s OR chapter_url ILIKE %s")
-            _params.extend([f"%{_esc_u}%", f"%{_esc_u}%", f"%{_esc_u}%"])
-        if _conds:
-            _where = " OR ".join(_conds)
-            if _src:
-                _where = f"({_where}) AND source=%s"
-                _params.append(_src)
-            cur.execute(f"DELETE FROM recent_chapters WHERE {_where}", _params)
-            rc_deleted = cur.rowcount
-        conn.commit()
+            _del = _del.or_(f"series_url.ilike.*{_esc_u}*,url.ilike.*{_esc_u}*,chapter_url.ilike.*{_esc_u}*")
+        if _src:
+            _del = _del.eq("source", _src)
+        r = _del.execute()
+        rc_deleted = len(r.data or [])
     except Exception as _e:
-        logger.warn("delete_whitelist: atomic delete failed", err=str(_e)[:160])
-        if conn:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-    finally:
-        if cur is not None:
-            try:
-                cur.close()
-            except Exception:
-                pass
-        if conn:
-            try:
-                put_conn(conn)
-            except Exception:
-                pass
+        logger.warn("delete_whitelist: recent_chapters delete failed", err=str(_e)[:160])
 
     total_deleted = deleted + rc_deleted
     logger.info(
