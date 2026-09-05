@@ -24,16 +24,18 @@ export default function AdminDashboard() {
     },
     refetchInterval: 15000,
   });
-  const { data: cron } = useQuery({
-    queryKey: ["admin-cron"],
+  const { data: snapshot } = useQuery({
+    queryKey: ["admin-snapshot"],
     queryFn: async () => {
       const r = await readerFetch<{ success: boolean; data: any }>(
-        "/api/v1/cron/status"
+        "/api/v1/dashboard/snapshot"
       );
       return r.data;
     },
     refetchInterval: 30000,
   });
+  const cron =
+    (snapshot as any)?.cronStatus ?? (snapshot as any)?.lastDelivery ?? {};
   const { data: errors } = useQuery({
     queryKey: ["admin-errors"],
     queryFn: async () => {
