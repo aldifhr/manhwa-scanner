@@ -62,19 +62,20 @@ def get_whitelisted_items(items: list[dict], whitelist_map: dict[tuple[str, str]
 
 def normalize_cover(cov: str | None) -> str | None:
     """Extract raw URL from proxy wrapper, handle double-encoding."""
-    if not cov or not isinstance(cov, str):
+    if not cov or not isinstance(cov, str) or cov.startswith(("http://", "https://")):
         return cov
-    if cov.startswith(("http://", "https://")):
-        return cov
-    for pfx in ("/api/reader/proxy?url=", "https://scanner.aldifhr.fun/api/reader/proxy?url=", "http://scanner.aldifhr.fun/api/reader/proxy?url="):
-        if cov.startswith(pfx):
-            inner = unquote(cov[len(pfx):])
-            if "%" in inner and not inner.startswith("http"):
-                try:
-                    inner = unquote(inner)
-                except Exception:
-                    pass
-            return inner if inner.startswith(("http://", "https://")) else cov
+    # ponytail: stdlib parse_qs replaces 3-prefix loop + manual unquote chain
+    from urllib.parse import parse_qs, urlparse, unquote as _uq
+    try:
+        q = parse_qs(urlparse(cov).query)
+        raw = (q.get("url") or [""])[0]
+        if raw:
+            if "%" in raw:
+                try: raw = _uq(_uq(raw))
+                except Exception: raw = _uq(raw)
+            return raw if raw.startswith(("http://", "https://")) else cov
+    except Exception:
+        pass
     return cov
 
 
