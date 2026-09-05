@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "voratoon.com" },
     ],
   },
+  async redirects() {
+    return [{ source: "/status", destination: "/admin", permanent: false }];
+  },
   async rewrites() {
     return [
       // Legacy compat — deleted duplicate route files now served via rewrites (no duplicate handler)
