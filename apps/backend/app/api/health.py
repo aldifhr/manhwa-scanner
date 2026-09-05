@@ -50,6 +50,21 @@ async def api_health(request: Request):
                 pending = sum(1 for u in urls if u not in sent_urls)
         except Exception:
             pending = -1
+        # ponytail: snapshot staleness 900s (1.5x source_interval) -> degraded signal, per-endpoint split when >1000L
+        _snap_age_s = None
+        _snap_stale = False
+        try:
+            from datetime import datetime as _dt_snap, timezone as _tz_snap
+            _sr = _gsb().table("dashboard_snapshot").select("computed_at").eq("id", 1).maybe_single().execute()
+            _comp = (_sr.data or {}).get("computed_at") if _sr else None
+            if _comp:
+                _ct = _dt_snap.fromisoformat(str(_comp).replace("Z", "+00:00"))
+                if _ct.tzinfo is None:
+                    _ct = _ct.replace(tzinfo=_tz_snap.utc)
+                _snap_age_s = int((_dt_snap.now(_tz_snap.utc) - _ct).total_seconds())
+                _snap_stale = _snap_age_s > 900
+        except Exception:
+            pass
         return JSONResponse(content={
             "success": True,
             "data": {
@@ -57,6 +72,9 @@ async def api_health(request: Request):
                 "pending": pending,
                 "lastScrapeAt": max((s["lastScrape"] for s in sources), default=""),
                 "service": "be-ag-py",
+                "snapshot_age_s": _snap_age_s,
+                "snapshot_stale": _snap_stale,
+                "status": "degraded" if _snap_stale else "healthy",
             },
         })
     except Exception as e:
