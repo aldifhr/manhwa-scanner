@@ -18,10 +18,12 @@ export default function Navbar() {
   const { logout } = useAuth();
   const prefetch = usePrefetch();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
     const m = document.cookie.match(
       /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
     );
+    setIsLoggedIn(!!m?.[1]);
     setIsAdmin(m ? getRole(m[1]) === "admin" : false);
   }, [pathname]);
 
@@ -77,14 +79,23 @@ export default function Navbar() {
               className="hidden md:block w-px h-6 bg-white/10 mx-2"
               aria-hidden
             />
-            <button
-              onClick={logout}
-              title="Logout"
-              aria-label="Logout"
-              className="hidden md:flex items-center justify-center p-2 ml-1 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            >
-              <SignOut size={18} />
-            </button>
+            {isLoggedIn ? (
+              <button
+                onClick={logout}
+                title="Logout"
+                aria-label="Logout"
+                className="hidden md:flex items-center justify-center p-2 ml-1 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <SignOut size={18} />
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="hidden md:inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition-colors"
+              >
+                Login
+              </Link>
+            )}
 
             <button
               onClick={() => setOpen(true)}
@@ -161,15 +172,25 @@ export default function Navbar() {
 
               <div className="p-3 border-t border-white/10 space-y-3 bg-black/20">
                 <NavbarStatus variant="mobile" />
-                <button
-                  onClick={() => {
-                    setOpen(false);
-                    logout();
-                  }}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-colors"
-                >
-                  <SignOut size={18} /> Logout
-                </button>
+                {isLoggedIn ? (
+                  <button
+                    onClick={() => {
+                      setOpen(false);
+                      logout();
+                    }}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-colors"
+                  >
+                    <SignOut size={18} /> Logout
+                  </button>
+                ) : (
+                  <Link
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition-colors"
+                  >
+                    Login
+                  </Link>
+                )}
               </div>
             </motion.div>
           </div>
