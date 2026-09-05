@@ -531,7 +531,16 @@ export default function HomePage() {
             value: totalTracked || (data?.data?.total ?? 0),
           },
           { icon: Star, label: "Total Sent", value: totalSent },
-          { icon: ArrowClockwise, label: "Auto Refresh", value: "60s" },
+          {
+            icon: ArrowClockwise,
+            label: "Last Update",
+            value: latestTimestamp
+              ? new Date(latestTimestamp).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Manual",
+          },
         ].map(({ icon: Icon, label, value }) => (
           <div
             key={label}
