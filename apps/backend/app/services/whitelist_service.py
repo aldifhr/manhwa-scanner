@@ -124,7 +124,7 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
 
     mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, last_notified) for r in rows]
 
-    # ponytail: dedup inlined (was whitelist_dedup.py 57L single caller)
+    # ponytail: dedup inlined (was whitelist_dedup.py 57L single caller), extract to dedup.py when reused by second caller
 
     _is_db_paginated = bool(_db_paginated_flag)
     if merge:

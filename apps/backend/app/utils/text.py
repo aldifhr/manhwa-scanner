@@ -20,7 +20,7 @@ def normalize_title_key(title: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-# ponytail: normalize_title_loose alias removed — use normalize_title_key directly
+# ponytail: normalize_title_loose alias removed — use normalize_title_key directly, restore alias when grep -r "normalize_title_loose" finds legacy caller needing loose (non-collapsed) semantics
 
 
 def slugify_title_key(title: str) -> str:

@@ -93,7 +93,7 @@ def claimed_fcfs_keys(fcfs_keys: list[str]) -> set[str]:
     return claimed
 
 
-# ponytail: claimed_titles removed — use claimed_fcfs_keys; kept as shim in dispatch_mod via alias
+# ponytail: claimed_titles removed — use claimed_fcfs_keys; kept as shim in dispatch_mod via alias, delete shim when grep -r "claimed_titles" ==0
 
 
-# ponytail: _parse_chapter_num alias removed — import parse_chapter_number directly
+# ponytail: _parse_chapter_num alias removed — import parse_chapter_number directly, delete alias shim when grep -r "_parse_chapter_num" ==0

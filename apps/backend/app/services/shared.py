@@ -64,7 +64,7 @@ def normalize_cover(cov: str | None) -> str | None:
     """Extract raw URL from proxy wrapper, handle double-encoding."""
     if not cov or not isinstance(cov, str) or cov.startswith(("http://", "https://")):
         return cov
-    # ponytail: stdlib parse_qs replaces 3-prefix loop + manual unquote chain
+    # ponytail: stdlib parse_qs replaces 3-prefix loop + manual unquote chain, restore manual when parse_qs fails on double-encoded bare % URLs
     from urllib.parse import parse_qs, urlparse, unquote as _uq
     try:
         q = parse_qs(urlparse(cov).query)
