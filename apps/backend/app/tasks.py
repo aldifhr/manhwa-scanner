@@ -1,4 +1,4 @@
-"""Durable task queue backed by Redis (replaces the old in-memory queue).
+"""Durable task queue backed by Redis — ponytail: enqueue_cron + _run_cron_inline dual path intentional (Redis fast-path + inline fallback when Redis down), collapse to single queue when Redis is hard-required.
 
 Why Redis: the previous in-process queue lost all pending jobs on process
 restart and had no graceful shutdown. Redis lists + BLPOP give us:
