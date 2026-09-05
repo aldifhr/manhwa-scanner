@@ -52,6 +52,17 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         (lambda m: float(m.group(1)) if m else float("inf"))(_re.search(r"(\d+(?:\.\d+)?)", str(it.get("chapter") or "")))
     ))
 
+    # ponytail: dedupe same title_key across sources (shinigami+voratoon), keep latest chapter
+    _deduped: dict[str, dict] = {}
+    for it in to_send:
+        _tk = it.get("title_key") or ""
+        _ch = (lambda m: float(m.group(1)) if m else 0.0)(_re.search(r"(\d+(?:\.\d+)?)", str(it.get("chapter") or "")))
+        if _tk not in _deduped or _ch > (lambda m: float(m.group(1)) if m else 0.0)(_re.search(r"(\d+(?:\.\d+)?)", str(_deduped[_tk].get("chapter") or ""))):
+            _deduped[_tk] = it
+    to_send = list(_deduped.values())
+    if len(to_send) < len(items):
+        logger.info("dispatch: deduped cross-source duplicates", removed=len(items) - len(to_send))
+
     # Backfill HTML-backlog items silently
     if to_backfill:
         bf_urls = [it.get("url") or it.get("chapter_url") for it in to_backfill if (it.get("url") or it.get("chapter_url"))]
