@@ -45,17 +45,30 @@ export const Reader = {
       mapWhitelist
     ) as unknown as Promise<import("@/lib/types").WhitelistRouteItem[]>;
   },
-  getDispatchHistory: (page = 1, pageSize = 1000, search = "") => {
-    const p = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-    });
-    if (search) p.set("search", search);
-    return paginatedGet(
-      "/api/v1/reader/dispatch-history",
-      p,
-      mapHistory
-    ) as unknown as Promise<import("@/lib/types").DispatchHistoryItem[]>;
+  getDispatchHistory: async (
+    page = 1,
+    pageSize = 1000,
+    search = ""
+  ): Promise<import("@/lib/types").DispatchHistoryItem[]> => {
+    try {
+      const p = new URLSearchParams({
+        page: String(page),
+        page_size: String(pageSize),
+      });
+      if (search) p.set("search", search);
+      return (await paginatedGet(
+        "/api/v1/reader/dispatch-history",
+        p,
+        mapHistory
+      )) as unknown as import("@/lib/types").DispatchHistoryItem[];
+    } catch (e) {
+      if (
+        (e as Error).message.includes("401") ||
+        (e as Error).message.includes("403")
+      )
+        return [];
+      throw e;
+    }
   },
   getDispatchHistoryPage: async (
     page = 1,
@@ -118,11 +131,20 @@ export const Reader = {
       mapRss
     ) as unknown as Promise<import("@/lib/types").RssFlatItem[]>,
   getExcludedTitles: async (): Promise<ExcludedTitleItem[]> => {
-    const data = await readerFetch<{
-      success: boolean;
-      data: { results: Record<string, unknown>[] };
-    }>("/api/v1/excluded-titles");
-    return (data.data?.results ?? []).map(mapExcluded) as ExcludedTitleItem[];
+    try {
+      const data = await readerFetch<{
+        success: boolean;
+        data: { results: Record<string, unknown>[] };
+      }>("/api/v1/excluded-titles");
+      return (data.data?.results ?? []).map(mapExcluded) as ExcludedTitleItem[];
+    } catch (e) {
+      if (
+        (e as Error).message.includes("401") ||
+        (e as Error).message.includes("403")
+      )
+        return [];
+      throw e;
+    }
   },
   getDashboardSnapshot: async (): Promise<DashboardSnapshot | null> => {
     try {
