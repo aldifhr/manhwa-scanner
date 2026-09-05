@@ -27,15 +27,19 @@ import { getSecurityHeaders } from "@/lib/security/headers";
 //   /api/reader/dashboard — full operational snapshot + MinIO presigned URLs (data exposure).
 //   /api/reader/queue, /stats, /whitelist, /dispatch-history — operational/internal.
 const PUBLIC_EXACT = new Set<string>([
-  "/login",
+  "/",
+  "/recent",
+  "/whitelist",
+  "/exclude-list",
+  "/dispatch-history",
+  "/bookmarks",
+  "/status",
   "/about",
+  "/login",
   "/sw.js",
   "/manifest.json",
   "/icon.svg",
   "/favicon.ico",
-  // Origin flag images referenced from AllCard / GroupedSeriesCard; they are
-  // plain static assets and must not 307-redirect when a request arrives
-  // without a session cookie.
   "/cn.png",
   "/jp.png",
   "/kr.png",
@@ -66,8 +70,33 @@ const PUBLIC_PREFIX = [
   "/api/cron",
 ];
 
-function isPublicPath(pathname: string): boolean {
+const PUBLIC_GET_PREFIX = [
+  "/api/v1/reader/whitelist",
+  "/api/v1/whitelist",
+  "/api/v1/excluded-titles",
+  "/api/v1/dispatch-history",
+  "/api/v1/reader/dispatch-history",
+  "/api/v1/stats",
+  "/api/v1/queue",
+  "/api/v1/dashboard",
+  "/api/v1/bookmarks",
+  "/api/reader/whitelist",
+  "/api/excluded-titles",
+];
+
+function isPublicPath(pathname: string, method: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
+  const isGet = method === "GET" || method === "HEAD";
+  if (
+    isGet &&
+    PUBLIC_GET_PREFIX.some(
+      (p) =>
+        pathname === p ||
+        pathname.startsWith(p + "/") ||
+        pathname.startsWith(p + "?")
+    )
+  )
+    return true;
   return PUBLIC_PREFIX.some(
     (p) =>
       pathname === p ||
@@ -87,7 +116,7 @@ function applySecurityHeaders(res: NextResponse): NextResponse {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname, request.method)) {
     return applySecurityHeaders(NextResponse.next());
   }
 
