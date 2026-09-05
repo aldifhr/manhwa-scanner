@@ -125,7 +125,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 to_dispatch = enriched_all
             else:
                 to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
-            channels = channel_ids or _load_channels()
+            channels = channel_ids or dispatch_mod._load_channels()
             # When the deep-queue claim path (_use_claimed) was used, the URLs
             # were ALREADY written to dispatch_claims by
             # claim_recent_chapters_for_dispatch() in the same transaction.
