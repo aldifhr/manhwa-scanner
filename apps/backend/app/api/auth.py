@@ -27,6 +27,7 @@ router = APIRouter()
 
 _COOKIE_SESSION = "ikiru_dashboard_session"
 _COOKIE_CSRF = "ikiru_csrf_token"
+_COOKIE_ROLE = "ikiru_role"
 _COOKIE_MAX_AGE = 7 * 24 * 60 * 60
 
 
@@ -79,23 +80,30 @@ def _verify_password(pw: str, h: str) -> bool:
         return False
 
 def _set_session_cookies(resp: JSONResponse, token: str) -> None:
+    role = role_from_jwt(token) or "member"
     resp.set_cookie(
         key=_COOKIE_SESSION,
         value=token,
         httponly=True,
         secure=True,
-        samesite="lax",  # FE is on a different host; Lax allows top-level navigation
+        samesite="lax",
         path="/",
         max_age=_COOKIE_MAX_AGE,
     )
-    # CSRF defense: set a readable (non-httponly) cookie so the FE can
-    # echo it back as a header on mutating requests (double-submit pattern).
-    # Middleware validates it on write methods.
+    resp.set_cookie(
+        key=_COOKIE_ROLE,
+        value=role,
+        httponly=False,  # readable by JS for nav gating (httpOnly session can't be read)
+        secure=True,
+        samesite="lax",
+        path="/",
+        max_age=_COOKIE_MAX_AGE,
+    )
     csrf_token = _secrets.token_urlsafe(32)
     resp.set_cookie(
         key=_COOKIE_CSRF,
         value=csrf_token,
-        httponly=False,  # FE JS must read this to send X-CSRF-Token header
+        httponly=False,
         secure=True,
         samesite="lax",
         path="/",
@@ -199,6 +207,15 @@ async def auth_handler(request: Request):
     resp = JSONResponse({"success": True, "data": {"ok": True, "role": role}})
     _set_session_cookies(resp, token)
     return resp
+
+
+@router.get("/auth")
+async def auth_me(request: Request):
+    token = _get_session_cookie(request)
+    role = role_from_jwt(token) if token else None
+    if not role:
+        return JSONResponse({"success": False, "error": "unauthorized"}, status_code=401)
+    return JSONResponse({"success": True, "data": {"role": role}})
 
 
 # Discord OAuth login has been removed.

@@ -20,11 +20,29 @@ export default function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    const m = document.cookie.match(
-      /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
-    );
-    setIsLoggedIn(!!m?.[1]);
-    setIsAdmin(m ? getRole(m[1]) === "admin" : false);
+    const roleMatch = document.cookie.match(/(?:^|;\s*)ikiru_role=([^;]*)/);
+    if (roleMatch?.[1]) {
+      setIsLoggedIn(true);
+      setIsAdmin(roleMatch[1] === "admin");
+      return;
+    }
+    // fallback for old sessions without ikiru_role cookie — probe backend
+    fetch("/api/v1/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const role = j?.data?.role;
+        if (role) {
+          setIsLoggedIn(true);
+          setIsAdmin(role === "admin");
+        } else {
+          setIsLoggedIn(false);
+          setIsAdmin(false);
+        }
+      })
+      .catch(() => {
+        setIsLoggedIn(false);
+        setIsAdmin(false);
+      });
   }, [pathname]);
 
   useEffect(() => {
