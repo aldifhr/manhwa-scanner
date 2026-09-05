@@ -50,5 +50,23 @@ module.exports = {
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       merge_logs: true,
     },
+    {
+      name: "health-check",
+      script: "/root/projects/manhwa-scanner/scripts/health-check.sh",
+      cwd: "/root/projects/manhwa-scanner",
+      interpreter: "/bin/bash",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "32M",
+      min_uptime: "10s",
+      max_restarts: 999,
+      restart_delay: 5000,
+      env: {
+        NODE_ENV: "production",
+      },
+      error_file: "/root/.pm2/logs/health-check-error.log",
+      out_file: "/root/.pm2/logs/health-check-out.log",
+    },
   ],
 };
