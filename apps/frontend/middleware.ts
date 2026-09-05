@@ -44,6 +44,7 @@ const PUBLIC_EXACT = new Set<string>([
 
 const PUBLIC_PREFIX = [
   "/api/v1/auth/login",
+  "/api/v1/auth/register",
   "/api/v1/cron",
   "/api/v1/reader/rss",
   "/api/v1/reader/rss/new",
