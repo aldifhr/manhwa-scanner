@@ -556,12 +556,12 @@ def _retention_loop() -> None:
                     logger.info("retention: cleaned stale dispatch_claims", expired=_stale_count, null_created=_null_count)
             except Exception as e:
                 logger.warn("retention: stale claims cleanup failed", err=str(e)[:160])
-            # 4) error_logs retention (30d)
+            # 4) error_logs retention (7d — was 30d, but at ~4k rows/day it bloats quickly)
             try:
                 from app.storage.error_logs import delete_older_than as _err_prune
-                _pruned = _err_prune(days=30)
+                _pruned = _err_prune(days=7)
                 if _pruned:
-                    logger.info("retention: pruned error_logs", deleted=_pruned, days=30)
+                    logger.info("retention: pruned error_logs", deleted=_pruned, days=7)
             except Exception as e:
                 logger.warn("retention: error_logs cleanup failed", err=str(e)[:120])
             logger.info("retention prune done", 

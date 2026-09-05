@@ -208,7 +208,12 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             _snap = build_snapshot_sync()
             health.write_dashboard_snapshot(_snap)
         except Exception as _se:
-            logger.error("cron snapshot persist failed", exc=_se)
+            # Connection closed during deploy shutdown is expected — debug only
+            _msg = str(_se).lower()
+            if "already closed" in _msg or "pool closed" in _msg or "connection" in _msg and "closed" in _msg:
+                logger.debug("cron snapshot skipped — pool closed", err=str(_se)[:120])
+            else:
+                logger.error("cron snapshot persist failed", exc=_se)
 
         # Retention prune: cron_run_status is an operational log — keep only 2 days
         try:

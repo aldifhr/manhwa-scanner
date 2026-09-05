@@ -78,7 +78,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
                 rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
                 _pc(_conn)
             except Exception as _e:
-                logger.warn("enrich_resync miss_only fallback to Supabase", err=str(_e)[:120])
+                logger.debug("enrich_resync miss_only fallback to Supabase", err=str(_e)[:120])
                 rows = (
                     sb.table("recent_chapters")
                     .select("*")
@@ -163,7 +163,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
                     if str(_rating).strip().lower() == "rating":
                         logger.debug("enrich_resync: skip header rating", chapter_url=cu)
                     else:
-                        logger.warn("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
+                        logger.debug("enrich_resync: skip non-numeric rating", chapter_url=cu, rating=str(_rating)[:40])
         _cover = it.get("cover")
         if _cover:
             _sets.append("cover=%s"); _vals.append(str(_cover))
@@ -188,7 +188,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
         except Exception as e:
             err_s = str(e).lower()
             if "already closed" in err_s or "cursor" in err_s and "closed" in err_s:
-                logger.warn("enrich_resync: abort — pool closed during shutdown", cu=cu[:40])
+                logger.debug("enrich_resync: abort — pool closed during shutdown", cu=cu[:40])
                 failed += 1
                 try:
                     conn.rollback()
@@ -196,7 +196,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
                     pass
                 put_conn(conn)
                 return {"ok": False, "error": "pool closed — aborted mid-batch", "updated": updated, "failed": failed}
-            logger.warn("enrich_resync: update failed", cu=cu[:60], err=str(e)[:120])
+            logger.debug("enrich_resync: update failed", cu=cu[:60], err=str(e)[:120])
             failed += 1
         time.sleep(_INTER_FETCH_DELAY)
     try:
@@ -204,7 +204,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
     except Exception as e:
         err_s = str(e).lower()
         if "already closed" not in err_s:
-            logger.warn("enrich_resync: commit failed", err=str(e)[:120])
+            logger.debug("enrich_resync: commit failed", err=str(e)[:120])
     try:
         put_conn(conn)
     except Exception:

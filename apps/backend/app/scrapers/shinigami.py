@@ -41,7 +41,7 @@ _CLIENT = httpx.Client(timeout=TIMEOUT, headers=_HEADERS, verify=True)
 
 def _get(path: str, retries: int = 4):
     if not cb_shinigami.allow():
-        logger.warn("shinigami circuit OPEN — skipping fetch", path=path)
+        logger.debug("shinigami circuit OPEN — skipping fetch", path=path)
         return None
     try:
         for attempt in range(retries + 1):
@@ -61,12 +61,12 @@ def _get(path: str, retries: int = 4):
                     _sleep = min(3.0 * (attempt + 1), 12.0) + random.uniform(0, 1.0)
                 _t.sleep(_sleep)
                 continue
-            logger.warn("Shinigami HTTP error", path=path, status=r.status_code)
+            logger.debug("Shinigami HTTP error", path=path, status=r.status_code)
             cb_shinigami.record_failure()
             return None
     except Exception as e:
         cb_shinigami.record_failure()
-        logger.warn("Shinigami fetch failed", path=path, err=str(e))
+        logger.debug("Shinigami fetch failed", path=path, err=str(e))
     return None
 
 

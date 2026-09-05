@@ -114,7 +114,6 @@ class CircuitBreaker:
         with self._lock:
             if self._state == CircuitState.HALF_OPEN:
                 self._successes += 1
-                self._successes  # noqa
                 if self._successes >= self.success_threshold:
                     self._state = CircuitState.CLOSED
                     self._failures = 0
@@ -128,13 +127,13 @@ class CircuitBreaker:
             if self._state == CircuitState.HALF_OPEN:
                 self._state = CircuitState.OPEN
                 self._opened_at = time.monotonic()
-                logger.warn("circuit_open", name=self.name, reason="half_open_failure")
+                logger.debug("circuit_open", name=self.name, reason="half_open_failure")
                 return
             self._failures += 1
             if self._failures >= self.failure_threshold:
                 self._state = CircuitState.OPEN
                 self._opened_at = time.monotonic()
-                logger.warn("circuit_open", name=self.name, reason="threshold")
+                logger.debug("circuit_open", name=self.name, reason="threshold")
 
     def __call__(self, fn: Callable):
         @wraps(fn)
@@ -164,6 +163,9 @@ cb_shinigami = CircuitBreaker("shinigami", failure_threshold=3, recovery_timeout
 # report voratoon circuit state alongside ikiru/shinigami. Voratoon's API is
 # stable but rate-limits (429) under burst, so a moderate threshold.
 cb_voratoon = CircuitBreaker("voratoon", failure_threshold=5, recovery_timeout=120)
+# ApiFailureDetector merged here — ikiru API → HTML fallback (threshold 5, cooldown 300)
+# ponytail: reuse CircuitBreaker instead of separate class
+cb_ikiru_api = CircuitBreaker("ikiru_api", failure_threshold=5, recovery_timeout=300)
 
 
 def with_circuit_breaker(cb: CircuitBreaker):

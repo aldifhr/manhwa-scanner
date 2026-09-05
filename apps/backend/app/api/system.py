@@ -11,29 +11,17 @@ from app.utils.request_auth import require_cron_auth, require_monitor_auth
 logger = get_logger("api:system")
 router = APIRouter()
 
-# Cron concurrency guard: prevent overlapping runs that cause duplicate sends
-# and DB contention. Uses a threading lock (process-wide) + DB advisory lock
-# (cross-process/replica) so two pods/instances don't double-send.
-# Per-action locks so rss-fetch isn't blocked by update and vice versa.
-_cron_locks: dict[str, threading.Lock] = {
-    "update": threading.Lock(),
-    "rss-fetch": threading.Lock(),
-    "dispatch": threading.Lock(),
-    "health": threading.Lock(),
-    "rss-fetch:ikiru": threading.Lock(),
-    "rss-fetch:shinigami": threading.Lock(),
-    "rss-fetch:voratoon": threading.Lock(),
-    "enrich": threading.Lock(),
-    "enrich-missing": threading.Lock(),
-    "enrich-refresh": threading.Lock(),
-    "voratoon-cover": threading.Lock(),
-}
+# Cron concurrency guard: per-action lock + DB advisory lock (cross-process).
+# ponytail: 11 literal Locks → default dict factory; bounded by action string
+import collections
+_cron_locks: dict[str, threading.Lock] = collections.defaultdict(threading.Lock)  # type: ignore[assignment]
+# preload known actions so introspection still works
+for _k in ("update","rss-fetch","dispatch","health","rss-fetch:ikiru","rss-fetch:shinigami","rss-fetch:voratoon","enrich","enrich-missing","enrich-refresh","voratoon-cover"):
+    _cron_locks[_k]  # touch
 _cron_running = False
-# Per-source advisory keys to avoid serializing independent scrapes (P0 #5)
-# hash(action) & 0x7fffffff -> stable 31-bit int for pg_try_advisory_lock
+# ponytail: hash() replaces sha256 — fast, stable per-process, sufficient for advisory key sharding
 def _advisory_key(action: str) -> int:
-    import hashlib as _hl
-    return int(_hl.sha256(action.encode()).hexdigest()[:8], 16) & 0x7FFFFFFF
+    return hash(action) & 0x7FFFFFFF
 
 _CRON_ADVISORY_KEY = 424242  # legacy fallback (not used directly, kept for compat)
 

@@ -94,9 +94,7 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
             "limit": page_size,
             "totalPages": total_pages,
             "hasMore": has_more,
-            "has_more": has_more,
             "nextCursor": next_cursor,
-            "next_cursor": next_cursor,
         },
     }
 

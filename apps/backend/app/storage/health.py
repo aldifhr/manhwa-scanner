@@ -115,7 +115,12 @@ def write_dashboard_snapshot(payload: dict) -> None:
             on_conflict="id",
         ).execute()
     except Exception as e:
-        logger.error("write_dashboard_snapshot failed", exc=e)
+        # Pool closed during deploy shutdown is expected — don't pollute error_logs
+        msg = str(e).lower()
+        if "already closed" in msg or "pool closed" in msg or "connection" in msg and "closed" in msg:
+            logger.debug("write_dashboard_snapshot skipped — pool closed", err=str(e)[:120])
+        else:
+            logger.error("write_dashboard_snapshot failed", exc=e)
 
 
 def read_dashboard_snapshot() -> dict | None:

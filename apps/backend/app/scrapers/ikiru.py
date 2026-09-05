@@ -14,7 +14,7 @@ from app.services.rating_utils import normalize_rating
 from app.config import settings
 from app.logger import get_logger
 from app.utils.cover_scrub import scrub_cover
-from app.services.resilience import cb_ikiru
+from app.services.resilience import cb_ikiru, cb_ikiru_api
 
 logger = get_logger("ikiru:api")
 
@@ -52,13 +52,11 @@ def _cf_get(url: str, timeout: float = TIMEOUT) -> object:
 def _fetch_json(path: str, retries: int = 4):
     """GET JSON from Ikiru API with jittered backoff. Circuit-aware."""
     if not cb_ikiru.allow():
-        logger.warn("ikiru circuit OPEN — skipping fetch", path=path)
+        logger.debug("ikiru circuit OPEN — skipping fetch", path=path)
         return None
 
-    # API failure detector — skip API if in HTML-only mode
-    from app.services.api_health import get_detector
-    _api_health = get_detector("ikiru")
-    if not _api_health.should_try_api():
+    # ponytail: api_health.ApiFailureDetector → cb_ikiru_api (same threshold 5 / cooldown 300)
+    if not cb_ikiru_api.allow():
         logger.debug("ikiru in HTML-only mode, skipping API", path=path)
         return None
 
@@ -77,13 +75,13 @@ def _fetch_json(path: str, retries: int = 4):
                 try:
                     data = r.json()
                     cb_ikiru.record_success()
-                    _api_health.record_success()
+                    cb_ikiru_api.record_success()
                     return data
                 except Exception:
                     # Not JSON — likely Cloudflare challenge
-                    logger.warn("ikiru non-JSON response (CF challenge?)", path=path, attempt=attempt)
+                    logger.debug("ikiru non-JSON response (CF challenge?)", path=path, attempt=attempt)
                     cb_ikiru.record_failure()
-                    _api_health.record_failure()
+                    cb_ikiru_api.record_failure()
                     if attempt < retries:
                         _t.sleep(1.0 + random.uniform(0, 2.0))
                         continue
@@ -99,14 +97,14 @@ def _fetch_json(path: str, retries: int = 4):
                     _sleep = min(2.0 * (attempt + 1), 12.0) + random.uniform(0, 1.0)
                 _t.sleep(_sleep)
                 continue
-            logger.warn("Ikiru HTTP error", path=path, status=r.status_code)
+            logger.debug("Ikiru HTTP error", path=path, status=r.status_code)
             cb_ikiru.record_failure()
-            _api_health.record_failure()
+            cb_ikiru_api.record_failure()
             return None
     except Exception as e:
-        logger.warn("Ikiru fetch failed", path=path, err=str(e))
+        logger.debug("Ikiru fetch failed", path=path, err=str(e))
         cb_ikiru.record_failure()
-        _api_health.record_failure()
+        cb_ikiru_api.record_failure()
     return None
 
 
@@ -133,7 +131,7 @@ def get_ikiru_latest_updates(max_pages: int = 20, hours_cutoff: int = 24):
     for page in range(1, max_pages + 1):
         data = _fetch_json(f"/list/latest?page={page}&per_page=50")
         if not data or not data.get("ok"):
-            logger.warn("ikiru /list/latest API failed, falling back to HTML")
+            logger.debug("ikiru /list/latest API failed, falling back to HTML")
             break
 
         items = data.get("items", [])
@@ -177,7 +175,7 @@ def get_ikiru_latest_updates(max_pages: int = 20, hours_cutoff: int = 24):
 
     # ── FALLBACK: HTML scrape ──
     if not all_items:
-        logger.warn("ikiru API returned no items, falling back to HTML scrape")
+        logger.debug("ikiru API returned no items, falling back to HTML scrape")
         return _get_ikiru_latest_updates_html(max_pages, hours_cutoff)
 
     return all_items
@@ -209,11 +207,11 @@ def _get_ikiru_latest_updates_html(max_pages: int = 2, hours_cutoff: int = 24):
                 _t.sleep(2.0)
                 r = _cf_get(url)
             if r.status_code != 200:
-                logger.warn("ikiru latest-update http", page=page, status=r.status_code)
+                logger.debug("ikiru latest-update http", page=page, status=r.status_code)
                 break
             html = r.text
         except Exception as e:
-            logger.warn("ikiru latest-update fetch failed", page=page, err=str(e)[:120])
+            logger.debug("ikiru latest-update fetch failed", page=page, err=str(e)[:120])
             break
 
         link_hits = [(m.start(), m) for m in _LINK_RE.finditer(html)]
@@ -288,7 +286,7 @@ def get_ikiru_series_meta(slug: str) -> dict | None:
     try:
         r = _cf_get(url)
         if r.status_code != 200:
-            logger.warn("ikiru series meta http", slug=slug, status=r.status_code)
+            logger.debug("ikiru series meta http", slug=slug, status=r.status_code)
             return None
         d = r.json()
         s = d.get("series") if isinstance(d, dict) else None
@@ -347,7 +345,7 @@ def get_ikiru_series_meta(slug: str) -> dict | None:
                 pass
         return result
     except Exception as e:
-        logger.warn("ikiru series meta failed", slug=slug, err=str(e)[:120])
+        logger.debug("ikiru series meta failed", slug=slug, err=str(e)[:120])
         return None
 
 
@@ -380,8 +378,8 @@ def get_ikiru_chapters(slug: str, per_page: int = 100):
         # / not-yet-indexed) — expected, not an error.
         logger.debug("ikiru API ok but no chapters, falling back to HTML", slug=slug)
     else:
-        # API genuinely failed (CF challenge, 5xx, circuit open) — worth a warn.
-        logger.warn("ikiru chapters API failed, falling back to HTML", slug=slug)
+        # API genuinely failed (CF challenge, 5xx, circuit open) — worth a debug.
+        logger.debug("ikiru chapters API failed, falling back to HTML", slug=slug)
     return get_ikiru_series_chapters_html(slug)
 
 
@@ -439,12 +437,12 @@ def get_ikiru_series_chapters_html(slug: str) -> list[dict]:
             if r.status_code == 404:
                 logger.debug("ikiru html chapter fetch http (not found)", slug=slug)
             else:
-                logger.warn("ikiru html chapter fetch http", slug=slug, status=r.status_code)
+                logger.debug("ikiru html chapter fetch http", slug=slug, status=r.status_code)
             html_text = ""
         else:
             html_text = r.text
     except Exception as e:
-        logger.warn("ikiru html chapter fetch failed", slug=slug, err=str(e))
+        logger.debug("ikiru html chapter fetch failed", slug=slug, err=str(e))
         html_text = ""
 
     if not html_text:

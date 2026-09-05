@@ -198,7 +198,7 @@ def collect_voratoon() -> list[dict]:
                     if r.status_code == 429:
                         retry_after = r.headers.get("retry-after")
                         wait = float(retry_after) if retry_after else (2 ** attempt + random.uniform(0, 1))
-                        logger.warn("voratoon 429 rate limited", attempt=attempt, wait=round(wait, 2))
+                        logger.debug("voratoon 429 rate limited", attempt=attempt, wait=round(wait, 2))
                         time.sleep(wait)
                         continue
                     r.raise_for_status()
