@@ -281,7 +281,7 @@ export default function HealthDashboard() {
             </h2>
             <a
               href="/error-logs"
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors min-h-0 min-w-0"
+              className="inline-flex items-center justify-center leading-none text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors min-h-0 min-w-0"
             >
               View all →
             </a>
