@@ -92,11 +92,14 @@ export const Reader = {
       total_pages?: number;
     };
     return {
-      results: (d?.results ?? []).map((r) => mapHistory(r) as unknown as DispatchHistoryItem),
+      results: (d?.results ?? []).map(
+        (r) => mapHistory(r) as unknown as DispatchHistoryItem
+      ),
       total: d?.total ?? 0,
       page: d?.page ?? page,
       pageSize: d?.pageSize ?? pageSize,
-      totalPages: d?.totalPages ?? (d as { total_pages?: number })?.total_pages ?? 1,
+      totalPages:
+        d?.totalPages ?? (d as { total_pages?: number })?.total_pages ?? 1,
     };
   },
   getRssFlat: (
@@ -122,23 +125,50 @@ export const Reader = {
     return (data.data?.results ?? []).map(mapExcluded) as ExcludedTitleItem[];
   },
   getDashboardSnapshot: async (): Promise<DashboardSnapshot | null> => {
-    const data = await readerFetch<{
-      success: boolean;
-      data: DashboardSnapshot;
-    }>("/api/v1/dashboard-snapshot");
-    return (data.data ?? null) as DashboardSnapshot | null;
+    try {
+      const data = await readerFetch<{
+        success: boolean;
+        data: DashboardSnapshot;
+      }>("/api/v1/dashboard-snapshot");
+      return (data.data ?? null) as DashboardSnapshot | null;
+    } catch (e) {
+      if (
+        (e as Error).message.includes("401") ||
+        (e as Error).message.includes("403")
+      )
+        return null;
+      throw e;
+    }
   },
   getStats: async () => {
-    const data = await readerFetch<{ success: boolean; data: unknown }>(
-      "/api/v1/stats"
-    );
-    return (data.data ?? null) as unknown;
+    try {
+      const data = await readerFetch<{ success: boolean; data: unknown }>(
+        "/api/v1/stats"
+      );
+      return (data.data ?? null) as unknown;
+    } catch (e) {
+      if (
+        (e as Error).message.includes("401") ||
+        (e as Error).message.includes("403")
+      )
+        return null;
+      throw e;
+    }
   },
   getQueueDepth: async (): Promise<QueueDepth> => {
-    const data = await readerFetch<{ success: boolean; data: unknown }>(
-      "/api/v1/queue"
-    );
-    return (data.data ?? {}) as QueueDepth;
+    try {
+      const data = await readerFetch<{ success: boolean; data: unknown }>(
+        "/api/v1/queue"
+      );
+      return (data.data ?? {}) as QueueDepth;
+    } catch (e) {
+      if (
+        (e as Error).message.includes("401") ||
+        (e as Error).message.includes("403")
+      )
+        return {} as QueueDepth;
+      throw e;
+    }
   },
   getCronStatus: async () => {
     const data = await readerFetch<{ success: boolean; data: unknown }>(
@@ -256,7 +286,11 @@ export const Reader = {
       return { status: "added" as const };
     } catch (e) {
       const msg = (e as Error).message;
-      if (msg.includes("409") || msg.toLowerCase().includes("already_exists") || msg.toLowerCase().includes("already exists")) {
+      if (
+        msg.includes("409") ||
+        msg.toLowerCase().includes("already_exists") ||
+        msg.toLowerCase().includes("already exists")
+      ) {
         return { status: "already_exists" as const };
       }
       throw e;
@@ -274,7 +308,10 @@ export const Reader = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if ((res as unknown as { status?: string }).status === "not_found" || (res as unknown as { deleted?: number }).deleted === 0) {
+      if (
+        (res as unknown as { status?: string }).status === "not_found" ||
+        (res as unknown as { deleted?: number }).deleted === 0
+      ) {
         throw new Error("No matching whitelist entry to delete");
       }
       return;
@@ -305,14 +342,14 @@ export const Reader = {
     });
   },
   bulkExcludeBySource: async (source: string) => {
-    const data = await readerFetch<{ success: boolean; data: { excluded: number } }>(
-      "/api/v1/excluded-titles/bulk",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source }),
-      }
-    );
+    const data = await readerFetch<{
+      success: boolean;
+      data: { excluded: number };
+    }>("/api/v1/excluded-titles/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source }),
+    });
     return { excluded: data.data?.excluded ?? 0 };
   },
   // Page-wise seam for AllTab infinite scroll — hides snake→camel + hasMore logic

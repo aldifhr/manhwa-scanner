@@ -13,6 +13,7 @@ from app.utils.request_auth import require_monitor_auth
 logger = get_logger("api:continue_reading")
 router = APIRouter()
 
+# ponytail: continue_reading now delegates to bookmark (single source) — keep API compat
 
 def _get_session_hash(request: Request) -> str:
     """Extract session hash from cookie."""
@@ -26,121 +27,94 @@ def _get_session_hash(request: Request) -> str:
 
 @router.get("/continue-reading")
 async def get_continue_reading(request: Request):
-    """Get continue-reading entries for current user."""
+    """Get continue-reading entries for current user. ponytail: delegates to bookmark (single source)."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-
     sid_hash = _get_session_hash(request)
     if not sid_hash:
         return JSONResponse(content={"success": True, "data": {}})
-
     try:
-        from app.db import get_supabase
-        sb = get_supabase()
-        res = (
-            sb.table("continue_reading")
-            .select("entries, updated_at")
-            .eq("session_hash", sid_hash)
-            .execute()
-        )
-        if res.data:
-            return JSONResponse(content={"success": True, "data": res.data[0]})
-        return JSONResponse(content={"success": True, "data": {}})
+        from app.services.bookmark import get_bookmarks
+        rows = get_bookmarks(sid_hash, limit=100, offset=0)
+        # Convert bookmarks → continue_reading entries map
+        entries = {}
+        for r in rows:
+            tk = r.get("title_key") or r.get("titleKey") or ""
+            if not tk:
+                continue
+            entries[tk] = {
+                "titleKey": tk,
+                "title": r.get("title", ""),
+                "cover": r.get("cover"),
+                "source": r.get("source", ""),
+                "lastChapter": str(r.get("chapter_number", "")),
+                "chapterUrl": r.get("chapter_url", ""),
+                "seriesUrl": "",
+                "origin": "",
+                "updatedAt": r.get("updated_at", ""),
+            }
+        return JSONResponse(content={"success": True, "data": entries})
     except Exception as e:
-        logger.warn("get_continue_reading failed", err=str(e)[:120])
+        logger.warn("get_continue_reading (bookmark) failed", err=str(e)[:120])
         return JSONResponse(content={"success": True, "data": {}})
 
 
 @router.put("/continue-reading")
 async def put_continue_reading(request: Request):
-    """Update continue-reading entry for current user. Supports single entry or batch map."""
+    """Update continue-reading — ponytail: delegates to bookmark, keep compat."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-
     try:
         body = await request.json()
     except Exception:
         return JSONResponse(content={"success": False, "error": "invalid JSON"}, status_code=400)
-
     if not isinstance(body, dict):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
-
-    # Empty batch (FE initial empty sync) -> no-op success
     if len(body) == 0:
         return JSONResponse(content={"success": True, "data": {}})
-
     sid_hash = _get_session_hash(request)
     if not sid_hash:
         return JSONResponse(content={"success": False, "error": "no session"}, status_code=401)
-
-    # Batch mode: body is {titleKey: entry, ...} (FE sends clean map)
-    # Detect batch by checking if any value looks like an entry dict with titleKey/chapterUrl
     is_batch = False
     if body and all(isinstance(v, dict) and (v.get("titleKey") or v.get("title_key") or v.get("chapterUrl")) for v in body.values()):
-        # Also ensure top-level doesn't look like a single entry (single entry has titleKey at top level)
         if not (body.get("titleKey") or body.get("title_key") or body.get("chapterUrl")):
             is_batch = True
-    # Fallback: if body has no titleKey at top level but has multiple keys, treat as batch
     if not is_batch and len(body) > 1 and not (body.get("titleKey") or body.get("title_key")):
-        # Heuristic: batch map has 2+ entries, each with titleKey
         sample = next(iter(body.values())) if body else None
         if isinstance(sample, dict) and sample.get("titleKey"):
             is_batch = True
-
     try:
-        from app.db import get_supabase
-        sb = get_supabase()
+        from app.services.bookmark import save_bookmark
         if is_batch:
-            # Batch upsert: REPLACE entire entries with FE's clean map (handles deletes)
-            # FE sends Object.fromEntries([...entries]) → {titleKey: entry} for all remaining
-            merged: dict = {}
             for k, v in body.items():
                 if not isinstance(v, dict):
                     continue
                 tk = v.get("titleKey") or v.get("title_key") or k
                 if not tk:
                     continue
-                merged[tk] = {
-                    "titleKey": tk,
-                    "title": v.get("title", ""),
-                    "cover": v.get("cover"),
-                    "source": v.get("source", ""),
-                    "lastChapter": v.get("lastChapter") or v.get("chapter", ""),
-                    "chapterUrl": v.get("chapterUrl", ""),
-                    "seriesUrl": v.get("seriesUrl", ""),
-                    "origin": v.get("origin", ""),
-                    "updatedAt": v.get("updatedAt") or time.time(),
-                }
-            sb.table("continue_reading").upsert(
-                {"session_hash": sid_hash, "entries": merged, "updated_at": datetime.now(timezone.utc).isoformat()},
-                on_conflict="session_hash",
-            ).execute()
-            return JSONResponse(content={"success": True, "data": merged})
-        # Single entry mode
+                cn = v.get("chapterNumber") or 0
+                try:
+                    cn = float(cn)
+                except Exception:
+                    cn = 0
+                cu = v.get("chapterUrl") or v.get("chapter_url") or ""
+                if not cu:
+                    continue
+                save_bookmark(tk, cn or 1, cu, sid_hash, v.get("source", ""), 0, v.get("title", ""), v.get("cover", ""))
+            return JSONResponse(content={"success": True, "data": body})
         title_key = body.get("titleKey") or body.get("title_key") or ""
         if not title_key:
             return JSONResponse(content={"success": False, "error": "titleKey required"}, status_code=400)
-        entry = {
-            "titleKey": title_key,
-            "chapter": body.get("lastChapter") or body.get("chapter", ""),
-            "chapterNumber": body.get("chapterNumber", 0),
-            "chapterUrl": body.get("chapterUrl", ""),
-            "seriesUrl": body.get("seriesUrl", ""),
-            "source": body.get("source", ""),
-            "title": body.get("title", ""),
-            "cover": body.get("cover", None),
-            "origin": body.get("origin", ""),
-            "isRead": body.get("isRead", True),
-            "readAt": time.time(),
-            "updatedAt": time.time(),
-        }
-        sb.table("continue_reading").upsert(
-            {"session_hash": sid_hash, "entries": {title_key: entry}, "updated_at": datetime.now(timezone.utc).isoformat()},
-            on_conflict="session_hash",
-        ).execute()
-        return JSONResponse(content={"success": True, "data": entry})
+        cu = body.get("chapterUrl") or body.get("chapter_url") or ""
+        cn = body.get("chapterNumber") or 0
+        try:
+            cn = float(cn)
+        except Exception:
+            cn = 0
+        save_bookmark(title_key, cn or 1, cu or f"https://x/{title_key}", sid_hash, body.get("source", ""), 0, body.get("title", ""), body.get("cover", ""))
+        return JSONResponse(content={"success": True, "data": body})
     except Exception as e:
-        logger.warn("put_continue_reading failed", err=str(e)[:120])
+        logger.warn("put_continue_reading (bookmark) failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
