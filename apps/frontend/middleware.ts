@@ -33,7 +33,6 @@ const PUBLIC_EXACT = new Set<string>([
   "/exclude-list",
   "/dispatch-history",
   "/bookmarks",
-  "/status",
   "/about",
   "/login",
   "/sw.js",
