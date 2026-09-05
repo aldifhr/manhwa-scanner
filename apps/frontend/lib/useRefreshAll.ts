@@ -14,7 +14,7 @@ export function useRefreshAll() {
     try {
       await Promise.all([
         queryClient.refetchQueries({ queryKey: ["rss-feed-flat"] }),
-        queryClient.refetchQueries({ queryKey: queryKeys.whitelist }),
+        queryClient.refetchQueries({ queryKey: queryKeys.whitelistAll }),
         queryClient.refetchQueries({ queryKey: queryKeys.dispatchHistory() }),
         queryClient.refetchQueries({ queryKey: queryKeys.dashboardSnapshot }),
         queryClient.refetchQueries({ queryKey: queryKeys.excludedTitles }),

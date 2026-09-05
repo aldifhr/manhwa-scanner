@@ -19,7 +19,7 @@ import { WhitelistCard } from "@/components/WhitelistCard";
 
 export function WhitelistGrid() {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: queryKeys.whitelist,
+    queryKey: queryKeys.whitelist(false),
     queryFn: () =>
       Reader.getWhitelist(1, 1000, false) as unknown as Promise<
         WhitelistRouteItem[]
@@ -194,7 +194,11 @@ export function WhitelistGrid() {
       ) : (
         <div className={GRID_CLASS}>
           {filtered.map((item) => (
-            <WhitelistCard key={item.id} item={item} onRefetch={refetch} />
+            <WhitelistCard
+              key={`${item.id}:${item.source}`}
+              item={item}
+              onRefetch={refetch}
+            />
           ))}
         </div>
       )}

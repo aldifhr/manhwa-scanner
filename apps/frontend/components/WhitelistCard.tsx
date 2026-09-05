@@ -79,8 +79,11 @@ export function WhitelistCard({
       (item as unknown as { titleKey?: string }).titleKey ||
       (item as unknown as { title_key?: string }).title_key ||
       "";
+    // whitelist sekarang terpisah per source (merge=false) — optimistic filter harus source-aware
+    const deleteSource =
+      effectiveSources.length === 1 ? effectiveSources[0] : "";
     queryClient.setQueryData<WhitelistRouteItem[]>(
-      queryKeys.whitelist,
+      queryKeys.whitelist(false),
       (old) =>
         old
           ? old.filter((it) => {
@@ -89,6 +92,31 @@ export function WhitelistCard({
                 (it as unknown as { title_key?: string }).title_key ||
                 (it as unknown as { id?: string }).id ||
                 "";
+              const itSource =
+                (it as unknown as { source?: string }).source || "";
+              const itSources = (it as unknown as { sources?: unknown })
+                .sources;
+              const itSourceList: string[] = Array.isArray(itSources)
+                ? (itSources
+                    .map((s) =>
+                      typeof s === "string"
+                        ? s
+                        : (s as { source: string }).source
+                    )
+                    .filter(Boolean) as string[])
+                : [];
+              // jika delete per source, hanya hapus yang source-nya match
+              if (deleteSource) {
+                const keyMatch =
+                  (fallbackKey && itKey === fallbackKey) ||
+                  (!fallbackKey && itKey === titleKey);
+                const sourceMatch =
+                  itSource === deleteSource ||
+                  itSourceList.includes(deleteSource);
+                if (keyMatch && sourceMatch) return false;
+                // jika key sama tapi source beda, jangan hapus (biarin terpisah)
+                if (keyMatch && !sourceMatch) return true;
+              }
               if (fallbackKey && itKey === fallbackKey) return false;
               if (!fallbackKey && itKey === titleKey) return false;
               // fallback: match by title if titleKey missing (defensive)
@@ -164,7 +192,9 @@ export function WhitelistCard({
       deletePayload.source = effectiveSources[0];
     pendingDeleteRef.current = removeWhitelistEntry(deletePayload)
       .then(() => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
+        queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(false) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(true) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
         queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
         queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
         queryClient.invalidateQueries({

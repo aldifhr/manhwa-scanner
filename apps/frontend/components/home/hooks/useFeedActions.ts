@@ -60,7 +60,7 @@ export function useFeedActions() {
     onSuccess: ({ result, optKey, item }) => {
       // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
       setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
-      queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       const isExists = result.status === "already_exists";
@@ -85,7 +85,7 @@ export function useFeedActions() {
                       () => {}
                     );
                   queryClient.invalidateQueries({
-                    queryKey: queryKeys.whitelist,
+                    queryKey: queryKeys.whitelistAll,
                   });
                   queryClient.invalidateQueries({
                     queryKey: queryKeys.homeFeed,
@@ -141,7 +141,7 @@ export function useFeedActions() {
     onSuccess: ({ results, optKeys }, series) => {
       // Bandel fix: already_exists also counts as added for optimistic
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
-      queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       toast(`Added ${series.title} to whitelist`, {
@@ -167,7 +167,7 @@ export function useFeedActions() {
                 () => {}
               );
             }
-            queryClient.invalidateQueries({ queryKey: queryKeys.whitelist });
+            queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
             queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
           },
         },

@@ -24,8 +24,9 @@ export function usePrefetch() {
         break;
       case "/whitelist":
         qc.prefetchQuery({
-          queryKey: queryKeys.whitelist,
-          queryFn: () => Reader.getWhitelist(1, 1000) as Promise<unknown>,
+          queryKey: queryKeys.whitelist(false),
+          queryFn: () =>
+            Reader.getWhitelist(1, 1000, false) as Promise<unknown>,
           staleTime: staleTimes.whitelist,
         });
         break;

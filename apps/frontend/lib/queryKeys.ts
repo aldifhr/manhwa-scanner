@@ -2,7 +2,9 @@
 // (e.g. invalidating "dashboard" but querying "dashboardSnapshot" would silently no-op).
 
 export const queryKeys = {
-  whitelist: ["whitelist"] as const,
+  whitelist: (merge = true) =>
+    ["whitelist", merge ? "merged" : "separate"] as const,
+  whitelistAll: ["whitelist"] as const,
   homeFeed: ["home-feed"] as const,
   rssFeedFlat: (
     exclude?: string,
