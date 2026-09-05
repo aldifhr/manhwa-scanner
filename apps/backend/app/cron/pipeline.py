@@ -21,7 +21,11 @@ logger = get_logger("cron:dual-pass")
 health_store = health
 
 
-# ponytail: deprecated re-exports removed — import from collect/dispatch_mod/enrich directly
+# ponytail: re-export shim for external callers (grep 0 → delete) — internal uses collect.* prefix
+collect_recent_chapters = collect.collect_recent_chapters  # noqa: shim
+filter_whitelisted = collect.filter_whitelisted  # noqa: shim
+enrich = enrich_mod.enrich  # noqa: shim
+dispatch = dispatch_mod.dispatch  # noqa: shim
 
 
 def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True, dry_run: bool = False, action: str = "update") -> dict:
