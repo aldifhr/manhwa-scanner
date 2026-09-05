@@ -248,21 +248,14 @@ export function CardActions({
   showAdd?: boolean;
 }) {
   // ponytail: adminOnly gate for Add WL — member/anon cuma bookmark, keep hook inside component for SSR safety
+  // Read ikiru_role cookie (httponly=False, JS-readable) — ikiru_dashboard_session is HttpOnly so JS can't read it
   const isAdmin =
     typeof document !== "undefined" &&
     (() => {
       const m = document.cookie.match(
-        /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
+        /(?:^|;\s*)ikiru_role=([^;]*)/
       );
-      if (!m?.[1]) return false;
-      try {
-        const p = JSON.parse(
-          atob(m[1].split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
-        );
-        return p?.role === "admin";
-      } catch {
-        return false;
-      }
+      return m?.[1] === "admin";
     })();
   const showAddEff = showAdd && isAdmin;
   const showExcludeEff = !isWhitelisted && isAdmin;
