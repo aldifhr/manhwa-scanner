@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { COOKIE_NAME } from "@/lib/auth";
+import { COOKIE_NAME, getRole } from "@/lib/auth";
 import { getSecurityHeaders } from "@/lib/security/headers";
 
 // Endpoints that must NEVER be behind the auth gate (login page, auth API,
@@ -120,22 +120,40 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  // Hardened: FE only checks cookie presence. HS256 signature + exp are verified
-  // server-side (app/api/auth/* sets httpOnly + backend re-validates on every
-  // proxied call). Keeping verifyToken() in lib/auth for tests, but not gating
-  // the edge — a forged token will 401 at the API layer, not here.
-  // API routes (/api/*) must NOT redirect to /login on missing token —
-  // the browser fetch would follow the 307 to the HTML login page, then
-  // res.json() throws and the client crashes with "Cannot read properties of
-  // null (reading 'success')". Instead return a 401 JSON so fetchJson throws a
-  // clean "HTTP 401" the UI catches. Covers /api/reader/* AND /api/excluded-titles*
-  // (which previously fell through to the HTML redirect).
   if (!token) {
     if (pathname.startsWith("/api/")) {
       return applySecurityHeaders(
         NextResponse.json(
           { success: false, error: "unauthorized" },
           { status: 401 }
+        )
+      );
+    }
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return applySecurityHeaders(NextResponse.redirect(loginUrl));
+  }
+
+  const role = getRole(token);
+  const isMutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+  const needsAdmin =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/status") ||
+    (isMutating &&
+      (pathname.startsWith("/api/v1/reader/whitelist") ||
+        pathname.startsWith("/api/v1/whitelist") ||
+        pathname.startsWith("/api/v1/excluded-titles") ||
+        pathname.startsWith("/api/excluded-titles") ||
+        pathname.startsWith("/api/v1/bookmarks") ||
+        pathname.startsWith("/api/v1/reader/excluded") ||
+        pathname.startsWith("/api/v1/health/refresh")));
+
+  if (needsAdmin && role !== "admin") {
+    if (pathname.startsWith("/api/")) {
+      return applySecurityHeaders(
+        NextResponse.json(
+          { success: false, error: "forbidden — admin only" },
+          { status: 403 }
         )
       );
     }
