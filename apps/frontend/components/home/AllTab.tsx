@@ -45,7 +45,13 @@ import { useUiUrlSync } from "@/lib/useUiUrlSync";
 import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
 import { usePacerThrottledScroll } from "@/lib/usePacerThrottles";
 import { PageShell } from "@/components/PageShell";
-function normalizeTitleKey(k: string){ return (k||"").toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim(); }
+function normalizeTitleKey(k: string) {
+  return (k || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 import { usePinnedSet } from "./hooks/usePinnedSet";
 import { useInfiniteFeed } from "./hooks/useInfiniteFeed";
 import { useFeedActions } from "./hooks/useFeedActions";
@@ -156,7 +162,9 @@ function AllTabInner() {
     if (sourceFilter) f = f.filter((c) => (c.source || "") === sourceFilter);
     if (typeFilter) {
       f = f.filter((c) => {
-        const raw = String(c.type || "").toLowerCase().trim();
+        const raw = String(c.type || "")
+          .toLowerCase()
+          .trim();
         const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
         return t === typeFilter;
       });
@@ -176,7 +184,9 @@ function AllTabInner() {
           !(
             c.isWhitelisted ||
             optimisticWhitelist.has(`${c.titleKey}:${c.source}`) ||
-            optimisticWhitelist.has(`${normalizeTitleKey(c.titleKey)}:${c.source}`)
+            optimisticWhitelist.has(
+              `${normalizeTitleKey(c.titleKey)}:${c.source}`
+            )
           )
       );
     if (feed === "wl")
@@ -184,7 +194,9 @@ function AllTabInner() {
         (c) =>
           c.isWhitelisted ||
           optimisticWhitelist.has(`${c.titleKey}:${c.source}`) ||
-          optimisticWhitelist.has(`${normalizeTitleKey(c.titleKey)}:${c.source}`)
+          optimisticWhitelist.has(
+            `${normalizeTitleKey(c.titleKey)}:${c.source}`
+          )
       );
     const q = searchQuery.trim().toLowerCase();
     if (q) f = f.filter((c) => (c.title || "").toLowerCase().includes(q));
@@ -202,7 +214,10 @@ function AllTabInner() {
 
   const deepLinkRef = useRef<HTMLDivElement | null>(null);
   const scrollKey = "alltab_scroll";
-  const initialScrollOffset = typeof window !== "undefined" ? Number(localStorage.getItem(scrollKey) || "0") : undefined;
+  const initialScrollOffset =
+    typeof window !== "undefined"
+      ? Number(localStorage.getItem(scrollKey) || "0")
+      : undefined;
 
   const { grouped, flatDisplay, newSeriesKeys } = useFeedGrouping(filtered, {
     pinnedSet,
@@ -424,62 +439,92 @@ function AllTabInner() {
             subMessage={
               view === "fav"
                 ? "Click the Pin (📌) button on a card to add"
-                : "Try adjusting the filters above"
+                : all.length > 0
+                  ? "Filters hide all results — try clearing them"
+                  : "Try adjusting the filters above"
+            }
+            action={
+              all.length > 0 &&
+              (sourceFilter ||
+                typeFilter ||
+                countryFilter ||
+                searchQuery ||
+                feed !== "all") ? (
+                <button
+                  onClick={resetFilters}
+                  className="inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-full bg-[var(--gold-accent)] text-black font-semibold hover:bg-[var(--gold-accent-hover)] transition-colors"
+                >
+                  Reset filters
+                </button>
+              ) : undefined
             }
           />
         )
       ) : groupMode ? (
-        <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}>
-          {grouped.map((series, i) => {
+        <VirtualizedList
+          items={grouped}
+          gap={12}
+          estimateSize={186}
+          overscan={6}
+          initialScrollOffset={initialScrollOffset}
+          scrollToTitleKey={deepLinkSeries}
+          titleKeyOf={(s) => (s as GroupedSeries).titleKey}
+          renderItem={(series, i) => {
+            const s = series as GroupedSeries;
             const isRead =
-              series.chapters.length > 0 &&
-              series.chapters.every((c) => readItems.has(c.url));
+              s.chapters.length > 0 &&
+              s.chapters.every((c) => readItems.has(c.url));
             const isWL =
-              series.isWhitelisted ||
+              s.isWhitelisted ||
               optimisticWhitelist.has(
-                `${series.titleKey}:${series.chapters[0]?.source || ""}`
+                `${s.titleKey}:${s.chapters[0]?.source || ""}`
               );
             const isDeepMatch = i === groupedDeepLinkIndex;
             return (
-              <motion.div
-                key={`${series.titleKey}-${i}`}
-                data-title-key={series.titleKey}
-                ref={isDeepMatch ? deepLinkRef : undefined}
-                variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3 } } }}
+              <div
+                key={`${s.titleKey}-${i}`}
+                data-title-key={s.titleKey}
+                ref={
+                  isDeepMatch
+                    ? (deepLinkRef as unknown as React.RefObject<HTMLDivElement>)
+                    : undefined
+                }
+                className={cn(
+                  isDeepMatch &&
+                    "ring-2 ring-[var(--gold-accent)] ring-offset-2 ring-offset-black rounded-xl"
+                )}
               >
                 <GroupedSeriesCard
-                  series={series}
+                  series={s}
                   isRead={isRead}
                   isWhitelisted={isWL}
-                  isNew={newSeriesKeys.has(series.titleKey)}
-                  isPinned={pinnedSet.has(series.titleKey)}
+                  isNew={newSeriesKeys.has(s.titleKey)}
+                  isPinned={pinnedSet.has(s.titleKey)}
                   unreadCount={
-                    series.chapters.filter((c) => !readItems.has(c.url)).length
+                    s.chapters.filter((c) => !readItems.has(c.url)).length
                   }
                   readCount={
-                    series.chapters.filter((c) => readItems.has(c.url)).length
+                    s.chapters.filter((c) => readItems.has(c.url)).length
                   }
-                  totalChapters={series.chapters.length}
-                  adding={addingKey === series.titleKey}
+                  totalChapters={s.chapters.length}
+                  adding={addingKey === s.titleKey}
                   onToggleRead={() =>
-                    toggleReadAll(series.chapters.map((c) => c.url))
+                    toggleReadAll(s.chapters.map((c) => c.url))
                   }
-                  onTogglePin={() => togglePin(series.titleKey)}
-                  onMarkRead={() =>
-                    markAllRead(series.chapters.map((c) => c.url))
-                  }
-                  onExclude={() => handleExcludeSeries(series)}
-                  isExcluded={optimisticExcluded.has(series.titleKey)}
-                  excluding={excludingKey === series.titleKey}
-                  onAdd={() => handleAddGroup(series)}
-                  isSentToDiscord={series.chapters.some(
+                  onTogglePin={() => togglePin(s.titleKey)}
+                  onMarkRead={() => markAllRead(s.chapters.map((c) => c.url))}
+                  onExclude={() => handleExcludeSeries(s)}
+                  isExcluded={optimisticExcluded.has(s.titleKey)}
+                  excluding={excludingKey === s.titleKey}
+                  onAdd={() => handleAddGroup(s)}
+                  isSentToDiscord={s.chapters.some(
                     (c) => c.isSent === true || sentKeys.has(c.key)
                   )}
                 />
-              </motion.div>
+              </div>
             );
-          })}
-        </motion.div>
+          }}
+        />
       ) : (
         <VirtualizedList
           items={flatDisplay}
