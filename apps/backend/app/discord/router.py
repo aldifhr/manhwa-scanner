@@ -178,14 +178,25 @@ def _route_setfilter(payload: dict, data: dict):
         )
     if not guild_id:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "❌ Missing guild"})
+    # ponytail: 2.5s DB guard — was blocking → 3s Discord timeout → `The application didn't respond`
     try:
         from app.db import get_supabase
-        get_supabase().table("guild_settings").upsert(
-            {"guild_id": guild_id, "origin_filter": ",".join(sorted(origins))},
-            on_conflict="guild_id",
-        ).execute()
+
+        def _do_upsert():
+            return get_supabase().table("guild_settings").upsert(
+                {"guild_id": guild_id, "origin_filter": ",".join(sorted(origins))},
+                on_conflict="guild_id",
+            ).execute()
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=1) as _ex:
+            _ex.submit(_do_upsert).result(timeout=2.5)
         msg = f"✅ This server will now receive: **{', '.join(sorted(origins))}**" if origins else "✅ Filter cleared — this server receives ALL origins"
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": msg})
+    except TimeoutError:
+        logger.warn("setfilter DB timeout", guild=guild_id)
+        return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "⏳ Filter save is slow — try again in 5s (DB timeout)."})
     except Exception as e:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": f"❌ Failed: {e}"})
 
