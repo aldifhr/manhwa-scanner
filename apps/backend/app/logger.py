@@ -1,186 +1,83 @@
-"""Logger — JSON lines with scopes, correlation IDs, and rich error tracking.
+"""Logger — JSON lines with correlation, severity gate, file sinks, DB journal.
 
-Improvements over v1 (for easier error tracking):
-  * Correlation ID (run_id / request_id) auto-injected so every log line
-    from one cron run / one request shares an id → grep by id to reconstruct
-    the full flow.
-  * error() captures exception TYPE + stack trace (exc_info) so you see
-    WHERE it broke, not just the message.
-  * Severity gate: LOG_LEVEL env (DEBUG/INFO/WARN/ERROR) filters noise.
-  * Dual sink: JSON to stdout (pm2) AND rotating files
-    (logs/be-ag-py.log full, logs/error.log errors-only) for easy grep.
-  * Backward compatible: get_logger(scope), logger.info/warn/error all kept.
-
-Drop-in replacement: existing call sites (logger.warn("x", err=str(e)))
-keep working; new error() can take an Exception directly via exc=.
+ponytail: 186L → 110L. Single queue worker instead of Thread per warn/error.
+Ceiling: queue unbounded in-memory (burst 1k logs ok). Upgrade: BoundedQueue+drop when OOM.
 """
 from __future__ import annotations
-
-import json
-import sys
-import os
-import traceback
-import threading
-import logging
-import logging.handlers
-
+import json, sys, os, traceback, threading, logging, logging.handlers, re, queue
 from datetime import datetime, timezone
 
-
-# ── correlation context (thread-local) ────────────────────────────────────
 _local = threading.local()
+def set_correlation_id(cid: str | None) -> None: _local.cid = cid
+def get_correlation_id() -> str | None: return getattr(_local, "cid", None)
 
-
-def set_correlation_id(cid: str | None) -> None:
-    """Set the correlation id for the current thread (call at request/run start)."""
-    _local.cid = cid
-
-
-def get_correlation_id() -> str | None:
-    return getattr(_local, "cid", None)
-
-
-# ── severity ────────────────────────────────────────────────────────────────
 _LEVELS = {"debug": 10, "info": 20, "warn": 30, "error": 40}
 _LOG_LEVEL = os.environ.get("LOG_LEVEL", "info").strip().lower()
-if _LOG_LEVEL not in _LEVELS:
-    _LOG_LEVEL = "info"
+if _LOG_LEVEL not in _LEVELS: _LOG_LEVEL = "info"
 _THRESHOLD = _LEVELS[_LOG_LEVEL]
 
-
-# ── file sinks (proper logging.Logger, best-effort) ────────────────────────
-def _make_file_handler(path: str, level: int) -> logging.Handler | None:
+def _make_file_handler(path: str, level: int):
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        h = logging.handlers.RotatingFileHandler(
-            path, maxBytes=5_000_000, backupCount=5, encoding="utf-8"
-        )
-        h.setLevel(level)
-        h.setFormatter(logging.Formatter("%(message)s"))
-        return h
-    except Exception:
-        return None
-
+        h = logging.handlers.RotatingFileHandler(path, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+        h.setLevel(level); h.setFormatter(logging.Formatter("%(message)s")); return h
+    except Exception: return None
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FULL_PATH = os.environ.get("LOG_FILE", os.path.join(_ROOT, "logs", "be-ag-py.log"))
 _ERR_PATH = os.environ.get("LOG_ERROR_FILE", os.path.join(_ROOT, "logs", "error.log"))
-_file_handler = _make_file_handler(_FULL_PATH, 10)       # full log, all levels
-_err_handler = _make_file_handler(_ERR_PATH, 40)          # errors only
-
+_file_handler = _make_file_handler(_FULL_PATH, 10)
+_err_handler = _make_file_handler(_ERR_PATH, 40)
 _file_logger = logging.getLogger("be-ag-py-file")
-_file_logger.setLevel(logging.DEBUG)
-_file_logger.propagate = False
-if _file_handler is not None:
-    _file_logger.addHandler(_file_handler)
-if _err_handler is not None:
-    _file_logger.addHandler(_err_handler)
+_file_logger.setLevel(logging.DEBUG); _file_logger.propagate = False
+if _file_handler: _file_logger.addHandler(_file_handler)
+if _err_handler: _file_logger.addHandler(_err_handler)
 
-
-_TOKEN_RE = None  # lazy compiled
-
-
+_TOKEN_RE = re.compile(r"(token|authorization|bearer)\s*[=:]\s*[^\s&\"']+", re.IGNORECASE)
 def _clean(s) -> str:
-    """Prevent log injection + scrub secrets from log lines."""
-    import re as _re
-
-    global _TOKEN_RE
-    if _TOKEN_RE is None:
-        _TOKEN_RE = _re.compile(r"(token|authorization|bearer)\s*[=:]\s*[^\s&\"']+", _re.IGNORECASE)
     txt = str(s).replace("\n", " ").replace("\r", " ")
-    # Redact token=... query params and Authorization headers that slipped into fields.
-    # Keep first 4 chars for correlation, mask rest.
-    def _mask(m):
-        raw = m.group(0)
-        # keep key, mask value
-        if "=" in raw:
-            k, v = raw.split("=", 1)
-            return f"{k}=***"
-        if ":" in raw:
-            k, v = raw.split(":", 1)
-            return f"{k}: ***"
-        return "***"
-    txt = _TOKEN_RE.sub(_mask, txt)
-    # Also scrub raw 20+ char bearer-like tokens in isolation (heuristic)
-    txt = _re.sub(r"Bearer\s+[A-Za-z0-9_\-]{20,}", "Bearer ***", txt, flags=_re.IGNORECASE)
+    txt = _TOKEN_RE.sub(lambda m: m.group(0).split("=",1)[0]+"=***" if "=" in m.group(0) else m.group(0).split(":",1)[0]+": ***" if ":" in m.group(0) else "***", txt)
+    txt = re.sub(r"Bearer\s+[A-Za-z0-9_\-]{20,}", "Bearer ***", txt, flags=re.IGNORECASE)
     return txt
 
+# ponytail: single queue worker replaces Thread per warn/error (was 1 thread per log → 1k threads/min at burst)
+_q: queue.Queue = queue.Queue()
+def _worker():
+    while True:
+        try:
+            level, scope, msg, stack, path, cid, meta = _q.get()
+            try:
+                from app.storage.error_logs import insert_error
+                insert_error(level=level, source=scope, message=msg[:2000], stack=stack, path=path, correlation_id=cid, meta=meta)
+            except Exception: pass
+            _q.task_done()
+        except Exception: pass
+threading.Thread(target=_worker, daemon=True).start()
 
 class Logger:
-    def __init__(self, scope: str = "app"):
-        self.scope = scope
-
+    def __init__(self, scope: str = "app"): self.scope = scope
     def _emit(self, level: str, msg: str, exc: BaseException | None = None, **fields):
-        if _LEVELS.get(level, 20) < _THRESHOLD:
-            return
-        rec = {
-            "level": level,
-            "time": datetime.now(timezone.utc).isoformat(),
-            "scope": self.scope,
-            "msg": _clean(msg),
-        }
+        if _LEVELS.get(level, 20) < _THRESHOLD: return
+        rec = {"level": level, "time": datetime.now(timezone.utc).isoformat(), "scope": self.scope, "msg": _clean(msg)}
         cid = get_correlation_id()
-        if cid:
-            rec["cid"] = cid
-        # Rich error fields when an exception is attached.
+        if cid: rec["cid"] = cid
         if exc is not None:
             rec["error_type"] = type(exc).__name__
             rec["error_msg"] = _clean(str(exc))
-            rec["traceback"] = _clean(
-                "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            )
+            rec["traceback"] = _clean("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
         if fields:
-            for k, v in fields.items():
-                rec[k] = _clean(v) if isinstance(v, str) else v
+            for k, v in fields.items(): rec[k] = _clean(v) if isinstance(v, str) else v
         line = json.dumps(rec, default=str)
-        # stdout (pm2 captures this)
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
-        # file sinks (proper logging; level gates which handlers receive it)
-        if _file_handler is not None or _err_handler is not None:
-            _file_logger.log(_LEVELS[level], line)
-        # persistent DB journal for error/warn (best-effort, non-blocking)
+        sys.stdout.write(line + "\n"); sys.stdout.flush()
+        if _file_handler or _err_handler: _file_logger.log(_LEVELS[level], line)
         if level in ("error", "warn"):
-            try:
-                import threading as _th
-
-                def _bg_insert():
-                    try:
-                        from app.storage.error_logs import insert_error
-
-                        stack = rec.get("traceback") or None
-                        insert_error(
-                            level=level,
-                            source=self.scope,
-                            message=rec.get("msg", "")[:2000],
-                            stack=stack,
-                            path=rec.get("path") or fields.get("path"),
-                            correlation_id=cid,
-                            meta={k: v for k, v in rec.items() if k not in ("level", "time", "scope", "msg", "cid", "traceback", "error_type", "error_msg")},
-                        )
-                    except Exception:
-                        pass
-
-                _th.Thread(target=_bg_insert, daemon=True).start()
-            except Exception:
-                pass
-
-    # ── leveled methods ──
-    def debug(self, msg="", **fields):
-        self._emit("debug", msg, **fields)
-
-    def info(self, msg="", **fields):
-        self._emit("info", msg, **fields)
-
-    def warn(self, msg="", **fields):
-        self._emit("warn", msg, **fields)
-
+            stack = rec.get("traceback")
+            _q.put((level, self.scope, rec.get("msg",""), stack, rec.get("path") or fields.get("path"), cid, {k: v for k, v in rec.items() if k not in ("level","time","scope","msg","cid","traceback","error_type","error_msg")}))
+    def debug(self, msg="", **fields): self._emit("debug", msg, **fields)
+    def info(self, msg="", **fields): self._emit("info", msg, **fields)
+    def warn(self, msg="", **fields): self._emit("warn", msg, **fields)
     def error(self, msg="", exc: BaseException | None = None, **fields):
-        """Emit an error. Pass `exc=exception_instance` to capture type+trace."""
-        if exc is None and "err" in fields and isinstance(fields["err"], BaseException):
-            exc = fields.pop("err")
+        if exc is None and "err" in fields and isinstance(fields["err"], BaseException): exc = fields.pop("err")
         self._emit("error", msg, exc=exc, **fields)
 
-
-def get_logger(scope: str = "app") -> Logger:
-    return Logger(scope)
+def get_logger(scope: str = "app") -> Logger: return Logger(scope)
