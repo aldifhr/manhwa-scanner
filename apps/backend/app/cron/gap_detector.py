@@ -61,48 +61,34 @@ def _ikiru_chapters(slug: str) -> list[dict]:
 def detect_gaps() -> list[dict]:
     """Return [{title_key, source, sent, scraped}] where scraped - sent > threshold.
     
-    Compares max chapter in dispatch_history vs max chapter in recent_chapters.
-    This avoids false positives from stale whitelist markers.
+    Uses whitelist.latest_sent_chapter (authoritative marker) instead of
+    computing MAX from dispatch_history (which can be incomplete if cross-source
+    dedup or dispatch failures leave gaps in history).
     """
-    conn = None
     try:
-        from app.db import get_conn, put_conn
-        conn = get_conn()
-        cur = conn.cursor()
-        cur.execute('''
-            SELECT w.title_key, w.source,
-                   COALESCE(MAX(NULLIF(regexp_replace(dh.chapter_title, '[^0-9.]', '', 'g'), '')::float), 0) as max_dispatched,
-                   (SELECT MAX(rc.chapter_num) FROM recent_chapters rc 
-                    WHERE REPLACE(rc.title_key, ' ', '-') = REPLACE(w.title_key, ' ', '-') AND rc.source = w.source) as max_scraped
-            FROM whitelist w
-            LEFT JOIN dispatch_history dh ON REPLACE(dh.title_key, ' ', '-') = REPLACE(w.title_key, ' ', '-') AND dh.source = w.source
-            GROUP BY w.title_key, w.source
-            HAVING MAX(NULLIF(regexp_replace(dh.chapter_title, '[^0-9.]', '', 'g'), '')::float) IS NOT NULL
-            AND (SELECT MAX(rc.chapter_num) FROM recent_chapters rc 
-                 WHERE REPLACE(rc.title_key, ' ', '-') = REPLACE(w.title_key, ' ', '-') AND rc.source = w.source) IS NOT NULL
-        ''')
-        rows = cur.fetchall()
+        from app.db import get_supabase
+        sb = get_supabase()
+        wl = sb.table('whitelist').select('title_key,source,latest_sent_chapter').execute().data or []
         out = []
-        for r in rows:
-            sent = float(r['max_dispatched'] or 0)
-            scraped = float(r['max_scraped'] or 0)
+        for w in wl:
+            tk = str(w.get('title_key', ''))
+            src = str(w.get('source', ''))
+            sent = float(w.get('latest_sent_chapter') or 0)
+            if sent <= 0:
+                continue
+            r = sb.table('recent_chapters').select('chapter_num').eq('source', src).eq('title_key', tk).execute()
+            scraped = max([float(x.get('chapter_num', 0) or 0) for x in r.data or []] or [0])
             if scraped - sent > GAP_THRESHOLD:
                 out.append({
-                    "title_key": r['title_key'],
-                    "source": r['source'],
-                    "sent": sent,
-                    "scraped": scraped,
+                    'title_key': tk,
+                    'source': src,
+                    'sent': sent,
+                    'scraped': scraped,
                 })
         return out
     except Exception as e:
         logger.warn("gap detection failed", err=str(e)[:160])
         return []
-    finally:
-        if conn is not None:
-            try:
-                put_conn(conn)
-            except Exception:
-                pass
 
 
 def _backfill_and_dispatch(gaps: list[dict]) -> dict:
