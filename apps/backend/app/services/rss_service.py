@@ -266,9 +266,4 @@ async def fetch_rss_data(
             results = [r for r in results if r.get("rating") is not None and float(r.get("rating") or 0) <= mv]
         except Exception:
             pass
-    # unread_only
-    unread_only = False  # caller passes via whitelist_only? keep for compat
-    if unread_only:
-        results = [r for r in results if not r.get("isSent")]
-
     return results, wl_map, meta_map, sm_map, dh_sent
