@@ -326,7 +326,7 @@ async def _build_snapshot() -> dict:
             recent_feed = []
         # queue depth = whitelisted chapters in recent_chapters(24h) NOT yet notified
         try:
-            from app.cron.pipeline import filter_whitelisted
+            from app.cron.collect import filter_whitelisted
             from app.cron.dispatch_mod import fcfs_key as _fk, _claimed_titles
             rc_24h_q = rc_24h  # reuse parallel-fetched 24h window
             wl_rows = wl_store.load_whitelist()

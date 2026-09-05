@@ -109,7 +109,7 @@ async def failed_dispatches_action(request: Request):
         dispatch_id = request.query_params.get("id")
     if action == "retry" and dispatch_id:
         from app.db import get_supabase
-        from app.cron.pipeline import dispatch, _load_channels
+        from app.cron.dispatch_mod import dispatch, _load_channels
         sb = get_supabase()
         fd = sb.table("failed_dispatches").select("*").eq("chapter_url", dispatch_id).execute()
         fd_row = (fd.data or [None])[0]
@@ -205,7 +205,7 @@ async def failed_queue(request: Request):
     from app.storage import whitelist as _wl
     from app.storage import dispatch as _ds
     from app.storage import recent_chapters as _rc
-    from app.cron.pipeline import filter_whitelisted
+    from app.cron.collect import filter_whitelisted
 
     now = _time.time()
     if _QDEPTH_CACHE["data"] is not None and (now - _QDEPTH_CACHE["ts"]) < _QDEPTH_TTL:

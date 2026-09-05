@@ -21,26 +21,7 @@ logger = get_logger("cron:dual-pass")
 health_store = health
 
 
-# ── Re-exports (call-site compatibility) — DEPRECATED, will be removed 2026-Q4
-# Direct import from services/scraper_service & services/dispatch_service instead.
-# Kept only for tests that import from pipeline (spaghetti, P1 fix #14).
-_parse_chapter_num = collect._parse_chapter_num  # noqa: deprecated
-_parse_types = collect._parse_types  # noqa: deprecated
-collect_recent_chapters = collect.collect_recent_chapters  # noqa: deprecated
-filter_whitelisted = collect.filter_whitelisted  # noqa: deprecated
-_ikiru_slug_from_source = collect._ikiru_slug_from_source  # noqa: deprecated
-collect_whitelisted_shinigami_chapters = collect.collect_whitelisted_shinigami_chapters  # noqa: deprecated
-collect_whitelisted_ikiru_chapters = collect.collect_whitelisted_ikiru_chapters  # noqa: deprecated
-
-# enrich — deprecated, use app.cron.enrich directly
-enrich = enrich_mod.enrich  # noqa: deprecated
-_split_send_backfill = enrich_mod._split_send_backfill  # noqa: deprecated
-mark_history_only = enrich_mod.mark_history_only  # noqa: deprecated
-backfill_dispatch_history = enrich_mod.backfill_dispatch_history  # noqa: deprecated
-
-# dispatch_mod — deprecated, use app.services.dispatch_service
-dispatch = dispatch_mod.dispatch  # noqa: deprecated
-_load_channels = dispatch_mod._load_channels  # noqa: deprecated
+# ponytail: deprecated re-exports removed — import from collect/dispatch_mod/enrich directly
 
 
 def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True, dry_run: bool = False, action: str = "update") -> dict:
