@@ -58,7 +58,8 @@ class WhitelistPatch(BaseModel):
 @router.get("/dispatch-history")
 async def dispatch_history(request: Request):
     """Flat list of all dispatched (notified) chapters from dispatch_history."""
-    # ponytail: GET public for anon/member dashboard, POST/DELETE stays admin-only
+    if not require_role_auth(request, {"admin"}):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         page = int_safe(request.query_params.get("page", "1"), 1)
         _ps_raw = request.query_params.get("page_size", "50")

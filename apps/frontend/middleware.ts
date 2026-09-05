@@ -30,8 +30,6 @@ const PUBLIC_EXACT = new Set<string>([
   "/",
   "/recent",
   "/whitelist",
-  "/exclude-list",
-  "/dispatch-history",
   "/bookmarks",
   "/about",
   "/login",
@@ -73,15 +71,11 @@ const PUBLIC_PREFIX = [
 const PUBLIC_GET_PREFIX = [
   "/api/v1/reader/whitelist",
   "/api/v1/whitelist",
-  "/api/v1/excluded-titles",
-  "/api/v1/dispatch-history",
-  "/api/v1/reader/dispatch-history",
   "/api/v1/stats",
   "/api/v1/queue",
   "/api/v1/dashboard",
   "/api/v1/bookmarks",
   "/api/reader/whitelist",
-  "/api/excluded-titles",
 ];
 
 function isPublicPath(pathname: string, method: string): boolean {
@@ -145,9 +139,12 @@ export function middleware(request: NextRequest) {
         pathname.startsWith("/api/v1/whitelist") ||
         pathname.startsWith("/api/v1/excluded-titles") ||
         pathname.startsWith("/api/excluded-titles") ||
-        pathname.startsWith("/api/v1/bookmarks") ||
         pathname.startsWith("/api/v1/reader/excluded") ||
-        pathname.startsWith("/api/v1/health/refresh")));
+        pathname.startsWith("/api/v1/health/refresh") ||
+        pathname.startsWith("/api/v1/cron") ||
+        pathname.startsWith("/api/cron") ||
+        pathname.startsWith("/api/v1/queue/retry") ||
+        pathname.startsWith("/api/v1/logs")));
 
   if (needsAdmin && role !== "admin") {
     if (pathname.startsWith("/api/")) {

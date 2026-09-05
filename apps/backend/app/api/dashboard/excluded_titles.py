@@ -25,8 +25,9 @@ _LIST_TTL = 15.0
 
 @router.get("/excluded-titles")
 async def get_excluded(request: Request):
-    """Return ALL excluded titles. Public GET for anon/member dashboard."""
-    # ponytail: public GET, no auth
+    """Return ALL excluded titles. Admin only."""
+    if not require_role_auth(request, {"admin"}):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     _now = time.monotonic()
     if _LIST_CACHE[0] is not None and (_now - _LIST_CACHE[0]) < _LIST_TTL:
         return JSONResponse(content=_LIST_CACHE[1])
