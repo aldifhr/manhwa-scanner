@@ -1,4 +1,4 @@
-"""Whitelist service — CRUD + metadata joins for whitelist entries."""
+"""Whitelist service — CRUD + metadata joins — ponytail: 751L whitelist CRUD+enrich+dedup intentional, split when file >1000L or per-route churn diverges."""
 from __future__ import annotations
 
 import re

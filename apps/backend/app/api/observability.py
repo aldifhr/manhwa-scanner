@@ -1,4 +1,4 @@
-"""Observability / dashboard data API (formerly part of the compat layer).
+"""Observability / dashboard data API — ponytail: 751L health+incidents+proxy single router intentional, split to per-endpoint routers when file >1000L or cold-start import cost measured. (formerly part of the compat layer).
 
 Endpoints: notifications log, health-status, incidents, history, reader image
 proxy, metrics.

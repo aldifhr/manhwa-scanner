@@ -1,4 +1,4 @@
-"""Dispatch storage: claim + history (parity with lib/services/storage/dispatch.ts)."""
+"""Dispatch storage — ponytail: 407L claim primitives (distinct from dispatch_mod 337L send), keep split until single dispatch owns both. Dispatch storage: claim + history (parity with lib/services/storage/dispatch.ts)."""
 from __future__ import annotations
 
 from app.db import get_supabase

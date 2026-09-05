@@ -1,4 +1,4 @@
-"""Separate, low-frequency cron that re-enriches recent_chapters metadata.
+"""Separate, low-frequency cron — ponytail: 424L resync (distinct from enrich 296L + enrich_whitelist 318L), unify when single enrich covers all. Separate, low-frequency cron that re-enriches recent_chapters metadata.
 
 Why this exists (decoupled from the per-10-min chapter fetch):
 - The rss-fetch pipeline scrapes new chapters + inserts them. Running the

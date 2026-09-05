@@ -1,4 +1,4 @@
-"""Source collection orchestrator — delegates per-source to collectors/*."""
+"""Source collection orchestrator — ponytail: 407L collect (distinct from gap_detector 419L), merge when unified pipeline covers scrape+gap. Source collection orchestrator — delegates per-source to collectors/*."""
 from __future__ import annotations
 
 import re
