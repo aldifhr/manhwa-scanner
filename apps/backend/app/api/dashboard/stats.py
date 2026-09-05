@@ -1,4 +1,4 @@
-"""Auto-split from dashboard.py — stats routes."""
+"""Auto-split from dashboard.py — ponytail: 498L stats snapshot (distinct from analytics 392L), merge when stats+analytics share same aggregation. Auto-split from dashboard.py — stats routes."""
 import time
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request

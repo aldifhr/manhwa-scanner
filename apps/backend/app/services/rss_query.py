@@ -1,4 +1,4 @@
-"""RSS query helpers — filtering, result mapping, and grouping.
+"""RSS query helpers — ponytail: 365L filter/map/group helpers (used by rss_service+api), keep until inline in rss_service if only one caller. RSS query helpers — filtering, result mapping, and grouping.
 
 Extracted from app/api/rss.py to separate data-transformation logic
 from the HTTP request handler.

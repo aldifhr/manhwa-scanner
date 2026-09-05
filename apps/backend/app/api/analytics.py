@@ -1,4 +1,4 @@
-"""Analytics dashboard — popular series, chapter velocity, engagement metrics."""
+"""Analytics dashboard — ponytail: 392L analytics (distinct from stats 498L), keep separate until unified dashboard query. Analytics dashboard — popular series, chapter velocity, engagement metrics."""
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
