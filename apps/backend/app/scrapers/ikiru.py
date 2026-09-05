@@ -1,4 +1,4 @@
-"""Ikiru REST API client — JSON API primary, HTML scrape fallback.
+"""Ikiru REST API client — ponytail: 534L ikiru API+HTML fallback (13 warn→debug + cb_ikiru_api), keep until API stabilizes. Ikiru REST API client — JSON API primary, HTML scrape fallback.
 
 API endpoints used:
   - /list/latest     → latest updates feed (replaces HTML scrape)
