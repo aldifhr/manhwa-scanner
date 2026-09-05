@@ -164,7 +164,7 @@ cb_shinigami = CircuitBreaker("shinigami", failure_threshold=3, recovery_timeout
 # stable but rate-limits (429) under burst, so a moderate threshold.
 cb_voratoon = CircuitBreaker("voratoon", failure_threshold=5, recovery_timeout=120)
 # ApiFailureDetector merged here — ikiru API → HTML fallback (threshold 5, cooldown 300)
-# ponytail: reuse CircuitBreaker instead of separate class
+# ponytail: reuse CircuitBreaker (shared threshold 5/cooldown 300), per-scraper tuning if 429 profile diverges — split cb_ikiru_api config when shinigami/voratoon needs different window
 cb_ikiru_api = CircuitBreaker("ikiru_api", failure_threshold=5, recovery_timeout=300)
 
 

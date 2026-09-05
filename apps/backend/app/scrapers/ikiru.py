@@ -55,7 +55,7 @@ def _fetch_json(path: str, retries: int = 4):
         logger.debug("ikiru circuit OPEN — skipping fetch", path=path)
         return None
 
-    # ponytail: api_health.ApiFailureDetector → cb_ikiru_api (same threshold 5 / cooldown 300)
+    # ponytail: ApiFailureDetector → cb_ikiru_api (shared 5/300), split per-source breaker when cooldown needs diverge
     if not cb_ikiru_api.allow():
         logger.debug("ikiru in HTML-only mode, skipping API", path=path)
         return None

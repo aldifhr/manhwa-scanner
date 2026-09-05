@@ -12,14 +12,14 @@ logger = get_logger("api:system")
 router = APIRouter()
 
 # Cron concurrency guard: per-action lock + DB advisory lock (cross-process).
-# ponytail: 11 literal Locks → default dict factory; bounded by action string
+# ponytail: 11 Locks → defaultdict factory (unbounded actions leak), cap to LRU/bounded dict when action cardinality >20
 import collections
 _cron_locks: dict[str, threading.Lock] = collections.defaultdict(threading.Lock)  # type: ignore[assignment]
 # preload known actions so introspection still works
 for _k in ("update","rss-fetch","dispatch","health","rss-fetch:ikiru","rss-fetch:shinigami","rss-fetch:voratoon","enrich","enrich-missing","enrich-refresh","voratoon-cover"):
     _cron_locks[_k]  # touch
 _cron_running = False
-# ponytail: hash() replaces sha256 — fast, stable per-process, sufficient for advisory key sharding
+# ponytail: hash() replaces sha256 (per-process seed, collision risk) — restore sha256 when cross-process advisory collisions cause duplicate cron runs
 def _advisory_key(action: str) -> int:
     return hash(action) & 0x7FFFFFFF
 

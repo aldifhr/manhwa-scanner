@@ -3,7 +3,7 @@ from fastapi import Request
 
 async def legacy_redirect_middleware(request: Request, call_next):
     path = request.url.path
-    # ponytail: generic prefix rewrite replaces 28-entry map; per-route 301 no longer needed
+    # ponytail: generic /api/→/api/v1/ rewrite (catch-all), restore allowlist when non-v1 /api/* route needs distinct handling
     if path.startswith("/api/") and not path.startswith("/api/v1/") and not path.startswith("/api/docs") and not path.startswith("/api/openapi"):
         from fastapi.responses import RedirectResponse
         qs = str(request.query_params)
