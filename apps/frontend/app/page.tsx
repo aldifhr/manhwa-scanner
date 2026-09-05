@@ -155,7 +155,7 @@ function HomeGroupedCard({
   isBookmarked?: boolean;
 }) {
   const origin = normalizeOrigin(series.origin);
-  const flag = getOriginFlag(origin);
+  const flag = series.type ? getOriginFlag(origin) : "";
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
   const [hasRetried, setHasRetried] = useState(false);
   const [imgErrorFinal, setImgErrorFinal] = useState(false);

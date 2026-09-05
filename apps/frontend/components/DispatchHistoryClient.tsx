@@ -50,7 +50,7 @@ function Row({ item }: { item: DispatchHistoryItem }) {
           <span className="text-sm font-medium text-text truncate">
             {decodeHtml(item.title)}
           </span>
-          {item.origin && getOriginFlag(item.origin) && (
+          {item.origin && item.type && getOriginFlag(item.origin) && (
             <img
               src={getOriginFlag(item.origin)}
               alt={item.origin}
