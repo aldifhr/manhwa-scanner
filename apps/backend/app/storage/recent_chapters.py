@@ -137,6 +137,22 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         "status",
         "rating",
     }
+    # ponytail: load whitelist origins so recent_chapters.origin matches
+    # whitelist.origin (collector source country_id is unreliable —
+    # shinigami hosts CN content but reports country_id=KR)
+    _wl_origins: dict[tuple[str, str], str] = {}
+    try:
+        from app.db import get_supabase as _gsb_wl
+        _sb_wl = _gsb_wl()
+        _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
+        for _wl in _wl_rows:
+            _tk_wl = str(_wl.get("title_key") or "").strip()
+            _src_wl = str(_wl.get("source") or "").strip()
+            _orig_wl = str(_wl.get("origin") or "").strip().upper()
+            if _tk_wl and _src_wl and _orig_wl:
+                _wl_origins[(_tk_wl, _src_wl)] = _orig_wl
+    except Exception:
+        pass
     cleaned = []
     for row in rows:
         # skip rows without chapter_url (not-null constraint)
@@ -154,6 +170,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             _norm = normalize_origin(_src)
         if not _norm:
             _norm = "KR" if _src in ("ikiru", "shinigami") else ""
+        # ponytail: override with whitelist origin if available (collector
+        # country_id is unreliable — shinigami hosts CN content but may
+        # report country_id=KR, so whitelist.origin is the source of truth)
+        _tk_override = str(row.get("title_key") or "").strip()
+        if _tk_override and (_tk_override, _src) in _wl_origins:
+            _norm = _wl_origins[(_tk_override, _src)]
         # Derive type from origin if type is missing (shinigami often has origin but no type)
         if not row.get("type") and _norm:
             _origin_to_type = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
