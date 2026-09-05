@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./gold.css";
 import Navbar from "@/components/Navbar";
 import QueryProvider from "@/components/QueryProvider";
 import { ToastProvider } from "@/lib/useToast";
