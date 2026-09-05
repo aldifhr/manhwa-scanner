@@ -88,16 +88,26 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             s = None
         return slug, s
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-        futures = {ex.submit(_fetch_ikiru, slug): slug for slug in set(ikiru_slugs)}
-        for fut in concurrent.futures.as_completed(futures):
-            slug, s = fut.result()
-            if not s:
-                continue
-            cached[slug] = s
-            # Do NOT auto-upsert to whitelist on RSS fetch — that's enrich_whitelist's job
-            # if persist_cache:
-            #     ... (removed)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            futures = {ex.submit(_fetch_ikiru, slug): slug for slug in set(ikiru_slugs)}
+            for fut in concurrent.futures.as_completed(futures):
+                slug, s = fut.result()
+                if not s:
+                    continue
+                cached[slug] = s
+                # Do NOT auto-upsert to whitelist on RSS fetch — that's enrich_whitelist's job
+                # if persist_cache:
+                #     ... (removed)
+    except RuntimeError:
+        # Interpreter shutting down (PM2 restart) — fallback to sequential
+        for slug in set(ikiru_slugs):
+            try:
+                _slug, s = _fetch_ikiru(slug)
+                if s:
+                    cached[slug] = s
+            except Exception:
+                pass
 
     # ── Ikiru apply to items ──
     for slug, indices in ikiru_idx.items():
