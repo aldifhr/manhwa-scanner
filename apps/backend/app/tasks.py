@@ -265,67 +265,72 @@ def _scheduler_loop() -> None:
         pass
     # Then loop: dispatch every 60s, RSS every 300s (staggered), enrich every 900s
     last_source = __import__("time").monotonic()
-    while not _stop.is_set():
-        if _stop.wait(_DISPATCH_INTERVAL_S):
-            break
-        _now = __import__("time").monotonic()
-        # Discord dispatch every 60s
-        if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
-            try:
-                enqueue_cron("update")
-                last_dispatch = _now
-            except Exception as e:
-                logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
-        # RSS fetch every 300s
-        if _now - last_source >= _SOURCE_INTERVAL_S:
-            if not _stop.is_set():
-                for src in _RSS_SOURCES:
-                    if _stop.is_set():
-                        break
-                    try:
-                        logger.info("scheduler enqueue rss-fetch", source=src)
-                        enqueue_cron(f"rss-fetch:{src}")
-                    except Exception as e:
-                        logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
-                    _stop.wait(20)
-            logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
-            last_source = _now
-        # Periodic enrich so metadata stays fresh without external triggers.
-        if _now - last_enrich >= _ENRICH_INTERVAL_S:
-            try:
-                enqueue_cron("enrich")
-                last_enrich = _now
-            except Exception:
-                pass
-        # Static-data backfill: only rows missing description/rating/genres (cheap, runs 30m)
-        if _now - last_enrich_missing >= _ENRICH_MISSING_INTERVAL_S:
-            try:
-                enqueue_cron("enrich-missing")
-                last_enrich_missing = _now
-            except Exception:
-                pass
-        # Weekly stale check: refresh series_meta older than 7d (rating/desc drift)
-        if _now - last_enrich_refresh >= _ENRICH_REFRESH_INTERVAL_S:
-            try:
-                enqueue_cron("enrich-refresh")
-                last_enrich_refresh = _now
-            except Exception:
-                pass
-        # Voratoon cover refresh: private bucket presigned 6d expiry -> 24h
-        if _now - last_voratoon_cover >= _VORATOON_COVER_INTERVAL_S:
-            try:
-                enqueue_cron("voratoon-cover")
-                last_voratoon_cover = _now
-            except Exception:
-                pass
-
-        # Queue depth alert: log + DLQ if queue grows unbounded (> 50)
+    # ponytail: scheduler auto-restart — if exception kills the loop, restart after 30s
+    while True:
         try:
-            qlen = _get_redis().llen(CRON_QUEUE_KEY)
-            if qlen > 50:
-                logger.error("cron queue depth exceeded", queue_length=qlen, threshold=50)
-        except Exception:
-            pass
+            if _stop.wait(_DISPATCH_INTERVAL_S):
+                break
+            _now = __import__("time").monotonic()
+            # Discord dispatch every 60s
+            if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
+                try:
+                    enqueue_cron("update")
+                    last_dispatch = _now
+                except Exception as e:
+                    logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
+            # RSS fetch every 300s
+            if _now - last_source >= _SOURCE_INTERVAL_S:
+                if not _stop.is_set():
+                    for src in _RSS_SOURCES:
+                        if _stop.is_set():
+                            break
+                        try:
+                            logger.info("scheduler enqueue rss-fetch", source=src)
+                            enqueue_cron(f"rss-fetch:{src}")
+                        except Exception as e:
+                            logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
+                        _stop.wait(20)
+                logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
+                last_source = _now
+            # Periodic enrich so metadata stays fresh without external triggers.
+            if _now - last_enrich >= _ENRICH_INTERVAL_S:
+                try:
+                    enqueue_cron("enrich")
+                    last_enrich = _now
+                except Exception:
+                    pass
+            # Static-data backfill: only rows missing description/rating/genres (cheap, runs 30m)
+            if _now - last_enrich_missing >= _ENRICH_MISSING_INTERVAL_S:
+                try:
+                    enqueue_cron("enrich-missing")
+                    last_enrich_missing = _now
+                except Exception:
+                    pass
+            # Weekly stale check: refresh series_meta older than 7d (rating/desc drift)
+            if _now - last_enrich_refresh >= _ENRICH_REFRESH_INTERVAL_S:
+                try:
+                    enqueue_cron("enrich-refresh")
+                    last_enrich_refresh = _now
+                except Exception:
+                    pass
+            # Voratoon cover refresh: private bucket presigned 6d expiry -> 24h
+            if _now - last_voratoon_cover >= _VORATOON_COVER_INTERVAL_S:
+                try:
+                    enqueue_cron("voratoon-cover")
+                    last_voratoon_cover = _now
+                except Exception:
+                    pass
+            # Queue depth alert: log + DLQ if queue grows unbounded (> 50)
+            try:
+                qlen = _get_redis().llen(CRON_QUEUE_KEY)
+                if qlen > 50:
+                    logger.error("cron queue depth exceeded", queue_length=qlen, threshold=50)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error("scheduler loop crashed, restarting in 30s", exc=e)
+            _stop.wait(30)
+            last_source = __import__("time").monotonic()
 
 
 def start_cron_scheduler() -> None:
