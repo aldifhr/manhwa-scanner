@@ -92,6 +92,15 @@ export function useContinueReading(
   }, [store]);
 
   useEffect(() => {
+    // anon (no login) → jangan fetch backend (401 spam), pakai localStorage aja
+    if (
+      typeof document !== "undefined" &&
+      !document.cookie.match(/(?:^|;\s*)ikiru_role=/)
+    ) {
+      hasHydrated.current = true;
+      globalHasFetchedRemote = true;
+      return;
+    }
     if (globalHasFetchedRemote) {
       hasHydrated.current = true;
       return;
@@ -140,8 +149,14 @@ export function useContinueReading(
     }
     store.save(entries);
     if (!hasHydrated.current) return;
-    if (entries.size === 0) return; // don't sync empty (would 400)
-    if (typeof document !== "undefined" && document.hidden) return; // jangan spam pas tab hidden
+    if (entries.size === 0) return;
+    // anon → jangan push ke backend (401), localStorage aja
+    if (
+      typeof document !== "undefined" &&
+      !document.cookie.match(/(?:^|;\s*)ikiru_role=/)
+    )
+      return;
+    if (typeof document !== "undefined" && document.hidden) return;
     // circuit breaker: kalau 3× 502 berturut, pause 60s
     if (consecutiveFailures >= 3 && Date.now() - globalLastPushTime < 60000)
       return;
