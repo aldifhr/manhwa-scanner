@@ -161,7 +161,7 @@ function AllCard({
         {/* Badge row */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           <SourceChip source={item.source} />
-          {item.type && <OriginFlag origin={item.origin} />}
+          <OriginFlag origin={item.origin} type={item.type} />
           {(() => {
             const lbl = getChapterLabel(item);
             return lbl === "?" ? null : (

@@ -10,8 +10,9 @@ export function OriginFlag({
   type?: string | null;
   className?: string;
 }) {
-  // no type = no flag (avoids showing flag for type-less entries)
-  if (!type) return null;
+  // no type / no_type = no flag (hide flag untuk type=no_type & data lama tanpa type)
+  const t = (type || "").toLowerCase().trim();
+  if (!t || (t !== "manhwa" && t !== "manhua")) return null;
   const normalized = normalizeOrigin(origin);
   const flag = getOriginFlag(normalized);
   if (!flag) return null;
