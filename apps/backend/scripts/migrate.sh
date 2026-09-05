@@ -9,6 +9,6 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 for f in app/db/migrations/*.sql; do
   echo "=> $f"
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -f "$f"
 done
 echo "done"

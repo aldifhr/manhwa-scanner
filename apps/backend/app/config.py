@@ -50,9 +50,6 @@ class Settings(BaseSettings):
     # Legacy API key (kept for rotation support)
     FASTCRON_API_KEY: str = ""  # Legacy — either secret works
     MONITOR_AUTH_TOKEN: str = ""
-    # Member login password (write-limited: can add whitelist / exclude,
-    # cannot delete / retry / clear / access settings). Separate from admin.
-    MEMBER_AUTH_TOKEN: str = ""
     # JWT session-cookie secret for /api/auth login.
     # MUST be set explicitly — never defaults to MONITOR_AUTH_TOKEN (which is
     # exposed in query strings). Boot guard in _validate_settings enforces this.

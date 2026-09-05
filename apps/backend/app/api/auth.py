@@ -194,21 +194,11 @@ async def auth_handler(request: Request):
     if not password:
         return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
 
-    # Two roles: admin (MONITOR_AUTH_TOKEN) and member (MEMBER_AUTH_TOKEN or DB).
-    # ponytail: drop MEMBER_AUTH_TOKEN static when DB has users (>0) — keep admin token always
+    # Admin login via MONITOR_AUTH_TOKEN.
+    # Member login is via email+password against app_users (DB) only.
     role = None
     if settings.MONITOR_AUTH_TOKEN and hmac.compare_digest(password, settings.MONITOR_AUTH_TOKEN):
         role = "admin"
-    elif settings.MEMBER_AUTH_TOKEN and hmac.compare_digest(password, settings.MEMBER_AUTH_TOKEN):
-        # yagni dual source — check DB has users, if yes ignore static member token
-        try:
-            from app.db import get_supabase as _sb2
-            _cnt = _sb2().table("app_users").select("id", count="exact").limit(1).execute()
-            has_users = (_cnt.count or 0) > 0 if hasattr(_cnt, "count") else bool(_cnt.data)
-            if not has_users:
-                role = "member"
-        except Exception:
-            role = "member"
     if not role:
         return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)
 
