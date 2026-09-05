@@ -235,7 +235,7 @@ async def _rss_impl(request: Request):
         paged = final_results[start:start + limit]
         # hasMore heuristic: if we fetched max and filtered still fills page, DB likely has more beyond fetch
         _has_more = page * limit < total
-        if not _has_more and len(rc_rows) == _fetch_limit and len(filtered) >= limit:
+        if not _has_more and len(results) >= _fetch_limit and len(final_results) >= limit:
             _has_more = True
             # total underestimate when fetch truncated — bump for UI hasMore
             total = max(total, page * limit + 1)
