@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -7,24 +6,22 @@ import {
   EyeSlash,
   WarningCircle,
   ArrowRight,
+  Shield,
+  User,
 } from "@phosphor-icons/react";
 
-/**
- * Only allow same-origin, path-only redirects. Rejects absolute URLs,
- * protocol-relative (//), scheme injections (javascript:, data:, vbscript:),
- * backslashes, and control chars. Anything suspicious falls back to "/".
- */
 function sanitizeRedirect(raw: string | null): string {
   if (!raw) return "/";
   if (/[\x00-\x1f\\]/.test(raw)) return "/";
-  if (/^(https?:)?\/\//i.test(raw)) return "/"; // absolute or protocol-relative
-  if (/^(javascript|data|vbscript):/i.test(raw)) return "/"; // scheme injection
-  if (!raw.startsWith("/")) return "/"; // must be a path, not a bare host
+  if (/^(https?:)?\/\//i.test(raw)) return "/";
+  if (/^(javascript|data|vbscript):/i.test(raw)) return "/";
+  if (!raw.startsWith("/")) return "/";
   return raw;
 }
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
+  const [mode, setMode] = useState<"member" | "admin">("member");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -35,28 +32,30 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       const body: Record<string, string> = { password };
-      if (email.trim()) body.email = email.trim().toLowerCase();
+      if (mode === "member") {
+        if (!email.trim()) {
+          setError("Email wajib untuk member");
+          setLoading(false);
+          return;
+        }
+        body.email = email.trim().toLowerCase();
+      }
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const err = data.error;
-        // Backend returns {error: {message}} OR {error: "string"}
         setError(
           (err && typeof err === "object" ? err.message : err) || "Login failed"
         );
         return;
       }
-
-      const redirect = sanitizeRedirect(searchParams.get("redirect"));
-      window.location.href = redirect;
+      window.location.href = sanitizeRedirect(searchParams.get("redirect"));
     } catch {
       setError("Network error");
     } finally {
@@ -66,7 +65,6 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen bg-bg flex items-center justify-center px-4 overflow-hidden">
-      {/* Ambient glow — radial accent from center, fades to bg */}
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden
@@ -75,8 +73,6 @@ export default function LoginPage() {
             "radial-gradient(ellipse 60% 50% at 50% 45%, rgba(129,140,248,0.06) 0%, transparent 70%)",
         }}
       />
-
-      {/* Subtle dot grid — adds texture without weight */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
         aria-hidden
@@ -86,10 +82,8 @@ export default function LoginPage() {
           backgroundSize: "32px 32px",
         }}
       />
-
       <div className="relative z-10 w-full max-w-95 animate-fade-in-up">
-        {/* Brand mark */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6">
           <h1 className="text-2xl font-bold tracking-tight text-text">
             Manhwa<span className="text-accent">Scanner</span>
           </h1>
@@ -98,12 +92,33 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Login card */}
+        <div className="flex p-1 rounded-xl bg-bg border border-border mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("member");
+              setError("");
+            }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${mode === "member" ? "bg-surface border border-border text-text shadow-sm" : "text-text-muted hover:text-text"}`}
+          >
+            <User size={14} /> Member
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("admin");
+              setError("");
+            }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${mode === "admin" ? "bg-surface border border-border text-text shadow-sm" : "text-text-muted hover:text-text"}`}
+          >
+            <Shield size={14} /> Admin
+          </button>
+        </div>
+
         <form
           onSubmit={handleSubmit}
           className="bg-surface border border-border rounded-xl p-6 space-y-5 shadow-lg shadow-black/20"
         >
-          {/* Error message — hidden completely when no error to avoid empty space from space-y-5 */}
           {error && (
             <div
               className="flex items-start gap-2.5 rounded-lg px-3.5 py-2.5 text-sm bg-danger-dim border border-danger/20 text-danger"
@@ -117,24 +132,28 @@ export default function LoginPage() {
               <span>{error}</span>
             </div>
           )}
-
-          <div>
-            <label className="block text-[13px] font-medium text-text-secondary mb-2">
-              Email{" "}
-              <span className="text-text-muted font-normal">
-                (opsional — untuk member register, kosongkan untuk admin)
-              </span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-bg border border-border rounded-lg px-3.5 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
-              placeholder="you@email.com (member) atau kosong (admin)"
-              autoComplete="email"
-              autoFocus
-            />
-          </div>
+          {mode === "member" && (
+            <div>
+              <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@email.com"
+                required={mode === "member"}
+                autoComplete="email"
+                autoFocus={mode === "member"}
+                className="w-full bg-bg border border-border rounded-lg px-3.5 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+          )}
+          {mode === "admin" && (
+            <p className="text-xs text-text-muted bg-bg border border-border rounded-lg px-3 py-2">
+              Login admin pakai <b>MONITOR_AUTH_TOKEN</b> — tanpa email.
+            </p>
+          )}
           <div>
             <label
               htmlFor="password"
@@ -148,49 +167,48 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-bg border border-border rounded-lg px-3.5 py-2.5 pr-10 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all duration-150"
-                placeholder="Enter password"
+                placeholder={
+                  mode === "admin" ? "Admin password" : "Member password"
+                }
                 autoComplete="current-password"
+                autoFocus={mode === "admin"}
                 required
+                className="w-full bg-bg border border-border rounded-lg px-3.5 py-2.5 pr-10 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-text-muted hover:text-text-secondary transition-colors duration-150 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-text-muted hover:text-text"
                 tabIndex={-1}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide" : "Show"}
               >
-                {showPassword ? (
-                  <EyeSlash size={16} weight="regular" />
-                ) : (
-                  <Eye size={16} weight="regular" />
-                )}
+                {showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
-
           <button
             type="submit"
-            disabled={loading || !password}
-            className="w-full bg-accent hover:bg-accent-hover text-black text-sm font-medium rounded-lg px-4 py-2.5 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+            disabled={loading || !password || (mode === "member" && !email)}
+            className="w-full bg-accent hover:bg-accent-hover text-black text-sm font-medium rounded-lg px-4 py-2.5 flex items-center justify-center gap-2 disabled:opacity-40"
           >
             {loading ? (
-              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                Sign in
+                {mode === "admin" ? "Sign in as Admin" : "Sign in as Member"}{" "}
                 <ArrowRight weight="bold" size={14} />
               </>
             )}
           </button>
         </form>
-
-        <p className="text-center text-xs text-text-muted mt-4">
-          Belum punya akun?{" "}
-          <a href="/register" className="text-accent hover:underline">
-            Register member
-          </a>
-        </p>
+        {mode === "member" && (
+          <p className="text-center text-xs text-text-muted mt-4">
+            Belum punya akun?{" "}
+            <a href="/register" className="text-accent hover:underline">
+              Register member
+            </a>
+          </p>
+        )}
         <p className="text-center text-text-muted text-xs mt-2 tracking-wide">
           secured access only
         </p>
