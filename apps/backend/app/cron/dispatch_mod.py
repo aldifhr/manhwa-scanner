@@ -19,8 +19,9 @@ from app.cron.enrich import _split_send_backfill, backfill_dispatch_history
 logger = get_logger("cron:dispatch")
 
 # Centralized FCFS — single source of truth (app/services/fcfs.py). Re-export for callers that import from dispatch_mod.
+# ponytail: claimed_titles alias removed → use claimed_fcfs_keys directly; keep _claimed_titles compat shim
 from app.services.fcfs import (  # noqa: F401
-    claimed_titles as _claimed_titles,
+    claimed_fcfs_keys as _claimed_titles,
     fcfs_key,
     normalize_chapter as _norm_chapter,
     normalize_title,

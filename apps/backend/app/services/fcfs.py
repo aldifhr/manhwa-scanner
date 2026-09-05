@@ -93,9 +93,7 @@ def claimed_fcfs_keys(fcfs_keys: list[str]) -> set[str]:
     return claimed
 
 
-def claimed_titles(fcfs_keys: list[str]) -> set[str]:
-    """Alias for claimed_fcfs_keys — for backward compat with dispatch_mod._claimed_titles."""
-    return claimed_fcfs_keys(fcfs_keys)
+# ponytail: claimed_titles removed — use claimed_fcfs_keys; kept as shim in dispatch_mod via alias
 
 
 # Legacy alias: collect imports parse_chapter_number as _parse_chapter_num
