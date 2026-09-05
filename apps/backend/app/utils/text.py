@@ -20,9 +20,7 @@ def normalize_title_key(title: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-# Alias for call sites that do a "loose" title match (whitelist join, dedup).
-# Same normalization as normalize_title_key — there is only one implementation.
-normalize_title_loose = normalize_title_key
+# ponytail: normalize_title_loose alias removed — use normalize_title_key directly
 
 
 def slugify_title_key(title: str) -> str:

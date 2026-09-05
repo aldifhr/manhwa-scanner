@@ -96,5 +96,4 @@ def claimed_fcfs_keys(fcfs_keys: list[str]) -> set[str]:
 # ponytail: claimed_titles removed — use claimed_fcfs_keys; kept as shim in dispatch_mod via alias
 
 
-# Legacy alias: collect imports parse_chapter_number as _parse_chapter_num
-_parse_chapter_num = parse_chapter_number
+# ponytail: _parse_chapter_num alias removed — import parse_chapter_number directly
