@@ -25,12 +25,6 @@ importers:
       "@phosphor-icons/react":
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      "@tanstack/pacer":
-        specifier: ^0.22.0
-        version: 0.22.0
-      "@tanstack/react-pacer":
-        specifier: ^0.23.0
-        version: 0.23.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       "@tanstack/react-query":
         specifier: ^5.101.1
         version: 5.102.8(react@19.2.8)
@@ -43,9 +37,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      dayjs:
-        specifier: ^1.11.23
-        version: 1.11.23
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.8)
@@ -1466,36 +1457,11 @@ packages:
       }
     hasBin: true
 
-  "@tanstack/devtools-event-client@0.5.0":
-    resolution:
-      {
-        integrity: sha512-H+OH3zC6Vhu/K0NaVfQKknEKawc/+2PT+D3SB3Ox0V8SiMlTo0abbmH2rH0721R2aNYbjdMXA1oENOd8E2UVoA==,
-      }
-    engines: { node: ">=18" }
-    hasBin: true
-
-  "@tanstack/pacer@0.22.0":
-    resolution:
-      {
-        integrity: sha512-Zq23KOn30tFiA6ZYWihs5x++ttHkOIcnIIjRrJq05tGrYx9+iHsmVaj8jb7UJVemEI+JRWGzJ9C+50YV4nRz0w==,
-      }
-    engines: { node: ">=18" }
-
   "@tanstack/query-core@5.102.8":
     resolution:
       {
         integrity: sha512-ZNjkJ33CqvPNec/6lZBnHqLc3EVGPZ9ySLhYahU9TcuRFdmwXewuj0c4hwSWcGHqEUwcSrKeZ+oGcvPBqXcQcg==,
       }
-
-  "@tanstack/react-pacer@0.23.0":
-    resolution:
-      {
-        integrity: sha512-Ec3h+kT8kYlpGb1M8F7836q+udE/M2RmE8KLr1rhs+UDBgvxjfmyR2bIUeaDEe9Zn1YXNI986RbErXyr5fEJIg==,
-      }
-    engines: { node: ">=18" }
-    peerDependencies:
-      react: ">=16.8"
-      react-dom: ">=16.8"
 
   "@tanstack/react-query@5.102.8":
     resolution:
@@ -1505,15 +1471,6 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
-  "@tanstack/react-store@0.11.1":
-    resolution:
-      {
-        integrity: sha512-HaIGKI3YLmjBYIvy5DFDY23oNaYZIsTZfngey07Uh5iLVJgM3bIGCnZeOFOqzjFld9JHWcaHJnasD/bKoGKwJQ==,
-      }
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
   "@tanstack/react-virtual@3.14.10":
     resolution:
       {
@@ -1522,12 +1479,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  "@tanstack/store@0.11.1":
-    resolution:
-      {
-        integrity: sha512-mzTOBhypOuDJAy/D8n2MfUZ1HFkXnmSETviRyhqEC8LUE7/IZQExOTxMANj3KjTofYTkFNpBY67qaVrT41YccA==,
-      }
 
   "@tanstack/virtual-core@3.17.8":
     resolution:
@@ -2251,12 +2202,6 @@ packages:
         integrity: sha512-23XHcCF+coGYevirZceTVD7NdJOqVn+49IHyxgszm+JIiHLoB2TkmPtsYkNWT1pvRSGkc35L6NHs0yHkN2SumA==,
       }
     engines: { node: ^20.19.0 || ^22.12.0 || >=24.0.0 }
-
-  dayjs@1.11.23:
-    resolution:
-      {
-        integrity: sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ==,
-      }
 
   debounce-fn@4.0.0:
     resolution:
@@ -6267,41 +6212,18 @@ snapshots:
     transitivePeerDependencies:
       - babel-plugin-macros
 
-  "@tanstack/devtools-event-client@0.5.0": {}
-
-  "@tanstack/pacer@0.22.0":
-    dependencies:
-      "@tanstack/devtools-event-client": 0.5.0
-      "@tanstack/store": 0.11.1
-
   "@tanstack/query-core@5.102.8": {}
-
-  "@tanstack/react-pacer@0.23.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)":
-    dependencies:
-      "@tanstack/pacer": 0.22.0
-      "@tanstack/react-store": 0.11.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
 
   "@tanstack/react-query@5.102.8(react@19.2.8)":
     dependencies:
       "@tanstack/query-core": 5.102.8
       react: 19.2.8
 
-  "@tanstack/react-store@0.11.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)":
-    dependencies:
-      "@tanstack/store": 0.11.1
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
-      use-sync-external-store: 1.6.0(react@19.2.8)
-
   "@tanstack/react-virtual@3.14.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)":
     dependencies:
       "@tanstack/virtual-core": 3.17.8
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-
-  "@tanstack/store@0.11.1": {}
 
   "@tanstack/virtual-core@3.17.8": {}
 
@@ -6733,8 +6655,6 @@ snapshots:
       whatwg-url: 16.0.1
     transitivePeerDependencies:
       - "@noble/hashes"
-
-  dayjs@1.11.23: {}
 
   debounce-fn@4.0.0:
     dependencies:

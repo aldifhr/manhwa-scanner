@@ -1,12 +1,10 @@
 /**
  * Deep module Cover — single seam for cover URL resolution.
- * Handles: same-origin proxy, presigned S3 direct, legacy alias rewrites,
- * double-encode fixing, and LRU caching. Import via `@/lib/cover`.
+ * LRU via Map, direct-host bypass, rewrites legacy cover-img → proxy/cover.
  */
 
 const COVER_CACHE = new Map<string, string | null>();
 const COVER_CACHE_MAX = 200;
-
 function putCover(key: string, val: string | null): string | null {
   COVER_CACHE.set(key, val);
   if (COVER_CACHE.size > COVER_CACHE_MAX) {
@@ -16,7 +14,6 @@ function putCover(key: string, val: string | null): string | null {
   return val;
 }
 
-// Hosts that must be served direct (presigned S3 / CORS-open, proxy would 403/502)
 const DIRECT_HOSTS = new Set([
   "cvr.voratoon.id",
   "cdn.voratoon.com",
@@ -24,19 +21,32 @@ const DIRECT_HOSTS = new Set([
   "imgkc1.my.id",
   "assets.shngm.id",
 ]);
-
 export function isDirectAllowed(hostname: string): boolean {
   return DIRECT_HOSTS.has(hostname);
 }
-
 export function toProxy(url: string): string {
   return `/api/v1/reader/proxy?url=${encodeURIComponent(url)}`;
 }
 
-/**
- * Rewrite cover URLs to route through same-origin /api/v1/reader/proxy.
- * See original implementation in lib/utils.ts for full rationale.
- */
+// Extract inner URL from any cover-img form: /cover-img?url=… or ?series=…
+function extractCoverImgInner(
+  cover: string
+): { inner: string; param: string } | null {
+  if (!cover.includes("cover-img?")) return null;
+  try {
+    const u = new URL(cover, "https://manhwa.aldifhr.fun");
+    const inner = u.searchParams.get("url") || u.searchParams.get("series");
+    if (!inner) return null;
+    const param = u.searchParams.has("url") ? "url" : "series";
+    return { inner, param };
+  } catch {
+    return null;
+  }
+}
+function canonicalForCoverImg(param: string): string {
+  return param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
+}
+
 export function resolveCoverUrl(
   cover: string | null | undefined
 ): string | null {
@@ -44,39 +54,31 @@ export function resolveCoverUrl(
   const cached = COVER_CACHE.get(cover);
   if (cached !== undefined) return cached;
 
+  // 1. Already canonical local path (not cover-img) → keep
+  if (cover.startsWith("/api/v1/reader/cover") && !cover.includes("cover-img?"))
+    return putCover(cover, cover);
+
+  // 2. Any cover-img form → rewrite to canonical proxy/cover (direct hosts stay as-is)
+  const img = extractCoverImgInner(cover);
+  if (img) {
+    if (img.inner.includes("cvr.voratoon.id")) return putCover(cover, cover);
+    return putCover(
+      cover,
+      `${canonicalForCoverImg(img.param)}?${img.param}=${encodeURIComponent(img.inner)}`
+    );
+  }
+  // Local prefix variant "/api/v1/reader/cover-img?url=" without host
   const COVER_IMG_PREFIX = "/api/v1/reader/cover-img?url=";
   if (cover.startsWith(COVER_IMG_PREFIX)) {
     const inner = decodeURIComponent(cover.slice(COVER_IMG_PREFIX.length));
-    if (inner.includes("cvr.voratoon.id")) {
-      return putCover(cover, cover);
-    }
+    if (inner.includes("cvr.voratoon.id")) return putCover(cover, cover);
     return putCover(
       cover,
       `/api/v1/reader/proxy?url=${encodeURIComponent(inner)}`
     );
   }
-  if (cover.includes("/api/v1/reader/cover-img?")) {
-    try {
-      const u = new URL(cover, "https://manhwa.aldifhr.fun");
-      const inner = u.searchParams.get("url") || u.searchParams.get("series");
-      if (inner) {
-        const param = u.searchParams.has("url") ? "url" : "series";
-        if (inner.includes("cvr.voratoon.id")) {
-          return putCover(cover, cover);
-        }
-        const canonical =
-          param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
-        return putCover(
-          cover,
-          `${canonical}?${param}=${encodeURIComponent(inner)}`
-        );
-      }
-    } catch {
-      /* fall through */
-    }
-  }
-  if (cover.startsWith("/api/v1/reader/cover")) return putCover(cover, cover);
 
+  // 3. Backend-host absolute URL → strip to local path (handles scanner/manhwa + envHost)
   const backendHosts = ["scanner.aldifhr.fun", "manhwa.aldifhr.fun"];
   try {
     const envHost = (
@@ -88,117 +90,61 @@ export function resolveCoverUrl(
       const h = new URL(envHost).hostname;
       if (h && !backendHosts.includes(h)) backendHosts.push(h);
     }
-  } catch {
-    /* ignore */
-  }
+  } catch {}
   for (const host of backendHosts) {
-    const prefix = `https://${host}/api/v1/reader/`;
-    if (cover.startsWith(prefix)) {
-      const path = cover.slice(`https://${host}`.length);
-      if (path.startsWith("/api/v1/reader/cover-img?")) {
-        try {
-          const u = new URL(cover);
-          const inner =
-            u.searchParams.get("url") || u.searchParams.get("series");
-          if (inner) {
-            const param = u.searchParams.has("url") ? "url" : "series";
-            const canonical =
-              param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
-            return putCover(
-              cover,
-              `${canonical}?${param}=${encodeURIComponent(inner)}`
-            );
-          }
-        } catch {
-          /* fall through */
-        }
-      }
-      return putCover(cover, path);
+    for (const proto of ["https://", "http://"]) {
+      const prefix = `${proto}${host}/api/v1/reader/`;
+      if (cover.startsWith(prefix))
+        return putCover(cover, cover.slice(`${proto}${host}`.length));
     }
-    const httpPrefix = `http://${host}/api/v1/reader/`;
-    if (cover.startsWith(httpPrefix))
-      return putCover(cover, cover.slice(`http://${host}`.length));
   }
+  // Generic absolute URL containing /api/v1/reader/ → strip to path
   if (cover.includes("/api/v1/reader/")) {
     try {
       const u = new URL(cover);
-      if (u.pathname.startsWith("/api/v1/reader/")) {
-        const path = u.pathname + u.search;
-        if (path.startsWith("/api/v1/reader/cover-img?")) {
-          const inner =
-            u.searchParams.get("url") || u.searchParams.get("series");
-          if (inner) {
-            const param = u.searchParams.has("url") ? "url" : "series";
-            const canonical =
-              param === "url" ? "/api/v1/reader/proxy" : "/api/v1/reader/cover";
-            return putCover(
-              cover,
-              `${canonical}?${param}=${encodeURIComponent(inner)}`
-            );
-          }
-        }
-        return putCover(cover, path);
-      }
-    } catch {
-      /* not a valid URL, fall through */
-    }
+      if (u.pathname.startsWith("/api/v1/reader/"))
+        return putCover(cover, u.pathname + u.search);
+    } catch {}
   }
+
+  // 4. Proxy prefix: normalize double-encode, direct hosts bypass proxy
   const PROXY_PREFIX = "/api/v1/reader/proxy?url=";
   if (cover.startsWith(PROXY_PREFIX)) {
     const inner = decodeURIComponent(cover.slice(PROXY_PREFIX.length));
     let raw = inner;
     try {
-      if (/%[0-9A-Fa-f]{2}/.test(inner) && !inner.startsWith("http")) {
+      if (/%[0-9A-Fa-f]{2}/.test(inner) && !inner.startsWith("http"))
         raw = decodeURIComponent(inner);
-      }
-    } catch {
-      /* keep as-is */
-    }
+    } catch {}
     try {
-      const h = new URL(raw).hostname;
-      if (isDirectAllowed(h)) {
-        return putCover(cover, raw);
-      }
+      if (isDirectAllowed(new URL(raw).hostname)) return putCover(cover, raw);
     } catch {}
     return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
   }
+
   if (!/^https?:\/\//.test(cover)) return putCover(cover, null);
 
+  // 5. Unwrap nested proxy wrapper if present
   let rawUrl = cover;
   if (cover.includes("/api/v1/reader/proxy?")) {
     try {
       const u = new URL(cover, "https://example.com");
       const inner = u.searchParams.get("url");
-      if (
-        inner &&
-        (cover.startsWith("http://") || cover.startsWith("https://"))
-      ) {
-        rawUrl = inner;
-      } else if (inner) {
-        rawUrl = decodeURIComponent(inner);
-      }
-    } catch {
-      /* keep cover as rawUrl */
-    }
+      if (inner)
+        rawUrl = cover.startsWith("http") ? inner : decodeURIComponent(inner);
+    } catch {}
   }
   if (!/^https?:\/\//.test(rawUrl)) return putCover(cover, null);
 
   let host = "";
   try {
     host = new URL(rawUrl).hostname;
-  } catch {
-    /* fall through to proxy */
-  }
-  if (isDirectAllowed(host)) {
-    return putCover(cover, rawUrl);
-  }
+  } catch {}
+  if (isDirectAllowed(host)) return putCover(cover, rawUrl);
   return putCover(cover, toProxy(rawUrl));
 }
 
-// Backward compat alias — utils still re-exports this name
 export const rewriteCoverUrl = resolveCoverUrl;
-
-// Test seam: clear cache
 export function _clearCoverCache(): void {
   COVER_CACHE.clear();
 }

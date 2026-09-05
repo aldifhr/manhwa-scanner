@@ -23,8 +23,25 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      // Generic fallback: any /api/reader/* without explicit mapping goes to /api/v1/reader/*
-      // Must be last in the list so explicit rewrites win.
+      // Legacy compat — deleted duplicate route files now served via rewrites (no duplicate handler)
+      { source: "/api/auth/:path*", destination: "/api/v1/auth/:path*" },
+      {
+        source: "/api/excluded-titles/:path*",
+        destination: "/api/v1/excluded-titles/:path*",
+      },
+      {
+        source: "/api/excluded-titles",
+        destination: "/api/v1/excluded-titles",
+      },
+      {
+        source: "/api/v1/dashboard-snapshot",
+        destination: "/api/v1/dashboard/snapshot",
+      },
+      {
+        source: "/api/v1/reader/rss/:path*",
+        destination: "/api/v1/rss/:path*",
+      },
+      { source: "/api/v1/reader/rss", destination: "/api/v1/rss" },
       // Explicit legacy -> canonical v1 mappings
       { source: "/api/reader/stats", destination: "/api/v1/stats" },
       { source: "/api/reader/queue", destination: "/api/v1/queue" },
@@ -98,8 +115,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
-            value:
-              "camera=(), microphone=(), geolocation=(), payment=()",
+            value: "camera=(), microphone=(), geolocation=(), payment=()",
           },
         ],
       },

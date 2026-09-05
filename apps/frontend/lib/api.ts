@@ -1,18 +1,6 @@
-import { WhitelistRouteItem } from "@/lib/types";
 import { Reader } from "@/lib/reader";
-
-export async function getWhitelist(
-  page = 1,
-  pageSize = 1000
-): Promise<WhitelistRouteItem[]> {
-  return Reader.getWhitelist(page, pageSize) as unknown as Promise<
-    WhitelistRouteItem[]
-  >;
-}
-
-/* ── History (GET /api/history) ── */
-/** Flat per-chapter log of what was actually delivered. */
-import {
+import type {
+  WhitelistRouteItem,
   DispatchHistoryItem,
   ExcludedTitleItem,
   RssFlatPage,
@@ -27,7 +15,11 @@ import {
   DashboardSnapshot,
 } from "@/lib/types";
 
-/* ── Whitelist mutations — delegate to Reader seam (no bare fetch) ── */
+// Thin compat shim — all logic lives in Reader (single seam). Keep named exports for existing imports.
+export const getWhitelist = (page = 1, pageSize = 1000) =>
+  Reader.getWhitelist(page, pageSize) as unknown as Promise<
+    WhitelistRouteItem[]
+  >;
 
 export async function addWhitelistEntry(data: {
   title: string;
@@ -48,128 +40,125 @@ export async function addWhitelistEntry(data: {
   if (data.title_key) body.title_key = data.title_key;
   if (data.cover) body.cover = data.cover;
   if (data.status) body.status = data.status;
-  if (data.rating !== null && data.rating !== undefined)
-    body.rating = data.rating;
+  if (data.rating != null) body.rating = data.rating;
   if (data.origin) body.origin = data.origin;
   if (data.type) body.type = data.type;
-  if (data.genres && data.genres.length > 0) body.genres = data.genres;
+  if (data.genres?.length) body.genres = data.genres;
   if (data.description) body.description = data.description;
   return Reader.addWhitelistEntry(body) as Promise<{
     status: "added" | "already_exists";
   }>;
 }
-
-export async function removeWhitelistEntry(data: {
+export const removeWhitelistEntry = (data: {
   title_key?: string;
   title?: string;
   url?: string;
   source?: string;
-}): Promise<void> {
-  return Reader.removeWhitelistEntry(data as Record<string, unknown>);
-}
-
-/* ── Excluded titles (RSS "Exclude" feature) — delegate to Reader ── */
-
-export async function getExcludedTitles(): Promise<ExcludedTitleItem[]> {
-  return Reader.getExcludedTitles() as Promise<ExcludedTitleItem[]>;
-}
-
-export async function addExcludedTitle(data: {
+}) => Reader.removeWhitelistEntry(data as Record<string, unknown>);
+export const getExcludedTitles = () =>
+  Reader.getExcludedTitles() as Promise<ExcludedTitleItem[]>;
+export const addExcludedTitle = (data: {
   title_key: string;
   title?: string;
   source?: string;
   cover?: string | null;
   series_url?: string | null;
-}): Promise<{ status: "ok" | "error" }> {
-  return Reader.addExcludedTitle(data as Record<string, unknown>) as Promise<{
+}) =>
+  Reader.addExcludedTitle(data as Record<string, unknown>) as Promise<{
     status: "ok" | "error";
   }>;
-}
-
-export async function removeExcludedTitle(data: {
+export const removeExcludedTitle = (data: {
   title_key: string;
   source?: string;
-}): Promise<void> {
-  return Reader.removeExcludedTitle(data as Record<string, unknown>);
-}
-
-export async function bulkExcludeBySource(
-  source: string
-): Promise<{ excluded: number }> {
-  return Reader.bulkExcludeBySource(source);
-}
-
-/* ── RSS Flat (no grouping) ── */
-
-/** Fetch a single page of the flat RSS feed (server-side paginated). */
-export async function getRssFeedFlatPage(
+}) => Reader.removeExcludedTitle(data as Record<string, unknown>);
+export const bulkExcludeBySource = (source: string) =>
+  Reader.bulkExcludeBySource(source);
+export const getRssFeedFlatPage = (
   page: number,
   limit = 1000,
   exclude?: string,
   whitelist = false,
   source?: string | null,
   type?: string | null
-): Promise<RssFlatPage> {
-  return Reader.getRssFlatPage(page, limit, {
+) =>
+  Reader.getRssFlatPage(page, limit, {
     exclude,
     whitelist,
     source,
     type,
   }) as unknown as Promise<RssFlatPage>;
-}
-
-/**
- * Count RSS series (distinct titleKey) newer than `lastSeen`. Uses the backend's lightweight
- * /api/rss/new?since= endpoint (single request). No fallback walk — pure BE count.
- * @param opts.distinct - jika false hitung chapter, default true = hitung judul unik (series)
- */
-export async function countNewSince(
+export const countNewSince = (
   lastSeen: number,
   opts?: { distinct?: boolean }
-): Promise<number> {
-  return Reader.countNewSince(lastSeen, opts);
+) => Reader.countNewSince(lastSeen, opts);
+export const resolveCatalogUrl = (url: string) =>
+  Reader.resolveCatalogUrl(url) as Promise<CatalogResolveResult | null>;
+export const getDispatchHistory = (page = 1, pageSize = 50, search = "") =>
+  Reader.getDispatchHistory(page, pageSize, search) as unknown as Promise<
+    DispatchHistoryItem[]
+  >;
+export const getStats = () => Reader.getStats() as Promise<StatsData | null>;
+export const getDashboardSnapshot = () =>
+  Reader.getDashboardSnapshot() as Promise<DashboardSnapshot>;
+export const getQueueDepth = () =>
+  Reader.getQueueDepth() as Promise<QueueDepth>;
+export const getAnalyticsOverview = () =>
+  Reader.getAnalyticsOverview() as Promise<AnalyticsOverview | null>;
+export const getAnalyticsSeriesDetail = (titleKey: string) =>
+  Reader.getAnalyticsSeriesDetail(
+    titleKey
+  ) as Promise<AnalyticsSeriesDetail | null>;
+export const getAnalyticsEngagement = () =>
+  Reader.getAnalyticsEngagement() as Promise<AnalyticsEngagement | null>;
+
+export interface RetentionData {
+  overall_retention_30d: number;
+  total_whitelisted: number;
+  retained_titles: number;
+  churned_titles: number;
+  top_retained: {
+    title_key: string;
+    title: string;
+    dispatched_30d: number;
+    read_sessions: number;
+    retention_pct: number;
+  }[];
+  top_churned: {
+    title_key: string;
+    title: string;
+    dispatched_30d: number;
+    read_sessions: number;
+    retention_pct: number;
+  }[];
 }
-
-/* ── URL Resolver (GET /api/catalog/resolve) ── */
-
-export async function resolveCatalogUrl(
-  url: string
-): Promise<CatalogResolveResult | null> {
-  return Reader.resolveCatalogUrl(url) as Promise<CatalogResolveResult | null>;
+export async function getAnalyticsRetention(): Promise<RetentionData | null> {
+  try {
+    const { readerFetch } = await import("@/lib/reader/transport");
+    const data = await readerFetch<{ success: boolean; data: RetentionData }>(
+      "/api/v1/analytics/retention"
+    );
+    return (data.data ?? null) as RetentionData | null;
+  } catch (e) {
+    if ((e as Error)?.message?.includes("404")) return null;
+    throw e;
+  }
 }
-
-/* ── Dispatch History ── */
-
-export async function getDispatchHistory(
-  page = 1,
-  pageSize = 50,
-  search = ""
-): Promise<DispatchHistoryItem[]> {
-  return Reader.getDispatchHistory(
-    page,
-    pageSize,
-    search
-  ) as unknown as Promise<DispatchHistoryItem[]>;
-}
-
-/* ── Stats (GET /api/reader/stats) ── */
-
-export async function getStats(): Promise<StatsData | null> {
-  return Reader.getStats() as Promise<StatsData | null>;
-}
-
-/* ── Dashboard snapshot (overview widgets) ── */
-
-export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
-  return Reader.getDashboardSnapshot() as Promise<DashboardSnapshot>;
-}
-
-/* ── Live dispatch queue depth (GET /api/reader/queue) ── */
-
-export async function getQueueDepth(): Promise<QueueDepth> {
-  return Reader.getQueueDepth() as Promise<QueueDepth>;
-}
-
+export const getRssCustomFeed = (params: {
+  genres?: string;
+  sources?: string;
+  origins?: string;
+  status?: string;
+  minRating?: string;
+  maxRating?: string;
+  unreadOnly?: boolean;
+  subscribedOnly?: boolean;
+  sort?: string;
+  limit?: number;
+  page?: number;
+}) =>
+  Reader.getRssCustomFeed(params) as unknown as Promise<RssCustomFeedResult>;
+export const getRssFilterMetadata = () =>
+  Reader.getRssFilterMetadata() as unknown as Promise<RssFilterMetadata>;
 export async function getHealthDetailed(): Promise<{
   sources: Array<{
     name: string;
@@ -200,115 +189,10 @@ export async function getHealthDetailed(): Promise<{
   const body = await readerFetch<{ success: boolean; data: unknown }>(
     "/api/v1/health/detailed"
   );
-  return (body as unknown as { data: unknown }).data as unknown as {
-    sources: Array<{
-      name: string;
-      status: string;
-      lastScrape: string;
-      lastSuccess: string;
-      errorRate24h: number;
-      consecutiveFailures: number;
-      lastError: string | null;
-      disabledUntil: string | null;
-    }>;
-    overall: string;
-    uptime: number;
-    version: string;
-    circuit_breakers: Record<string, string>;
-    db_pool: Record<string, number>;
-    voratoon_covers?: Array<{
-      title_key: string;
-      title: string;
-      cover: string;
-      expiry: string;
-      hours_remaining: number;
-      expiring_soon: boolean;
-      expired: boolean;
-    }>;
-  };
+  return (body as unknown as { data: unknown }).data as never;
 }
 
-/* ── Analytics (GET /api/analytics/*) ── */
-
-export async function getAnalyticsOverview(): Promise<AnalyticsOverview | null> {
-  return Reader.getAnalyticsOverview() as Promise<AnalyticsOverview | null>;
-}
-
-export async function getAnalyticsSeriesDetail(
-  titleKey: string
-): Promise<AnalyticsSeriesDetail | null> {
-  return Reader.getAnalyticsSeriesDetail(
-    titleKey
-  ) as Promise<AnalyticsSeriesDetail | null>;
-}
-
-export async function getAnalyticsEngagement(): Promise<AnalyticsEngagement | null> {
-  return Reader.getAnalyticsEngagement() as Promise<AnalyticsEngagement | null>;
-}
-
-export interface RetentionData {
-  overall_retention_30d: number;
-  total_whitelisted: number;
-  retained_titles: number;
-  churned_titles: number;
-  top_retained: {
-    title_key: string;
-    title: string;
-    dispatched_30d: number;
-    read_sessions: number;
-    retention_pct: number;
-  }[];
-  top_churned: {
-    title_key: string;
-    title: string;
-    dispatched_30d: number;
-    read_sessions: number;
-    retention_pct: number;
-  }[];
-}
-
-export async function getAnalyticsRetention(): Promise<RetentionData | null> {
-  try {
-    const { readerFetch } = await import("@/lib/reader/transport");
-    const data = await readerFetch<{ success: boolean; data: RetentionData }>(
-      "/api/v1/analytics/retention"
-    );
-    return (data.data ?? null) as RetentionData | null;
-  } catch (e) {
-    // 404 until BE deployed — don't spam console, just hide card
-    if ((e as Error)?.message?.includes("404")) return null;
-    throw e;
-  }
-}
-
-/* ── Custom RSS Feed (GET /api/rss/custom) ── */
-
-export async function getRssCustomFeed(params: {
-  genres?: string;
-  sources?: string;
-  origins?: string;
-  status?: string;
-  minRating?: string;
-  maxRating?: string;
-  unreadOnly?: boolean;
-  subscribedOnly?: boolean;
-  sort?: string;
-  limit?: number;
-  page?: number;
-}): Promise<RssCustomFeedResult> {
-  return Reader.getRssCustomFeed(
-    params
-  ) as unknown as Promise<RssCustomFeedResult>;
-}
-
-export async function getRssFilterMetadata(): Promise<RssFilterMetadata> {
-  return Reader.getRssFilterMetadata() as unknown as Promise<RssFilterMetadata>;
-}
-
-/* ── Audit Log removed — page deleted per CONTEXT.md 2026-09-02 ── */
-
-/* ── Bookmarks (GET/POST/DELETE /api/v1/bookmarks) ── */
-
+// Bookmarks
 export interface BookmarkEntry {
   title_key: string;
   chapter_number: number;
@@ -319,7 +203,6 @@ export interface BookmarkEntry {
   title?: string;
   cover?: string | null;
 }
-
 export async function getBookmarks(
   page = 1,
   pageSize = 50
@@ -340,18 +223,16 @@ export async function getBookmarks(
       d &&
       typeof d === "object" &&
       "results" in (d as Record<string, unknown>)
-    ) {
+    )
       return (
         ((d as { results: BookmarkEntry[] }).results as BookmarkEntry[]) || []
       );
-    }
     return [];
   } catch (e) {
     if ((e as Error)?.message?.includes("404")) return [];
     throw e;
   }
 }
-
 export async function getBookmarksPaginated(
   page = 1,
   pageSize = 50
@@ -376,7 +257,6 @@ export async function getBookmarksPaginated(
     }
   );
 }
-
 export async function saveBookmark(data: {
   title_key: string;
   chapter_number: number;
@@ -393,7 +273,6 @@ export async function saveBookmark(data: {
     body: JSON.stringify(data),
   });
 }
-
 export async function deleteBookmark(
   titleKey: string,
   chapterNumber: number
@@ -403,5 +282,3 @@ export async function deleteBookmark(
     method: "DELETE",
   });
 }
-
-/* ── A/B Testing removed — /ab-tests page deleted per CONTEXT.md 2026-09-02 ── */

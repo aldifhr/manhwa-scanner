@@ -10,7 +10,7 @@ import {
 import { Reader } from "@/lib/reader";
 import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
-import { useRateLimitedCallback } from "@tanstack/react-pacer";
+import { usePacerRateLimitedWL } from "@/lib/usePacerThrottles";
 import type { FlatChapter } from "@/lib/feed";
 import type { GroupedSeries } from "@/lib/groupChapters";
 
@@ -259,13 +259,11 @@ export function useFeedActions() {
     onSettled: () => setExcludingKey(null),
   });
 
-  const rateLimitedAdd = useRateLimitedCallback(
-    (item: FlatChapter) => addMutation.mutate(item),
-    { limit: 5, window: 10_000 }
+  const rateLimitedAdd = usePacerRateLimitedWL((item: FlatChapter) =>
+    addMutation.mutate(item)
   );
-  const rateLimitedAddGroup = useRateLimitedCallback(
-    (series: GroupedSeries) => addGroupMutation.mutate(series),
-    { limit: 5, window: 10_000 }
+  const rateLimitedAddGroup = usePacerRateLimitedWL((series: GroupedSeries) =>
+    addGroupMutation.mutate(series)
   );
   const handleAdd = useCallback(
     (item: FlatChapter) => rateLimitedAdd(item),
