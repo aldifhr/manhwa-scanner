@@ -1,4 +1,4 @@
-"""Durable task queue backed by Redis — ponytail: enqueue_cron + _run_cron_inline dual path intentional (Redis fast-path + inline fallback when Redis down), collapse to single queue when Redis is hard-required.
+"""Durable task queue backed by Redis (replaces the old in-memory queue).
 
 Why Redis: the previous in-process queue lost all pending jobs on process
 restart and had no graceful shutdown. Redis lists + BLPOP give us:
@@ -13,9 +13,7 @@ dead-letter list so they don't block the main queue.
 from __future__ import annotations
 
 import json
-import os
 import threading
-import time
 
 from app.config import settings
 from app.logger import get_logger
@@ -109,25 +107,17 @@ def enqueue_cron(action: str) -> None:
     the HTTP request path entirely — if the scraper stalls or ikiru hits
     Cloudflare, the RSS API process is unaffected.
 
-    Graceful degradation: if Redis is down the cron worker runs the pipeline
-    inline (old behaviour). The API process does NOT fall back inline — it
-    raises so the caller returns 503 instead of blocking the HTTP thread for
-    60-90s (which would 502 other users).
+    Graceful degradation: if Redis is down we run the pipeline directly in
+    the API process (old behaviour) so FastCron-triggered crons still work
+    without Redis.
     """
     payload = {"action": action}
     try:
         _get_redis().rpush(CRON_QUEUE_KEY, json.dumps(payload))
         logger.info("enqueued cron job", action=action)
     except Exception as e:
-        _role = (os.environ.get("ROLE") or "api").lower()
-        if _role == "cron":
-            # CRON WORKER: safe to run inline (no HTTP threads to block)
-            logger.warn("enqueue cron failed (redis down), running inline", err=str(e)[:120], action=action)
-            _run_cron_inline(action)
-        else:
-            # API PROCESS: do NOT block HTTP threads — raise so caller returns 503
-            logger.warn("enqueue cron failed (redis down), API mode — returning error", err=str(e)[:120], action=action)
-            raise
+        logger.warn("enqueue cron failed (redis down), running inline", err=str(e)[:120], action=action)
+        _run_cron_inline(action)
 
 
 def _run_cron_inline(action: str) -> None:
@@ -145,7 +135,7 @@ def _run_cron_inline(action: str) -> None:
     if action in ("enrich", "enrich-missing", "enrich-refresh"):
         from app.cron.enrich_resync import enrich_recent_chapters, enrich_stale_series_meta
         if action == "enrich":
-            stats = enrich_recent_chapters(limit=100)
+            stats = enrich_recent_chapters()
         elif action == "enrich-missing":
             stats = enrich_recent_chapters(limit=100, miss_only=True)
         else:  # enrich-refresh
@@ -153,53 +143,36 @@ def _run_cron_inline(action: str) -> None:
         logger.info("cron enrich done", action=action, stats=stats)
         return
 
-    # voratoon-cover: presigned URL 6d expiry → 24h refresh
-    if action == "voratoon-cover":
-        from app.cron.enrich_resync import enrich_voratoon_covers
-        stats = enrich_voratoon_covers(limit=50)
-        logger.info("cron voratoon-cover done", **stats)
-        return
+    try:
+        from app.cron.pipeline import run_pipeline
 
-    # Retry with exponential backoff: 0s, 2s, 4s, then DLQ
-    max_attempts = 3
-    for attempt in range(1, max_attempts + 1):
-        try:
-            from app.cron.pipeline import run_pipeline
-            run_pipeline(action=action, do_dispatch=do_dispatch)
-            return
-        except Exception as e:
-            if attempt < max_attempts:
-                wait = 2 ** attempt  # 2s, 4s
-                logger.warn("cron run failed, retrying", action=action, attempt=attempt, wait=wait, err=str(e)[:120])
-                time.sleep(wait)
-            else:
-                logger.error("cron run failed, moving to DLQ", action=action, attempts=max_attempts, exc=e)
-                try:
-                    _get_redis().rpush(DLQ_KEY, json.dumps({"action": action, "error": str(e)[:200], "attempts": max_attempts}))
-                except Exception:
-                    pass
-    # Record the last time we ATTEMPTED a scrape for this source, so the
-    # /cron monitor shows "scrape is running on schedule" even when the
-    # source is quiet (no new chapters -> recent_chapters.updated_time
-    # doesn't move, which would otherwise look "stale").
-    if is_scrape and source:
-        try:
-            from datetime import datetime, timezone
-            _get_redis().set(
-                f"cron:last_scrape:{source}",
-                datetime.now(timezone.utc).isoformat(),
-                ex=3600,
-            )
-        except Exception:
-            pass
+        run_pipeline(action=action, do_dispatch=do_dispatch)
+    except Exception as e:
+        logger.error("inline cron run failed", action=action, exc=e)
+    finally:
+        # Record the last time we ATTEMPTED a scrape for this source, so the
+        # /cron monitor shows "scrape is running on schedule" even when the
+        # source is quiet (no new chapters -> recent_chapters.updated_time
+        # doesn't move, which would otherwise look "stale").
+        if is_scrape and source:
+            try:
+                from datetime import datetime, timezone
+
+                _get_redis().set(
+                    f"cron:last_scrape:{source}",
+                    datetime.now(timezone.utc).isoformat(),
+                    ex=3600,
+                )
+            except Exception:
+                pass
 
 
 def run_cron_worker() -> None:
     """Blocking worker for the cron queue (ROLE=cron process only).
 
     Pops cron jobs and runs run_pipeline. At-least-once: a job removed only
-    after it succeeds; on crash the job is retried by the scheduler
-    (internal scheduler enqueues; this worker executes).
+    after it succeeds; on crash the job is retried by FastCron's next tick
+    (FastCron is the scheduler; this worker is just the executor).
     """
     logger.info("cron worker started")
     while not _stop.is_set():
@@ -221,18 +194,17 @@ def run_cron_worker() -> None:
 
 
 # Internal scheduler: fires the 3 source crons (+ enrich) on a fixed interval so
-# the pipeline runs autonomously WITHOUT depending on any external trigger.
-# The scheduler can still coexist — enqueue_cron() is idempotent per Redis
+# the pipeline runs autonomously WITHOUT depending on FastCron (or any external
+# trigger). FastCron can still coexist — enqueue_cron() is idempotent per Redis
 # list, and the per-action DB advisory lock in run_pipeline de-dupes concurrent
 # runs, so a double-fire just becomes a no-op skip.
 _SCHED_THREAD: "threading.Thread | None" = None
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
-_SOURCE_INTERVAL_S = 600          # 10 min per source (RSS fetch takes ~100s)
-_DISPATCH_INTERVAL_S = 120        # 2 min Discord dispatch
-_ENRICH_INTERVAL_S = 3600        # 60 min (reduce RAM peak from 130k voratoon dict)
-_ENRICH_MISSING_INTERVAL_S = 3600  # 1 hour static-data backfill (miss_only)
+_SOURCE_INTERVAL_S = 300          # 5 min per source (RSS)
+_DISPATCH_INTERVAL_S = 60        # 1 min Discord dispatch (user request)
+_ENRICH_INTERVAL_S = 900         # 15 min (legacy full refresh)
+_ENRICH_MISSING_INTERVAL_S = 1800  # 30 min static-data backfill (miss_only)
 _ENRICH_REFRESH_INTERVAL_S = 604800  # 7 days stale check (rating/description drift)
-_VORATOON_COVER_INTERVAL_S = 86400  # 24h voratoon presigned cover refresh (6d expiry)
 
 
 def _scheduler_loop() -> None:
@@ -240,15 +212,12 @@ def _scheduler_loop() -> None:
     last_enrich = 0.0
     last_enrich_missing = 0.0
     last_enrich_refresh = 0.0
-    last_voratoon_cover = 0.0
-    last_dispatch = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
                 enrich_interval=_ENRICH_INTERVAL_S,
                 enrich_missing_interval=_ENRICH_MISSING_INTERVAL_S,
-                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S,
-                voratoon_cover_interval=_VORATOON_COVER_INTERVAL_S)
+                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S)
     # Kick off immediately on startup so freshness doesn't wait 10 min.
     _t0 = __import__("time").monotonic()
     for i, src in enumerate(_RSS_SOURCES):
@@ -265,72 +234,52 @@ def _scheduler_loop() -> None:
         pass
     # Then loop: dispatch every 60s, RSS every 300s (staggered), enrich every 900s
     last_source = __import__("time").monotonic()
-    # ponytail: scheduler auto-restart — if exception kills the loop, restart after 30s
-    while True:
-        try:
-            if _stop.wait(_DISPATCH_INTERVAL_S):
-                break
-            _now = __import__("time").monotonic()
-            # Discord dispatch every 60s
-            if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
-                try:
-                    enqueue_cron("update")
-                    last_dispatch = _now
-                except Exception as e:
-                    logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
-            # RSS fetch every 300s
-            if _now - last_source >= _SOURCE_INTERVAL_S:
-                if not _stop.is_set():
-                    for src in _RSS_SOURCES:
-                        if _stop.is_set():
-                            break
-                        try:
-                            logger.info("scheduler enqueue rss-fetch", source=src)
-                            enqueue_cron(f"rss-fetch:{src}")
-                        except Exception as e:
-                            logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
-                        _stop.wait(20)
-                logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
-                last_source = _now
-            # Periodic enrich so metadata stays fresh without external triggers.
-            if _now - last_enrich >= _ENRICH_INTERVAL_S:
-                try:
-                    enqueue_cron("enrich")
-                    last_enrich = _now
-                except Exception:
-                    pass
-            # Static-data backfill: only rows missing description/rating/genres (cheap, runs 30m)
-            if _now - last_enrich_missing >= _ENRICH_MISSING_INTERVAL_S:
-                try:
-                    enqueue_cron("enrich-missing")
-                    last_enrich_missing = _now
-                except Exception:
-                    pass
-            # Weekly stale check: refresh series_meta older than 7d (rating/desc drift)
-            if _now - last_enrich_refresh >= _ENRICH_REFRESH_INTERVAL_S:
-                try:
-                    enqueue_cron("enrich-refresh")
-                    last_enrich_refresh = _now
-                except Exception:
-                    pass
-            # Voratoon cover refresh: private bucket presigned 6d expiry -> 24h
-            if _now - last_voratoon_cover >= _VORATOON_COVER_INTERVAL_S:
-                try:
-                    enqueue_cron("voratoon-cover")
-                    last_voratoon_cover = _now
-                except Exception:
-                    pass
-            # Queue depth alert: log + DLQ if queue grows unbounded (> 50)
+    while not _stop.is_set():
+        if _stop.wait(_DISPATCH_INTERVAL_S):
+            break
+        _now = __import__("time").monotonic()
+        # Discord dispatch every 60s
+        if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
             try:
-                qlen = _get_redis().llen(CRON_QUEUE_KEY)
-                if qlen > 50:
-                    logger.error("cron queue depth exceeded", queue_length=qlen, threshold=50)
+                enqueue_cron("update")
+                last_dispatch = _now
+            except Exception as e:
+                logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
+        # RSS fetch every 300s
+        if _now - last_source >= _SOURCE_INTERVAL_S:
+            if not _stop.is_set():
+                for src in _RSS_SOURCES:
+                    if _stop.is_set():
+                        break
+                    try:
+                        logger.info("scheduler enqueue rss-fetch", source=src)
+                        enqueue_cron(f"rss-fetch:{src}")
+                    except Exception as e:
+                        logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
+                    _stop.wait(20)
+            logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
+            last_source = _now
+        # Periodic enrich so metadata stays fresh without FastCron.
+        if _now - last_enrich >= _ENRICH_INTERVAL_S:
+            try:
+                enqueue_cron("enrich")
+                last_enrich = _now
             except Exception:
                 pass
-        except Exception as e:
-            logger.error("scheduler loop crashed, restarting in 30s", exc=e)
-            _stop.wait(30)
-            last_source = __import__("time").monotonic()
+        # Static-data backfill: only rows missing description/rating/genres (cheap, runs 30m)
+        if _now - last_enrich_missing >= _ENRICH_MISSING_INTERVAL_S:
+            try:
+                enqueue_cron("enrich-missing")
+                last_enrich_missing = _now
+            except Exception:
+                pass
+        # Weekly stale check: refresh series_meta older than 7d (rating/desc drift)
+        if _now - last_enrich_refresh >= _ENRICH_REFRESH_INTERVAL_S:
+            try:
+                enqueue_cron("enrich-refresh")
+                last_enrich_refresh = _now
+            except Exception:
+                pass
 
 
 def start_cron_scheduler() -> None:
@@ -359,7 +308,6 @@ def get_cron_status() -> dict:
         "enrich_interval_s": _ENRICH_INTERVAL_S,
         "enrich_missing_interval_s": _ENRICH_MISSING_INTERVAL_S,
         "enrich_refresh_interval_s": _ENRICH_REFRESH_INTERVAL_S,
-        "voratoon_cover_interval_s": _VORATOON_COVER_INTERVAL_S,
         "sources": list(_RSS_SOURCES),
         "now": datetime.now(timezone.utc).isoformat(),
     }
@@ -494,7 +442,7 @@ def worker_loop() -> None:
 # realistic scrape gap (cron runs every ~1.6 min, max observed gap 15 min).
 # 7 days is a safe buffer for VPS-downtime incidents without unbounded growth
 # (~500 rows at current volume). Per-series rows are also capped (below).
-_DISPATCH_HISTORY_RETENTION_DAYS = 2
+_DISPATCH_HISTORY_RETENTION_DAYS = 90
 _CHAPTER_CLICKS_RETENTION_DAYS = 90
 _CRON_RUN_STATUS_RETENTION_DAYS = 30
 _FAILED_DISPATCHES_RETENTION_DAYS = 30
@@ -570,14 +518,6 @@ def _retention_loop() -> None:
                     logger.info("retention: cleaned stale dispatch_claims", expired=_stale_count, null_created=_null_count)
             except Exception as e:
                 logger.warn("retention: stale claims cleanup failed", err=str(e)[:160])
-            # 4) error_logs retention (7d — was 30d, but at ~4k rows/day it bloats quickly)
-            try:
-                from app.storage.error_logs import delete_older_than as _err_prune
-                _pruned = _err_prune(days=7)
-                if _pruned:
-                    logger.info("retention: pruned error_logs", deleted=_pruned, days=7)
-            except Exception as e:
-                logger.warn("retention: error_logs cleanup failed", err=str(e)[:120])
             logger.info("retention prune done", 
                         dispatch_history_days=_DISPATCH_HISTORY_RETENTION_DAYS, 
                         chapter_clicks_days=_CHAPTER_CLICKS_RETENTION_DAYS,

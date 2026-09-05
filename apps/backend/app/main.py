@@ -22,15 +22,12 @@ async def lifespan(app: FastAPI):
     start_worker()
     # Cron decoupling: the ROLE=cron process runs the cron queue worker so the
     # (slow, upstream-heavy) scrape/dispatch never runs inside the HTTP API
-    # process. External cron hits /api/cron on the API process, which enqueues to
+    # process. FastCron hits /api/cron on the API process, which enqueues to
     # Redis; the cron worker pops and executes run_pipeline.
     _role = (os.environ.get("ROLE") or "api").lower()
     if _role == "cron":
         from app.tasks import run_cron_worker, start_cron_scheduler
-        # Triple workers: 3 BLPOP threads so enqueue rate < process rate → queue never grows unbounded
-        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-1").start()
-        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-2").start()
-        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker-3").start()
+        threading.Thread(target=run_cron_worker, daemon=True, name="cron-worker").start()
         start_cron_scheduler()
         logger.info("cron-worker started (ROLE=cron)")
     logger.info("application startup complete")
@@ -129,7 +126,7 @@ async def metrics_root(request: Request):
 async def api_openapi(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    return JSONResponse(content=custom_openapi(request.app))
+    return JSONResponse(content=custom_openapi())
 
 
 # --- Uniform JSON error responses (no HTML leaks to the FE) ---
@@ -174,30 +171,15 @@ async def api_interactive(request: Request):
     """Discord interaction endpoint — verifies Ed25519 signature and routes."""
     from app.discord import client as _disc
     from app.discord.router import handle_interaction
-    from app.logger import get_logger
-    logger = get_logger("discord:interactive")
 
     signature = request.headers.get("x-signature-ed25519", "")
     timestamp = request.headers.get("x-signature-timestamp", "")
     body = await request.body()
 
-    logger.info("interaction received",
-        sig_len=len(signature),
-        ts=timestamp,
-        ts_len=len(timestamp),
-        body_len=len(body),
-        body_preview=body[:80].decode(errors="replace"))
-
-    if not _disc.verify_interaction_v2(body, signature, timestamp):
-        logger.warn("interaction signature rejected",
-            sig_len=len(signature),
-            ts_len=len(timestamp),
-            body_len=len(body))
+    if not _disc.verify_interaction(body, signature, timestamp):
         return JSONResponse(content={"error": "invalid signature"}, status_code=401)
 
-    logger.info("interaction verified, routing...")
     status_code, response_body = handle_interaction(body)
-    logger.info("interaction handled", status=status_code, response_preview=str(response_body)[:120])
     return JSONResponse(content=response_body, status_code=status_code)
 
 
@@ -235,7 +217,7 @@ if __name__ == "__main__":
         forwarded_allow_ips="*",
         loop="uvloop",
         access_log=False,
-        limit_concurrency=2000,
+        limit_concurrency=100,
         limit_max_requests=10000,
         timeout_keep_alive=30,
     )
