@@ -1,9 +1,4 @@
-"""Whitelist service — CRUD + metadata joins for whitelist entries.
-
-This module is now a thin orchestration layer. Dispatch history lives in
-dispatch_history.py; enrichment helpers live in whitelist_enrichment.py.
-All function signatures are preserved for backward compatibility.
-"""
+"""Whitelist service — CRUD + metadata joins for whitelist entries."""
 from __future__ import annotations
 
 import re
