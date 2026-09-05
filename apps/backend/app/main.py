@@ -172,11 +172,12 @@ async def api_interactive(request: Request):
     from app.discord import client as _disc
     from app.discord.router import handle_interaction
 
-    signature = request.headers.get("x-signature-ed25519", "")
-    timestamp = request.headers.get("x-signature-timestamp", "")
+    signature = request.headers.get("x-signature-ed25519", "") or request.headers.get("X-Signature-Ed25519", "")
+    timestamp = request.headers.get("x-signature-timestamp", "") or request.headers.get("X-Signature-Timestamp", "")
     body = await request.body()
 
-    if not _disc.verify_interaction(body, signature, timestamp):
+    # ponytail: v2 handles base64url PK (Portal shows base64, not hex) + hex signature
+    if not _disc.verify_interaction_v2(body, signature, timestamp):
         return JSONResponse(content={"error": "invalid signature"}, status_code=401)
 
     status_code, response_body = handle_interaction(body)
