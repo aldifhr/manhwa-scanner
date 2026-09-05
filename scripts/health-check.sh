@@ -2,7 +2,7 @@
 # Health-check: hit /health every 60s, log failures locally
 # Runs as a PM2 service (auto-restart, logs, no external dependencies)
 
-HEALTH_URL="http://127.0.0.1:3000/health"
+HEALTH_URL="http://127.0.0.1:3000/api/v1/healthz"
 INTERVAL=60
 RETRY=3
 
