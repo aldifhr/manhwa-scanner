@@ -1,9 +1,11 @@
-"""
+"""ponytail: 663L PostgREST shim — intentional (67 call sites), not ROT
 Direct PostgreSQL access layer (replaces PostgREST/Supabase client).
 
 Backend now connects to Supabase via the TRANSACTION POOLER (IPv4, reachable
 from the VPS) using psycopg2. The old `supabase` PostgREST client is removed.
 
+Ceiling: builder keeps call sites unchanged (param SQL, column allowlist, WHERE guard)
+Upgrade: drop builder for raw q() helpers when 67 sites refactored / new query needs raw JOIN
 We keep a builder-style API (`get_supabase().table(...).select(...).eq(...)`
 ) that mirrors the PostgREST surface the rest of the codebase uses, so the
 ~67 call sites do NOT need rewriting. Each builder compiles to parameterized

@@ -1,4 +1,7 @@
-"""Recent chapters storage (parity with lib/services/storage/recent-chapters.ts)."""
+"""Recent chapters storage — ponytail: 679L intentional (dedup+claim+re-touch guard)
+Ceiling: Python pre-insert dedup (composite key + URL rotation) + chunked upsert + single-queue origin backfill
+Upgrade: push dedup to SQL ON CONFLICT/DISTINCT ON when composite key stabilizes + pg advisory covers rotation
+"""
 from datetime import datetime, timezone, timedelta
 
 from app.db import get_supabase
