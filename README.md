@@ -1,66 +1,50 @@
-# manhwa-scanner — Monorepo (1 repo 1 codebase)
+# manhwa-scanner — Monorepo
 
-Next.js Frontend + Python FastAPI Backend — single repo, synced via `openapi.json`.
+Next.js Frontend + FastAPI Backend — `openapi.json` synced, `komik.aldifhr.fun` (FE) → `scanner.aldifhr.fun` (BE).
 
-- **Repo**: https://github.com/aldifhr/manhwa-scanner
-- **Frontend**: `apps/frontend` — Next.js 15 App Router (TS)
-- **Backend**: `apps/backend` — Python FastAPI (scraper shinigami/ikiru/voratoon)
+- **FE** `apps/frontend` — Next 16 App Router, `pnpm --filter manhwa-reader dev` (`http://localhost:3000`)
+- **BE** `apps/backend` — FastAPI, `uv run uvicorn app.main:app --reload` (`http://localhost:8000`)
+- **Live:** `https://komik.aldifhr.fun` → `https://scanner.aldifhr.fun`
 
-## Monorepo Structure
+## Roles
 
-```
-apps/frontend/   # Next.js, pnm run dev (next dev tanpa build)
-  app/           # Home, Recent, Whitelist, Exclude-list, Health, Bookmarks, Feed
-  components/    # UI: MangaCard, PageShell, Nav, NavbarStatus
-  lib/           # Reader seam, api, server-api, queryKeys
-apps/backend/    # FastAPI, uv run uvicorn app.main:app --reload
-packages/shared/ # (rencana) openapi.json → zod + TS types
-```
+| Role     | Login                                                                                                                        | Bisa                                                                                                                                                                     |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `anon`   | —                                                                                                                            | Lihat `Home` `/`, `Recent` `/recent`, `Bookmarks` (localStorage), `Operational` dot di nav                                                                               |
+| `member` | `POST /api/auth?action=register` `{email,password}` → `POST /api/auth?action=login` `{email,password}` → `ikiru_role=member` | `anon` + `bookmark` per login (`chapter_bookmarks` per `session_hash`), `continueReading` sync `bookmark`                                                                |
+| `admin`  | `POST /api/auth?action=login` `{password: MONITOR_AUTH_TOKEN}` → `role:admin`                                                | `member` + `add/remove whitelist`, `exclude`, `dispatch`/`send notif`, `GET /admin`, `/status` (redirect → `/admin`), `/whitelist`, `/exclude-list`, `/dispatch-history` |
 
-## Development (tanpa build)
+`GET` whitelist/dispatch/exclude → `admin` only (member `401`), `POST/DELETE` whitelist/exclude → `admin` only. `member` cuma `bookmark`.
+
+## Routes
+
+- Public `GET`: `/`, `/recent`, `/bookmarks` (anon local), `GET /api/v1/reader/rss`, `/api/v1/dashboard/snapshot` (`Operational` dot), `GET /whitelist` (Home badge)
+- Protected `GET`: `/whitelist`, `/exclude-list`, `/dispatch-history`, `/admin`, `/status` → `admin` (member `302 /login`)
+- Mutating: `POST /whitelist`, `POST /excluded-titles` → `admin` (`403` buat member)
+
+## Dev
 
 ```bash
-# root — FE only (BE belum ada package.json)
-pnpm run dev              # → apps/frontend next dev (http://localhost:3000)
-# atau langsung FE
-cd apps/frontend && npm run dev
-
-# BE
-cd apps/backend && uv run uvicorn app.main:app --reload  # http://localhost:8000
-
-# setup awal
 pnpm install
-pnpm approve-builds --all   # sekali untuk tree-sitter
+pnpm --filter manhwa-reader dev        # FE
+cd apps/backend && uv run uvicorn app.main:app --reload  # BE
+pnpm --filter manhwa-reader typecheck && pnpm --filter manhwa-reader test
 ```
 
-## Production
+## Env
 
-```bash
-cd apps/frontend && npm run build && npm run start
-cd apps/backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+| Variable                               | Contoh          | Ket                                           |
+| -------------------------------------- | --------------- | --------------------------------------------- |
+| `MONITOR_AUTH_TOKEN`                   | `BE .env`       | admin password                                |
+| `MEMBER_AUTH_TOKEN`                    | `BE .env`       | seed member (di-ignore kalau `app_users` >0)  |
+| `AUTH_SECRET`                          | `BE .env`       | HS256 JWT `ikiru_dashboard_session`           |
+| `DATABASE_URL`                         | Supabase pooler | `app_users`, `chapter_bookmarks`, `whitelist` |
+| `NEXT_PUBLIC_API_BASE` / `BACKEND_URL` | `FE .env.local` | `https://scanner.aldifhr.fun`                 |
 
-## Quality & Tests
-
-```bash
-pnpm --filter manhwa-reader typecheck
-pnpm --filter manhwa-reader lint
-pnpm --filter manhwa-reader test
-```
-
-## Environment
-
-| Variable | Lokasi | Contoh |
-|----------|--------|--------|
-| `NEXT_PUBLIC_API_BASE` | `apps/frontend/.env.local` | `https://scanner.aldifhr.fun` |
-| `BACKEND_URL` | `apps/frontend/.env.local` atau `apps/backend/.env` | `http://localhost:8000` |
-| `API_TOKEN` | `apps/backend/.env` | `Bearer <token>` |
-| `DATABASE_URL` | `apps/backend/.env` | Supabase |
-
-> `.env` dipisah per app ( `apps/frontend/.env.local`, `apps/backend/.env` ), `pnpm-lock.yaml` tunggal di root.
+`app_users` (`049_create_users`) — `email` unique, `password_hash` `pbkdf2`, `role` `member`.
 
 ## Docs
 
-- `CONTEXT.md` — glossary domain & deep modules
-- `PROGRESS.md` — log perubahan per tanggal/commit
-- `apps/backend/openapi.json` — contract FE↔BE
+- `CONTEXT.md` — domain & deep modules (`Reader`, `Cover`, `Cache`)
+- `AGENTS.md` — 14 skills `obra/superpowers` (ponytail full)
+- `apps/backend/openapi.json` — contract
