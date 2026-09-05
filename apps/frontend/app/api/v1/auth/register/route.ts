@@ -34,6 +34,12 @@ export async function POST(request: Request) {
     const csrfTokenValue = csrfCookie
       ? csrfCookie.split("=").slice(1).join("=")
       : "";
+    const roleCookie = setCookies
+      .map((c) => c.split(";")[0])
+      .find((c) => c.startsWith("ikiru_role="));
+    const roleValue = roleCookie
+      ? roleCookie.split("=").slice(1).join("=")
+      : "member";
     const response = NextResponse.json({ success: true });
     if (backendJwtValue) {
       response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
@@ -45,6 +51,14 @@ export async function POST(request: Request) {
       });
       if (csrfTokenValue)
         response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60,
+        });
+      if (roleValue)
+        response.cookies.set("ikiru_role", roleValue, {
           httpOnly: false,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",

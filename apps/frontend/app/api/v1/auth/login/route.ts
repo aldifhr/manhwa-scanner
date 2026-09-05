@@ -41,29 +41,29 @@ export async function POST(request: Request) {
       : "";
 
     // Also extract the CSRF token cookie (non-httponly, JS-readable).
-    // Backend sets ikiru_csrf_token on login; FE needs it for
-    // double-submit CSRF validation on mutating requests.
     const csrfCookie = setCookies
       .map((c) => c.split(";")[0])
       .find((c) => c.startsWith("ikiru_csrf_token="));
     const csrfTokenValue = csrfCookie
       ? csrfCookie.split("=").slice(1).join("=")
       : "";
+    const roleCookie = setCookies
+      .map((c) => c.split(";")[0])
+      .find((c) => c.startsWith("ikiru_role="));
+    const roleValue = roleCookie
+      ? roleCookie.split("=").slice(1).join("=")
+      : json.data?.role || "";
 
     const response = NextResponse.json({ success: true });
 
-    // Set the REAL backend JWT as our session cookie (same name, same value).
-    // Browser sends it back; server-api.authHeaders forwards it to the backend.
     if (backendJwtValue) {
       response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
-        maxAge: 7 * 24 * 60 * 60, // 7d (matches backend JWT exp)
+        maxAge: 7 * 24 * 60 * 60,
       });
-
-      // Forward CSRF token cookie to browser (non-httponly so JS can read it).
       if (csrfTokenValue) {
         response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
           httpOnly: false,
@@ -73,7 +73,15 @@ export async function POST(request: Request) {
           maxAge: 7 * 24 * 60 * 60,
         });
       }
-
+      if (roleValue) {
+        response.cookies.set("ikiru_role", roleValue, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60,
+        });
+      }
       return response;
     }
 
