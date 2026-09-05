@@ -636,11 +636,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     }
 
 
-def _canonical_of(tk: str) -> str:
-    from app.storage.canonical import canonical_of as _co
-    return _co(tk)
-
-
 def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
     """Fetch rc/meta/dh maps for get_whitelist — isolated for testability."""
     rc_map: dict = {}
