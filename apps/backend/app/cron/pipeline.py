@@ -64,7 +64,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         _health_map: dict = {}
         if not do_dispatch:
             # Full telemetry from the actual scrape
-            items, _health_map = collect_recent_chapters(
+            items, _health_map = collect.collect_recent_chapters(
                 with_whitelisted_ikiru=True,
                 with_whitelisted_shinigami=True,
                 source=source,
@@ -78,7 +78,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 health_store.save_source_health_map(_health_map)
             except Exception as _he:
                 logger.warn("collect health persist failed", err=str(_he)[:160])
-            enriched_all = enrich(items, persist_cache=True, skip_api=True)
+            enriched_all = enrich_mod.enrich(items, persist_cache=True, skip_api=True)
             recent_chapters.batch_insert_recent_chapters(enriched_all)
         else:
             # Dispatch mode: deep queue claim (FOR UPDATE SKIP LOCKED) — atomic whitelisted claim.
@@ -91,14 +91,14 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 _claimed = _ds_claim.claim_for_dispatch(whitelist=_wl_for_claim, hours=24, limit=500)
                 if _claimed:
                     items = _claimed
-                    enriched_all = enrich(items, persist_cache=False)
+                    enriched_all = enrich_mod.enrich(items, persist_cache=False)
                     _use_claimed = True
                 else:
                     raise ValueError("no claimed rows, fallback")
             except Exception as e:
                 logger.debug("claim queue fallback to get_recent_chapters", err=str(e)[:80])
                 items = recent_chapters.get_recent_chapters(hours=24)
-                enriched_all = enrich(items, persist_cache=False)
+                enriched_all = enrich_mod.enrich(items, persist_cache=False)
                 _use_claimed = False
         # Persist health (both modes)
         try:
