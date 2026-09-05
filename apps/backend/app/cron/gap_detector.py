@@ -151,7 +151,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                     """SELECT title_key, title, chapter, chapter_num, source, cover,
                               series_url, origin, updated_time, description, chapter_url
                        FROM recent_chapters
-                       WHERE title_key=%s AND source=%s AND chapter_num>%s AND chapter_num<=%s
+                       WHERE REPLACE(title_key,' ','-')=%s AND source=%s AND chapter_num>%s AND chapter_num<=%s
                        ORDER BY chapter_num""",
                     (tk_norm, src, lo, hi),
                 )
