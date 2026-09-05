@@ -141,14 +141,15 @@ function HomeGroupedCard({
   isBookmarked?: boolean;
 }) {
   const origin = normalizeOrigin(series.origin);
-  const flag = series.type ? getOriginFlag(origin) : "";
+  const t = (series.type || "").toLowerCase().trim();
+  const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
   const [hasRetried, setHasRetried] = useState(false);
   const [imgErrorFinal, setImgErrorFinal] = useState(false);
   const { trackChapter } = useContinueReading();
 
   return (
-    <div className="group relative flex gap-4 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/[0.07] transition-all">
+    <div className="group relative flex gap-4 p-4 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] transition-all hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]">
       {/* Cover */}
       <a
         href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
@@ -475,10 +476,13 @@ export default function HomePage() {
   return (
     <PageShell>
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+        <h1
+          className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[-0.04em] text-white mb-2"
+          style={{ fontFamily: '"Space Grotesk", var(--font-sans)' }}
+        >
           ManhwaScan
         </h1>
-        <p className="text-white/60 text-sm sm:text-base">
+        <p className="text-white/55 text-sm sm:text-[15px] leading-relaxed max-w-2xl">
           Read manhwa, manga, and webtoon for free. Daily updates from multiple
           sources.
         </p>
@@ -544,7 +548,7 @@ export default function HomePage() {
         ].map(({ icon: Icon, label, value }) => (
           <div
             key={label}
-            className="bg-white/5 border border-white/10 rounded-xl p-3 sm:p-4 flex items-center gap-3"
+            className="bg-[var(--gold-surface)] border border-[var(--gold-border)] rounded-xl p-3 sm:p-4 flex items-center gap-3 hover:border-[var(--gold-border-hover)] transition-colors"
           >
             {isLoading || snapshotLoading ? (
               <>
@@ -556,14 +560,18 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <div className="p-2 rounded-lg bg-white/10">
-                  <Icon size={18} className="text-white" weight="fill" />
+                <div className="p-2 rounded-lg bg-[var(--gold-accent-soft)] border border-[var(--gold-border)]">
+                  <Icon
+                    size={18}
+                    className="text-[var(--gold-accent)]"
+                    weight="fill"
+                  />
                 </div>
                 <div>
-                  <p className="text-base sm:text-lg font-bold text-white">
+                  <p className="text-base sm:text-lg font-bold tracking-[-0.02em] text-white tabular-nums">
                     {value}
                   </p>
-                  <p className="text-[10px] sm:text-xs text-white/50">
+                  <p className="text-[10px] sm:text-xs text-white/45 tracking-wide">
                     {label}
                   </p>
                 </div>
@@ -574,14 +582,17 @@ export default function HomePage() {
       </div>
 
       <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <h2 className="text-lg sm:text-xl font-bold text-white">
+        <h2
+          className="text-lg sm:text-[20px] font-bold tracking-[-0.03em] text-white"
+          style={{ fontFamily: '"Space Grotesk", var(--font-sans)' }}
+        >
           Latest Updates
         </h2>
         <button
           onClick={() => refetch()}
-          className="text-sm text-white/60 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/15 transition-colors"
         >
-          Refresh
+          <ArrowClockwise size={12} /> Refresh
         </button>
       </div>
 
