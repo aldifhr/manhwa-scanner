@@ -16,12 +16,12 @@ export function filterButtonClass(
     );
   }
 
-  // pill variant (default)
+  // pill variant (default) — gold accent when active
   return cn(
-    "px-3 py-1.5 text-xs font-medium rounded-full transition-colors cursor-pointer",
+    "px-3 py-1.5 text-xs font-medium rounded-full transition-colors cursor-pointer border",
     active
-      ? "bg-white text-black"
-      : "bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/20"
+      ? "bg-[var(--gold-accent)] text-black border-transparent shadow-[0_2px_10px_var(--gold-accent-soft)]"
+      : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:border-white/20 hover:bg-white/10"
   );
 }
 

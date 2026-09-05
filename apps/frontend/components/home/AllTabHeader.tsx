@@ -24,11 +24,14 @@ export default function AllTabHeader({
 }: Props) {
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap">
-      <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
-        <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-white">
+      <div className="flex items-baseline gap-2.5 sm:gap-3.5 flex-wrap">
+        <h1
+          className="text-[20px] sm:text-[22px] font-bold tracking-[-0.03em] text-white"
+          style={{ fontFamily: '"Space Grotesk", var(--font-sans)' }}
+        >
           All Manhwa
         </h1>
-        <div className="flex items-center rounded-lg border border-white/10 overflow-hidden text-xs">
+        <div className="flex items-center rounded-full border border-white/10 overflow-hidden text-xs p-0.5 bg-white/[0.03]">
           <button
             onClick={() => setFeed("all")}
             className={cn(
@@ -79,7 +82,7 @@ export default function AllTabHeader({
           </button>
         </div>
         {hasData && (
-          <span className="text-xs sm:text-sm text-white/50">
+          <span className="text-[11px] font-medium tracking-wide px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/50">
             {groupedCount} {countLabel}
           </span>
         )}
