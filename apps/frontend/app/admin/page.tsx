@@ -131,26 +131,26 @@ export default function AdminDashboard() {
           <button
             onClick={() => cronRun.mutate()}
             disabled={cronRun.isPending}
-            className="text-xs px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50"
+            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50"
           >
             {cronRun.isPending ? "..." : "Trigger cron update"}
           </button>
           <button
             onClick={() => refreshVor.mutate()}
             disabled={refreshVor.isPending}
-            className="text-xs px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
+            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
           >
             {refreshVor.isPending ? "..." : "Refresh Voratoon covers"}
           </button>
           <Link
             href="/status"
-            className="text-xs px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
+            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
           >
             Open /status
           </Link>
           <Link
             href="/error-logs"
-            className="text-xs px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
+            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
           >
             Error logs →
           </Link>
