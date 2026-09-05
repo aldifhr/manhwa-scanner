@@ -1,4 +1,4 @@
-"""Chapter gap detector + auto-backfill.
+"""Chapter gap detector + auto-backfill — ponytail: 419L gap/backfill (distinct from collect 407L scraper), keep separate until unified pipeline covers gap+scrape.
 
 Compares each whitelist series' latest_sent_chapter (what Discord got) against
 the newest chapter_num seen in recent_chapters (what the scraper found). A jump
