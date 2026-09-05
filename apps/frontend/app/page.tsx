@@ -85,7 +85,6 @@ function SourcePill({ source }: { source: string }) {
 
 function ContinueReadingCard({
   entry,
-  onRemove,
 }: {
   entry: ReturnType<typeof useContinueReading>["entries"] extends Map<
     string,
@@ -93,7 +92,6 @@ function ContinueReadingCard({
   >
     ? V
     : never;
-  onRemove?: (titleKey: string) => void;
 }) {
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
@@ -116,19 +114,7 @@ function ContinueReadingCard({
           </div>
         </div>
       </a>
-      {onRemove && (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onRemove(entry.titleKey);
-          }}
-          aria-label={`Remove ${entry.title} from continue reading`}
-          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-black/70 backdrop-blur border border-white/15 text-white/70 hover:text-white hover:bg-red-500/90 hover:border-red-500/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-[10px]"
-        >
-          ×
-        </button>
-      )}
+
       <div className="mt-2.5 px-1">
         <h3 className="text-xs sm:text-[13px] font-semibold leading-snug text-white line-clamp-2 min-h-[2.2rem] group-hover:text-white/80 transition-colors">
           {decodeHtml(entry.title)}
@@ -445,11 +431,8 @@ export default function HomePage() {
     staleTime: staleTimes.dashboard,
   });
 
-  const {
-    entries: continueReading,
-    removeReading,
-    clearAll: clearContinueReading,
-  } = useContinueReading();
+  const { entries: continueReading, clearAll: clearContinueReading } =
+    useContinueReading();
 
   const sortedContinueReading = useMemo(
     () =>
@@ -501,13 +484,13 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Continue Reading */}
+      {/* Bookmark */}
       {continueReading.size > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <BookOpen size={18} className="text-white" weight="fill" />
+            <BookBookmark size={18} className="text-white" weight="fill" />
             <h2 className="text-lg sm:text-xl font-bold text-white">
-              Continue Reading
+              Bookmark
             </h2>
             <span className="text-xs text-white/50">
               ({continueReading.size})
@@ -527,11 +510,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04, duration: 0.25 }}
               >
-                <ContinueReadingCard
-                  key={entry.titleKey}
-                  entry={entry}
-                  onRemove={removeReading}
-                />
+                <ContinueReadingCard key={entry.titleKey} entry={entry} />
               </motion.div>
             ))}
           </div>
