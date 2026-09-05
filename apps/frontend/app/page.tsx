@@ -441,6 +441,9 @@ export default function HomePage() {
     return s;
   }, [bookmarks]);
 
+  const isLoggedInForSnapshot =
+    typeof document !== "undefined" &&
+    !!document.cookie.match(/(?:^|;\s*)ikiru_role=/);
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: queryKeys.dashboardSnapshot,
     queryFn: () =>
@@ -448,6 +451,9 @@ export default function HomePage() {
         import("@/lib/types").DashboardSnapshot
       >,
     staleTime: staleTimes.dashboard,
+    retry: false,
+    refetchOnWindowFocus: false,
+    enabled: isLoggedInForSnapshot,
   });
 
   const { entries: continueReading, clearAll: clearContinueReading } =
