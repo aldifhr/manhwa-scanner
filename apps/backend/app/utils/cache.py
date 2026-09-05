@@ -27,13 +27,11 @@ _REGISTRY: list[Callable] = []
 
 
 def _make_key(args: tuple, kwargs: dict) -> str:
-    # Stable key: hash of repr for args/kwargs (fast, handles unhashables via str)
-    import hashlib, json
+    # ponytail: stdlib hash replaces hashlib+json (stable enough for cache key), switch to sha256 when collision observed
     try:
-        raw = json.dumps([args, sorted(kwargs.items())], sort_keys=True, default=str)
+        return str(hash((str(args), str(sorted(kwargs.items())))))
     except Exception:
-        raw = repr((args, tuple(sorted(kwargs.items()))))
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+        return str(hash(repr((args, tuple(sorted(kwargs.items()))))))
 
 
 def ttl_cache(ttl: float = 30.0, maxsize: int = 200):

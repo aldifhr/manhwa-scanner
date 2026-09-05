@@ -23,13 +23,9 @@ MAX_COUNTERS = 200
 def inc(name: str, by: int = 1) -> None:
     with _lock:
         _counters[name] += by
-        # M1 FIX: Prune oldest counters if we exceed MAX_COUNTERS
+        # ponytail: sorted prune → clear (same bound, O(1) not O(n log n)), restore LRU prune when counter loss matters
         if len(_counters) > MAX_COUNTERS:
-            # Remove the oldest 25% of counters (those with lowest values)
-            sorted_counters = sorted(_counters.items(), key=lambda x: x[1])
-            to_remove = sorted_counters[:len(sorted_counters) // 4]
-            for k, _ in to_remove:
-                del _counters[k]
+            _counters.clear()
 
 
 def snapshot() -> dict:
