@@ -12,7 +12,8 @@ _SERIES_META_RETENTION_DAYS = 14  # ponytail: series_meta inactive 2 minggu auto
 
 
 def _retention_loop(stop_event) -> None:
-    """Hourly check: prune old/overflowing dispatch_history rows + stale claims."""
+    """Hourly check: prune old rows + stale whitelist (1 bulan nggak update → hapus)."""
+    _last_whitelist_prune = 0.0
     while not stop_event.is_set():
         try:
             from app.db import get_supabase as _gsb_m
@@ -75,7 +76,6 @@ def _retention_loop(stop_event) -> None:
             try:
                 from datetime import datetime, timedelta, timezone
                 cutoff = (datetime.now(timezone.utc) - timedelta(days=_SERIES_META_RETENTION_DAYS)).isoformat()
-                # keep if in whitelist or recent_chapters last 14d
                 _wl = _sb.table("whitelist").select("title_key").execute()
                 _wl_keys = {r.get("title_key") for r in (_wl.data or []) if r.get("title_key")}
                 _rc = _sb.table("recent_chapters").select("title_key").gte("updated_time", cutoff).execute()
@@ -88,6 +88,17 @@ def _retention_loop(stop_event) -> None:
                     logger.info("retention: pruned series_meta", deleted=len(to_del), days=_SERIES_META_RETENTION_DAYS)
             except Exception as e:
                 logger.warn("retention: series_meta cleanup failed", err=str(e)[:120])
+            # ponytail: whitelist 30d never notified → auto-hapus (daily)
+            try:
+                import time as _t2
+                if _t2.time() - _last_whitelist_prune > 86400:
+                    from app.storage.whitelist import auto_cleanup_stale_whitelist
+                    _r = auto_cleanup_stale_whitelist(days=30)
+                    if _r.get("removed"):
+                        logger.info("retention: pruned stale whitelist", removed=_r.get("removed"), days=30)
+                    _last_whitelist_prune = _t2.time()
+            except Exception as e:
+                logger.warn("retention: whitelist 30d cleanup failed", err=str(e)[:120])
             logger.info("retention prune done",
                         dispatch_history_days=_DISPATCH_HISTORY_RETENTION_DAYS,
                         cron_run_status_days=_CRON_RUN_STATUS_RETENTION_DAYS,
