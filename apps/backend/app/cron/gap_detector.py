@@ -133,7 +133,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
         for g in gaps:
             tk, src = g["title_key"], g["source"]
             key = f"{tk[:30]} ({src})"
-            # per-series savepoint isolation — sanitize (hash int -> safe, tapi validate)
+            # per-series savepoint isolation
             sp_name = f"sp_gap_{abs(hash(key)) % 100000}"
             import re as _re_sp
             if not _re_sp.match(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$", sp_name):
@@ -145,6 +145,44 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
             try:
                 tk_norm = tk.replace(" ", "-")
                 lo, hi = g["sent"], g["scraped"]
+
+                # ponytail: check if rows already exist in recent_chapters gap range
+                cur.execute(
+                    """SELECT title_key, title, chapter, chapter_num, source, cover,
+                              series_url, origin, updated_time, description, chapter_url
+                       FROM recent_chapters
+                       WHERE title_key=%s AND source=%s AND chapter_num>%s AND chapter_num<=%s
+                       ORDER BY chapter_num""",
+                    (tk_norm, src, lo, hi),
+                )
+                names = ["title_key", "title", "chapter", "chapter_num", "source", "cover",
+                         "series_url", "origin", "updated_time", "description", "chapter_url"]
+                existing_items = [dict(zip(names, r)) for r in cur.fetchall()]
+                if existing_items:
+                    fresh_stamp = datetime.now(timezone.utc).isoformat()
+                    for it in existing_items:
+                        it["updated_time"] = fresh_stamp
+                        it["url"] = it.get("chapter_url") or it.get("url") or ""
+                    if channels is None:
+                        channels = _load_channels()
+                    sent_this = dispatch(existing_items, channels, instance_id="gap-autofix", force=False) if channels else 0
+                    dispatched += sent_this
+                    cur.execute(
+                        """UPDATE whitelist SET
+                             latest_sent_chapter = GREATEST(COALESCE(latest_sent_chapter,0), %s),
+                             latest_chapter      = GREATEST(COALESCE(latest_chapter,0), %s)
+                           WHERE title_key=%s AND source=%s""",
+                        (hi, hi, tk, src),
+                    )
+                    fixed.append(key)
+                    details[key] = f"ok existing rows, sent:{sent_this}"
+                    try:
+                        cur.execute(f"RELEASE SAVEPOINT {sp_name}")
+                    except Exception:
+                        pass
+                    continue
+
+                # No rows in gap range — try to backfill from source API
                 cur.execute(
                     "SELECT series_url FROM whitelist WHERE title_key=%s AND source=%s",
                     (tk, src),
