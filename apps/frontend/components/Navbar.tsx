@@ -26,23 +26,9 @@ export default function Navbar() {
       setIsAdmin(roleMatch[1] === "admin");
       return;
     }
-    // fallback for old sessions without ikiru_role cookie — probe backend
-    fetch("/api/v1/auth/me", { cache: "no-store", credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        const role = j?.data?.role;
-        if (role) {
-          setIsLoggedIn(true);
-          setIsAdmin(role === "admin");
-        } else {
-          setIsLoggedIn(false);
-          setIsAdmin(false);
-        }
-      })
-      .catch(() => {
-        setIsLoggedIn(false);
-        setIsAdmin(false);
-      });
+    // no readable role → treat as anon, don't spam /api/v1/auth/me (ga login ngespam 401)
+    setIsLoggedIn(false);
+    setIsAdmin(false);
   }, [pathname]);
 
   useEffect(() => {

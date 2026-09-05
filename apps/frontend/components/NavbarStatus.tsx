@@ -57,6 +57,8 @@ export default function NavbarStatus({
       }>,
     refetchInterval: 30_000,
     staleTime: 15_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const agg = aggregate(data?.sourceHealth, data?.cronStatus);
