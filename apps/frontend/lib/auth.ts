@@ -40,9 +40,4 @@ export function verifyToken(token: string): boolean {
   return Date.now() < payload.exp * 1000;
 }
 
-// compat — roles removed, single password model. Any valid JWT is "user".
-export function getRole(token: string): "user" | null {
-  return verifyToken(token) ? "user" : null;
-}
-
 export { COOKIE_NAME };
