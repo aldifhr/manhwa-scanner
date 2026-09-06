@@ -38,7 +38,7 @@ export default function RootLayout({
 }) {
   return (
     <html
-      lang="id"
+      lang="en"
       suppressHydrationWarning
       className={cn("font-sans dark", geist.variable)}
     >

@@ -57,7 +57,7 @@ export default function Announcement() {
   return (
     <div className="w-full bg-zinc-900 border-b border-white/10 text-white text-xs font-medium py-1.5 px-3 flex items-center gap-2">
       <span className="flex-1 text-center">
-        ✨ {total ?? "?"} rilis baru hari ini — jangan ketinggalan!{degraded}
+        ✨ {total ?? "?"} new releases today — don&apos;t miss out!{degraded}
       </span>
       <button
         aria-label="Dismiss"
