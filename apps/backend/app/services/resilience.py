@@ -168,22 +168,5 @@ cb_voratoon = CircuitBreaker("voratoon", failure_threshold=5, recovery_timeout=1
 cb_ikiru_api = CircuitBreaker("ikiru_api", failure_threshold=5, recovery_timeout=300)
 
 
-def with_circuit_breaker(cb: CircuitBreaker):
-    """Decorator that wraps a function with a given CircuitBreaker."""
-
-    def decorator(fn: Callable):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            if not cb.allow():
-                raise RuntimeError(f"circuit {cb.name} OPEN — fast fail")
-            try:
-                result = fn(*args, **kwargs)
-                cb.record_success()
-                return result
-            except Exception:
-                cb.record_failure()
-                raise
-
-        return wrapper
-
-    return decorator
+def with_circuit_breaker(cb: CircuitBreaker):  # ponytail: alias — was 19L dup of CircuitBreaker.__call__, use @cb directly; keep alias for compat
+    return cb
