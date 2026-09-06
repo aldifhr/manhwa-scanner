@@ -63,6 +63,14 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     except Exception as _pe:
         logger.warn("shinigami latest fetch failed", err=str(_pe)[:120])
         return items
+    # ponytail: bulk preload 1 query vs N
+    if fetch_meta and _series:
+        try:
+            from app.cron.collectors.common import preload_series_meta_bulk
+            _keys = [(normalize_title_key(m.get("title") or m.get("manga_name") or ""), "shinigami") for m in _series]
+            preload_series_meta_bulk(_keys)
+        except Exception:
+            pass
     _now = _dt.now(_tz.utc)
     _cutoff = _now - _td(hours=24)
     for m in _series:

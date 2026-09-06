@@ -63,7 +63,7 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
 def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = True, exclude_keys: set[str] | None = None) -> list[dict]:
     from app.scrapers import ikiru as _ikiru_scraper
     from concurrent.futures import ThreadPoolExecutor
-    from app.cron.collectors.common import _COLLECT_WORKERS
+    from app.cron.collectors.common import _COLLECT_WORKERS, preload_series_meta_bulk
     from app.utils.text import normalize_title_key as _ntk
     items: list[dict] = []
     _series = list(_ikiru_scraper.get_ikiru_latest_updates())
@@ -73,6 +73,13 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
         _series = [u for u in _series if _ntk(u.get("title", "")) not in exclude_keys]
         if not _series:
             return items
+    # ponytail: bulk preload 1 query vs 150
+    if fetch_meta:
+        try:
+            _keys = [(normalize_title_key(u.get("title", "")), "ikiru") for u in _series]
+            preload_series_meta_bulk(_keys)
+        except Exception:
+            pass
     with ThreadPoolExecutor(max_workers=_COLLECT_WORKERS) as _ex:
         _futs = [_ex.submit(_ikiru_process_series, u, latest_sent, fetch_meta) for u in _series]
         for _f in _futs:

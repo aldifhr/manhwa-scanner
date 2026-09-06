@@ -72,6 +72,50 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
     return data
 
 
+def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
+    """ponytail: 1 query for 150 series vs 150 queries — warm both caches"""
+    if not keys:
+        return
+    # dedupe, group by source
+    from collections import defaultdict
+    by_src: dict[str, set[str]] = defaultdict(set)
+    for tk, src in keys:
+        if src in ("ikiru", "shinigami") and tk:
+            by_src[src].add(tk)
+    for src, tks in by_src.items():
+        cache, ttl, mx = (
+            (_IKIRU_META_CACHE, _IKIRU_META_CACHE_TTL, _IKIRU_META_CACHE_MAX)
+            if src == "ikiru"
+            else (_SHINIGAMI_META_CACHE, _SHINIGAMI_META_CACHE_TTL, _SHINIGAMI_META_CACHE_MAX)
+        )
+        # filter not cached
+        now = _time_mod.monotonic()
+        need = [tk for tk in tks if not (cache.get(tk) and (now - cache[tk][0]) < ttl)]
+        if not need:
+            continue
+        try:
+            from app.db import get_supabase as _gsb2
+            # chunk 100 (PostgREST IN limit)
+            for i in range(0, len(need), 100):
+                chunk = need[i:i+100]
+                rows = (
+                    _gsb2().table("series_meta")
+                    .select("title_key, source, rating, genres, description, cover, type")
+                    .in_("title_key", chunk)
+                    .eq("source", src)
+                    .execute()
+                    .data
+                    or []
+                )
+                for r in rows:
+                    tk = r.get("title_key")
+                    if tk and (r.get("rating") not in (None, "", 0) or (r.get("description") or "").strip()):
+                        # use tk as sid key for cache (both sid and tk forms)
+                        with _CHAPTER_CACHE_LOCK:
+                            cache[tk] = (now, r)
+        except Exception:
+            pass
+
 def _cached_series_meta(source: str, sid: str, tk: str | None = None) -> dict:
     if source not in ("ikiru", "shinigami"):
         return {}
@@ -85,6 +129,11 @@ def _cached_series_meta(source: str, sid: str, tk: str | None = None) -> dict:
         c = cache.get(sid)
         if c and (now - c[0]) < ttl:
             return c[1]
+        # also check tk alias
+        if tk:
+            c2 = cache.get(tk)
+            if c2 and (now - c2[0]) < ttl:
+                return c2[1]
     _key = tk if tk else normalize_title_key(str(sid))
     try:
         from app.db import get_supabase as _gsb
