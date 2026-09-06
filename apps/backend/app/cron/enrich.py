@@ -204,7 +204,11 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             if not it.get("genres"):
                 it["genres"] = s.get("genres", [])
             it["description"] = _strip_html(s.get("description", "")) or it.get("description", "")
-            it["origin"] = normalize_origin(shin_origin or it.get("origin", ""))
+            # Don't overwrite a valid collector origin with API origin — shinigami
+            # API country_id is unreliable (hosts CN content, reports KR). Collector
+            # origin is the source of truth after the 31194e0 fix; only fill when empty.
+            if not it.get("origin"):
+                it["origin"] = shin_origin
             # Update type from cached shinigami data if available
             if not it.get("type") and s.get("type"):
                 it["type"] = s["type"]

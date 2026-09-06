@@ -47,10 +47,15 @@ export default function AdminDashboard() {
       const r = await readerFetch<{
         success: boolean;
         data: { results: any[] };
-      }>("/api/v1/logs/errors?page=1&page_size=5");
-      return r.data?.results ?? [];
+      }>("/api/v1/logs/errors?page=1&page_size=20");
+      return (r.data?.results ?? []).filter((e: any) => e.level === "error").slice(0, 5);
     },
     refetchInterval: 60000,
+  });
+  const clearErrors = useMutation({
+    mutationFn: async () => readerFetch<{ success: boolean }>("/api/v1/logs/errors", { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-errors"] }); setMsg("Logs cleared"); setTimeout(() => setMsg(null), 2000); },
+    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
   });
 
   const cronRun = useMutation({
@@ -81,6 +86,25 @@ export default function AdminDashboard() {
       setTimeout(() => setMsg(null), 3000);
       qc.invalidateQueries({ queryKey: ["admin-health"] });
     },
+    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
+  });
+
+  const { data: failed } = useQuery({
+    queryKey: ["admin-failed"],
+    queryFn: async () => {
+      const r = await readerFetch<{ success: boolean; data: { results: any[]; total: number } }>("/api/v1/failed-dispatches?limit=20");
+      return r.data;
+    },
+    refetchInterval: 30000,
+  });
+  const retryOne = useMutation({
+    mutationFn: async (id: string) => readerFetch<{ success: boolean }>("/api/v1/failed-dispatches?action=retry", { method: "POST", body: JSON.stringify({ id }) }),
+    onSuccess: () => { setMsg("Retried"); setTimeout(() => setMsg(null), 2000); qc.invalidateQueries({ queryKey: ["admin-failed"] }); },
+    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
+  });
+  const retryAll = useMutation({
+    mutationFn: async () => readerFetch<{ success: boolean }>("/api/v1/failed-dispatches?action=retry-all", { method: "POST" }),
+    onSuccess: () => { setMsg("Retry-all triggered"); setTimeout(() => setMsg(null), 2000); qc.invalidateQueries({ queryKey: ["admin-failed"] }); },
     onError: (e) => setMsg((e as Error).message.slice(0, 120)),
   });
 
@@ -192,9 +216,10 @@ export default function AdminDashboard() {
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-white/80">
-            Latest errors (5)
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white/80">Latest errors (5)</h2>
+            <button onClick={() => clearErrors.mutate()} disabled={clearErrors.isPending} className="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50">{clearErrors.isPending ? "..." : "Clear"}</button>
+          </div>
           {!errors || errors.length === 0 ? (
             <p className="text-sm text-white/40 border border-dashed border-white/10 rounded-lg p-4 text-center">
               Clean
@@ -231,6 +256,14 @@ export default function AdminDashboard() {
           <pre className="text-xs bg-black/30 rounded-lg p-3 overflow-auto max-h-64 text-white/70">
             {JSON.stringify(cron ?? {}, null, 2)}
           </pre>
+        </div>
+
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Failed dispatches {(failed as any)?.total ? `(${(failed as any).total})` : ""}</h3>
+            <button onClick={() => retryAll.mutate()} disabled={retryAll.isPending || !(failed as any)?.results?.length} className="text-xs px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50">{retryAll.isPending ? "..." : "Retry all"}</button>
+          </div>
+          {!(failed as any)?.results?.length ? <p className="text-xs text-white/40">No failures</p> : <div className="space-y-2">{(failed as any).results.map((r: any) => <div key={r.id} className="flex items-center gap-2 text-xs bg-black/20 rounded-lg p-2"><span className="truncate flex-1">{r.title} — {r.chapter}</span><span className="text-white/40 hidden sm:inline truncate max-w-[160px]">{r.error?.slice(0, 80)}</span><button onClick={() => retryOne.mutate(r.id)} disabled={retryOne.isPending} className="shrink-0 px-2 py-1 rounded bg-white/10 hover:bg-white/15 border border-white/10">Retry</button></div>)}</div>}
         </div>
       </div>
     </PageShell>

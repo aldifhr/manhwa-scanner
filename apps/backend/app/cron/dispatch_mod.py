@@ -313,10 +313,15 @@ def load_guild_settings() -> list[dict]:
         res = (
             get_supabase()
             .table("guild_settings")
-            .select("guild_id, channel_id, origin_filter, excluded_titles, label")
+            .select("guild_id, channel_id, origin_filter, label")
             .execute()
         )
-        return [r for r in (res.data or []) if r.get("channel_id")]
+        rows = [r for r in (res.data or []) if r.get("channel_id")]
+        # normalize missing optional cols
+        for r in rows:
+            r.setdefault("excluded_titles", [])
+            r.setdefault("label", "")
+        return rows
     except Exception:
         return []
 

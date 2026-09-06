@@ -25,6 +25,8 @@ logger = get_logger("gap-detector")
 GAP_THRESHOLD = 1.0     # newest_scraped - latest_sent must exceed this
 COOLDOWN_MIN = 240      # at most one gap alert every 4h
 _last_alert: float = 0.0
+_last_backfill_ts: float = 0.0  # ponytail: throttle backfill when repeatedly nothing fixed
+_last_gaps_hash: str = ""
 
 
 def _shinigami_chapters(manga_id: str) -> list[dict]:
@@ -379,25 +381,32 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
     if fixed:
         logger.info("gap auto-backfill done", inserted=inserted, dispatched=dispatched, series=len(fixed), details=str(details)[:500])
     else:
-        logger.warn("gap auto-backfill: nothing fixed", inserted=inserted, dispatched=dispatched, details=str(details)[:500])
+        logger.debug("gap auto-backfill: nothing fixed", inserted=inserted, dispatched=dispatched, details=str(details)[:500])
     return {"inserted": inserted, "dispatched": dispatched, "fixed": fixed, "details": details}
 
 
 def maybe_alert_gaps() -> int:
     """Run detection; alert admin channel (with cooldown), then AUTO-BACKFILL
     and re-dispatch the missing chapters. Returns number of gapped series found."""
-    global _last_alert
+    global _last_alert, _last_backfill_ts, _last_gaps_hash
     gaps = detect_gaps()
     if not gaps:
+        _last_gaps_hash = ""
         return 0
-    result = None
+    gaps_hash = ",".join(sorted(f"{g['title_key']}:{g['source']}:{g['sent']}->{g['scraped']}" for g in gaps))
     now = time.monotonic()
+    if gaps_hash == _last_gaps_hash and now - _last_backfill_ts < 900:
+        logger.debug("gap backfill throttled (same gaps <15m)")
+        return len(gaps)
+    result = None
     should_alert = now - _last_alert >= COOLDOWN_MIN * 60
     if should_alert:
         _last_alert = now
 
     # ── AUTO-FIX: always attempt, regardless of alert cooldown ──
     result = _backfill_and_dispatch(gaps)
+    _last_backfill_ts = now
+    _last_gaps_hash = gaps_hash if not result.get("fixed") else ""
     fixed_names = set(result.get("fixed") or [])
 
     cid = (settings.ADMIN_REPORT_CHANNEL_ID or "").strip()

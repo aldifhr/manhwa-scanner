@@ -387,7 +387,7 @@ def normalize_whitelist_urls(dry_run: bool = False) -> dict:
     """Rewrite stale shinigami hosts in whitelist + recent_chapters to current base."""
     from app.db import get_supabase as _sb
 
-    wl_rows = _sb().table("whitelist").select("title_key,source,series_url,url,permalink,cover").execute().data or []
+    wl_rows = _sb().table("whitelist").select("title_key,source,series_url,url,cover").execute().data or []
     rc_rows = _sb().table("recent_chapters").select("id,series_url,chapter_url,cover").execute().data or []
 
     def _apply(v):
@@ -404,7 +404,7 @@ def normalize_whitelist_urls(dry_run: bool = False) -> dict:
             continue
         seen_wl.add(key)
         changed = {}
-        for fld in ("series_url", "url", "permalink", "cover"):
+        for fld in ("series_url", "url", "cover"):
             v = r.get(fld)
             if not v:
                 continue
