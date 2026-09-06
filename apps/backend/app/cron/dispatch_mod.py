@@ -79,6 +79,42 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         logger.info("dispatch: nothing to send")
         return 0
 
+    # ponytail: ceiling guard — drop chapters at/below whitelist.latest_sent_chapter even when legacy fcfs_key is NULL/mismatched
+    try:
+        from app.db import get_supabase as _gs_ceil
+        from app.utils.text import normalize_title_key as _ntk_ceil
+        _wl_c = _gs_ceil().table("whitelist").select("title_key,source,latest_sent_chapter").execute().data or []
+        _ceil_map: dict[tuple[str, str], float] = {}
+        for _w in _wl_c:
+            _tkc = _ntk_ceil(str(_w.get("title_key") or ""))
+            _srcc = str(_w.get("source") or "")
+            try:
+                _lsv = float(_w.get("latest_sent_chapter") or 0)
+            except (ValueError, TypeError):
+                _lsv = 0
+            if _tkc and _lsv:
+                _ceil_map[(_tkc, _srcc)] = max(_ceil_map.get((_tkc, _srcc), 0), _lsv)
+        _filtered: list[dict] = []
+        for _it in to_send:
+            try:
+                _cn = float(str(_it.get("chapter") or _it.get("chapter_num") or 0) or 0)
+            except (ValueError, TypeError):
+                _cn = 0
+            if _cn:
+                _tk_it = _ntk_ceil(str(_it.get("title_key") or ""))
+                _src_it = str(_it.get("source") or "")
+                _ceil_v = _ceil_map.get((_tk_it, _src_it), 0)
+                if _ceil_v and _cn <= _ceil_v:
+                    continue
+            _filtered.append(_it)
+        if len(_filtered) < len(to_send):
+            logger.info("dispatch: ceiling filtered", removed=len(to_send) - len(_filtered))
+            to_send = _filtered
+            if not to_send:
+                return 0
+    except Exception as _e:
+        logger.warn("dispatch ceiling check failed", err=str(_e)[:120])
+
     # FCFS dedupe: skip chapters ALREADY NOTIFIED (in dispatch_history).
     # NOTE: we intentionally do NOT consult dispatch_claims here. The deep-queue
     # claim in pipeline.py (claim_recent_chapters_for_dispatch) and the
@@ -123,6 +159,25 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # transient claims and must not suppress sending.
     _all_urls = [it.get("url", "") for it in to_send if it.get("url")]
     _claimed_urls_set = set() if force else (dispatch_store._already_dispatched(_all_urls) if _all_urls else set())
+    # ponytail: legacy fallback — old fcfs_key = chapter#title_key (010) vs new title#chapter, also check title_key+chapter_title directly
+    _legacy_pairs: set[tuple[str, str]] = set()
+    try:
+        from app.db import get_supabase as _gs_leg
+        _tk_list = list({str(it.get("title_key") or "") for it in to_send if it.get("title_key")})
+        if _tk_list:
+            _rows_leg = _gs_leg().table("dispatch_history").select("title_key,chapter_title").in_("title_key", _tk_list).execute().data or []
+            for _r in _rows_leg:
+                _tkh = str(_r.get("title_key") or "")
+                _cth = str(_r.get("chapter_title") or "")
+                if _tkh and _cth:
+                    _legacy_pairs.add((_tkh, _cth))
+                    try:
+                        _cnorm = ("%.10g" % float(_cth))
+                        _legacy_pairs.add((_tkh, _cnorm))
+                    except (ValueError, TypeError):
+                        pass
+    except Exception:
+        _legacy_pairs = set()
 
     # Reject junk URLs that don't match known source patterns
     _VALID_URL_PREFIXES = ("https://11.shinigami.asia/chapter/", "https://v1.voratoon.com/series/", "https://07.ikiru.wtf/manga/")
@@ -185,6 +240,15 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 continue
             norm = fcfs_key(it.get("title", ""), it.get("chapter", ""))
             if norm in claimed_keys or norm in seen_key_run or url in _claimed_urls_set:
+                continue
+            # legacy title_key#chapter fallback
+            _tk_l = str(it.get("title_key") or "")
+            _ch_l = str(it.get("chapter") or "")
+            try:
+                _ch_n = ("%.10g" % float(_ch_l)) if _ch_l else _ch_l
+            except (ValueError, TypeError):
+                _ch_n = _ch_l
+            if (_tk_l, _ch_l) in _legacy_pairs or (_tk_l, _ch_n) in _legacy_pairs:
                 continue
             seen_key_run.add(norm)
 

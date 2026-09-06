@@ -457,12 +457,20 @@ def claim_recent_chapters_for_dispatch(
 
     # Build whitelist lookup for fast filtering
     allowed: set[tuple[str, str]] = set()
+    _latest_sent: dict[tuple[str, str], float] = {}
     for w in whitelist:
         from app.utils.text import normalize_title_key as _ntk
         tk = _ntk(str(w.get("title_key") or ""))
         src = str(w.get("source") or "")
         if tk:
             allowed.add((tk, src))
+        # ponytail: ceiling guard — chapter <= latest_sent never re-notify (re-touch/URL-rotate bypasses fcfs when legacy fcfs_key is NULL)
+        try:
+            _ls = float(w.get("latest_sent_chapter") or 0)
+        except (ValueError, TypeError):
+            _ls = 0
+        if tk and _ls:
+            _latest_sent[(tk, src)] = max(_latest_sent.get((tk, src), 0), _ls)
 
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
     conn = None
@@ -524,6 +532,26 @@ def claim_recent_chapters_for_dispatch(
             ph3 = ",".join(["%s"] * len(uniq_fk))
             cur.execute(f"SELECT fcfs_key FROM dispatch_claims WHERE fcfs_key IN ({ph3}) AND expires_at >= %s", uniq_fk + [now])
             already_fcfs |= {row["fcfs_key"] for row in cur.fetchall() if row.get("fcfs_key")}  # type: ignore
+        # ponytail: legacy fcfs_key fallback (migration 010 stored chapter#title_key, new is title#chapter) — check title_key+chapter_title directly
+        _legacy_pairs: set[tuple[str, str]] = set()
+        try:
+            _tk_list = list({str(c.get("title_key") or "") for c in candidates if c.get("title_key")})
+            if _tk_list:
+                ph_tk = ",".join(["%s"] * len(_tk_list))
+                cur.execute(f"SELECT title_key, chapter_title FROM dispatch_history WHERE title_key IN ({ph_tk})", _tk_list)
+                for _r in cur.fetchall():
+                    _tkh = str(_r.get("title_key") or "")
+                    _cth = str(_r.get("chapter_title") or "")
+                    if _tkh and _cth:
+                        _legacy_pairs.add((_tkh, _cth))
+                        # also store normalized chapter (e.g., '108.0' vs '108')
+                        try:
+                            _cnorm = ("%.10g" % float(_cth))
+                            _legacy_pairs.add((_tkh, _cnorm))
+                        except (ValueError, TypeError):
+                            pass
+        except Exception:
+            _legacy_pairs = set()
 
         # Filter candidates to not yet sent
         to_claim: list[dict] = []
@@ -532,6 +560,28 @@ def claim_recent_chapters_for_dispatch(
             fk = fcfs_key(c.get("title") or "", c.get("chapter") or "")
             if u in already_urls or fk in already_fcfs:
                 continue
+            # legacy title_key+chapter check
+            _tk_c = str(c.get("title_key") or "")
+            _ch_c = str(c.get("chapter") or c.get("chapter_num") or "")
+            try:
+                _ch_norm = ("%.10g" % float(_ch_c)) if _ch_c else _ch_c
+            except (ValueError, TypeError):
+                _ch_norm = _ch_c
+            if _tk_c and _ch_c and ((_tk_c, _ch_c) in _legacy_pairs or (_tk_c, _ch_norm) in _legacy_pairs):
+                continue
+            # ponytail: ceiling check — if chapter_num <= latest_sent, skip even when fcfs_key legacy is NULL
+            try:
+                _cn = float(str(c.get("chapter") or c.get("chapter_num") or 0) or 0)
+            except (ValueError, TypeError):
+                _cn = 0
+            if _cn:
+                _tk2 = str(c.get("title_key") or "")
+                from app.utils.text import normalize_title_key as _ntk3
+                _ntk_c = _ntk3(_tk2)
+                _src2 = str(c.get("source") or "")
+                _ceil = _latest_sent.get((_ntk_c, _src2), 0) or _latest_sent.get((_tk2, _src2), 0)
+                if _ceil and _cn <= _ceil:
+                    continue
             to_claim.append(c)
 
         # C1 Fix: Write dispatch_claims in the SAME transaction as the row lock
