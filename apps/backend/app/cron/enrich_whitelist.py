@@ -171,6 +171,9 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
     return updates if updates else None
 
 
+_ENRICH_LAST_RUN: float = 0
+_ENRICH_THROTTLE_S = 3600  # 1h — ponytail: was every 5m cron, 150 skipped but still 1 SELECT+loop; throttle saves DB
+
 def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
     """Enrich whitelist entries with upstream metadata (cover, rating, genres,
     description, status, type, origin).
@@ -188,6 +191,13 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
 
     Returns count updated.
     """
+    import time as _t
+    global _ENRICH_LAST_RUN
+    # ponytail: throttle 1h — if last run was <1h ago and all were skipped, skip DB entirely
+    if _t.time() - _ENRICH_LAST_RUN < _ENRICH_THROTTLE_S:
+        # quick check via cache? still need SELECT to know, so just skip if within throttle and previous was all-skip
+        # we keep simple: if throttled, return 0 immediately (next 5m tick will still check)
+        return 0
     sb = get_supabase()
 
     # Pull ALL fields used by the completeness check + the throttle timestamp.
@@ -315,4 +325,9 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         logger.warn("voratoon extra refresh failed", err=str(e)[:120])
 
     logger.info("enrich_all_whitelist done", updated=updated, refreshed=refreshed, skipped=skipped, total=len(rows))
+    # update throttle marker only when all skipped (no work) -> next run 1h later
+    if skipped == len(rows) and updated == 0:
+        _ENRICH_LAST_RUN = _t.time()
+    else:
+        _ENRICH_LAST_RUN = 0  # reset if work done, so next cron retries soon
     return updated

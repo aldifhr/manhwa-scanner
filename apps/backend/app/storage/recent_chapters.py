@@ -75,6 +75,9 @@ def _composite_key(r: dict) -> tuple[str, str, str] | None:
     return (tk, src, cn)
 
 
+_EXISTING_RC_CACHE: dict[tuple, tuple[set[str], set[tuple[str, str, str]], float]] = {}
+_EXISTING_RC_TTL = 60.0
+
 def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, str]]]:
     """Existing recent_chapters rows for this batch.
 
@@ -83,11 +86,17 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
     rows whose URL already exists and (b) skip URL-rotated re-touches of a
     chapter that already exists under a different URL.
     """
+    import time as _t
     existing_urls: set[str] = set()
     existing_ch: set[tuple[str, str, str]] = set()
     tks = sorted({(r.get("title_key") or "") for r in rows if r.get("title_key")})
     if not tks:
         return existing_urls, existing_ch
+    # ponytail: cache 60s — same batch re-hit within cron tick wastes 1 DB round-trip; 154→131 inserted 0 still pays lookup
+    _key = tuple(tks[:5] + [str(len(tks))])  # cheap sig
+    _cached = _EXISTING_RC_CACHE.get(_key)
+    if _cached and (_t.time() - _cached[2]) < _EXISTING_RC_TTL:
+        return _cached[0], _cached[1]
     _cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     try:
         for i in range(0, len(tks), 100):
@@ -111,6 +120,14 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
                     existing_ch.add((_tk, _src, _cn))  # type: ignore
     except Exception as e:
         logger.error("batchInsertRecentChapters existing lookup failed", exc=e)
+    # cache store
+    try:
+        import time as _t2
+        _EXISTING_RC_CACHE[_key] = (existing_urls, existing_ch, _t2.time())
+        if len(_EXISTING_RC_CACHE) > 64:
+            _EXISTING_RC_CACHE.pop(next(iter(_EXISTING_RC_CACHE)))
+    except Exception:
+        pass
     return existing_urls, existing_ch
 
 

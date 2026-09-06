@@ -303,7 +303,7 @@ def _probe_source_health(force: bool = False) -> dict:
         # healthy<->degraded every cron tick.
         for _attempt in range(2):
             try:
-                r = cffi_req.get(url, headers=_probe_headers, impersonate="chrome", timeout=15)
+                r = cffi_req.get(url, headers=_probe_headers, impersonate="chrome", timeout=5)
                 rt = int((_t.time() - t0) * 1000)
                 if r.status_code < 500:
                     ok = True
