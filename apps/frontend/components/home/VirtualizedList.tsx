@@ -1,19 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useWindowVirtualizer, useVirtualizer } from "@tanstack/react-virtual";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 
 interface VirtualizedListProps<T> {
   items: T[];
   gap?: number;
   estimateSize?: number;
-  /** Intentional overscan: extra rows beyond viewport to avoid flash */
   overscan?: number;
   chunkSize?: number;
   scrollToTitleKey?: string | null;
   titleKeyOf?: (item: T) => string;
   renderItem: (item: T, index: number) => ReactNode;
-  /** window = document scroll (homepage), element = container scroll (e.g. modal) */
-  scrollMode?: "window" | "element";
-  /** Snapshot to restore scroll position from (e.g. localStorage) */
   initialScrollOffset?: number;
 }
 
@@ -26,11 +29,9 @@ export default function VirtualizedList<T>({
   scrollToTitleKey,
   titleKeyOf,
   renderItem,
-  scrollMode = "window",
   initialScrollOffset,
 }: VirtualizedListProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
   const [cols, setCols] = useState(2);
   useEffect(() => {
@@ -80,29 +81,14 @@ export default function VirtualizedList<T>({
     return out;
   }, [items, effectiveChunk]);
 
-  // Window virtualizer (default) — scroll surface is document, product UI owns container markup
-  const windowVirtualizer = useWindowVirtualizer({
+  const virtualizer = useWindowVirtualizer({
     count: rows.length,
     estimateSize: () => estimateSize,
     overscan,
     gap,
     scrollMargin,
-    enabled: scrollMode === "window",
     initialOffset: initialScrollOffset,
   });
-
-  // Element virtualizer — when scrollMode="element", scroll container is owned by product UI
-  const elementVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => estimateSize,
-    overscan,
-    gap,
-    enabled: scrollMode === "element",
-    initialOffset: initialScrollOffset,
-  });
-
-  const virtualizer = scrollMode === "element" ? elementVirtualizer : windowVirtualizer;
 
   // Dynamic measurement: content height unknown until rendered (cover + text)
   const measureRef = useCallback(
@@ -117,20 +103,15 @@ export default function VirtualizedList<T>({
     [virtualizer]
   );
 
-  // Stable anchors for prepends/streaming: keep first visible index anchored
   const anchorIndexRef = useRef<number | null>(null);
   useEffect(() => {
     const onScroll = () => {
       const first = virtualizer.getVirtualItems()[0];
       if (first) anchorIndexRef.current = first.index;
     };
-    if (scrollMode === "window") window.addEventListener("scroll", onScroll, { passive: true });
-    else scrollRef.current?.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      scrollRef.current?.removeEventListener("scroll", onScroll);
-    };
-  }, [virtualizer, scrollMode]);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [virtualizer]);
 
   // When items prepend (new chapters stream at top), restore anchor instead of jumping
   const prevLenRef = useRef(items.length);
@@ -146,53 +127,53 @@ export default function VirtualizedList<T>({
   // Deep-link & snapshot restore: scroll matching row into view (virtual rows not in DOM)
   useEffect(() => {
     if (scrollToTitleKey && titleKeyOf) {
-      const idx = items.findIndex((it) => titleKeyOf(it).toLowerCase() === scrollToTitleKey.toLowerCase());
+      const idx = items.findIndex(
+        (it) => titleKeyOf(it).toLowerCase() === scrollToTitleKey.toLowerCase()
+      );
       if (idx !== -1) {
-        const rowIndex = effectiveChunk <= 1 ? idx : Math.floor(idx / effectiveChunk);
-        const t = setTimeout(() => virtualizer.scrollToIndex(rowIndex, { align: "center" }), 300);
+        const rowIndex =
+          effectiveChunk <= 1 ? idx : Math.floor(idx / effectiveChunk);
+        const t = setTimeout(
+          () => virtualizer.scrollToIndex(rowIndex, { align: "center" }),
+          300
+        );
         return () => clearTimeout(t);
       }
     }
     if (initialScrollOffset !== undefined && initialScrollOffset > 0) {
       virtualizer.scrollToOffset(initialScrollOffset);
     }
-  }, [scrollToTitleKey, items, effectiveChunk, titleKeyOf, virtualizer, initialScrollOffset]);
+  }, [
+    scrollToTitleKey,
+    items,
+    effectiveChunk,
+    titleKeyOf,
+    virtualizer,
+    initialScrollOffset,
+  ]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
 
-  // Product UI owns scroll surface & markup — virtualizer only positions
-  if (scrollMode === "element") {
-    return (
-      <div ref={scrollRef} className="overflow-auto" style={{ height: "70vh" }}>
-        <div ref={containerRef} className="relative" style={{ height: `${totalSize}px` }}>
-          {virtualItems.map((vi) => {
-            const rowItems = rows[vi.index] ?? [];
-            return (
-              <div key={vi.key} data-index={vi.index} ref={measureRef} className="absolute top-0 left-0 w-full" style={{ transform: `translateY(${vi.start}px)` }}>
-                {effectiveChunk <= 1 ? renderItem(rowItems[0], vi.index) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {rowItems.map((it, k) => {
-                      const realIndex = vi.index * effectiveChunk + k;
-                      return <div key={realIndex}>{renderItem(it, realIndex)}</div>;
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div ref={containerRef} className="relative" style={{ height: `${totalSize}px` }}>
+    <div
+      ref={containerRef}
+      className="relative"
+      style={{ height: `${totalSize}px` }}
+    >
       {virtualItems.map((vi) => {
         const rowItems = rows[vi.index] ?? [];
         return (
-          <div key={vi.key} data-index={vi.index} ref={measureRef} className="absolute top-0 left-0 w-full" style={{ transform: `translateY(${vi.start - scrollMargin}px)` }}>
-            {effectiveChunk <= 1 ? renderItem(rowItems[0], vi.index) : (
+          <div
+            key={vi.key}
+            data-index={vi.index}
+            ref={measureRef}
+            className="absolute top-0 left-0 w-full"
+            style={{ transform: `translateY(${vi.start - scrollMargin}px)` }}
+          >
+            {effectiveChunk <= 1 ? (
+              renderItem(rowItems[0], vi.index)
+            ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {rowItems.map((it, k) => {
                   const realIndex = vi.index * effectiveChunk + k;
