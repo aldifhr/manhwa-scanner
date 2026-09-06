@@ -58,6 +58,7 @@ import { useFeedActions } from "./hooks/useFeedActions";
 import AllTabHeader from "./AllTabHeader";
 import AllTabToolbar from "./AllTabToolbar";
 import InfiniteSentinel from "./InfiniteSentinel";
+import FilterDrawer from "./FilterDrawer";
 import type { FlatChapter } from "@/lib/feed";
 import {
   KNOWN_ORIGINS,
@@ -83,6 +84,10 @@ function AllTabInner() {
   const countryFilter = useUiStore((s) => s.countryFilter);
   const typeFilter = useUiStore((s) => s.typeFilter);
   const searchQuery = useUiStore((s) => s.searchQuery);
+  const genreFilter = useUiStore((s) => s.genreFilter);
+  const statusFilter = useUiStore((s) => s.statusFilter);
+  const minRating = useUiStore((s) => s.minRating);
+  const whitelistOnly = useUiStore((s) => s.whitelistOnly);
   const setFeed = useUiStore((s) => s.setFeed);
   const toggleGroupMode = useUiStore((s) => s.toggleGroupMode);
   const setSortMode = useUiStore((s) => s.setSortMode);
@@ -103,6 +108,7 @@ function AllTabInner() {
     setLocalSearch(searchQuery);
   }, [searchQuery]);
 
+  const [filterOpen, setFilterOpen] = useState(false);
   // Reusable hooks
   const { pinnedSet, togglePin } = usePinnedSet();
   const {
@@ -198,6 +204,13 @@ function AllTabInner() {
             `${normalizeTitleKey(c.titleKey)}:${c.source}`
           )
       );
+    if (genreFilter) f = f.filter((c) => (c.genres || []).map((g: string) => g.toLowerCase()).includes(genreFilter.toLowerCase()));
+    if (statusFilter) f = f.filter((c) => String(c.status || "").toLowerCase() === statusFilter.toLowerCase());
+    if (minRating) {
+      const mr = parseFloat(minRating);
+      if (!isNaN(mr)) f = f.filter((c) => parseFloat(String(c.rating || "0")) >= mr);
+    }
+    if (whitelistOnly) f = f.filter((c) => c.isWhitelisted || optimisticWhitelist.has(`${c.titleKey}:${c.source}`));
     const q = searchQuery.trim().toLowerCase();
     if (q) f = f.filter((c) => (c.title || "").toLowerCase().includes(q));
     return f.map((c) => ({ ...c, seriesUrl: resolveSeriesUrl(c) }));
@@ -206,6 +219,10 @@ function AllTabInner() {
     optimisticExcluded,
     sourceFilter,
     typeFilter,
+    genreFilter,
+    statusFilter,
+    minRating,
+    whitelistOnly,
     countryFilter,
     optimisticWhitelist,
     searchQuery,
@@ -412,6 +429,12 @@ function AllTabInner() {
         groupMode={groupMode}
         toggleGroupMode={toggleGroupMode}
       />
+      <div className="flex justify-end -mt-1">
+        <button onClick={() => setFilterOpen(true)} className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white">
+          Filters {(genreFilter || statusFilter || minRating || whitelistOnly) ? "•" : ""}
+        </button>
+      </div>
+      <FilterDrawer open={filterOpen} onClose={() => setFilterOpen(false)} />
       <AllTabFilters
         sources={sources}
         countryCounts={countryCounts}

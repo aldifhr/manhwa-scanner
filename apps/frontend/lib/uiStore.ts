@@ -14,6 +14,10 @@ interface UiState {
   countryFilter: string | null;
   typeFilter: string | null;
   searchQuery: string;
+  genreFilter: string | null;
+  statusFilter: string | null;
+  minRating: string | null;
+  whitelistOnly: boolean;
   setFeed: (f: Feed) => void;
   toggleGroupMode: () => void;
   setSortMode: (s: SortMode) => void;
@@ -22,6 +26,10 @@ interface UiState {
   setCountryFilter: (c: string | null) => void;
   setTypeFilter: (t: string | null) => void;
   setSearchQuery: (q: string) => void;
+  setGenreFilter: (g: string | null) => void;
+  setStatusFilter: (s: string | null) => void;
+  setMinRating: (r: string | null) => void;
+  setWhitelistOnly: (v: boolean) => void;
   resetFilters: () => void;
 }
 
@@ -42,6 +50,10 @@ export const useUiStore = create<UiState>()(
       countryFilter: null,
       typeFilter: null,
       searchQuery: "",
+      genreFilter: null,
+      statusFilter: null,
+      minRating: null,
+      whitelistOnly: false,
       setFeed: (feed) => set({ feed }),
       toggleGroupMode: () => set((s) => ({ groupMode: !s.groupMode })),
       setSortMode: (sortMode) => set({ sortMode }),
@@ -50,12 +62,20 @@ export const useUiStore = create<UiState>()(
       setCountryFilter: (countryFilter) => set({ countryFilter }),
       setTypeFilter: (typeFilter) => set({ typeFilter }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setGenreFilter: (genreFilter) => set({ genreFilter }),
+      setStatusFilter: (statusFilter) => set({ statusFilter }),
+      setMinRating: (minRating) => set({ minRating }),
+      setWhitelistOnly: (whitelistOnly) => set({ whitelistOnly }),
       resetFilters: () =>
         set({
           sourceFilter: null,
           countryFilter: null,
           typeFilter: null,
           searchQuery: "",
+          genreFilter: null,
+          statusFilter: null,
+          minRating: null,
+          whitelistOnly: false,
         }),
     }),
     {
@@ -70,6 +90,10 @@ export const useUiStore = create<UiState>()(
         countryFilter: s.countryFilter,
         typeFilter: s.typeFilter,
         searchQuery: s.searchQuery,
+        genreFilter: s.genreFilter,
+        statusFilter: s.statusFilter,
+        minRating: s.minRating,
+        whitelistOnly: s.whitelistOnly,
       }),
     }
   )
