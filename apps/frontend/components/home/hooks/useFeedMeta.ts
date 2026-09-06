@@ -8,10 +8,8 @@ export function useFeedMeta(
   all: FlatChapter[],
   optimisticWhitelist: Set<string>
 ) {
-  const sources = useMemo(
-    () => [...new Set(all.map((c) => c.source).filter(Boolean))].sort(),
-    [all]
-  );
+  // ponytail: static sources — was derived from filtered `all` (source=ikiru → only ikiru) so other buttons disappeared
+  const sources = useMemo(() => ["ikiru", "shinigami", "voratoon"] as const, []);
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of all) {
