@@ -279,7 +279,7 @@ def _emit_series(results: list[dict], s: dict) -> None:
             "rating": float(rating) if rating else 0.0,
             "genres": genres,
             "type": fmt,
-            "origin": "CN" if fmt == "manhua" else "KR",
+            "origin": "CN" if fmt == "manhua" else "KR" if fmt == "manhwa" else "", # ponytail: unknown fmt → "" not KR (was leaking voratoon CN→KR)
             "updated_time": _created,
             "created_at": datetime.now(timezone.utc).isoformat(),
         })

@@ -168,13 +168,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         _norm = normalize_origin(_raw_origin)
         if not _norm and _src:
             _norm = normalize_origin(_src)
+        # ponytail: don't default ikiru/shinigami to KR when origin+type empty — leave "" so KR-only guild filters it correctly (was mis-labeling CN manhua as KR)
         if not _norm:
-            _norm = "KR" if _src in ("ikiru", "shinigami") else ""
-        # ponytail: override with whitelist origin if available (collector
-        # country_id is unreliable — shinigami hosts CN content but may
-        # report country_id=KR, so whitelist.origin is the source of truth)
+            _norm = ""
+        # ponytail: whitelist override only when collector has no origin (empty) — don't overwrite a valid CN/JP/KR from collector (fixes CN→KR leak)
         _tk_override = str(row.get("title_key") or "").strip()
-        if _tk_override and (_tk_override, _src) in _wl_origins:
+        if not _norm and _tk_override and (_tk_override, _src) in _wl_origins:
             _norm = _wl_origins[(_tk_override, _src)]
         # Derive type from origin if type is missing (shinigami often has origin but no type)
         if not row.get("type") and _norm:

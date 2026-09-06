@@ -2,7 +2,11 @@ import type { FlatChapter } from "@/lib/feed";
 
 function normalizeTitleKey(k: string): string {
   if (!k) return "";
-  return k.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  return k
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 function coverPriority(source: string): number {
   const s = (source || "").toLowerCase();
@@ -18,12 +22,24 @@ function isVoratoonExpired(cover: string): boolean {
   try {
     const d = m[1]; // 20260828T025606Z
     const exp = parseInt(m[2], 10);
-    const dt = new Date(d.slice(0,4)+"-"+d.slice(4,6)+"-"+d.slice(6,11)+":"+d.slice(11,13)+":"+d.slice(13,15)+"Z");
-    const expiry = dt.getTime() + exp*1000;
-    return Date.now() > expiry - 24*3600*1000; // treat as expired if <24h left
-  } catch { return false; }
+    const dt = new Date(
+      d.slice(0, 4) +
+        "-" +
+        d.slice(4, 6) +
+        "-" +
+        d.slice(6, 11) +
+        ":" +
+        d.slice(11, 13) +
+        ":" +
+        d.slice(13, 15) +
+        "Z"
+    );
+    const expiry = dt.getTime() + exp * 1000;
+    return Date.now() > expiry - 24 * 3600 * 1000; // treat as expired if <24h left
+  } catch {
+    return false;
+  }
 }
-
 
 interface GroupedChapter {
   /** unique key per chapter+source */
@@ -62,7 +78,8 @@ export interface GroupedSeries {
  *  from multiple sources (ikiru/shinigami/voratoon) merges into ONE card
  *  with merged chapters. Cover priority: shinigami > ikiru > voratoon (non-expired). */
 export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
-  const map = new Map<string, GroupedSeries & { _sources: Set<string> }>();
+  const map = new Map<string, GroupedSeries>();
+  const coverSource = new Map<string, string>();
   for (const it of items) {
     const tk = it.titleKey;
     const gk = normalizeTitleKey(tk); // dedup across dash/space/case/uuid
@@ -81,11 +98,10 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
         description: it.description,
         isWhitelisted: it.isWhitelisted,
         chapters: [],
-        _sources: new Set([it.source]),
-      } as any;
+      };
       map.set(gk, g!);
+      if (it.cover) coverSource.set(gk, it.source);
     } else {
-      g._sources.add(it.source);
       // keep type if missing (for flag visibility)
       if (!g!.type && it.type) g!.type = it.type;
     }
@@ -120,21 +136,21 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
     )
       g!.sentAt = it.sentAt;
     // cover priority: shinigami > ikiru > voratoon (non-expired). Expired voratoon presigned is skipped.
-    const curPri = g!.cover ? coverPriority((g as any)._coverSource || "") : 99;
+    const curPri = g!.cover ? coverPriority(coverSource.get(gk) || "") : 99;
     const newPri = coverPriority(it.source);
     const curExpired = isVoratoonExpired(g!.cover);
     const newExpired = isVoratoonExpired(it.cover || "");
-    if (it.cover && (!g!.cover || curExpired || (!newExpired && newPri < curPri))) {
-      (g as any)._coverSource = it.source;
+    if (
+      it.cover &&
+      (!g!.cover || curExpired || (!newExpired && newPri < curPri))
+    ) {
+      coverSource.set(gk, it.source);
       g!.cover = it.cover;
       if (it.seriesUrl) g!.seriesUrl = it.seriesUrl;
       // also adopt title from higher priority source if available
       if (it.title && newPri < curPri) g!.title = it.title;
     }
   }
-  // cleanup dedup helper
-  for (const g of map.values()) delete (g as any)._sources;
-  for (const g of map.values()) delete (g as any)._coverSource;
   // Sort chapters within a group by chapter number desc (newest first)
   const out = [...map.values()];
   for (const g of out) {

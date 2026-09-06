@@ -25,23 +25,33 @@ export function filterButtonClass(
   );
 }
 
+const SOURCE_COLOR: Record<string, string> = {
+  shinigami: "red",
+  ikiru: "emerald",
+  voratoon: "orange",
+};
+const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
+  shinigami: {
+    badge: "bg-red-500/15 text-red-400 border border-red-500/20",
+    chip: "bg-red-500/15 text-red-400",
+  },
+  ikiru: {
+    badge: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
+    chip: "bg-green-500/15 text-green-400",
+  },
+  voratoon: {
+    badge: "bg-orange-500/15 text-orange-400 border border-orange-500/20",
+    chip: "bg-orange-500/15 text-orange-400",
+  },
+};
 export function sourceBadgeClass(source: string): string {
-  const s = source.toLowerCase();
-  if (s === "shinigami")
-    return "bg-red-500/15 text-red-400 border border-red-500/20";
-  if (s === "ikiru")
-    return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20";
-  if (s === "voratoon")
-    return "bg-orange-500/15 text-orange-400 border border-orange-500/20";
-  return "bg-white/10 text-white/80 border border-white/10";
+  return (
+    SOURCE_MAP[source.toLowerCase()]?.badge ??
+    "bg-white/10 text-white/80 border border-white/10"
+  );
 }
-
 export function sourceChipClass(source: string): string {
-  const s = source.toLowerCase();
-  if (s === "shinigami") return "bg-red-500/15 text-red-400";
-  if (s === "ikiru") return "bg-green-500/15 text-green-400";
-  if (s === "voratoon") return "bg-orange-500/15 text-orange-400";
-  return "bg-white/10 text-white/80";
+  return SOURCE_MAP[source.toLowerCase()]?.chip ?? "bg-white/10 text-white/80";
 }
 
 // Canonical status / severity colors (single source of truth).

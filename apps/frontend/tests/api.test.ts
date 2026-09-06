@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { getRssFeedFlatPage, countNewSince } from "@/lib/api";
+import { Reader } from "@/lib/reader";
+const getRssFeedFlatPage = (p: number, l = 1000, ...a: unknown[]) =>
+  Reader.getRssFlatPage(p, l) as Promise<{
+    hasMore: boolean;
+    total: number;
+    totalPages: number;
+  }>;
+const countNewSince = (ts: number, opts?: unknown) =>
+  Reader.countNewSince(ts, opts as never);
 
 // Mock the global fetch used by fetchJson inside lib/api.
 function mockFetchOnce(payload: unknown) {

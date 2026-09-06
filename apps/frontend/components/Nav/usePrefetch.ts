@@ -1,7 +1,6 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys, staleTimes } from "@/lib/queryKeys";
-import { getDashboardSnapshot, getExcludedTitles } from "@/lib/api";
 import { Reader } from "@/lib/reader";
 
 export function usePrefetch() {
@@ -11,7 +10,7 @@ export function usePrefetch() {
       case "/":
         qc.prefetchQuery({
           queryKey: queryKeys.dashboardSnapshot,
-          queryFn: getDashboardSnapshot,
+          queryFn: () => Reader.getDashboardSnapshot() as Promise<unknown>,
           staleTime: staleTimes.dashboard,
         });
         break;
@@ -40,7 +39,7 @@ export function usePrefetch() {
       case "/exclude-list":
         qc.prefetchQuery({
           queryKey: queryKeys.excludedTitles,
-          queryFn: getExcludedTitles,
+          queryFn: () => Reader.getExcludedTitles() as Promise<unknown>,
           staleTime: staleTimes.excluded,
         });
         break;

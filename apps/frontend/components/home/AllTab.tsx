@@ -42,7 +42,7 @@ import {
 } from "@/lib/groupChapters";
 import { useUiStore } from "@/lib/uiStore";
 import { useUiUrlSync } from "@/lib/useUiUrlSync";
-import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
+import { useDebounced } from "@/lib/useDebounced";
 import { usePacerThrottledScroll } from "@/lib/usePacerThrottles";
 import { PageShell } from "@/components/PageShell";
 function normalizeTitleKey(k: string) {
@@ -94,7 +94,7 @@ function AllTabInner() {
 
   // Debounced search input
   const [localSearch, setLocalSearch] = useState(searchQuery);
-  const debouncedLocalSearch = usePacerDebouncedValue(localSearch, 300);
+  const debouncedLocalSearch = useDebounced(localSearch, 300);
   useEffect(() => {
     if (debouncedLocalSearch !== searchQuery)
       setSearchQuery(debouncedLocalSearch);

@@ -12,7 +12,7 @@ import {
 import type { DispatchHistoryItem } from "@/lib/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { timeAgo } from "@/lib/timeAgo";
-import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
+import { useDebounced } from "@/lib/useDebounced";
 import { SourceBadge } from "@/components/ui/SourceBadge";
 import { getOriginFlag } from "@/lib/constants";
 import {
@@ -94,12 +94,16 @@ export default function DispatchHistoryClient() {
   >("all");
   const [page, setPage] = useState(1);
   const pageSize = 50;
-  const debouncedSearch = usePacerDebouncedValue(search, 300);
+  const debouncedSearch = useDebounced(search, 300);
 
   // reset page when search changes
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [...queryKeys.dispatchHistory(debouncedSearch || undefined), page],
-    queryFn: () => Reader.getDispatchHistoryPage(page, pageSize, debouncedSearch || ""),
+    queryKey: [
+      ...queryKeys.dispatchHistory(debouncedSearch || undefined),
+      page,
+    ],
+    queryFn: () =>
+      Reader.getDispatchHistoryPage(page, pageSize, debouncedSearch || ""),
   });
 
   const items = (data?.results ?? []) as DispatchHistoryItem[];

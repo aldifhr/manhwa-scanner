@@ -1,12 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import {
-  addWhitelistEntry,
-  removeWhitelistEntry,
-  addExcludedTitle,
-  removeExcludedTitle,
-} from "@/lib/api";
 import { Reader } from "@/lib/reader";
 import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
@@ -47,7 +41,7 @@ export function useFeedActions() {
       const optKey = `${item.titleKey}:${item.source}`;
       return {
         item,
-        result: await addWhitelistEntry({
+        result: (await Reader.addWhitelistEntry({
           title: item.title,
           seriesUrl: item.seriesUrl,
           source: item.source,
@@ -58,7 +52,9 @@ export function useFeedActions() {
           origin: item.origin,
           genres: item.genres,
           description: item.description ?? undefined,
-        }),
+        } as Record<string, unknown>)) as {
+          status: "added" | "already_exists";
+        },
         optKey,
       };
     },
@@ -87,9 +83,10 @@ export function useFeedActions() {
                   });
                   const [tk, src] = optKey.split(":");
                   if (tk && src)
-                    removeWhitelistEntry({ title_key: tk, source: src }).catch(
-                      () => {}
-                    );
+                    Reader.removeWhitelistEntry({
+                      title_key: tk,
+                      source: src,
+                    } as Record<string, unknown>).catch(() => {});
                   queryClient.invalidateQueries({
                     queryKey: queryKeys.whitelistAll,
                   });
@@ -127,7 +124,7 @@ export function useFeedActions() {
       }
       const results = await Promise.all(
         [...bySource.entries()].map(([s, v]) =>
-          addWhitelistEntry({
+          Reader.addWhitelistEntry({
             title: series.title,
             seriesUrl: v.seriesUrl || undefined,
             source: s,
@@ -138,7 +135,7 @@ export function useFeedActions() {
             origin: series.origin,
             genres: series.genres,
             description: series.description ?? undefined,
-          })
+          } as Record<string, unknown>)
         )
       );
       return { results, optKeys };
@@ -169,9 +166,10 @@ export function useFeedActions() {
               if (src && !bySource.has(src)) bySource.set(src, tk);
             }
             for (const [src, tk] of bySource) {
-              removeWhitelistEntry({ title_key: tk, source: src }).catch(
-                () => {}
-              );
+              Reader.removeWhitelistEntry({
+                title_key: tk,
+                source: src,
+              } as Record<string, unknown>).catch(() => {});
             }
             queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
             queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
@@ -188,16 +186,19 @@ export function useFeedActions() {
     mutationFn: async (item: FlatChapter) => {
       const isExcl = optimisticExcluded.has(item.titleKey);
       if (isExcl) {
-        await removeExcludedTitle({ title_key: item.titleKey, source: "all" });
+        await Reader.removeExcludedTitle({
+          title_key: item.titleKey,
+          source: "all",
+        } as Record<string, unknown>);
         return { isExcl: true, titleKey: item.titleKey };
       } else {
-        await addExcludedTitle({
+        await Reader.addExcludedTitle({
           title_key: item.titleKey,
           title: item.title,
           source: "all",
           cover: item.cover ?? null,
           series_url: item.seriesUrl ?? null,
-        });
+        } as Record<string, unknown>);
         return { isExcl: false, titleKey: item.titleKey };
       }
     },
@@ -227,19 +228,19 @@ export function useFeedActions() {
     mutationFn: async (series: GroupedSeries) => {
       const isExcl = optimisticExcluded.has(series.titleKey);
       if (isExcl) {
-        await removeExcludedTitle({
+        await Reader.removeExcludedTitle({
           title_key: series.titleKey,
           source: "all",
-        });
+        } as Record<string, unknown>);
         return { isExcl: true, titleKey: series.titleKey };
       } else {
-        await addExcludedTitle({
+        await Reader.addExcludedTitle({
           title_key: series.titleKey,
           title: series.title,
           source: "all",
           cover: series.cover ?? null,
           series_url: series.seriesUrl ?? null,
-        });
+        } as Record<string, unknown>);
         return { isExcl: false, titleKey: series.titleKey };
       }
     },

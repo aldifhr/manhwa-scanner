@@ -12,7 +12,7 @@ def _collect_voratoon_source(latest_sent: dict) -> list[dict]:
         series_slug = u.get("title_key") or ""
         series_url = u.get("series_url") or ""
         series_cover = u.get("cover") or ""
-        origin = u.get("origin") or "KR"
+        origin = u.get("origin") or "" # ponytail: don't default CN manhua to KR (was leaking CN→KR filter)
         if not series_slug:
             continue
         ch_str = u.get("chapter") or ""

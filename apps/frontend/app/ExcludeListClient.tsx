@@ -2,11 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  addExcludedTitle,
-  removeExcludedTitle,
-  bulkExcludeBySource,
-} from "@/lib/api";
 import { Reader } from "@/lib/reader";
 import type { ExcludedTitleItem } from "@/lib/types";
 import { queryKeys } from "@/lib/queryKeys";
@@ -130,24 +125,24 @@ export function ExcludeListClient() {
         });
       }
       if (!title_key) throw new Error("title_key missing");
-      await removeExcludedTitle({
+      await Reader.removeExcludedTitle({
         title_key,
         source: it.source || "all",
         title: it.title ?? undefined,
-      } as unknown as { title_key: string; source?: string });
+      } as unknown as Record<string, unknown>);
       toast(`Un-excluded ${displayTitle(it)}`, {
         type: "info",
         action: {
           label: "Undo",
           onClick: async () => {
             try {
-              await addExcludedTitle({
+              await Reader.addExcludedTitle({
                 title_key: it.titleKey || it.id || "",
                 title: it.title ?? undefined,
                 source: it.source || "all",
                 cover: it.cover ?? null,
                 series_url: it.seriesUrl ?? null,
-              });
+              } as Record<string, unknown>);
               queryClient.invalidateQueries({
                 queryKey: queryKeys.excludedTitles,
               });
@@ -175,7 +170,7 @@ export function ExcludeListClient() {
       items;
     setBulkLoading(true);
     try {
-      const res = await bulkExcludeBySource(bulkSource);
+      const res = await Reader.bulkExcludeBySource(bulkSource);
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
       // Fetch new list to diff for undo
       let added: ExcludedTitleItem[] = [];
@@ -198,10 +193,10 @@ export function ExcludeListClient() {
                   let undone = 0;
                   for (const it of added) {
                     try {
-                      await removeExcludedTitle({
+                      await Reader.removeExcludedTitle({
                         title_key: it.titleKey || it.id || "",
                         source: it.source,
-                      });
+                      } as Record<string, unknown>);
                       undone++;
                     } catch {}
                   }

@@ -7,13 +7,12 @@ import type { WhitelistRouteItem } from "@/lib/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { MangaCardSkeleton } from "@/components/MangaCard";
 import { MagnifyingGlass } from "@phosphor-icons/react";
-import { usePacerDebouncedValue } from "@/lib/usePacerDebounce";
+import { useDebounced } from "@/lib/useDebounced";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/EmptyState";
 import { ErrorFallback } from "@/components/ErrorFallback";
 import { Select } from "@/components/ui/Select";
 import { CompactSearchInput } from "@/components/ui/SearchInput";
-import { GRID_CLASS } from "@/lib/grid";
 import { useWhitelistFilters } from "@/components/home/hooks/useWhitelistFilters";
 import { WhitelistCard } from "@/components/WhitelistCard";
 
@@ -31,7 +30,7 @@ export function WhitelistGrid() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [originFilter, setOriginFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearch = usePacerDebouncedValue(searchTerm, 300);
+  const debouncedSearch = useDebounced(searchTerm, 300);
   const [sort, setSort] = useState<"title" | "rating" | "recent">("recent");
 
   const items = data ?? [];
@@ -79,7 +78,7 @@ export function WhitelistGrid() {
         </div>
 
         {/* Grid skeleton — co-located with MangaCard for locality */}
-        <div className={GRID_CLASS}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {Array.from({ length: 12 }).map((_, i) => (
             <MangaCardSkeleton key={i} />
           ))}
@@ -192,7 +191,7 @@ export function WhitelistGrid() {
           />
         </div>
       ) : (
-        <div className={GRID_CLASS}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {filtered.map((item) => (
             <WhitelistCard
               key={`${item.id}:${item.source}`}

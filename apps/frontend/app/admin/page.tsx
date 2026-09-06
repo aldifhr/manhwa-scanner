@@ -1,8 +1,13 @@
 "use client";
 import { PageShell } from "@/components/PageShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getHealthDetailed } from "@/lib/api";
 import { readerFetch } from "@/lib/reader/transport";
+async function getHealthDetailed() {
+  const r = await readerFetch<{ success: boolean; data: unknown }>(
+    "/api/v1/health/detailed"
+  );
+  return (r as unknown as { data: unknown }).data as unknown;
+}
 import { useState } from "react";
 import Link from "next/link";
 

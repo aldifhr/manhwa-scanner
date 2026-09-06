@@ -2,7 +2,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash } from "@phosphor-icons/react";
 import MangaCard from "@/components/MangaCard";
-import { addWhitelistEntry, removeWhitelistEntry } from "@/lib/api";
+import { Reader } from "@/lib/reader";
 import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
 import { resolveDetailUrl } from "@/lib/whitelistUrl";
@@ -141,7 +141,7 @@ export function WhitelistCard({
             .catch(() => {})
             .then((): Promise<void> => {
               if (effectiveSources.length === 0) {
-                return addWhitelistEntry({
+                return Reader.addWhitelistEntry({
                   title: item.title,
                   seriesUrl: item.seriesUrl ?? undefined,
                   title_key: titleKey,
@@ -150,11 +150,11 @@ export function WhitelistCard({
                   rating: item.rating ?? undefined,
                   origin: item.origin ?? undefined,
                   description: item.description ?? undefined,
-                }).then(() => undefined);
+                } as Record<string, unknown>).then(() => undefined);
               }
               return Promise.all(
                 effectiveSources.map((s) =>
-                  addWhitelistEntry({
+                  Reader.addWhitelistEntry({
                     title: item.title,
                     seriesUrl: item.seriesUrl ?? undefined,
                     source: s,
@@ -164,7 +164,7 @@ export function WhitelistCard({
                     rating: item.rating ?? undefined,
                     origin: item.origin ?? undefined,
                     description: item.description ?? undefined,
-                  })
+                  } as Record<string, unknown>)
                 )
               ).then(() => undefined);
             })
@@ -190,7 +190,9 @@ export function WhitelistCard({
     // include source as extra matcher if single source (helps if backend still per-source)
     if (effectiveSources.length === 1)
       deletePayload.source = effectiveSources[0];
-    pendingDeleteRef.current = removeWhitelistEntry(deletePayload)
+    pendingDeleteRef.current = Reader.removeWhitelistEntry(
+      deletePayload as Record<string, unknown>
+    )
       .then(() => {
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(false) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(true) });
