@@ -56,8 +56,9 @@ def _retention_loop(stop_event) -> None:
             except Exception:
                 pass
             try:
-                _claims_cutoff = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
-                _stale = _sb.table("dispatch_claims").delete().lt("expires_at", _claims_cutoff).execute()
+                # ponytail: 2h TTL claims — delete expired (< now) hourly, not 48h later (was leaking queue depth)
+                _now_iso = datetime.now(timezone.utc).isoformat()
+                _stale = _sb.table("dispatch_claims").delete().lt("expires_at", _now_iso).execute()
                 _stale_count = len(_stale.data) if _stale.data else 0
                 _null = _sb.table("dispatch_claims").delete().is_("created_at", "null").execute()
                 _null_count = len(_null.data) if _null.data else 0

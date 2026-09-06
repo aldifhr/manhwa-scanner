@@ -36,12 +36,12 @@ export const queryKeys = {
 
 export const staleTimes = {
   dashboard: 60_000,
-  rss: 60_000,
+  rss: 10_000,
   whitelist: 60_000,
   dispatch: 300_000,
-  excluded: 15_000,
+  excluded: 60_000,
   stats: 60_000,
   queue: 30_000,
   rssHealth: 30_000,
-  cronStatus: 15_000,
+  cronStatus: 30_000,
 } as const;
