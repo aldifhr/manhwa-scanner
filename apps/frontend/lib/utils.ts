@@ -105,6 +105,8 @@ export function decodeHtml(text: string): string {
   out = out.replace(/<[^>]+>/g, " ");
   // Collapse whitespace left by stripped tags
   out = out.replace(/\s+/g, " ").trim();
+  // Fix mojibake � (0x92 Windows-1252 ’ mis-decoded as UTF-8) — shinigami titles
+  out = out.replace(/\uFFFD/g, "\u2019").replace(/\u0092/g, "\u2019");
   return out;
 }
 

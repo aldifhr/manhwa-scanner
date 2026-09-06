@@ -11,7 +11,7 @@ logger = get_logger("cron:collect:shinigami")
 
 def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float], fetch_meta: bool = True) -> list[dict]:
     items: list[dict] = []
-    title = m.get("title") or m.get("manga_name")
+    title = (m.get("title") or m.get("manga_name") or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
     manga_id = m.get("manga_id", "")
     if not manga_id:
         return items
@@ -46,7 +46,13 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
         _ceil = latest_sent.get((str(title or ""), "shinigami"), latest_sent.get((normalize_title_key(title or ""), "shinigami"), 0))
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
-        items.append({"title": title, "title_key": normalize_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"https://11.shinigami.asia/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _country_to_type_fn(m.get("country_id")) or ""})
+        # ponytail: origin CN=manhua KR=manhwa — enforce sync (was CN/manhwa mismatch)
+        _type = _country_to_type_fn(m.get("country_id")) or ""
+        if origin == "CN":
+            _type = "manhua"
+        elif origin == "KR":
+            _type = "manhwa"
+        items.append({"title": title, "title_key": normalize_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"https://11.shinigami.asia/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
     return items
 
 
@@ -114,5 +120,10 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
             _ceil = latest_sent.get((tk, "shinigami"), 0)
             if _chn is not None and _ceil and _chn <= _ceil:
                 continue
-            items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_at", ""), "rating": rating, "genres": genres, "description": description, "type": _ctt(m.get("country_id")) or ""})
+            _type2 = _ctt(m.get("country_id")) or ""
+            if origin == "CN":
+                _type2 = "manhua"
+            elif origin == "KR":
+                _type2 = "manhwa"
+            items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_at", ""), "rating": rating, "genres": genres, "description": description, "type": _type2})
     return items
