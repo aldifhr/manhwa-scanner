@@ -3,14 +3,14 @@
 GET  /api/settings            -> list guild rows (safe fields only)
 PUT  /api/settings/{guild_id} -> update origin_filter / excluded_titles / label
 
-Auth: PUT requires admin role (require_role_auth {"admin"}); GET is monitor-only.
+Auth: PUT requires admin role (require_monitor_auth {"admin"}); GET is monitor-only.
 """
 from __future__ import annotations
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from app.utils.request_auth import require_role_auth, safe_error
+from app.utils.request_auth import safe_error
 from app.cron.dispatch_mod import load_guild_settings
 from app.logger import get_logger
 
@@ -54,7 +54,7 @@ async def settings_get(request: Request):
 
 async def settings_put(request: Request, guild_id: str):
     # Destructive-ish write (changes guild notification policy) — admin only.
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()

@@ -183,8 +183,8 @@ def _run_pipeline_bg(action: str):
 @router.get("/cron")
 @router.post("/cron")
 async def cron_trigger(request: Request):
-    from app.utils.request_auth import require_role_auth
-    if not (require_cron_auth(request) or require_role_auth(request, {"admin"})):
+    from app.utils.request_auth import require_monitor_auth
+    if not (require_cron_auth(request) or require_monitor_auth(request)):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     action = request.query_params.get("action", "update")
     source = request.query_params.get("source")

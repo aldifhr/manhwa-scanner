@@ -28,9 +28,5 @@ export async function POST(request: Request) {
     ...clearOpts,
     httpOnly: false,
   });
-  response.cookies.set("ikiru_role", "", {
-    ...clearOpts,
-    httpOnly: false,
-  });
   return response;
 }

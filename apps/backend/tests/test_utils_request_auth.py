@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 from app.utils.request_auth import (
     require_monitor_auth,
     require_cron_auth,
-    require_role_auth,
     int_safe,
     safe_error,
 )
@@ -38,36 +37,6 @@ class TestRequireCronAuth:
         mock_request.query_params = {"token": "cron-secret"}
         with patch("app.utils.auth.check_cron_auth", return_value=True):
             assert require_cron_auth(mock_request) is True
-
-
-class TestRequireRoleAuth:
-    """Test require_role_auth() — role-based auth from request."""
-
-    def test_admin_access(self):
-        mock_request = MagicMock()
-        mock_request.headers = {"authorization": "Bearer monitor-secret"}
-        mock_request.query_params = {}
-        mock_request.cookies = {}
-        with patch("app.utils.request_auth.check_monitor_auth", return_value=True):
-            with patch("app.utils.request_auth.role_from_request", return_value="admin"):
-                assert require_role_auth(mock_request, {"admin"}) is True
-
-    def test_member_access(self):
-        mock_request = MagicMock()
-        mock_request.headers = {}
-        mock_request.query_params = {}
-        mock_request.cookies = {}
-        with patch("app.utils.request_auth.check_monitor_auth", return_value=True):
-            with patch("app.utils.request_auth.role_from_request", return_value="member"):
-                assert require_role_auth(mock_request, {"admin", "member"}) is True
-
-    def test_unauthenticated(self):
-        mock_request = MagicMock()
-        mock_request.headers = {}
-        mock_request.query_params = {}
-        mock_request.cookies = {}
-        with patch("app.utils.request_auth.check_monitor_auth", return_value=False):
-            assert require_role_auth(mock_request, {"admin"}) is False
 
 
 class TestIntSafe:

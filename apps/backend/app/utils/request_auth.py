@@ -1,7 +1,7 @@
 """Shared request-auth + query-param helpers for API routers."""
 
 from fastapi import Request
-from app.utils.auth import check_monitor_auth, role_from_request
+from app.utils.auth import check_monitor_auth
 
 
 def require_monitor_auth(request: Request) -> bool:
@@ -17,13 +17,6 @@ def require_cron_auth(request: Request) -> bool:
 
     return check_cron_auth(request.query_params.get("token", ""))
 
-
-def require_role_auth(request: Request, allowed: set[str]) -> bool:  # noqa: ARG001
-    # ponytail: roles removed — any authenticated caller passes; `allowed` ignored
-    authorization = request.headers.get("authorization", "")
-    token_param = request.query_params.get("token", "")
-    cookie = request.cookies.get("ikiru_dashboard_session", "")
-    return check_monitor_auth(authorization, token_param, cookie=cookie)
 
 
 def int_safe(value: str | None, default: int = 0, max_val: int | None = None) -> int:

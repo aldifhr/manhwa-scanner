@@ -41,8 +41,6 @@ export async function POST(request: Request) {
           maxAge: 7 * 24 * 60 * 60,
         });
       }
-      // clear legacy role cookie
-      response.cookies.set("ikiru_role", "", { httpOnly: false, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
       return response;
     }
     return NextResponse.json({ error: "Backend did not issue a session cookie" }, { status: 500 });

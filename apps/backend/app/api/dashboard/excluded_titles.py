@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.logger import get_logger
 from app.storage import excluded_titles as excl_store
-from app.utils.request_auth import require_monitor_auth, require_role_auth, safe_error, int_safe
+from app.utils.request_auth import require_monitor_auth, safe_error, int_safe
 
 logger = get_logger("api:excluded-titles")
 router = APIRouter()
@@ -26,7 +26,7 @@ _LIST_TTL = 15.0
 @router.get("/excluded-titles")
 async def get_excluded(request: Request):
     """Return ALL excluded titles. Admin only."""
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     _now = time.monotonic()
     if _LIST_CACHE[0] is not None and (_now - _LIST_CACHE[0]) < _LIST_TTL:
@@ -146,7 +146,7 @@ async def get_excluded(request: Request):
 
 @router.post("/excluded-titles")
 async def post_excluded(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         try:
@@ -187,7 +187,7 @@ async def post_excluded(request: Request):
 
 @router.delete("/excluded-titles")
 async def delete_excluded(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         try:
@@ -221,7 +221,7 @@ async def delete_excluded(request: Request):
 
 @router.post("/excluded-titles/bulk")
 async def post_excluded_bulk(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         try:

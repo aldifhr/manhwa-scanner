@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.logger import get_logger
-from app.utils.request_auth import require_monitor_auth, require_role_auth, int_safe, safe_error
+from app.utils.request_auth import require_monitor_auth, int_safe, safe_error
 
 logger = get_logger("api:error_logs")
 router = APIRouter()
@@ -36,7 +36,7 @@ async def list_errors(request: Request):
 
 @router.delete("/logs/errors")
 async def clear_errors(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         from app.storage.error_logs import delete_older_than

@@ -13,7 +13,7 @@ from app.services.whitelist_service import (
     patch_whitelist,
     normalize_whitelist_urls,
 )
-from app.utils.request_auth import require_monitor_auth, require_role_auth, int_safe, safe_error
+from app.utils.request_auth import require_monitor_auth, int_safe, safe_error
 
 logger = get_logger("api:whitelist")
 router = APIRouter()
@@ -58,7 +58,7 @@ class WhitelistPatch(BaseModel):
 @router.get("/dispatch-history")
 async def dispatch_history(request: Request):
     """Flat list of all dispatched (notified) chapters from dispatch_history."""
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         page = int_safe(request.query_params.get("page", "1"), 1)
@@ -120,7 +120,7 @@ async def whitelist_post_reader(request: Request):
 
 @router.post("/whitelist")
 async def whitelist_post(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
@@ -151,7 +151,7 @@ async def whitelist_post(request: Request):
 
 @router.delete("/whitelist")
 async def whitelist_delete(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
@@ -195,7 +195,7 @@ async def whitelist_delete(request: Request):
 
 @router.patch("/whitelist")
 async def whitelist_patch(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
@@ -242,7 +242,7 @@ async def whitelist_patch(request: Request):
 
 @router.post("/reader/whitelist/normalize-urls")
 async def whitelist_normalize_urls(request: Request):
-    if not require_role_auth(request, {"admin"}):
+    if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
