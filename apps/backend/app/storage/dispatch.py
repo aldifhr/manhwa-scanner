@@ -354,17 +354,31 @@ def complete_dispatch_claim(
         sb = get_supabase()
         # C2 FIX: Use upsert on_conflict=fcfs_key instead of DELETE+INSERT
         # to prevent duplicate rows when two concurrent runs target same fcfs_key
-        if fcfs_key:
-            sb.table("dispatch_history").upsert(
-                row, on_conflict="fcfs_key"
-            ).execute()
-        else:
-            # ponytail: idempotent fallback — upsert on chapter_url when fcfs_key empty (was insert → dup fail)
-            sb.table("dispatch_history").upsert(
-                row, on_conflict="chapter_url"
-            ).execute()
+        # ponytail: 010 created non-unique idx, 022 unique not applied if old exists → ON CONFLICT fcfs_key fails with InvalidColumnReference
+        # fallback to chapter_url upsert then plain insert
+        try:
+            if fcfs_key:
+                sb.table("dispatch_history").upsert(
+                    row, on_conflict="fcfs_key"
+                ).execute()
+            else:
+                sb.table("dispatch_history").upsert(
+                    row, on_conflict="chapter_url"
+                ).execute()
+        except Exception as _e:
+            if "ON CONFLICT" in str(_e) and "fcfs_key" in str(_e):
+                try:
+                    sb.table("dispatch_history").upsert(row, on_conflict="chapter_url").execute()
+                except Exception as _e2:
+                    logger.error("complete_dispatch_claim history failed (fallback)", exc=_e2, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
+                    raise
+            else:
+                logger.error("complete_dispatch_claim history failed", exc=_e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
+                raise
     except Exception as e:
-        logger.error("complete_dispatch_claim history failed", exc=e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
+        # outer fallback already logged
+        if "ON CONFLICT" not in str(e):
+            logger.error("complete_dispatch_claim history failed", exc=e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
     # Drop the claim so queue-depth reflects reality.
     try:
         get_supabase().table("dispatch_claims").delete().eq(

@@ -329,21 +329,35 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
     except Exception as _e:
         logger.warn("delete_whitelist: whitelist delete failed", err=str(_e)[:160])
 
-    # recent_chapters delete
+    # recent_chapters delete — ponytail: builder .or_ expects callables, was passing str → 'str not callable'; use raw q for OR
     try:
-        _del = sb.table("recent_chapters").delete()
+        from app.db import q as _q
+        _conds = []
+        _params: list = []
         if _tk:
-            _del = _del.or_(f"title_key.eq.{_tk},title_key.eq.{_tk.replace('-', ' ')}")
+            _conds.append("title_key = %s")
+            _params.append(_tk)
+            _conds.append("title_key = %s")
+            _params.append(_tk.replace("-", " "))
         if _title:
-            _esc_t = _title.replace("%", r"\%").replace("_", r"\_")
-            _del = _del.or_(f"title.ilike.*{_esc_t}*")
+            _conds.append("title ILIKE %s")
+            _params.append(f"%{_title}%")
         if _url:
-            _esc_u = _url.replace("%", r"\%").replace("_", r"\_")
-            _del = _del.or_(f"series_url.ilike.*{_esc_u}*,url.ilike.*{_esc_u}*,chapter_url.ilike.*{_esc_u}*")
-        if _src:
-            _del = _del.eq("source", _src)
-        r = _del.execute()
-        rc_deleted = len(r.data or [])
+            _slug = _url.rstrip("/").split("/")[-1]
+            if _slug:
+                _conds.append("series_url ILIKE %s")
+                _params.append(f"%{_slug}%")
+                _conds.append("chapter_url ILIKE %s")
+                _params.append(f"%{_slug}%")
+        if not _conds:
+            rc_deleted = 0
+        else:
+            _where = " OR ".join(f"({c})" for c in _conds)
+            if _src:
+                _where = f"({_where}) AND source = %s"
+                _params.append(_src)
+            _rows = _q(f"DELETE FROM recent_chapters WHERE {_where} RETURNING id", _params)
+            rc_deleted = len(_rows or [])
     except Exception as _e:
         logger.warn("delete_whitelist: recent_chapters delete failed", err=str(_e)[:160])
 
