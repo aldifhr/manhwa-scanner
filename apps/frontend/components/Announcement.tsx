@@ -67,7 +67,7 @@ export default function Announcement() {
           } catch {}
           setDismissed(true);
         }}
-        className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-colors text-[10px] leading-none"
+        className="shrink-0 inline-flex items-center justify-center w-6 h-6 text-white/60 hover:text-white transition-colors text-sm leading-none"
       >
         ×
       </button>
