@@ -1,13 +1,5 @@
-// Deep module: ContinueReading — seam for tracking read progress.
-// Storage + sync extracted to store.ts / sync.ts for DI + testability.
-
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  localStorageStore,
-  MAX_ENTRIES,
-  type ContinueReadingStore,
-} from "./store";
-import { fetchRemote, pushRemote } from "./sync";
+import { withCsrf } from "@/lib/csrf";
 
 export interface ContinueReadingEntry {
   title: string;
@@ -21,7 +13,108 @@ export interface ContinueReadingEntry {
   updatedAt: string;
 }
 
-// — builder helpers — caller tidak perlu tahu mapping field manual —
+// — store (was store.ts) —
+const LS_KEY = "continue_reading";
+export const MAX_ENTRIES = 20;
+export interface ContinueReadingStore {
+  load(): Map<string, ContinueReadingEntry>;
+  save(
+    entries: Map<string, ContinueReadingEntry>
+  ): Map<string, ContinueReadingEntry>;
+  clear(): void;
+}
+function loadFromStorage(): Map<string, ContinueReadingEntry> {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    const data: Record<string, ContinueReadingEntry> = raw
+      ? JSON.parse(raw)
+      : {};
+    const m = new Map<string, ContinueReadingEntry>();
+    for (const [k, v] of Object.entries(data))
+      if (v?.titleKey && v?.updatedAt && v?.chapterUrl) m.set(k, v);
+    return m;
+  } catch {
+    return new Map();
+  }
+}
+function saveToStorage(
+  entries: Map<string, ContinueReadingEntry>
+): Map<string, ContinueReadingEntry> {
+  try {
+    const sorted = [...entries.values()].sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+    const capped = new Map<string, ContinueReadingEntry>();
+    for (const e of sorted.slice(0, MAX_ENTRIES)) capped.set(e.titleKey, e);
+    localStorage.setItem(LS_KEY, JSON.stringify(Object.fromEntries(capped)));
+    return capped;
+  } catch {
+    return entries;
+  }
+}
+export const localStorageStore: ContinueReadingStore = {
+  load: loadFromStorage,
+  save: saveToStorage,
+  clear: () => {
+    try {
+      localStorage.removeItem(LS_KEY);
+    } catch {}
+  },
+};
+export function createInMemoryStore(
+  initial?: Map<string, ContinueReadingEntry>
+): ContinueReadingStore {
+  let mem = new Map(initial);
+  return {
+    load: () => new Map(mem),
+    save: (entries) => {
+      const sorted = [...entries.values()].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+      mem = new Map<string, ContinueReadingEntry>();
+      for (const e of sorted.slice(0, MAX_ENTRIES)) mem.set(e.titleKey, e);
+      return new Map(mem);
+    },
+    clear: () => {
+      mem = new Map();
+    },
+  };
+}
+
+// — sync (was sync.ts) —
+const SYNC_ENDPOINT = "/api/v1/continue-reading";
+export async function fetchRemote(): Promise<
+  Record<string, ContinueReadingEntry>
+> {
+  const res = await fetch(SYNC_ENDPOINT, { cache: "no-store" });
+  if (!res.ok) return {};
+  const body = await res.json().catch(() => null);
+  const remote: Record<string, ContinueReadingEntry> = body?.data ?? body ?? {};
+  if (!remote || typeof remote !== "object") return {};
+  return remote;
+}
+export async function pushRemote(
+  clean: Record<string, ContinueReadingEntry>
+): Promise<void> {
+  const res = await fetch(
+    SYNC_ENDPOINT,
+    withCsrf({
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(clean),
+    })
+  ).catch(() => null as unknown as Response);
+  if (!res || !res.ok) {
+    const err = new Error(`push failed ${res?.status ?? "network"}`);
+    (err as unknown as { status?: number }).status = res?.status;
+    throw err;
+  }
+}
+
+// — builder helpers —
 export function buildEntryFromChapter(ch: {
   title: string;
   titleKey: string;
@@ -57,7 +150,6 @@ export function buildEntryFromChapter(ch: {
   };
 }
 
-// Global dedupe & circuit breaker — semua instance share, biar gak spam per-card
 let globalLastPushed = "";
 let globalLastPushTime = 0;
 let consecutiveFailures = 0;
@@ -80,19 +172,15 @@ export function useContinueReading(
     () => new Map()
   );
   const hasHydrated = useRef(false);
-
   useEffect(() => {
     const loaded = store.load();
     if (loaded.size > 0) setEntries(loaded);
-    // mark hydrated after microtask so initial save effect can skip wiping
     const id = setTimeout(() => {
       hasHydrated.current = true;
     }, 0);
     return () => clearTimeout(id);
   }, [store]);
-
   useEffect(() => {
-    // anon (no login) → jangan fetch backend (401 spam), pakai localStorage aja
     if (
       typeof document !== "undefined" &&
       !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/)
@@ -127,7 +215,6 @@ export function useContinueReading(
           return changed ? next : prev;
         });
       } catch {
-        /* backend 502 / not yet implemented — keep local only, reset global so retry after 60s bisa */
         globalHasFetchedRemote = false;
         globalFetchPromise = null;
         setTimeout(() => {
@@ -141,7 +228,6 @@ export function useContinueReading(
       cancelled = true;
     };
   }, [store, doFetch]);
-
   useEffect(() => {
     if (entries.size === 0 && !hasHydrated.current) {
       const loaded = store.load();
@@ -150,14 +236,12 @@ export function useContinueReading(
     store.save(entries);
     if (!hasHydrated.current) return;
     if (entries.size === 0) return;
-    // anon → jangan push ke backend (401), localStorage aja
     if (
       typeof document !== "undefined" &&
       !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/)
     )
       return;
     if (typeof document !== "undefined" && document.hidden) return;
-    // circuit breaker: kalau 3× 502 berturut, pause 60s
     if (consecutiveFailures >= 3 && Date.now() - globalLastPushTime < 60000)
       return;
     const clean = Object.fromEntries(
@@ -169,10 +253,8 @@ export function useContinueReading(
       if (entries.size > 0) store.clear();
       return;
     }
-    // dedupe global: jangan push kalau payload sama kayak push terakhir
     const payloadStr = JSON.stringify(clean);
     if (payloadStr === globalLastPushed) return;
-    // debounce 8s + jitter biar gak thundering herd dari banyak card
     const delay = 8000 + Math.random() * 2000;
     const id = setTimeout(() => {
       if (payloadStr === globalLastPushed) return;
@@ -186,24 +268,18 @@ export function useContinueReading(
         },
         () => {
           consecutiveFailures += 1;
-          // rollback dedupe biar retry bisa coba lagi setelah backoff
           if (consecutiveFailures < 3) globalLastPushed = "";
         }
       );
     }, delay);
     return () => clearTimeout(id);
   }, [entries, store, doPush]);
-
   const trackReading = useCallback((entry: ContinueReadingEntry) => {
     if (!entry?.titleKey || !entry?.chapterUrl) return;
     setEntries((prev) => {
       const existing = prev.get(entry.titleKey);
-      if (
-        existing &&
-        new Date(entry.updatedAt) <= new Date(existing.updatedAt)
-      ) {
+      if (existing && new Date(entry.updatedAt) <= new Date(existing.updatedAt))
         return prev;
-      }
       const next = new Map(prev);
       next.set(entry.titleKey, entry);
       if (next.size > MAX_ENTRIES) {
@@ -218,7 +294,6 @@ export function useContinueReading(
       return next;
     });
   }, []);
-
   const trackChapter = useCallback(
     (ch: Parameters<typeof buildEntryFromChapter>[0]) => {
       const entry = buildEntryFromChapter(ch);
@@ -226,7 +301,6 @@ export function useContinueReading(
     },
     [trackReading]
   );
-
   const removeReading = useCallback((titleKey: string) => {
     setEntries((prev) => {
       const next = new Map(prev);
@@ -234,16 +308,8 @@ export function useContinueReading(
       return next;
     });
   }, []);
-
   const clearAll = useCallback(() => {
     setEntries(new Map());
   }, []);
-
-  return {
-    entries,
-    trackReading,
-    trackChapter,
-    removeReading,
-    clearAll,
-  };
+  return { entries, trackReading, trackChapter, removeReading, clearAll };
 }
