@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // Vercel → scanner proxy for API that lives on VPS (not on Vercel)
+      { source: "/api/v1/failed-dispatches/:path*", destination: "https://scanner.aldifhr.fun/api/v1/failed-dispatches/:path*" },
+      { source: "/api/v1/failed-dispatches", destination: "https://scanner.aldifhr.fun/api/v1/failed-dispatches" },
+      { source: "/api/v1/logs/:path*", destination: "https://scanner.aldifhr.fun/api/v1/logs/:path*" },
       // Legacy compat — deleted duplicate route files now served via rewrites (no duplicate handler)
       { source: "/api/auth/:path*", destination: "/api/v1/auth/:path*" },
       {
