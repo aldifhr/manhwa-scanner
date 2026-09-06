@@ -214,16 +214,6 @@ async def cron_trigger(request: Request):
     return JSONResponse(content={"success": True, "data": {"status": "enqueued", "action": action}}, status_code=202)
 
 
-@router.get("/cron/status")
-async def cron_status(request: Request):
-    """Return recent cron job runs (in-memory) so the FE can show real run
-    status instead of inferring it from the cronStatus timestamp."""
-    if not (require_cron_auth(request) or require_monitor_auth(request)):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    jobs = get_cron_jobs()
-    return JSONResponse(content={"success": True, "data": {"jobs": jobs, "running": _cron_running}})
-
-
 @router.get("/cleanup")
 async def cleanup(request: Request):
     if not require_cron_auth(request):
