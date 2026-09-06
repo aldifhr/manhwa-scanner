@@ -55,8 +55,8 @@ export default function Announcement() {
   const degraded = health && health.length > 0 ? ` • ${health.join(", ")} degraded` : "";
 
   return (
-    <div className="w-full bg-[var(--gold-accent)] text-black text-center text-xs font-medium py-1.5 px-4 flex items-center justify-center gap-2">
-      <span>
+    <div className="w-full bg-[var(--gold-accent)] text-black text-xs font-medium py-1.5 px-3 flex items-center gap-2">
+      <span className="flex-1 text-center">
         🔥 {total ?? "?"} baru 24h{degraded}
       </span>
       <button
@@ -67,7 +67,7 @@ export default function Announcement() {
           } catch {}
           setDismissed(true);
         }}
-        className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-black/10 hover:bg-black/20 text-black/60 hover:text-black transition-colors"
+        className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-black/10 hover:bg-black/20 text-black/60 hover:text-black transition-colors text-[10px] leading-none"
       >
         ×
       </button>
