@@ -6,21 +6,20 @@ Next.js Frontend + FastAPI Backend — `openapi.json` synced, `komik.aldifhr.fun
 - **BE** `apps/backend` — FastAPI, `uv run uvicorn app.main:app --reload` (`http://localhost:8000`)
 - **Live:** `https://komik.aldifhr.fun` → `https://scanner.aldifhr.fun`
 
-## Roles
+## Roles — Full Admin Only (single password `DASHBOARD_PASSWORD`)
 
-| Role     | Login                                                                                                                        | Bisa                                                                                                                                                                     |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `anon`   | —                                                                                                                            | Lihat `Home` `/`, `Recent` `/recent`, `Bookmarks` (localStorage), `Operational` dot di nav                                                                               |
-| `member` | `POST /api/auth?action=register` `{email,password}` → `POST /api/auth?action=login` `{email,password}` → `ikiru_role=member` | `anon` + `bookmark` per login (`chapter_bookmarks` per `session_hash`), `continueReading` sync `bookmark`                                                                |
-| `admin`  | `POST /api/auth?action=login` `{password: MONITOR_AUTH_TOKEN}` → `role:admin`                                                | `member` + `add/remove whitelist`, `exclude`, `dispatch`/`send notif`, `GET /admin`, `/status` (redirect → `/admin`), `/whitelist`, `/exclude-list`, `/dispatch-history` |
+| Role   | Login                                                                               | Bisa                                                                                                                                                          |
+| ------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `anon` | —                                                                                   | Lihat `Home` `/`, `Recent` `/recent`, `Bookmarks` (localStorage), `Operational` dot di nav                                                                    |
+| `admin`| `POST /api/v1/auth?action=login` `{password: DASHBOARD_PASSWORD}` → `ikiru_dashboard_session` (JWT) | `anon` + `bookmark`/`continueReading` sync DB `chapter_bookmarks` per `session_hash` + `add/remove whitelist`, `exclude`, `dispatch`/`send notif`, `GET /admin`, `/whitelist`, `/exclude-list`, `/dispatch-history` |
 
-`GET` whitelist/dispatch/exclude → `admin` only (member `401`), `POST/DELETE` whitelist/exclude → `admin` only. `member` cuma `bookmark`.
+Semua endpoint mutasi (`POST/DELETE /whitelist`, `POST /excluded-titles`, `POST /api/cron`) butuh `ikiru_dashboard_session` (admin). Tanpa login → `401` / `302 /login`.
 
 ## Routes
 
 - Public `GET`: `/`, `/recent`, `/bookmarks` (anon local), `GET /api/v1/reader/rss`, `/api/v1/dashboard/snapshot` (`Operational` dot), `GET /whitelist` (Home badge)
-- Protected `GET`: `/whitelist`, `/exclude-list`, `/dispatch-history`, `/admin`, `/status` → `admin` (member `302 /login`)
-- Mutating: `POST /whitelist`, `POST /excluded-titles` → `admin` (`403` buat member)
+- Protected `GET`: `/whitelist`, `/exclude-list`, `/dispatch-history`, `/admin`, `/status` → butuh login (`302 /login`)
+- Mutating: `POST /whitelist`, `POST /excluded-titles` → butuh login (`401` kalau anon)
 
 ## Dev
 
@@ -35,13 +34,11 @@ pnpm --filter manhwa-reader typecheck && pnpm --filter manhwa-reader test
 
 | Variable                               | Contoh          | Ket                                           |
 | -------------------------------------- | --------------- | --------------------------------------------- |
-| `MONITOR_AUTH_TOKEN`                   | `BE .env`       | admin password                                |
-| `MEMBER_AUTH_TOKEN`                    | `BE .env`       | seed member (di-ignore kalau `app_users` >0)  |
-| `AUTH_SECRET`                          | `BE .env`       | HS256 JWT `ikiru_dashboard_session`           |
-| `DATABASE_URL`                         | Supabase pooler | `app_users`, `chapter_bookmarks`, `whitelist` |
-| `NEXT_PUBLIC_API_BASE` / `BACKEND_URL` | `FE .env.local` | `https://scanner.aldifhr.fun`                 |
+| `DASHBOARD_PASSWORD` / `MONITOR_AUTH_TOKEN` | `BE .env`       | admin password (single, `DASHBOARD_PASSWORD` utama) |
+| `AUTH_SECRET`                          | `BE .env`       | HS256 JWT `ikiru_dashboard_session`                 |
+| `DATABASE_URL`                         | Supabase pooler | `chapter_bookmarks`, `whitelist`, `recent_chapters` |
 
-`app_users` (`049_create_users`) — `email` unique, `password_hash` `pbkdf2`, `role` `member`.
+`app_users` di-drop `050` — full admin only, tidak pakai `pbkdf2`/`role` lagi.
 
 ## Docs
 

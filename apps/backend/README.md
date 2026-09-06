@@ -77,8 +77,7 @@ Config lives in `app/config.py` (loaded from `.env` via pydantic-settings).
 | `DISCORD_BOT_TOKEN` | Discord bot token (dispatches + slash commands) |
 | `DATABASE_URL` | PostgreSQL transaction-pooler DSN |
 | `CRON_SECRET` | Shared secret for `POST /api/cron` |
-| `MONITOR_AUTH_TOKEN` | Bearer token for protected endpoints |
-| `MEMBER_AUTH_TOKEN` | Write-limited member login token |
+| `DASHBOARD_PASSWORD` / `MONITOR_AUTH_TOKEN` | Single admin password (`DASHBOARD_PASSWORD` utama) |
 | `PUBLIC_BASE_URL` | Public base for absolute links/embeds |
 | `IKIRU_BASE_URL` | ikiru site root (default `https://07.ikiru.wtf/`) |
 | `SECONDARY_SOURCE_URL` | shinigami API base (default `https://api.shngm.io`) |
