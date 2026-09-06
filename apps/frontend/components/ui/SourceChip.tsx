@@ -8,7 +8,6 @@ export function SourceChip({
   source: string;
   variant?: "chip" | "badge";
 }) {
-  if (source.toLowerCase() === "voratoon") return null;
   const cls =
     variant === "badge" ? sourceBadgeClass(source) : sourceChipClass(source);
   return (
