@@ -192,11 +192,11 @@ export async function getHealthDetailed(): Promise<{
   return (body as unknown as { data: unknown }).data as never;
 }
 
-// Bookmarks — anon pakai localStorage, member/admin pakai backend (per login)
+// Bookmarks — anon pakai localStorage, authed (ikiru_dashboard_session) pakai backend
 const LS_BM_KEY = "bookmarks";
 function isAnonBookmark(): boolean {
   if (typeof document === "undefined") return true;
-  return !document.cookie.match(/(?:^|;\s*)ikiru_role=/);
+  return !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
 }
 function loadLocalBookmarks(): BookmarkEntry[] {
   try {

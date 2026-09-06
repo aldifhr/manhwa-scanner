@@ -26,14 +26,14 @@ export function useFeedActions() {
   const [excludingKey, setExcludingKey] = useState<string | null>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
 
-  const isAdmin =
+  const isLoggedIn =
     typeof document !== "undefined" &&
-    !!document.cookie.match(/(?:^|;\s*)ikiru_role=admin/);
+    !!document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
   const { data: excludedData } = useQuery({
     queryKey: queryKeys.excludedTitles,
     queryFn: () =>
       Reader.getExcludedTitles() as Promise<{ titleKey: string }[]>,
-    enabled: isAdmin,
+    enabled: isLoggedIn,
     retry: false,
     refetchOnWindowFocus: false,
   });

@@ -95,7 +95,7 @@ export function useContinueReading(
     // anon (no login) → jangan fetch backend (401 spam), pakai localStorage aja
     if (
       typeof document !== "undefined" &&
-      !document.cookie.match(/(?:^|;\s*)ikiru_role=/)
+      !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/)
     ) {
       hasHydrated.current = true;
       globalHasFetchedRemote = true;
@@ -153,7 +153,7 @@ export function useContinueReading(
     // anon → jangan push ke backend (401), localStorage aja
     if (
       typeof document !== "undefined" &&
-      !document.cookie.match(/(?:^|;\s*)ikiru_role=/)
+      !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/)
     )
       return;
     if (typeof document !== "undefined" && document.hidden) return;

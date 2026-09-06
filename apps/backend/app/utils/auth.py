@@ -14,13 +14,18 @@ def _dashboard_passwords() -> list[str]:
     return [c for c in (settings.DASHBOARD_PASSWORD, settings.MONITOR_AUTH_TOKEN) if c]
 
 
-def token_matches(provided: str, *, role: str = "both") -> bool:  # noqa: ARG001 — kept for compat
+def token_matches(provided: str, *, role: str = "both") -> bool:
     if not provided or not isinstance(provided, str):
         return False
     provided = provided.strip()
     if not provided:
         return False
-    candidates = _dashboard_passwords()
+    if role == "cron":
+        candidates = [c for c in (settings.CRON_SECRET,) if c]
+    elif role == "monitor":
+        candidates = _dashboard_passwords()
+    else:  # both — legacy
+        candidates = [c for c in (settings.CRON_SECRET, *_dashboard_passwords()) if c]
     if not candidates:
         return False
     return any(hmac.compare_digest(provided, str(c)) for c in candidates)
