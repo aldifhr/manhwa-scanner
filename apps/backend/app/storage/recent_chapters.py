@@ -295,9 +295,10 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                 _touch_rows = []
                 for r in touch_rows:
                     _t = {"chapter_url": r["chapter_url"]}
-                    for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description"):
+                    for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type", "status"):
                         v = r.get(k)
-                        if v:
+                        if v not in (None, "", []):
+                            # ponytail: also refresh rating/genres/type on touch so A launch miss gets fixed next cron (was only cover/origin)
                             _t[k] = v
                     _touch_rows.append(_t)
                 # db_adapter requires every row in a batch to share the same
