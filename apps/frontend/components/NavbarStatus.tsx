@@ -27,7 +27,7 @@ function aggregate(
 const LABEL: Record<Agg, string> = {
   operational: "Live",
   degraded: "Degraded",
-  stale: "Stale",
+  stale: "Idle",
 };
 
 const DOT_CLASS: Record<Agg, string> = {
