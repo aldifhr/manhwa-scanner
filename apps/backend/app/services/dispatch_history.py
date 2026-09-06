@@ -44,7 +44,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             total_for_search = 0
         dh = (
             sb.table("dispatch_history")
-            .select("chapter_url, title_key, source, chapter_title, sent_at, cover, series_url")
+            .select("chapter_url, title_key, source, chapter_title, sent_at, cover, series_url, fcfs_key")
             .ilike("title_key", search_pattern)
             .order("sent_at", desc=True)
             .limit(page_size)
@@ -60,7 +60,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             total_for_search = 0
         dh = (
             sb.table("dispatch_history")
-            .select("chapter_url, title_key, source, chapter_title, sent_at, cover, series_url")
+            .select("chapter_url, title_key, source, chapter_title, sent_at, cover, series_url, fcfs_key")
             .order("sent_at", desc=True)
             .limit(page_size)
             .offset(offset)
@@ -182,7 +182,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             or "Untitled"
         )
         chapter = rc.get("chapter") or (r.get("chapter_title") or "")
-        title = html.unescape(title)
+        title = html.unescape(title).replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
+        _desc = (_desc or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
         # BUG5: scrub cover (voratoon presigned -> proxy-in)
         _cover = scrub_cover(r.get("cover") or rc.get("cover") or "")
         results.append({
@@ -199,6 +200,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             "description": _desc,
             "genres": _genres,
             "sentAt": r.get("sent_at") or "",
+            "fcfsKey": r.get("fcfs_key") or "",
+            "chapterUrl": _norm or _raw or "",
             "isDuplicate": idx in _dup_set,
             "canonicalTitleKey": normalize_title_key(r.get("title_key", "") or ""),
         })

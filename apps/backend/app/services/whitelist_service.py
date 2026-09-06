@@ -574,8 +574,14 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
             _wl_series = f"https://07.ikiru.wtf/manga/{tk}/"
         elif tk and s == "voratoon":
             _wl_series = f"https://v1.voratoon.com/series/{tk}"
-        elif tk and s == "shinigami" and rc.get("series_url"):
-            _wl_series = rc.get("series_url") or ""
+        elif tk and s == "shinigami":
+            if rc.get("series_url"):
+                _wl_series = rc.get("series_url") or ""
+            elif len(tk) == 36 and tk.count("-") == 4:
+                # shinigami UUID directly
+                _wl_series = f"https://11.shinigami.asia/series/{tk}"
+            elif " " not in tk:
+                _wl_series = f"https://11.shinigami.asia/series/{tk}"
     # ponytail: fix voratoon slug with spaces/%20 (e.g. a painter who draws dungeons → a-painter-who-draws-dungeons)
     if s == "voratoon" and _wl_series and (" " in _wl_series or "%20" in _wl_series):
         import re as _re2
@@ -597,15 +603,19 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     if _cover:
         _cover = scrub_cover(_cover)
     desc = r.get("description") or meta_desc.get(tk) or meta_desc.get(tk.replace(" ", "-")) or None
+    if desc:
+        desc = desc.replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
     if not desc and _wl_series:
         seg = _wl_series.rstrip("/").split("/")[-1]
         desc = meta_desc.get(seg) or None
+        if desc:
+            desc = desc.replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
     _meta_cov = meta_cover.get(tk) or meta_cover.get(" ".join(tk.split("-"))) or ""
     if _meta_cov:
         _meta_cov = scrub_cover(_meta_cov)
     return {
         "id": str(r.get("id") or f"{tk}:{s}" if s else tk),
-        "title": html.unescape(r.get("title") or ""),
+        "title": html.unescape(r.get("title") or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019"),
         "titleKey": tk,
         "canonicalTitleKey": normalize_title_key(tk),
         "cover": _cover or _meta_cov or "",
