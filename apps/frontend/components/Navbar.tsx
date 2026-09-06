@@ -18,7 +18,8 @@ export default function Navbar() {
   const prefetch = usePrefetch();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    setIsLoggedIn(!!document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/));
+    // ponytail: session is httpOnly (invisible to JS) → check readable csrf twin set alongside session
+    setIsLoggedIn(!!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/));
   }, [pathname]);
 
   useEffect(() => {
