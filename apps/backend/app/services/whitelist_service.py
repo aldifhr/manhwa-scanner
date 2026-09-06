@@ -565,6 +565,17 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     rc = rc_map.get((tk, s)) or rc_map.get(tk, {})
     _wl_raw = r.get("series_url") or ""
     _wl_series = _wl_raw if str(_wl_raw).startswith(("http://", "https://")) else (rc.get("series_url") or "")
+    # ponytail: fallback to whitelist url or construct from title_key when both missing (79 rows null)
+    if not _wl_series:
+        _u = str(r.get("url") or "").strip()
+        if _u.startswith(("http://", "https://")):
+            _wl_series = _u
+        elif tk and s == "ikiru":
+            _wl_series = f"https://07.ikiru.wtf/manga/{tk}/"
+        elif tk and s == "voratoon":
+            _wl_series = f"https://v1.voratoon.com/series/{tk}"
+        elif tk and s == "shinigami" and rc.get("series_url"):
+            _wl_series = rc.get("series_url") or ""
     # cover must be a real http(s) URL; scrapers/FE sometimes store 'x' or
     # other non-URL placeholders — fall through to recent_chapters cover.
     _wl_cover = r.get("cover")
