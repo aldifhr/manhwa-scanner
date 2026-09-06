@@ -40,7 +40,22 @@ SELECT COUNT(*) FROM whitelist WHERE series_url IS NULL OR series_url='';
 -- expect: 0
 ```
 
-## 4. Verifikasi
+## 4. Voratoon slug spaces %20 → dash (a painter..., chronicles..., i became...)
+
+```sql
+-- generic: ganti spasi/%20 di slug voratoon jadi -
+UPDATE whitelist SET series_url = REGEXP_REPLACE(series_url, '(%20| )+', '-', 'g') WHERE source='voratoon' AND series_url LIKE '%voratoon.com/series/%' AND (series_url LIKE '% %' OR series_url LIKE '%\%20%');
+-- lower + collapse -- (optional, idempotent)
+UPDATE whitelist SET series_url = LOWER(REGEXP_REPLACE(series_url, '-+', '-', 'g')) WHERE source='voratoon' AND series_url LIKE '%voratoon.com/series/%';
+-- 3 row spesifik (idempotent)
+UPDATE whitelist SET series_url = 'https://v1.voratoon.com/series/a-painter-who-draws-dungeons' WHERE source='voratoon' AND title='A Painter Who Draws Dungeons';
+UPDATE whitelist SET series_url = 'https://v1.voratoon.com/series/chronicles-of-the-lazy-sovereign' WHERE source='voratoon' AND title='Chronicles of the Lazy Sovereign';
+UPDATE whitelist SET series_url = 'https://v1.voratoon.com/series/i-became-the-master-of-the-weakest-demon-king' WHERE source='voratoon' AND title ILIKE 'I Became the Master of the Weakest Demon King%';
+-- recent_chapters juga kalau ada
+UPDATE recent_chapters SET series_url = REGEXP_REPLACE(series_url, '(%20| )+', '-', 'g') WHERE source='voratoon' AND series_url LIKE '%voratoon.com/series/%' AND (series_url LIKE '% %' OR series_url LIKE '%\%20%');
+```
+
+## 5. Verifikasi
 
 ```sql
 SELECT origin, type, COUNT(*) FROM recent_chapters WHERE source='shinigami' GROUP BY origin,type;
@@ -49,6 +64,8 @@ SELECT title FROM recent_chapters WHERE title LIKE '%�%' LIMIT 5;
 -- expect: 0 rows
 SELECT COUNT(*) FROM whitelist WHERE series_url IS NULL OR series_url='';
 -- expect: 0 rows
+SELECT title, series_url FROM whitelist WHERE source='voratoon' AND series_url LIKE '%\%20%' OR series_url LIKE '% %' LIMIT 5;
+-- expect: 0 rows
 ```
 
-Code fix sudah di `32e124e` (`lib/utils.ts:112` `FFFD→’` + `shinigami.py:14,50,123` origin sync) + `0c9cddd` (`whitelist_service.py:567` fallback), query ini cuma bersihkan row lama sebelum deploy.
+Code fix sudah di `32e124e` (`lib/utils.ts:112` `FFFD→’` + `shinigami.py:14,50,123` origin sync) + `0c9cddd` (`whitelist_service.py:567` fallback) + `ffdcf4f` (`whitelist_service.py:579` slug %20→-), query ini cuma bersihkan row lama sebelum deploy.
