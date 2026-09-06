@@ -2,9 +2,9 @@ module.exports = {
   apps: [
     {
       name: "manhwa-api",
-      cwd: "/root/projects/manhwa-backend",
+      cwd: "/root/projects/manhwa-scanner/apps/backend",
       script: "app/main.py",
-      interpreter: "/root/projects/manhwa-backend/.venv/bin/python",
+      interpreter: "/root/projects/manhwa-scanner/apps/backend/.venv/bin/python",
       args: "--port 3000",
       instances: 1,
       autorestart: true,
@@ -13,15 +13,15 @@ module.exports = {
       env: {
         ROLE: "api",
         PYTHONUNBUFFERED: "1",
-        PYTHONPATH: "/root/projects/manhwa-backend",
+        PYTHONPATH: "/root/projects/manhwa-scanner/apps/backend",
         SECONDARY_PUBLIC_BASE: "https://11.shinigami.asia",
       },
     },
     {
       name: "manhwa-cron",
-      cwd: "/root/projects/manhwa-backend",
+      cwd: "/root/projects/manhwa-scanner/apps/backend",
       script: "app/main.py",
-      interpreter: "/root/projects/manhwa-backend/.venv/bin/python",
+      interpreter: "/root/projects/manhwa-scanner/apps/backend/.venv/bin/python",
       args: "--port 3001",
       instances: 1,
       autorestart: true,
@@ -30,7 +30,7 @@ module.exports = {
       env: {
         ROLE: "cron",
         PYTHONUNBUFFERED: "1",
-        PYTHONPATH: "/root/projects/manhwa-backend",
+        PYTHONPATH: "/root/projects/manhwa-scanner/apps/backend",
         SECONDARY_PUBLIC_BASE: "https://11.shinigami.asia",
       },
     },

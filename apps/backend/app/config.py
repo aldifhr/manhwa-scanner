@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     # Legacy API key (kept for rotation support)
     FASTCRON_API_KEY: str = ""  # Legacy — either secret works
     MONITOR_AUTH_TOKEN: str = ""
+    # Single shared password — replaces admin/member model (ponytail: one env, no roles)
+    DASHBOARD_PASSWORD: str = "manhwascan"
     # JWT session-cookie secret for /api/auth login.
     # MUST be set explicitly — never defaults to MONITOR_AUTH_TOKEN (which is
     # exposed in query strings). Boot guard in _validate_settings enforces this.

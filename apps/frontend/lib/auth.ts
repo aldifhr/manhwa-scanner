@@ -1,17 +1,12 @@
 const COOKIE_NAME = "ikiru_dashboard_session";
 
 function b64UrlDecode(input: string): string {
-  // Edge-safe: no Buffer. Convert base64url -> base64 -> decode.
   let b64 = input.replace(/-/g, "+").replace(/_/g, "/");
   const pad = b64.length % 4;
   if (pad) b64 += "=".repeat(4 - pad);
-  // atob is available in both Node (>=16) and Edge/Web workers
   try {
-    // Use globalThis.atob if present, else Buffer fallback for older Node tests
     if (typeof atob === "function") return atob(b64);
-  } catch {
-    /* fall through to Buffer */
-  }
+  } catch {}
   try {
     const buf = (
       globalThis as {
@@ -21,10 +16,7 @@ function b64UrlDecode(input: string): string {
       }
     ).Buffer;
     if (buf) return buf.from(b64, "base64").toString();
-  } catch {
-    /* ignore */
-  }
-  // Last resort: manual (Node without atob/Buffer shouldn't happen)
+  } catch {}
   return "";
 }
 
@@ -48,10 +40,9 @@ export function verifyToken(token: string): boolean {
   return Date.now() < payload.exp * 1000;
 }
 
-export function getRole(token: string): "admin" | "member" | null {
-  const p = decodeJwtPayload<{ role?: string }>(token);
-  if (p?.role === "admin" || p?.role === "member") return p.role;
-  return null;
+// compat — roles removed, single password model. Any valid JWT is "user".
+export function getRole(token: string): "user" | null {
+  return verifyToken(token) ? "user" : null;
 }
 
 export { COOKIE_NAME };

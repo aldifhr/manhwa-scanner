@@ -12,24 +12,9 @@ import {
 export const NAV = [
   { href: "/", label: "Home", icon: House },
   { href: "/recent", label: "Recent", icon: Compass },
-  {
-    href: "/whitelist",
-    label: "Whitelist",
-    icon: Books,
-    adminOnly: true,
-  } as const,
-  {
-    href: "/exclude-list",
-    label: "Exclude",
-    icon: EyeSlash,
-    adminOnly: true,
-  } as const,
-  {
-    href: "/dispatch-history",
-    label: "History",
-    icon: Clock,
-    adminOnly: true,
-  } as const,
+  { href: "/whitelist", label: "Whitelist", icon: Books } as const,
+  { href: "/exclude-list", label: "Exclude", icon: EyeSlash } as const,
+  { href: "/dispatch-history", label: "History", icon: Clock } as const,
   { href: "/bookmarks", label: "Bookmarks", icon: BookBookmark },
 ] as const;
 

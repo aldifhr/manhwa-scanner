@@ -10,25 +10,15 @@ import { NavItem } from "@/components/Nav/NavItem";
 import { useAuth } from "@/components/Nav/useAuth";
 import { usePrefetch } from "@/components/Nav/usePrefetch";
 import NavbarStatus from "@/components/NavbarStatus";
-import { getRole } from "@/lib/auth";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { logout } = useAuth();
   const prefetch = usePrefetch();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    const roleMatch = document.cookie.match(/(?:^|;\s*)ikiru_role=([^;]*)/);
-    if (roleMatch?.[1]) {
-      setIsLoggedIn(true);
-      setIsAdmin(roleMatch[1] === "admin");
-      return;
-    }
-    // no readable role → treat as anon, don't spam /api/v1/auth/me (ga login ngespam 401)
-    setIsLoggedIn(false);
-    setIsAdmin(false);
+    setIsLoggedIn(!!document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/));
   }, [pathname]);
 
   useEffect(() => {
@@ -63,8 +53,7 @@ export default function Navbar() {
             </Link>
 
             <div className="hidden md:flex items-center gap-1 ml-4">
-              {NAV.filter((n) => !(n as any).adminOnly || isAdmin).map(
-                ({ href, label, icon }) => (
+              {NAV.map(({ href, label, icon }) => (
                   <NavItem
                     key={href}
                     href={href}
@@ -73,8 +62,7 @@ export default function Navbar() {
                     active={isNavActive(href, pathname)}
                     onPrefetch={prefetch}
                   />
-                )
-              )}
+                ))}
             </div>
 
             <div className="flex-1" />
@@ -125,7 +113,6 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
-
       {/* Mobile drawer */}
       <AnimatePresence>
         {open && (
@@ -158,8 +145,7 @@ export default function Navbar() {
               </div>
 
               <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-                {NAV.filter((n) => !(n as any).adminOnly || isAdmin).map(
-                  ({ href, label, icon }) => (
+                {NAV.map(({ href, label, icon }) => (
                     <NavItem
                       key={href}
                       href={href}
@@ -170,8 +156,7 @@ export default function Navbar() {
                       onPrefetch={prefetch}
                       onClick={() => setOpen(false)}
                     />
-                  )
-                )}
+                  ))}
               </div>
 
               <div className="p-3 border-t border-white/10 space-y-3 bg-black/20">
