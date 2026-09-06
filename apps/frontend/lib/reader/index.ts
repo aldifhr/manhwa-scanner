@@ -33,7 +33,7 @@ function buildRssParams(
 }
 
 export const Reader = {
-  getWhitelist: (page = 1, pageSize = 1000, merge = true) => {
+  getWhitelist: (page = 1, pageSize = 1000, merge = false) => {
     const p = new URLSearchParams({
       page: String(page),
       page_size: String(pageSize),

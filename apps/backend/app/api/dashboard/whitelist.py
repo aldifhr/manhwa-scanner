@@ -85,10 +85,10 @@ async def dispatch_history_reader(request: Request):
 @router.get("/reader/whitelist")
 async def get_whitelist_reader(request: Request):
     """Backward-compat alias — public GET for anon dashboard, same as /whitelist."""
-    # ponytail: public GET, no auth
+    # ponytail: pisah per source (merge=false) default — user request
     page = request.query_params.get("page", "1")
     page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
-    _merge_raw = (request.query_params.get("merge") or "true").lower()
+    _merge_raw = (request.query_params.get("merge") or "false").lower()
     _merge = _merge_raw not in ("false", "0", "no")
     cursor = request.query_params.get("cursor")
     return get_whitelist(page=page, page_size=page_size, merge=_merge, cursor=cursor)
@@ -96,13 +96,13 @@ async def get_whitelist_reader(request: Request):
 
 @router.get("/whitelist")
 async def whitelist_get(request: Request):
-    # ponytail: public GET for anon/member dashboard
+    # ponytail: pisah per source (merge=false) default — user request
     try:
         source = request.query_params.get("source", "")
         title = request.query_params.get("title") or request.query_params.get("q", "")
         page = request.query_params.get("page", "1")
         page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
-        _merge_raw = (request.query_params.get("merge") or "true").lower()
+        _merge_raw = (request.query_params.get("merge") or "false").lower()
         _merge = _merge_raw not in ("false", "0", "no")
         cursor = request.query_params.get("cursor")
         result = get_whitelist(source=source, title=title, page=page, page_size=page_size, merge=_merge, cursor=cursor)

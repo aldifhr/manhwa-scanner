@@ -100,7 +100,7 @@ def _fetch_whitelist_rows(
     sb = get_supabase()
     return rows, len(rows), sb, False
 
-def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: int = 100, merge: bool = True, cursor: str | None = None) -> dict:
+def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: int = 100, merge: bool = False, cursor: str | None = None) -> dict:
     """Get whitelist with metadata joins. DB-side pagination + cursor (keyset)."""
 
     try:
