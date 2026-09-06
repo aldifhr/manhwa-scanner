@@ -213,7 +213,7 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
     result: list[bool] = []
     new_claims: list[dict] = []
     claimed_fk: set[str] = set()  # fcfs_keys this batch already granted
-    expires = (now + timedelta(hours=2)).isoformat()
+    expires = (now + timedelta(hours=1)).isoformat()  # ponytail: 2h→1h queue depth fresher
     for i, (u, tk, src) in enumerate(zip(urls, title_keys, sources)):
         if not u:
             result.append(False)
@@ -359,9 +359,12 @@ def complete_dispatch_claim(
                 row, on_conflict="fcfs_key"
             ).execute()
         else:
-            sb.table("dispatch_history").insert(row).execute()
+            # ponytail: idempotent fallback — upsert on chapter_url when fcfs_key empty (was insert → dup fail)
+            sb.table("dispatch_history").upsert(
+                row, on_conflict="chapter_url"
+            ).execute()
     except Exception as e:
-        logger.error("complete_dispatch_claim history failed", exc=e)
+        logger.error("complete_dispatch_claim history failed", exc=e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
     # Drop the claim so queue-depth reflects reality.
     try:
         get_supabase().table("dispatch_claims").delete().eq(
