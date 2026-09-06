@@ -9,7 +9,7 @@ export function useFeedMeta(
   optimisticWhitelist: Set<string>
 ) {
   // ponytail: static sources — was derived from filtered `all` (source=ikiru → only ikiru) so other buttons disappeared
-  const sources = useMemo(() => ["ikiru", "shinigami", "voratoon"] as const, []);
+  const sources: string[] = useMemo(() => ["ikiru", "shinigami", "voratoon"], []);
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of all) {
@@ -60,5 +60,5 @@ export function useFeedMeta(
     nowlCount: distinctTotal - counts.wl,
     unknownCount: counts.unknown,
     distinctTotal,
-  } as const;
+  };
 }
