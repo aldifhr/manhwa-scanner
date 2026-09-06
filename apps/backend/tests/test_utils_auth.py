@@ -22,6 +22,7 @@ class TestTokenMatches:
     def test_cron_role_match(self):
         with patch("app.utils.auth.settings") as mock_settings:
             mock_settings.CRON_SECRET = "cron-secret"
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.FASTCRON_API_KEY = ""
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             assert token_matches("cron-secret", role="cron") is True
@@ -29,6 +30,7 @@ class TestTokenMatches:
     def test_monitor_role_match(self):
         with patch("app.utils.auth.settings") as mock_settings:
             mock_settings.CRON_SECRET = "cron-secret"
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             assert token_matches("monitor-secret", role="monitor") is True
 
@@ -57,6 +59,7 @@ class TestCronTokenMatches:
     def test_match(self):
         with patch("app.utils.auth.settings") as mock_settings:
             mock_settings.CRON_SECRET = "cron-secret"
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.FASTCRON_API_KEY = ""
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             assert cron_token_matches("cron-secret") is True
@@ -64,6 +67,7 @@ class TestCronTokenMatches:
     def test_no_match(self):
         with patch("app.utils.auth.settings") as mock_settings:
             mock_settings.CRON_SECRET = "cron-secret"
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.FASTCRON_API_KEY = ""
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             assert cron_token_matches("monitor-secret") is False
@@ -75,12 +79,14 @@ class TestMonitorTokenMatches:
     def test_match(self):
         with patch("app.utils.auth.settings") as mock_settings:
             mock_settings.CRON_SECRET = "cron-secret"
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             assert monitor_token_matches("monitor-secret") is True
 
     def test_no_match(self):
         with patch("app.utils.auth.settings") as mock_settings:
             mock_settings.CRON_SECRET = "cron-secret"
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             assert monitor_token_matches("cron-secret") is False
 
@@ -90,6 +96,7 @@ class TestCheckMonitorAuth:
 
     def test_bearer_header(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.AUTH_DISABLED = False
             mock_settings.ENVIRONMENT = "production"
@@ -97,6 +104,7 @@ class TestCheckMonitorAuth:
 
     def test_token_param(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.AUTH_DISABLED = False
             mock_settings.ENVIRONMENT = "production"
@@ -104,6 +112,7 @@ class TestCheckMonitorAuth:
 
     def test_invalid_token(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.AUTH_DISABLED = False
             mock_settings.ENVIRONMENT = "production"
@@ -111,6 +120,7 @@ class TestCheckMonitorAuth:
 
     def test_no_monitor_token_configured(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = ""
             mock_settings.MONITOR_AUTH_TOKEN = ""
             mock_settings.AUTH_DISABLED = False
             assert check_monitor_auth("Bearer any-token") is False
@@ -134,15 +144,17 @@ class TestRoleFromRequest:
 
     def test_bearer_admin(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.CRON_SECRET = "cron-secret"
-            assert role_from_request("Bearer monitor-secret") == "admin"
+            assert role_from_request("Bearer monitor-secret") == "user"
 
     def test_token_param_admin(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.CRON_SECRET = "cron-secret"
-            assert role_from_request("", token_param="monitor-secret") == "admin"
+            assert role_from_request("", token_param="monitor-secret") == "user"
 
     def test_no_auth(self):
         assert role_from_request("") is None
@@ -153,6 +165,7 @@ class TestRequireRole:
 
     def test_admin_access(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.CRON_SECRET = "cron-secret"
             mock_settings.AUTH_DISABLED = False
@@ -161,15 +174,17 @@ class TestRequireRole:
 
     def test_member_access(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.CRON_SECRET = "cron-secret"
             mock_settings.AUTH_DISABLED = False
             mock_settings.ENVIRONMENT = "production"
-            # Bearer token gives admin role, which is in allowed set
+            # Bearer token gives user role, which is in allowed set
             assert require_role({"admin", "member"}, "Bearer monitor-secret") is True
 
     def test_unauthenticated(self):
         with patch("app.utils.auth.settings") as mock_settings:
+            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
             mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
             mock_settings.AUTH_DISABLED = False
             mock_settings.ENVIRONMENT = "production"

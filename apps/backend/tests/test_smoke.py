@@ -10,7 +10,7 @@ client = TestClient(app)
 
 def test_healthz():
     """Health endpoint returns 200."""
-    r = client.get("/healthz")
+    r = client.get("/api/v1/healthz")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
 
@@ -49,9 +49,9 @@ def test_rss_new_with_auth():
 
 
 def test_whitelist_requires_auth():
-    """Whitelist endpoint requires authentication."""
+    """Whitelist GET is public (feed), writes require auth — GET returns 200 anon."""
     r = client.get("/api/v1/whitelist")
-    assert r.status_code == 401
+    assert r.status_code == 200
 
 
 def test_cron_requires_auth():

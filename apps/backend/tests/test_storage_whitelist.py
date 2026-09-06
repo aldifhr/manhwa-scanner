@@ -55,14 +55,14 @@ class TestLoadWhitelist:
 
     def test_empty_db(self):
         mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.order.return_value.execute.return_value.data = []
+        mock_sb.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value.data = []
         with patch("app.storage.whitelist.get_supabase", return_value=mock_sb):
             result = load_whitelist(force=True)
             assert result == []
 
     def test_with_data(self):
         mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.order.return_value.execute.return_value.data = [
+        mock_sb.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value.data = [
             {"title_key": "title-1", "source": "ikiru", "title": "Title 1"},
         ]
         with patch("app.storage.whitelist.get_supabase", return_value=mock_sb):
@@ -72,7 +72,7 @@ class TestLoadWhitelist:
 
     def test_exception_returns_empty(self):
         mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.order.return_value.execute.side_effect = Exception("DB error")
+        mock_sb.table.return_value.select.return_value.order.return_value.limit.return_value.execute.side_effect = Exception("DB error")
         with patch("app.storage.whitelist.get_supabase", return_value=mock_sb):
             result = load_whitelist(force=True)
             assert result == []

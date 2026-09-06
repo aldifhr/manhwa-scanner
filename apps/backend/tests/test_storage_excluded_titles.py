@@ -186,7 +186,7 @@ class TestExcludeAllBySource:
 
     def test_success(self):
         mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+        mock_sb.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [
             {"title_key": "title-1", "title": "Title 1", "series_url": "https://example.com/t1", "cover": "https://example.com/c1.jpg"},
         ]
         with patch("app.storage.excluded_titles.get_supabase", return_value=mock_sb):
@@ -196,7 +196,7 @@ class TestExcludeAllBySource:
 
     def test_exception_handled(self):
         mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = Exception("DB error")
+        mock_sb.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.side_effect = Exception("DB error")
         with patch("app.storage.excluded_titles.get_supabase", return_value=mock_sb):
             result = exclude_all_by_source("ikiru")
             assert result["status"] == "error"
