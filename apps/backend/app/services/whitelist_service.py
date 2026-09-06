@@ -576,6 +576,20 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
             _wl_series = f"https://v1.voratoon.com/series/{tk}"
         elif tk and s == "shinigami" and rc.get("series_url"):
             _wl_series = rc.get("series_url") or ""
+    # ponytail: fix voratoon slug with spaces/%20 (e.g. a painter who draws dungeons → a-painter-who-draws-dungeons)
+    if s == "voratoon" and _wl_series and (" " in _wl_series or "%20" in _wl_series):
+        import re as _re2
+        from urllib.parse import unquote as _unq2
+
+        try:
+            _slug_raw = _wl_series.rstrip("/").split("/")[-1]
+            _slug_raw = _unq2(_slug_raw)
+            _slug = _re2.sub(r"[^a-z0-9-]", "-", _slug_raw.lower().replace(" ", "-").replace("_", "-"))
+            _slug = _re2.sub(r"-+", "-", _slug).strip("-")
+            if _slug:
+                _wl_series = f"https://v1.voratoon.com/series/{_slug}"
+        except Exception:
+            pass
     # cover must be a real http(s) URL; scrapers/FE sometimes store 'x' or
     # other non-URL placeholders — fall through to recent_chapters cover.
     _wl_cover = r.get("cover")
