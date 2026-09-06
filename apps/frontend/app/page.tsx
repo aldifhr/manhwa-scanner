@@ -427,7 +427,7 @@ export default function HomePage() {
 
   const isLoggedInForSnapshot =
     typeof document !== "undefined" &&
-    !!document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
+    !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: queryKeys.dashboardSnapshot,
     queryFn: () =>

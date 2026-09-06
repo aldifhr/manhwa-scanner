@@ -183,7 +183,7 @@ export function useContinueReading(
   useEffect(() => {
     if (
       typeof document !== "undefined" &&
-      !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/)
+      !document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/)
     ) {
       hasHydrated.current = true;
       globalHasFetchedRemote = true;
@@ -238,7 +238,7 @@ export function useContinueReading(
     if (entries.size === 0) return;
     if (
       typeof document !== "undefined" &&
-      !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/)
+      !document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/)
     )
       return;
     if (typeof document !== "undefined" && document.hidden) return;

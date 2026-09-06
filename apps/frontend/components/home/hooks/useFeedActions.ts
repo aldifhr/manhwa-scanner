@@ -22,7 +22,7 @@ export function useFeedActions() {
 
   const isLoggedIn =
     typeof document !== "undefined" &&
-    !!document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
+    !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
   const { data: excludedData } = useQuery({
     queryKey: queryKeys.excludedTitles,
     queryFn: () =>

@@ -1,11 +1,12 @@
 // Bookmark seam — anon localStorage, authed backend. Other domains use Reader directly.
 // ponytail: shim deleted (was 150L re-export of Reader). Import Reader for rss/whitelist/exclude.
 
-// Bookmarks — anon pakai localStorage, authed (ikiru_dashboard_session) pakai backend
+// Bookmarks — anon pakai localStorage, authed (ikiru_csrf_token readable twin of httpOnly session) pakai backend
 const LS_BM_KEY = "bookmarks";
 function isAnonBookmark(): boolean {
   if (typeof document === "undefined") return true;
-  return !document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
+  // ponytail: session is httpOnly → check readable csrf twin
+  return !document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
 }
 function loadLocalBookmarks(): BookmarkEntry[] {
   try {
