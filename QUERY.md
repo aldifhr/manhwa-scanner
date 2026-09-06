@@ -55,17 +55,32 @@ UPDATE whitelist SET series_url = 'https://v1.voratoon.com/series/i-became-the-m
 UPDATE recent_chapters SET series_url = REGEXP_REPLACE(series_url, '(%20| )+', '-', 'g') WHERE source='voratoon' AND series_url LIKE '%voratoon.com/series/%' AND (series_url LIKE '% %' OR series_url LIKE '%\%20%');
 ```
 
-## 5. Verifikasi
+## 5. Dispatch/whitelist description � + shinigami 33 null (435d901)
+
+```sql
+-- dispatch_history / recent_chapters description mojibake (300�sebuah)
+UPDATE recent_chapters SET description = REPLACE(REPLACE(description, '�', '’'), E'\x92', '’') WHERE description LIKE '%�%' OR description LIKE E'%\x92%';
+UPDATE whitelist SET description = REPLACE(REPLACE(description, '�', '’'), E'\x92', '’') WHERE description LIKE '%�%' OR description LIKE E'%\x92%';
+UPDATE dispatch_history SET chapter_title = REPLACE(REPLACE(chapter_title, '�', '’'), E'\x92', '’') WHERE chapter_title LIKE '%�%' OR chapter_title LIKE E'%\x92%';
+-- shinigami whitelist 33 null series_url -> construct dari UUID
+UPDATE whitelist SET series_url = 'https://11.shinigami.asia/series/' || title_key WHERE source='shinigami' AND (series_url IS NULL OR series_url='') AND title_key ~ '^[0-9a-f]{8}-[0-9a-f]{4}-';
+```
+
+## 6. Verifikasi
 
 ```sql
 SELECT origin, type, COUNT(*) FROM recent_chapters WHERE source='shinigami' GROUP BY origin,type;
 -- expect: (KR,manhwa) 99, (CN,manhua) 29, no (CN,manhwa)
 SELECT title FROM recent_chapters WHERE title LIKE '%�%' LIMIT 5;
 -- expect: 0 rows
+SELECT description FROM dispatch_history WHERE description LIKE '%�%' LIMIT 5;
+-- expect: 0 rows
 SELECT COUNT(*) FROM whitelist WHERE series_url IS NULL OR series_url='';
 -- expect: 0 rows
 SELECT title, series_url FROM whitelist WHERE source='voratoon' AND series_url LIKE '%\%20%' OR series_url LIKE '% %' LIMIT 5;
 -- expect: 0 rows
+SELECT COUNT(*) FROM whitelist WHERE source='shinigami' AND (series_url IS NULL OR series_url='');
+-- expect: 0 rows (435d901 fallback)
 ```
 
-Code fix sudah di `32e124e` (`lib/utils.ts:112` `FFFD→’` + `shinigami.py:14,50,123` origin sync) + `0c9cddd` (`whitelist_service.py:567` fallback) + `ffdcf4f` (`whitelist_service.py:579` slug %20→-), query ini cuma bersihkan row lama sebelum deploy.
+Code fix sudah di `32e124e` (`lib/utils.ts:112` `FFFD→’` + `shinigami.py:14,50,123` origin sync) + `0c9cddd` (`whitelist_service.py:567` fallback) + `ffdcf4f` (`whitelist_service.py:579` slug %20→-) + `435d901` (`dispatch_history fcfsKey` + description + shinigami UUID), query ini cuma bersihkan row lama sebelum deploy.
