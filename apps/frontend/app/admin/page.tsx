@@ -200,6 +200,12 @@ export default function AdminDashboard() {
           >
             Error logs →
           </Link>
+          <Link
+            href="/cron"
+            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
+          >
+            Cron jobs →
+          </Link>
         </div>
 
         <div className="grid gap-3">

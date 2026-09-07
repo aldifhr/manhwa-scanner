@@ -11,6 +11,45 @@ logger = get_logger("api:queue_dashboard")
 router = APIRouter()
 
 
+@router.get("/api/v1/queue/cron")
+async def cron_list(request: Request):
+    """Full cron job list from Redis queue."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    
+    try:
+        from app.tasks import _get_redis, CRON_QUEUE_KEY
+        
+        r = _get_redis()
+        jobs_raw = r.lrange(CRON_QUEUE_KEY, 0, -1) or []
+        
+        import json
+        jobs = []
+        for j in jobs_raw:
+            try:
+                data = json.loads(j)
+                jobs.append({
+                    "action": data.get("action", "unknown"),
+                    "kind": data.get("kind", "unknown"),
+                    "title": data.get("title", "")[:60],
+                    "attempts": data.get("attempts", 0),
+                    "source": data.get("source", ""),
+                })
+            except Exception:
+                jobs.append({"raw": j[:100]})
+        
+        return JSONResponse(content={
+            "success": True,
+            "data": {
+                "total": len(jobs),
+                "jobs": jobs,
+            }
+        })
+    except Exception as e:
+        logger.warn("cron_list failed", err=str(e)[:120])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+
+
 @router.get("/api/v1/queue/status")
 async def queue_status(request: Request):
     """Redis queue status — pending jobs, DLQ depth, recent activity."""
