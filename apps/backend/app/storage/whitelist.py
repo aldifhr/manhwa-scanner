@@ -166,6 +166,13 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
     """
     if not rows:
         return {"status": "ok", "whitelist": []}
+    # ponytail: UUID title_key (voratoon) -> slug via title (e.g. bc135bac... + High Martial Arts... -> high-martial-arts...)
+    for _r in rows:
+        _tk = str(_r.get("title_key") or "").strip()
+        if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _tk, _re.I):
+            _title = str(_r.get("title") or "").strip()
+            if _title:
+                _r["title_key"] = slugify_title_key(_title)
     try:
         models = [WhitelistRow.model_validate(r) for r in rows]
         payload = [m.to_db() for m in models]
