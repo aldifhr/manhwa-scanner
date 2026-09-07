@@ -94,8 +94,17 @@ class WhitelistRow(BaseModel):
         return []
 
     def to_db(self) -> dict:
-        """Serialize for upsert (only non-None fields)."""
-        d = self.model_dump(exclude_none=True)
+        """Serialize for upsert (only whitelist minimal cols)."""
+        # ponytail: whitelist minimal since 061 — static fields (cover/rating/genres/description/type/origin/status) canonical in series_meta
+        d = self.model_dump(exclude_none=True, exclude={"cover", "rating", "genres", "description", "status", "origin", "type", "permalink"})
+        # also drop empty list default for genres if somehow included
+        d.pop("genres", None)
+        d.pop("cover", None)
+        d.pop("rating", None)
+        d.pop("description", None)
+        d.pop("status", None)
+        d.pop("origin", None)
+        d.pop("type", None)
         # ensure composite PK fields are always present
         d.setdefault("title_key", self.title_key)
         d.setdefault("source", self.source)
