@@ -140,6 +140,8 @@ export function resolveCoverUrl(
   try {
     host = new URL(rawUrl).hostname;
   } catch {}
+  // Voratoon private bucket presigned X-Amz- must go through proxy — direct 403 after 6d
+  if (host === "cvr.voratoon.id" && rawUrl.includes("X-Amz-")) return putCover(cover, toProxy(rawUrl));
   if (isDirectAllowed(host)) return putCover(cover, rawUrl);
   return putCover(cover, toProxy(rawUrl));
 }

@@ -411,6 +411,60 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             failed += 1
         time.sleep(0.75)
 
+    # --- also refresh recent_chapters voratoon presigned (non-whitelisted series like the reported 99-player) ---
+    # ponytail: 1 extra query, reuses same _fetch_vt + _scrub — no new abstraction
+    try:
+        _conn2 = _gc3()
+        _cur2 = _conn2.cursor()
+        # pick distinct title_key where cover still presigned and expiring within 24h or already expired
+        _cur2.execute(
+            """
+            SELECT DISTINCT ON (title_key) title_key, cover, series_url
+            FROM recent_chapters
+            WHERE source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%X-Amz-%%'
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        _cols2 = [d[0] for d in _cur2.description] if _cur2.description else []
+        rc_rows = [dict(zip(_cols2, r)) for r in _cur2.fetchall()] if _cols2 else []
+        _pc3(_conn2)
+        # filter via _is_expiring logic (reuse enrich_whitelist helper if available)
+        try:
+            from app.cron.enrich_whitelist import _is_voratoon_expiring_soon as _is_exp
+        except Exception:
+            _is_exp = lambda c, **kw: "X-Amz-" in (c or "")
+        rc_rows = [r for r in rc_rows if _is_exp(r.get("cover") or "", hours=24)]
+        for r2 in rc_rows:
+            tk2 = str(r2.get("title_key") or "").strip()
+            su2 = str(r2.get("series_url") or "").strip()
+            if not tk2:
+                continue
+            slug2 = su2.split("/series/")[-1].split("/")[0].split("?")[0] if su2 and "/series/" in su2 else tk2
+            checked += 1
+            try:
+                detail2 = _fetch_vt(slug2)
+                data2 = (detail2 or {}).get("data", {}) if isinstance(detail2, dict) else {}
+                raw2 = data2.get("coverImage") or data2.get("cover") or ""
+                new2 = _scrub(raw2) if raw2 else ""
+                if new2 and new2 != r2.get("cover"):
+                    # bulk update all chapters for this title_key
+                    _conn3 = _gc3()
+                    _cur3 = _conn3.cursor()
+                    _cur3.execute(
+                        "UPDATE recent_chapters SET cover=%s WHERE title_key=%s AND source='voratoon'",
+                        (new2, tk2),
+                    )
+                    _conn3.commit()
+                    _pc3(_conn3)
+                    updated += 1
+            except Exception as e:
+                logger.warn("voratoon cover rc: fetch failed", tk=tk2, err=str(e)[:120])
+                failed += 1
+            time.sleep(0.75)
+    except Exception as e:
+        logger.warn("voratoon cover rc: list failed", err=str(e)[:120])
+
     duration = round(time.time() - start, 1)
     stats = {"ok": True, "checked": checked, "updated": updated, "failed": failed, "duration": duration}
     logger.info("voratoon cover refresh done", **stats)

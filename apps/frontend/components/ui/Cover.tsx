@@ -61,9 +61,10 @@ export function Cover({
       decoding="async"
       fetchPriority="low"
       onError={() => {
-        if (withRetry && !hasRetried && titleKey) {
+        if (!hasRetried && titleKey) {
+          // ponytail: voratoon presigned 403 → fallback ke authed /api/v1/reader/cover?series= (BE scrub + proxy)
           setCoverSrc(
-            `/api/reader/cover?series=${encodeURIComponent(titleKey)}`
+            `/api/v1/reader/cover?series=${encodeURIComponent(titleKey)}`
           );
           setHasRetried(true);
         } else setImgError(true);
