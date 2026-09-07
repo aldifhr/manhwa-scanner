@@ -25,7 +25,7 @@ export function isDirectAllowed(hostname: string): boolean {
   return DIRECT_HOSTS.has(hostname);
 }
 export function toProxy(url: string): string {
-  return `/api/img?url=${encodeURIComponent(url)}`;
+  return `/api/v1/reader/proxy?url=${encodeURIComponent(url)}`;
 }
 
 // Extract inner URL from any cover-img form: /cover-img?url=… or ?series=…
@@ -111,12 +111,10 @@ export function resolveCoverUrl(
   }
 
   // 4. Proxy prefix: normalize double-encode, direct hosts bypass proxy
-  // ponytail: already proxied -> don't double-wrap, just normalize single encode
-  // canonical seam is /api/img?url= (BE @router.get("/img") -> /api/img); keep /api/v1/reader/proxy?url= compat
-  const PROXY_PREFIX = "/api/img?url=";
-  const LEGACY_PROXY_PREFIX = "/api/v1/reader/proxy?url=";
-  const LEGACY_V1_IMG_PREFIX = "/api/v1/img?url=";
-  for (const prefix of [PROXY_PREFIX, LEGACY_PROXY_PREFIX, LEGACY_V1_IMG_PREFIX]) {
+  // ponytail: FE canonical is /api/v1/reader/proxy?url= (Next.js handler), BE canonical /api/img?url= also compat
+  const PROXY_PREFIX = "/api/v1/reader/proxy?url=";
+  const LEGACY_IMG_PREFIX = "/api/img?url=";
+  for (const prefix of [PROXY_PREFIX, LEGACY_IMG_PREFIX, "/api/v1/img?url="]) {
     if (cover.startsWith(prefix)) {
       const inner = decodeURIComponent(cover.slice(prefix.length));
       let raw = inner;
