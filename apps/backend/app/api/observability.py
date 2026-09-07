@@ -506,7 +506,7 @@ def _detect_ctype(data: bytes) -> str:
     return "image/jpeg"
 
 
-# ponytail: single seam — _fetch_image centralizes allowlist/cache/fetch/size-cap for /reader/cover, /reader/cover-img, /reader/proxy sharing _IMAGE_CACHE_DIR; keep 3 routes for compat.
+# ponytail: single seam — _fetch_image centralizes allowlist/cache/fetch/size-cap for /img (canonical) + /reader/cover, /reader/cover-img, /reader/proxy compat aliases sharing _IMAGE_CACHE_DIR; keep 3 routes for compat.
 async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -> "FastResponse":
     """Shared image fetch: allowlist check + cache (single _IMAGE_CACHE_DIR) + httpx fetch + size cap."""
     from urllib.parse import urlparse
@@ -631,6 +631,35 @@ async def reader_proxy(request: Request):
     except ValueError:
         return FastResponse(status_code=400)
     # delegate to single seam
+    return await _fetch_image(url)
+
+
+# ponytail: canonical seam GET /img?url=... — single seam for all cover fetches, public (no auth) with same allowlist+cache as cover-img; /reader/cover, /reader/cover-img, /reader/proxy are compat aliases delegating to _fetch_image.
+@router.get("/img")
+async def img(request: Request):
+    """Canonical public image proxy — GET /img?url=... . Compat aliases: /reader/cover, /reader/cover-img, /reader/proxy."""
+    from urllib.parse import unquote, urlparse
+
+    raw_query = request.url.query or ""
+    if raw_query.startswith("url="):
+        url = raw_query[4:]
+    else:
+        url = request.query_params.get("url", "")
+    url = (url or "").strip()
+    if not url:
+        return FastResponse(status_code=400)
+    import re as _re
+    _guard = 0
+    while _re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
+        try:
+            url = unquote(url)
+        except Exception:
+            break
+        _guard += 1
+    try:
+        urlparse(url)
+    except ValueError:
+        return FastResponse(status_code=400)
     return await _fetch_image(url)
 
 

@@ -49,7 +49,7 @@ def _fetch_whitelist_rows(
     if use_db_pagination:
         try:
             sb_pg = get_supabase()
-            q = sb_pg.table("whitelist").select("*", count="exact")
+            q = sb_pg.table("whitelist").select("title_key, source, series_url, latest_sent_chapter, title, created_at, id, url, latest_chapter", count="exact")
             if source:
                 q = q.eq("source", source)
             if title:
@@ -58,7 +58,7 @@ def _fetch_whitelist_rows(
             cnt_res = q.limit(1).execute()
             total_raw = cnt_res.count or 0
             if merge:
-                q2 = sb_pg.table("whitelist").select("*")
+                q2 = sb_pg.table("whitelist").select("title_key, source, series_url, latest_sent_chapter, title, created_at, id, url, latest_chapter")
                 if source:
                     q2 = q2.eq("source", source)
                 if title:
@@ -69,7 +69,7 @@ def _fetch_whitelist_rows(
                 return rows, total_raw, sb_pg, False
             else:
                 if cursor:
-                    q2 = sb_pg.table("whitelist").select("*")
+                    q2 = sb_pg.table("whitelist").select("title_key, source, series_url, latest_sent_chapter, title, created_at, id, url, latest_chapter")
                     if source:
                         q2 = q2.eq("source", source)
                     if title:
@@ -79,7 +79,7 @@ def _fetch_whitelist_rows(
                     rows = q2.execute().data or []
                     return rows, total_raw, sb_pg, True
                 start = (page - 1) * page_size
-                q2 = sb_pg.table("whitelist").select("*")
+                q2 = sb_pg.table("whitelist").select("title_key, source, series_url, latest_sent_chapter, title, created_at, id, url, latest_chapter")
                 if source:
                     q2 = q2.eq("source", source)
                 if title:
@@ -706,7 +706,7 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
     def _q_meta():
         if not cand_keys:
             return None
-        return sb.table("whitelist").select("title_key, description, cover").in_("title_key", list(cand_keys)).execute()
+        return sb.table("series_meta").select("title_key, description, cover").in_("title_key", list(cand_keys)).execute()
 
     def _q_dh():
         tks = [r.get("title_key", "") for r in rows if r.get("title_key")]

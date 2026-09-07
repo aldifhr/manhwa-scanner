@@ -29,7 +29,7 @@ async def fetch_rss_data(
     fetch_limit: int = 1000,
 ):
     """Fetch recent_chapters + lookups and return mapped results."""
-    # ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type); whitelist is minimal (title_key,source,series_url,latest_sent) — rss prioritizes sm>it>wl via sm_map, no view, add DB view if join needed
+    # ponytail: series_meta canonical via v_series VIEW (053_v_series_view.sql) — sm_map now could be JOIN v_series (LEFT JOIN v_series v ON v.title_key=rc.title_key AND v.source=rc.source) to replace 2nd query; kept sm_map dict for now (minimal, no SQL change), switch to DB JOIN when extra round-trip matters
     from app.db import get_supabase
 
     sb = get_supabase()
@@ -96,10 +96,10 @@ async def fetch_rss_data(
         except Exception as _e:
             logger.warn("exclude_notified SQL failed, falling back to unfiltered", err=str(_e)[:160])
 
-    # ponytail: 2 queries max, no executor fan-out, no per-slug N+1; wl minimal, sm canonical
+    # ponytail: 2 queries max (rc + sm via v_series VIEW 053), no executor fan-out, no per-slug N+1; wl minimal, sm canonical — sm query could be JOIN v_series in rc query to drop to 1 query when needed
     try:
         wl_rows = sb.table("whitelist").select(
-            "title_key, source, cover, genres, rating, description, series_url, origin, type, latest_sent_chapter"
+            "title_key, source, series_url, latest_sent_chapter"
         ).execute().data or []
     except Exception:
         wl_rows = []
