@@ -204,9 +204,11 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         # Guard NOT-NULL columns: wrapper items may omit status/rating/etc
         # (ikiru/shinigami don't emit status), leaving None which Postgres
         # rejects as NULL and silently drops the whole upsert chunk.
-        for _k in ("status", "rating", "description", "type", "origin"):
+        for _k in ("status", "rating", "description", "type"):
             if _r.get(_k) is None:
                 _r[_k] = ""
+        # Origin: chk_rc_origin allows NULL but rejects "" — set after guard so it stays NULL
+        _r["origin"] = _norm or None  # ponytail: empty→NULL (chk_rc_origin rejects "")
         if _r.get("genres") is None:
             _r["genres"] = []
         # Coerce nullable numeric columns to 0.0 so Postgres numeric/double
@@ -221,7 +223,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                 except (TypeError, ValueError):
                     _r[_k] = 0.0
         _r["chapter_url"] = row["chapter_url"]
-        _r["origin"] = _norm or None  # ponytail: empty→NULL (chk_rc_origin rejects "")
         cleaned.append(_r)
     # Note: we do NOT dedupe ACROSS sources here because the design is
     # flat-per-source — the same chapter on ikiru AND shinigami must both

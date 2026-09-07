@@ -118,7 +118,7 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
 
         meta = ikiru.get_ikiru_series_meta(slug)
         if meta:
-            for f in ("cover", "rating", "genres", "description", "type"):
+            for f in ("title", "cover", "rating", "genres", "description", "status", "type"):
                 v = meta.get(f)
                 if v:
                     updates[f] = v

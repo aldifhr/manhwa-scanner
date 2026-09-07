@@ -310,39 +310,61 @@ def get_ikiru_series_meta(slug: str) -> dict | None:
             "source": "ikiru",
             "series_url": s.get("permalink") or f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/",
         }
-        # HTML fallback for rating (API returns empty rating)
-        if rating is None:
-            try:
-                from app.scrapers.ikiru import _cf_get as _g
-                html_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
-                hr = _g(html_url)
-                if hr.status_code == 200:
-                    import re as _re2
-                    m = _re2.search(r'aggregateRating[^}]*ratingValue":\s*([0-9.]+)', hr.text)
-                    if not m:
-                        m = _re2.search(r'ratingValue"\s*content="([0-9.]+)"', hr.text)
-                    if m:
-                        result["rating"] = normalize_rating(m.group(1))
-            except Exception:
-                pass
-        # HTML fallback for cover (API returns null for The Strongest Girl)
-        if not result.get("cover"):
-            try:
-                from app.scrapers.ikiru import _cf_get as _g2
-                html_url2 = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
-                hr2 = _g2(html_url2)
-                if hr2.status_code == 200:
-                    import re as _re3
-                    # Try series thumb first
-                    m = _re3.search(r'<div[^>]*class="[^"]*thumb[^"]*"[^>]*>.*?<img[^>]*src="([^"]+)"', hr2.text, _re3.I | _re3.S)
-                    if m:
-                        result["cover"] = scrub_cover(m.group(1))
-                    else:
-                        m2 = _re3.search(r'<meta[^>]*property="og:image"[^>]*content="([^"]+)"', hr2.text, _re3.I)
-                        if m2 and "logo-ikiru" not in m2.group(1):
-                            result["cover"] = scrub_cover(m2.group(1))
-            except Exception:
-                pass
+        # HTML fallback: JSON-LD ComicSeries has richer data than meta tags
+        # Maps to whitelist DB columns: title, description, genres, rating, status, cover
+        # Skipped (not in DB): released, author, illustrator, publisher, alternateName
+        try:
+            from app.scrapers.ikiru import _cf_get as _gh
+            html_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
+            hr = _gh(html_url)
+            if hr.status_code == 200:
+                import re as _reh
+                import html as _htmlh
+                import json as _jsh
+                blocks = _reh.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', hr.text, _reh.I | _reh.S)
+                ld = {}
+                for block in blocks:
+                    try:
+                        data = _jsh.loads(block)
+                    except Exception:
+                        continue
+                    nodes = data if isinstance(data, list) else data.get("@graph", [data])
+                    for node in nodes:
+                        if not isinstance(node, dict):
+                            continue
+                        types = node.get("@type", [])
+                        if isinstance(types, str):
+                            types = [types]
+                        if "ComicSeries" in types or "Book" in types:
+                            name = node.get("name")
+                            if name:
+                                ld["title"] = str(name).strip()
+                            desc = node.get("description")
+                            if desc:
+                                d = _reh.sub(r"<[^>]+>", "", desc)
+                                d = _htmlh.unescape(d)
+                                d = _reh.sub(r"\s+", " ", d).strip()
+                                if d:
+                                    ld["description"] = d[:2000]
+                            genre = node.get("genre")
+                            if genre:
+                                ld["genres"] = [genre] if isinstance(genre, str) else [str(g) for g in genre]
+                            ro = node.get("aggregateRating")
+                            if isinstance(ro, dict) and ro.get("ratingValue") is not None:
+                                ld["rating"] = normalize_rating(ro["ratingValue"])
+                            st = node.get("creativeWorkStatus")
+                            if st:
+                                ld["status"] = str(st).lower()
+                            img = node.get("image")
+                            if isinstance(img, dict) and img.get("url"):
+                                ld["cover"] = scrub_cover(img["url"])
+                            break
+                # Fill only missing fields (API takes precedence)
+                for k in ("title", "description", "genres", "rating", "status", "cover"):
+                    if not result.get(k) and ld.get(k):
+                        result[k] = ld[k]
+        except Exception:
+            pass
         return result
     except Exception as e:
         logger.debug("ikiru series meta failed", slug=slug, err=str(e)[:120])
