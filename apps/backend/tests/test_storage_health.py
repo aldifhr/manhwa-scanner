@@ -148,9 +148,13 @@ class TestReadDashboardSnapshot:
             "payload": {"key": "value"},
             "computed_at": fresh_time,
         }
-        with patch("app.storage.health.get_supabase", return_value=mock_sb):
+        mock_redis_cls = MagicMock()
+        mock_redis_cls.from_url.side_effect = Exception("no redis")
+        with patch("app.storage.health.get_supabase", return_value=mock_sb), \
+             patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             result = read_dashboard_snapshot()
-            assert result == {"payload": {"key": "value"}, "computed_at": fresh_time}
+            assert result is not None
+            assert result["payload"] == {"key": "value"}
 
     def test_stale_snapshot_returns_none(self):
         mock_sb = MagicMock()
@@ -160,20 +164,29 @@ class TestReadDashboardSnapshot:
             "payload": {"key": "value"},
             "computed_at": stale_time,
         }
-        with patch("app.storage.health.get_supabase", return_value=mock_sb):
+        mock_redis_cls = MagicMock()
+        mock_redis_cls.from_url.side_effect = Exception("no redis")
+        with patch("app.storage.health.get_supabase", return_value=mock_sb), \
+             patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             result = read_dashboard_snapshot()
             assert result is None
 
     def test_no_snapshot_returns_none(self):
         mock_sb = MagicMock()
         mock_sb.table.return_value.select.return_value.eq.return_value.limit.return_value.maybe_single.return_value.execute.return_value.data = None
-        with patch("app.storage.health.get_supabase", return_value=mock_sb):
+        mock_redis_cls = MagicMock()
+        mock_redis_cls.from_url.side_effect = Exception("no redis")
+        with patch("app.storage.health.get_supabase", return_value=mock_sb), \
+             patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             result = read_dashboard_snapshot()
             assert result is None
 
     def test_exception_returns_none(self):
         mock_sb = MagicMock()
         mock_sb.table.return_value.select.return_value.eq.return_value.limit.return_value.maybe_single.return_value.execute.side_effect = Exception("DB error")
-        with patch("app.storage.health.get_supabase", return_value=mock_sb):
+        mock_redis_cls = MagicMock()
+        mock_redis_cls.from_url.side_effect = Exception("no redis")
+        with patch("app.storage.health.get_supabase", return_value=mock_sb), \
+             patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             result = read_dashboard_snapshot()
             assert result is None

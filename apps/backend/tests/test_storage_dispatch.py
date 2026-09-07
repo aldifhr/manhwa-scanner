@@ -261,8 +261,8 @@ class TestCompleteDispatchClaim:
                 instance_id="test",
                 title_key="title1",
             )
-            # Should insert
-            mock_sb.table.return_value.insert.assert_called_once()
+            # Should upsert on chapter_url when no fcfs_key
+            mock_sb.table.return_value.upsert.assert_called_once()
 
     def test_exception_handled(self):
         mock_sb = MagicMock()
