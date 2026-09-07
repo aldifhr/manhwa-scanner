@@ -7,6 +7,7 @@ here remain exported for backward compatibility with existing call sites.
 from __future__ import annotations
 
 import html
+import time
 
 from app.discord import client as discord
 from app.discord.embeds import build_chapter_embed
@@ -227,6 +228,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _origin_f = {o.strip().upper() for o in str(_gs_row.get("origin_filter") or "").split(",") if o.strip()}
         _excl_titles = {_normalize_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
         seen_key_run: set[str] = set()
+        _consec_fail = 0  # ponytail: burst guard — stop flooding after 3 gateway fails
         for it in to_send:
             url = it.get("url", "")
             if not url or not _acq_map.get(url):
@@ -285,11 +287,26 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             try:
                 resp = discord.send_channel_message(channel_id=ch, content=content, embeds=[embed])
                 if resp is None:
-                    logger.warn("dispatch: send returned None", title=it.get("title", "")[:40])
+                    _consec_fail += 1
+                    logger.warn("dispatch: send returned None", title=it.get("title", "")[:40], consecutive=_consec_fail, channel=ch)
                     dispatch_store.unclaim(url)
-                    import time as _time
-                    _time.sleep(0.4)
+                    # ponytail: 3 consecutive gateway fails → mark failed, stop flooding channel
+                    if _consec_fail >= 3:
+                        try:
+                            dispatch_store.record_failed(
+                                chapter_url=url, title_key=it.get("title_key", ""),
+                                source=it.get("source", ""), chapter_title=str(it.get("chapter", "")),
+                                chapter_number=None, error_message="gateway burst threshold (3 consecutive None)",
+                                error_code="DISCORD_GATEWAY_BURST",
+                            )
+                        except Exception:
+                            pass
+                        logger.error("dispatch: burst threshold hit, stopping channel", channel=ch)
+                        time.sleep(0.8)
+                        break
+                    time.sleep(0.8)
                     continue
+                _consec_fail = 0
                 sent += 1
                 _sent_urls.add(url)
                 # Outbound webhook (external integrations) — async, never blocks
@@ -298,9 +315,9 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     fire_chapter_released(it)
                 except Exception:
                     pass
-                import time as _time
-                _time.sleep(0.4)
+                time.sleep(0.8)
             except Exception as derr:
+                _consec_fail += 1
                 dispatch_store.record_failed(
                     chapter_url=url, title_key=it.get("title_key", ""),
                     source=it.get("source", ""), chapter_title=str(it.get("chapter", "")),
@@ -308,6 +325,11 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     error_code="DISCORD_SEND_FAILED",
                 )
                 dispatch_store.unclaim(url)
+                if _consec_fail >= 3:
+                    logger.error("dispatch: burst threshold hit (exception), stopping channel", channel=ch, consecutive=_consec_fail)
+                    time.sleep(0.8)
+                    break
+                time.sleep(0.8)
 
     # Post-loop: flush dispatch_history + update whitelist markers
     if _sent_urls and not dry_run:

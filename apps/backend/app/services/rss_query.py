@@ -1,13 +1,8 @@
-"""RSS query helpers — ponytail: 365L filter/map/group helpers (used by rss_service+api), keep until inline in rss_service if only one caller. RSS query helpers — filtering, result mapping, and grouping.
-
-Extracted from app/api/rss.py to separate data-transformation logic
-from the HTTP request handler.
-"""
+"""RSS query helpers — filtering, result mapping, and grouping."""
 from __future__ import annotations
 
 import html
 import re
-import time as _time
 
 from app.utils.text import normalize_title_key
 from app.utils.origin import normalize_origin
@@ -16,26 +11,17 @@ from app.config import settings
 
 
 def normalize_type(raw) -> str | None:
-    """Canonicalize a series type string to manhwa/manhua/manga (lowercase)."""
     if not raw:
         return None
     t = str(raw).strip().lower()
     if t in ("manhwa", "manhua", "manga"):
         return t
-    # tolerate 'Manhwa', 'MANHWA', etc.
     if t.startswith("manh"):
         return "manhwa" if t.endswith("wa") else "manhua"
     return t or None
 
-# Live fallback cache for series meta when DB has no entry.
-_RSS_LIVE_META_CACHE: dict[str, tuple[float, dict]] = {}
-_RSS_LIVE_META_TTL = 3600.0
-_RSS_LIVE_META_MAX = 256
 
-_LABEL_RE = re.compile(r"^\s*(?:ch(?:apter)?\.?\s*|chapter\s*)[:.]?\s*(.+)$", re.I)
-_NUM_RE = re.compile(r"(\d+(?:\.\d+)?)")
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
-_GROUP_RE = re.compile(r"\s+")
 
 
 def _slug_key(tk: str) -> str:
@@ -49,12 +35,6 @@ def _canonical(tk: str) -> str:
 
 
 def _is_sent(it: dict, tk: str, src: str, dh_sent: set[tuple[str, float]] | None) -> bool:
-    """A chapter is 'sent' iff (title_key, chapter_num) is in dispatch_history.
-
-    BUG3: previously isSent was inferred from whitelist.latest_sent_chapter,
-    which drifted out of sync with actual dispatches. Dispatch is per-release
-    (any source), so we match on (title_key, chapter_num) only.
-    """
     if not dh_sent:
         return False
     _cn_raw = it.get("chapter_num")
@@ -114,7 +94,6 @@ def build_filter(
     excl_keys: set[tuple[str, str]] | None = None,
     type_f: str = "",
 ) -> callable:
-    """Build a filter function from RSS query parameters."""
     def _passes(it: dict) -> bool:
         src = it.get("source", "")
         o = (it.get("origin") or "").upper()
@@ -123,24 +102,19 @@ def build_filter(
             return False
         if origin_f and o != origin_f.upper():
             return False
-        if exclude:
-            if o in [e.strip().upper() for e in exclude.split(",") if e.strip()]:
-                return False
+        if exclude and o in [e.strip().upper() for e in exclude.split(",") if e.strip()]:
+            return False
         if q and q.lower() not in (it.get("title") or "").lower():
             return False
-        if exclude_origin:
-            if o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
-                return False
+        if exclude_origin and o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
+            return False
         if excl_keys and tk:
             if (tk, src) in excl_keys:
                 return False
             if (tk, "all") in excl_keys:
                 return False
-        # Type filter (manhwa/manhua/manga)
-        if type_f:
-            it_type = (it.get("type") or "").lower()
-            if it_type != type_f.lower():
-                return False
+        if type_f and (it.get("type") or "").lower() != type_f.lower():
+            return False
         return True
     return _passes
 
@@ -148,19 +122,15 @@ def build_filter(
 def map_result(
     it: dict,
     wl_map: dict[tuple[str, str], dict],
-    meta_map: dict[str, dict],
-    live_cnt_ref: list[int],
     sm_map: dict[tuple[str, str], dict] | None = None,
     dh_sent: set[tuple[str, float]] | None = None,
     wl_title_set: set[str] | None = None,
 ) -> dict:
-    """Map a recent_chapters row to the RSS response format.
+    """Map a recent_chapters row to RSS response. Uses it + wl + sm only.
 
-    `sm_map` is the per-series static metadata lookup (title_key, source) →
-    series_meta row. It is the single source of truth for rating/description/
-    genres/cover/type; recent_chapters columns are only used as a fallback
-    for rows belonging to a series not yet present in series_meta.
+    ponytail: series_meta canonical single source for static fields — sm>it>wl priority, whitelist minimal (title_key,source,series_url,latest_sent) legacy fields only fallback
     """
+    # ponytail: single scrub, sm is sole static source; no per-slug refetch, no live HTTP fallback — add DB view/join if misses grow
     if sm_map is None:
         sm_map = {}
     tk = it.get("title_key", "")
@@ -168,24 +138,17 @@ def map_result(
     nk = normalize_title_key(tk)
     wl = wl_map.get((tk, src)) or wl_map.get((nk, src), {}) or {}
     sm = sm_map.get((tk, src)) or sm_map.get((nk, src), {}) or {}
-    slug = _slug_key(tk)
 
     is_wl = (tk, src) in wl_map or (nk, src) in wl_map
-    # Title-based fallback: only for slug sources (ikiru/voratoon) and source-aware.
-    # shinigami uses UUID model, must not fallback via title (UUID vs slug mismatch).
-    # This prevents "semua verified" when any title matches across different sources.
     _title_norm = normalize_title_key(it.get("title") or "")
-    if _title_norm and src in ("ikiru", "voratoon"):
+    if _title_norm and src in ("ikiru", "voratoon") and not is_wl:
         if wl_title_set is not None:
-            # wl_title_set is built without source, keep but only for slug sources
             if _title_norm in wl_title_set:
-                # verify at least one WL entry for this title has same slug source family
                 for (wtk, wsrc) in wl_map:
                     if wsrc in ("ikiru", "voratoon") and normalize_title_key(wtk) == _title_norm:
                         is_wl = True
                         break
-                # if no slug-source WL, don't mark
-        elif not is_wl:
+        else:
             for (wtk, wsrc), wrow in wl_map.items():
                 if wsrc not in ("ikiru", "voratoon"):
                     continue
@@ -193,46 +156,28 @@ def map_result(
                     is_wl = True
                     break
 
-    series_url = it.get("series_url") or wl.get("series_url") or ""
-    _meta_slug = (series_url or it.get("series_url") or "").rstrip("/").split("/")[-1] if series_url else ""
-    _meta = meta_map.get(_meta_slug) or {}
-
-    # Live fallback disabled for RSS — was 8 sync HTTP fetches per request (2.6s bottleneck).
-    # Metadata is enriched via cron/whitelist enrichment, not per-RSS-request.
-    # Keep cache-hit path only (cron pre-warms), no live fetch.
-    if not _meta and _meta_slug and src in ("shinigami", "ikiru"):
-        _cached_live = _RSS_LIVE_META_CACHE.get(_meta_slug)
-        if _cached_live and (_time.monotonic() - _cached_live[0]) < _RSS_LIVE_META_TTL:
-            _meta = _cached_live[1]
-
-    cover = scrub_cover(it.get("cover") or wl.get("cover") or _meta.get("cover") or "")
-    if not series_url:
-        series_url = _meta.get("series_url") or ""
+    series_url = it.get("series_url") or wl.get("series_url") or sm.get("series_url") or ""
+    cover = scrub_cover(it.get("cover") or wl.get("cover") or sm.get("cover") or "")
 
     ls = wl.get("latest_sent_chapter")
 
-    # Fix broken ikiru chapter URLs (e.g. "?chapter" without slug)
-    chapter_url = it.get("chapter_url") or ""  # ponytail: None→"" guard for .startswith
+    chapter_url = it.get("chapter_url") or ""
     if chapter_url == "?chapter" or (chapter_url.startswith(f"{settings.IKIRU_BASE_URL.rstrip(chr(47))}/") and "/chapter-" not in chapter_url and "?" in chapter_url):
-        # Reconstruct from series_url + chapter info
-        series_url = it.get("series_url") or ""
+        series_url_rc = it.get("series_url") or ""
         ch_num = it.get("chapter") or ""
         cid = it.get("chapter_id") or ""
-        if series_url and ch_num:
-            # Extract slug from series_url
-            slug = series_url.rstrip("/").split("/")[-1]
+        if series_url_rc and ch_num:
+            slug = series_url_rc.rstrip("/").split("/")[-1]
             if slug and slug != "manga":
                 chapter_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/chapter-{ch_num}.{cid}/" if cid else f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/chapter-{ch_num}/"
             else:
-                chapter_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{series_url.split('/')[-2] if '/' in series_url else ''}/chapter-{ch_num}.{cid}/" if cid else f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{series_url.split('/')[-2] if '/' in series_url else ''}/chapter-{ch_num}/"
+                chapter_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{series_url_rc.split('/')[-2] if '/' in series_url_rc else ''}/chapter-{ch_num}.{cid}/" if cid else f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{series_url_rc.split('/')[-2] if '/' in series_url_rc else ''}/chapter-{ch_num}/"
         else:
             chapter_url = ""
 
-    # --- Field normalization (BUG2) ---
     _raw_title = it.get("title", "") or ""
     _title = html.unescape(_raw_title) if _raw_title else ""
-    # genres: unique + lowercase
-    _genres_raw = sm.get("genres") or it.get("genres") or wl.get("genres") or _meta.get("genres") or []
+    _genres_raw = sm.get("genres") or it.get("genres") or wl.get("genres") or []
     _genres_seen: set[str] = set()
     _genres: list[str] = []
     if isinstance(_genres_raw, list):
@@ -243,7 +188,7 @@ def map_result(
             if _gl and _gl not in _genres_seen:
                 _genres_seen.add(_gl)
                 _genres.append(g.strip())
-    # rating: standardize to number | null
+
     def _to_num(v):
         if v is None or v == "":
             return None
@@ -251,14 +196,13 @@ def map_result(
             return float(v)
         except (ValueError, TypeError):
             return None
+
+    # ponytail: canonical sm > it > wl — sm is single source, wl/it only legacy fallback; add DB view if richer joins needed
     _rating = _to_num(sm.get("rating")) if sm.get("rating") not in (None, "") else (
-        _to_num(it.get("rating")) if it.get("rating") is not None else (
-            _to_num(wl.get("rating")) if wl.get("rating") is not None else _to_num(_meta.get("rating"))
-        )
+        _to_num(it.get("rating")) if it.get("rating") is not None else _to_num(wl.get("rating"))
     )
-    _type = normalize_type(sm.get("type") or it.get("type") or wl.get("type") or _meta.get("type") or None)
-    # origin no type -> "" (hide flag) — FE AllCard now hides flag when type null, BE also empty
-    _raw_origin = it.get("origin") or wl.get("origin") or _meta.get("origin") or ""
+    _type = normalize_type(sm.get("type") or it.get("type") or wl.get("type") or None)
+    _raw_origin = it.get("origin") or wl.get("origin") or sm.get("origin") or ""
     origin = normalize_origin(_raw_origin)
 
     _raw_chapter_num = it.get("chapter_num")
@@ -266,6 +210,7 @@ def map_result(
         _chapter_num_f = float(_raw_chapter_num) if _raw_chapter_num is not None else 0.0
     except (ValueError, TypeError):
         _chapter_num_f = 0.0
+    slug = _slug_key(tk)
     return {
         "id": slug,
         "title": _title,
@@ -280,7 +225,7 @@ def map_result(
         "rating": _rating,
         "genres": _genres,
         "type": _type,
-        "description": sm.get("description") or it.get("description") or wl.get("description") or _meta.get("description") or "",
+        "description": sm.get("description") or it.get("description") or wl.get("description") or "",
         "isWhitelisted": is_wl,
         "chapter": it.get("chapter"),
         "chapterLabel": chapter_label(str(it.get("chapter") or "")),

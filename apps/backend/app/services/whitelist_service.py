@@ -6,7 +6,7 @@ import html
 
 from app.logger import get_logger
 from app.storage import whitelist as wl_store
-from app.utils.text import normalize_title_key, normalize_shinigami_url
+from app.utils.text import normalize_title_key, normalize_shinigami_url, slugify_title_key
 from app.utils.origin import normalize_origin
 from app.utils.cover_scrub import scrub_cover
 
@@ -165,7 +165,10 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
 
 
 def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | None = None) -> dict:
-    """Add a whitelist entry with enrichment."""
+    """Add a whitelist entry with enrichment.
+
+    ponytail: whitelist is minimal (title_key, source, series_url, latest_sent_chapter); static fields (cover/rating/genres/description/type/origin) canonical in series_meta. This post does NOT upsert series_meta — series_meta_sync + _cached_series_meta bootstrap canonical via upsert, avoiding unnecessary overwrite from incomplete FE payloads.
+    """
 
     title_key = body.get("title_key") or "" if body else ""
     if not title_key and url:
@@ -190,6 +193,16 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
             title_key = ""
     if not title_key:
         title_key = normalize_title_key(title)
+
+    # ponytail: canonical title_key = slug (lowercase, dash) via normalize_title_key
+    # UUID / spaced lower cause merge false + delete mismatches — enforce slug here
+    if title_key and re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", title_key, re.I):
+        logger.warn("post_whitelist: UUID title_key detected, expected slug", title_key=title_key[:16], title=(title or "")[:40])
+        _slug_from_title = slugify_title_key(title) if title else ""
+        if _slug_from_title:
+            title_key = _slug_from_title
+    # enforce canonical slug: normalize_title_key (alnum+space collapse) then dash
+    title_key = slugify_title_key(title_key) if title_key else ""
 
     entry = {"title": title, "title_key": title_key, "source": source}
     if body:

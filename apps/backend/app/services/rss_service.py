@@ -1,16 +1,9 @@
-"""RSS service — extracted from app/api/rss.py for testability.
-
-Single seam for DB fetch + whitelist/series_meta joins + isSent + filtering.
-rss.py now only handles HTTP (cache, pagination, dedup/group).
-"""
+"""RSS service — extracted from app/api/rss.py for testability."""
 from __future__ import annotations
-
-import asyncio
-from datetime import datetime, timezone, timedelta
 
 from app.logger import get_logger
 from app.utils.text import normalize_title_key
-from app.services.rss_query import build_filter, map_result, group_results
+from app.services.rss_query import build_filter, map_result
 
 logger = get_logger("services:rss_service")
 
@@ -36,11 +29,11 @@ async def fetch_rss_data(
     fetch_limit: int = 1000,
 ):
     """Fetch recent_chapters + lookups and return mapped results."""
+    # ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type); whitelist is minimal (title_key,source,series_url,latest_sent) — rss prioritizes sm>it>wl via sm_map, no view, add DB view if join needed
     from app.db import get_supabase
 
     sb = get_supabase()
 
-    # Recent chapters
     rc_q = (
         sb.table("recent_chapters")
         .select(
@@ -66,7 +59,6 @@ async def fetch_rss_data(
     if exclude_notified:
         try:
             from app.db import q as _raw_q
-
             _where = ["rc.updated_time >= %s"]
             _params: list = [cutoff]
             if source_f:
@@ -104,47 +96,19 @@ async def fetch_rss_data(
         except Exception as _e:
             logger.warn("exclude_notified SQL failed, falling back to unfiltered", err=str(_e)[:160])
 
-    # Parallel whitelist + series_meta
-    async def _fetch_wl_and_sm():
-        loop = asyncio.get_running_loop()
-
-        def _fetch_wl():
-            try:
-                return sb.table("whitelist").select(
-                    "title_key, source, cover, genres, rating, description, series_url, origin, status, type, latest_sent_chapter"
-                ).execute().data or []
-            except Exception:
-                return []
-
-        def _fetch_sm():
-            try:
-                return sb.table("series_meta").select(
-                    "title_key, source, rating, genres, description, cover, type"
-                ).execute().data or []
-            except Exception:
-                return []
-
-        wl_rows, sm_rows = await asyncio.gather(
-            loop.run_in_executor(None, _fetch_wl),
-            loop.run_in_executor(None, _fetch_sm),
-        )
-        return wl_rows, sm_rows
-
+    # ponytail: 2 queries max, no executor fan-out, no per-slug N+1; wl minimal, sm canonical
     try:
-        wl_rows, sm_rows = await _fetch_wl_and_sm()
+        wl_rows = sb.table("whitelist").select(
+            "title_key, source, cover, genres, rating, description, series_url, origin, type, latest_sent_chapter"
+        ).execute().data or []
     except Exception:
-        try:
-            wl_rows = sb.table("whitelist").select(
-                "title_key, source, cover, genres, rating, description, series_url, origin, status, type, latest_sent_chapter"
-            ).execute().data or []
-        except Exception:
-            wl_rows = []
-        try:
-            sm_rows = sb.table("series_meta").select(
-                "title_key, source, rating, genres, description, cover, type"
-            ).execute().data or []
-        except Exception:
-            sm_rows = []
+        wl_rows = []
+    try:
+        sm_rows = sb.table("series_meta").select(
+            "title_key, source, rating, genres, description, cover, type"
+        ).execute().data or []
+    except Exception:
+        sm_rows = []
 
     wl_map: dict[tuple[str, str], dict] = {}
     wl_title_set: set[str] = set()
@@ -155,47 +119,9 @@ async def fetch_rss_data(
             nk = normalize_title_key(tk)
             wl_map[(nk, src)] = w
             wl_map[(tk, src)] = w
-        # Title-based set for cross-source UUID vs slug matching (Full-time Hunter)
         t_norm = normalize_title_key(w.get("title") or tk)
         if t_norm:
             wl_title_set.add(t_norm)
-
-    # meta_map parallel chunks
-    meta_map: dict[str, dict] = {}
-    try:
-        slugs = list({(r.get("series_url") or "").rstrip("/").split("/")[-1] for r in rc_rows if r.get("series_url")})
-        slugs = [s for s in slugs if s]
-        if slugs:
-            chunks = [slugs[i:i+100] for i in range(0, len(slugs), 100)]
-
-            async def _fetch_meta_chunks():
-                loop = asyncio.get_running_loop()
-
-                def _fetch_one(chunk):
-                    try:
-                        return sb.table("whitelist").select("title_key, cover, status, rating, genres, description, origin").in_("title_key", chunk).execute().data or []
-                    except Exception:
-                        return []
-
-                results = await asyncio.gather(*[loop.run_in_executor(None, _fetch_one, c) for c in chunks])
-                out: dict[str, dict] = {}
-                for mrows in results:
-                    for m in mrows:
-                        out[str(m.get("title_key") or "")] = m
-                return out
-
-            try:
-                meta_map = await _fetch_meta_chunks()
-            except Exception:
-                for chunk in chunks:
-                    try:
-                        mrows = sb.table("whitelist").select("title_key, cover, status, rating, genres, description, origin").in_("title_key", chunk).execute().data or []
-                        for m in mrows:
-                            meta_map[str(m.get("title_key") or "")] = m
-                    except Exception:
-                        continue
-    except Exception:
-        pass
 
     sm_map: dict[tuple[str, str], dict] = {}
     for s in sm_rows:
@@ -204,7 +130,6 @@ async def fetch_rss_data(
         if stk and ssrc:
             sm_map[(stk, ssrc)] = s
 
-    # dispatch_history for isSent
     dh_sent: set[tuple[str, float]] = set()
     try:
         dh_rows = sb.table("dispatch_history").select("title_key, source, chapter_title").gte("sent_at", cutoff).limit(2000).execute().data or []
@@ -225,7 +150,6 @@ async def fetch_rss_data(
 
     try:
         from app.storage import excluded_titles as _excl_store
-
         _excl_keys = _excl_store.load_excluded_keys()
     except Exception:
         _excl_keys = set()
@@ -233,13 +157,11 @@ async def fetch_rss_data(
     _passes = build_filter(source_f, origin_f, exclude, q, exclude_origin, _excl_keys, type_f)
     filtered = [it for it in rc_rows if _passes(it)]
 
-    live_cnt_ref = [0]
-    results = [map_result(it, wl_map, meta_map, live_cnt_ref, sm_map, dh_sent, wl_title_set) for it in filtered]
+    results = [map_result(it, wl_map, sm_map, dh_sent, wl_title_set) for it in filtered]
 
     if whitelist_only or subscribed_only:
         results = [r for r in results if r["isWhitelisted"]]
 
-    # Custom filters
     if genres_f:
         try:
             wanted = {g.strip().lower() for g in genres_f.split(",") if g.strip()}
@@ -259,4 +181,4 @@ async def fetch_rss_data(
             results = [r for r in results if r.get("rating") is not None and float(r.get("rating") or 0) <= mv]
         except Exception:
             pass
-    return results, wl_map, meta_map, sm_map, dh_sent
+    return results, wl_map, sm_map, dh_sent

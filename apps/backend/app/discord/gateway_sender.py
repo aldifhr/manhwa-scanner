@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 from typing import Optional
 
 from app.config import settings
@@ -58,29 +59,36 @@ def send_via_gateway(
     embeds: Optional[list] = None,
 ) -> bool:
     """Send a message via Discord gateway in a subprocess. Returns True on success."""
-    try:
-        import os
-        venv_py = os.path.join(os.path.dirname(sys.executable), "python")
-        py = venv_py if os.path.exists(venv_py) else sys.executable
-        # Token via env var (not argv) — prevents exposure via ps aux / /proc/<pid>/cmdline
-        env = {**os.environ, "DISCORD_TOKEN": settings.DISCORD_BOT_TOKEN or ""}
-        proc = subprocess.run(
-            [py, "-c", _BRIDGE,
-             str(channel_id),
-             content or "", json.dumps(embeds or [])],
-            env=env,
-            capture_output=True, text=True, timeout=40,
-        )
-        if proc.returncode == 0:
-            return True
-        logger.error("gateway subprocess failed", rc=proc.returncode, stderr=proc.stderr[:200])
-        return False
-    except subprocess.TimeoutExpired:
-        logger.error("gateway subprocess timed out", channel=channel_id)
-        return False
-    except Exception as e:  # noqa: BLE001
-        logger.error("gateway send error", channel=channel_id, err=str(e)[:200])
-        return False
+    import os
+
+    venv_py = os.path.join(os.path.dirname(sys.executable), "python")
+    py = venv_py if os.path.exists(venv_py) else sys.executable
+    env = {**os.environ, "DISCORD_TOKEN": settings.DISCORD_BOT_TOKEN or ""}
+    # ponytail: retry with exponential backoff to avoid 1/sec subprocess burst on REST ban
+    for attempt in range(3):
+        try:
+            proc = subprocess.run(
+                [py, "-c", _BRIDGE,
+                 str(channel_id),
+                 content or "", json.dumps(embeds or [])],
+                env=env,
+                capture_output=True, text=True, timeout=40,
+            )
+            if proc.returncode == 0:
+                return True
+            # log full stderr (not truncated to 200) for debugging gateway hangs
+            err_out = (proc.stderr or "")[:2000]
+            out_out = (proc.stdout or "")[:500]
+            logger.error("gateway subprocess failed", rc=proc.returncode, attempt=attempt + 1, stderr=err_out, stdout=out_out)
+        except subprocess.TimeoutExpired:
+            logger.error("gateway subprocess timed out", channel=channel_id, attempt=attempt + 1)
+        except Exception as e:  # noqa: BLE001
+            logger.error("gateway send error", channel=channel_id, attempt=attempt + 1, err=str(e)[:500])
+            # non-retryable setup error — don't spin
+            return False
+        if attempt < 2:
+            time.sleep(1 * (2 ** attempt))  # 1s, 2s (4s cooldown after 3rd fail avoided — caller sleeps 0.8s)
+    return False
 
 
 def close_gateway() -> None:

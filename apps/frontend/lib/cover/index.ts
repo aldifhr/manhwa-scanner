@@ -59,8 +59,10 @@ export function resolveCoverUrl(
     return putCover(cover, cover);
 
   // 2. Any cover-img form → rewrite to canonical proxy/cover (direct hosts stay as-is)
+  // ponytail: if already proxy?url=, don't re-wrap
   const img = extractCoverImgInner(cover);
   if (img) {
+    if (img.inner.includes("/api/v1/reader/proxy?url=")) return putCover(cover, img.inner);
     if (img.inner.includes("cvr.voratoon.id")) return putCover(cover, cover);
     return putCover(
       cover,
@@ -71,6 +73,7 @@ export function resolveCoverUrl(
   const COVER_IMG_PREFIX = "/api/v1/reader/cover-img?url=";
   if (cover.startsWith(COVER_IMG_PREFIX)) {
     const inner = decodeURIComponent(cover.slice(COVER_IMG_PREFIX.length));
+    if (inner.includes("/api/v1/reader/proxy?url=")) return putCover(cover, inner);
     if (inner.includes("cvr.voratoon.id")) return putCover(cover, cover);
     return putCover(
       cover,
@@ -108,6 +111,7 @@ export function resolveCoverUrl(
   }
 
   // 4. Proxy prefix: normalize double-encode, direct hosts bypass proxy
+  // ponytail: already proxied -> don't double-wrap, just normalize single encode
   const PROXY_PREFIX = "/api/v1/reader/proxy?url=";
   if (cover.startsWith(PROXY_PREFIX)) {
     const inner = decodeURIComponent(cover.slice(PROXY_PREFIX.length));

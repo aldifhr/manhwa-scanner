@@ -82,7 +82,8 @@ async def health_status(request: Request):
             status = "healthy" if disc_ok else "degraded"
             ping = f"{_disc_ping}ms" if _disc_ping else None
         else:
-            status = "healthy"
+            # ponytail: degraded when Supabase ping failed (was always healthy)
+            status = "healthy" if _sb_ping is not None else "degraded"
             ping = f"{_sb_ping}ms" if _sb_ping else None
         services.append({
             "name": name,
@@ -90,12 +91,17 @@ async def health_status(request: Request):
             "ping": ping,
             "uptime": _fmt_uptime(_time.time() - APP_START_TS) if name == "api" else None,
         })
+    # overall health: degraded if any service degraded, down if any source down
+    _has_degraded = any(s["status"] == "degraded" for s in services)
+    _has_down = any((r.get("status") == "down") for r in (hm or {}).values())
+    _overall = "down" if _has_down else ("degraded" if _has_degraded else "healthy")
     return JSONResponse(content={
         "success": True,
         "data": {
             "services": services,
             "uptime": _fmt_uptime(_time.time() - APP_START_TS),
             "sources": hm or {},
+            "status": _overall,
         },
     })
 
@@ -479,7 +485,7 @@ async def reader_cover(request: Request):
         cover_url = scrub_cover(raw)
         if not cover_url or not cover_url.startswith("http"):
             continue
-        return await _proxy_url(cover_url)
+        return await _fetch_image(cover_url, cache_control="public, max-age=3600")
     return FastResponse(status_code=404)
 
 
@@ -496,11 +502,12 @@ def _detect_ctype(data: bytes) -> str:
     return "image/jpeg"
 
 
-async def _proxy_url(url: str) -> "FastResponse":
-    """Fetch `url` (already SSRF-checked by caller) and return image bytes."""
+# ponytail: single seam — _fetch_image centralizes allowlist/cache/fetch/size-cap for /reader/cover, /reader/cover-img, /reader/proxy sharing _IMAGE_CACHE_DIR; keep 3 routes for compat.
+async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -> "FastResponse":
+    """Shared image fetch: allowlist check + cache (single _IMAGE_CACHE_DIR) + httpx fetch + size cap."""
     from urllib.parse import urlparse
+
     p = urlparse(url)
-    # Use dynamic allowlist so domain changes in config auto-sync
     try:
         allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
     except Exception:
@@ -511,46 +518,56 @@ async def _proxy_url(url: str) -> "FastResponse":
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
     host_port = f"{host}:{port}"
-    # SECURITY: exact host:port match only — no wildcards, no port omission.
-    # This prevents SSRF via DNS rebinding or non-standard ports.
     if p.scheme not in ("http", "https") or host_port not in allowed:
         return FastResponse(status_code=403)
     cached = _cache_get(url)
     if cached is not None:
-        return FastResponse(
-            content=cached, status_code=200, media_type=_detect_ctype(cached),
-            headers={"Cache-Control": "public, max-age=3600", "X-Cache": "HIT"},
-        )
-    # Single-flight: the first concurrent request for this URL fetches +
-    # writes the cache file; all others await the same lock, then read
-    # the cached bytes. Prevents a cache stampede (200 <img> tags on
-    # a fast scroll all missing at once → 200 parallel hits to
-    # 07.ikiru.wtf → rate-limit 403s).
+        headers = {"Cache-Control": cache_control, "X-Cache": "HIT"}
+        if "86400" in cache_control:
+            headers["Expires"] = "Thu, 31 Dec 2026 23:59:59 GMT"
+        return FastResponse(content=cached, status_code=200, media_type=_detect_ctype(cached), headers=headers)
     lock = await _url_lock(url)
     async with lock:
-        # re-check after acquiring the lock (another coroutine may have
-        # populated the cache while we waited)
         cached = _cache_get(url)
         if cached is not None:
-            return FastResponse(
-                content=cached, status_code=200, media_type=_detect_ctype(cached),
-                headers={"Cache-Control": "public, max-age=3600", "X-Cache": "HIT"},
-            )
+            headers = {"Cache-Control": cache_control, "X-Cache": "HIT"}
+            if "86400" in cache_control:
+                headers["Expires"] = "Thu, 31 Dec 2026 23:59:59 GMT"
+            return FastResponse(content=cached, status_code=200, media_type=_detect_ctype(cached), headers=headers)
         try:
+            headers_req = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"}
+            if "ikiru.wtf" in url:
+                headers_req["Referer"] = "https://07.ikiru.wtf/"
+                headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
+            from urllib.parse import urljoin as _urljoin
+
             async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-                r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; IkiruBot/1.0)"})
+                r = await client.get(url, headers=headers_req)
+                _hops = 0
+                while r.is_redirect and _hops < 3:
+                    loc = r.headers.get("location", "")
+                    _next = _urljoin(str(r.url), loc)
+                    _p_next = urlparse(_next)
+                    if _p_next.scheme not in ("http", "https") or f"{_p_next.hostname}:{_p_next.port or (443 if _p_next.scheme == 'https' else 80)}" not in allowed:
+                        return FastResponse(status_code=403)
+                    r = await client.get(_next, headers=headers_req)
+                    _hops += 1
             if r.status_code == 200:
-                # SECURITY: cap response size to prevent upstream from exhausting memory.
                 content = r.content[:_RESPONSE_SIZE_CAP]
                 _cache_put(url, content)
                 ctype = r.headers.get("content-type") or _detect_ctype(content)
-                return FastResponse(
-                    content=content, status_code=200, media_type=ctype,
-                    headers={"Cache-Control": "public, max-age=3600", "X-Cache": "MISS"},
-                )
+                headers_out = {"Cache-Control": cache_control, "X-Cache": "MISS"}
+                if "86400" in cache_control:
+                    headers_out["Expires"] = "Thu, 31 Dec 2026 23:59:59 GMT"
+                return FastResponse(content=content, status_code=200, media_type=ctype, headers=headers_out)
             return FastResponse(status_code=r.status_code)
         except Exception:
             return FastResponse(status_code=502)
+
+
+async def _proxy_url(url: str) -> "FastResponse":
+    """Compat alias — delegates to shared _fetch_image (single seam)."""
+    return await _fetch_image(url, cache_control="public, max-age=3600")
 
 
 @router.get("/reader/cover-img")
@@ -566,7 +583,6 @@ async def reader_cover_public(request: Request):
     url = (url or "").strip()
     if not url:
         return FastResponse(status_code=400)
-
     import re as _re
     _guard = 0
     while _re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
@@ -575,61 +591,18 @@ async def reader_cover_public(request: Request):
         except Exception:
             break
         _guard += 1
-
     try:
-        p = urlparse(url)
+        urlparse(url)
     except ValueError:
         return FastResponse(status_code=400)
-
-    try:
-        allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
-    except Exception:
-        allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-            "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
-            "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
-        ]
-    host = (p.hostname or "").strip().lower()
-    port = p.port or (443 if p.scheme == "https" else 80)
-    host_port = f"{host}:{port}"
-    _scheme_ok = p.scheme in ("http", "https")
-    _host_ok = host_port in allowed
-    if not _scheme_ok or not _host_ok:
-        logger.warn("cover-img rejected", scheme=p.scheme, host_port=host_port)
-        return FastResponse(status_code=403)
-
-    cached = _cache_get(url)
-    if cached is not None:
-        return FastResponse(
-            content=cached, status_code=200,
-            media_type=_detect_ctype(cached),
-            headers={"Cache-Control": "public, max-age=86400", "X-Cache": "HIT"},
-        )
-    try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; IkiruBot/1.0)"})
-        if r.status_code == 200:
-            content = r.content[:_RESPONSE_SIZE_CAP]
-            _cache_put(url, content)
-            ctype = r.headers.get("content-type") or _detect_ctype(content)
-            return FastResponse(
-                content=content, status_code=200, media_type=ctype,
-                headers={"Cache-Control": "public, max-age=86400", "X-Cache": "MISS"},
-            )
-        return FastResponse(status_code=r.status_code)
-    except Exception as e:
-        logger.warn("cover-img fetch failed", err=str(e)[:100])
-        return FastResponse(status_code=502)
+    # delegate to single seam — allowlist/cache/fetch/size-cap shared
+    return await _fetch_image(url)
 
 
 @router.get("/reader/proxy")
 async def reader_proxy(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    # Reconstruct the full upstream URL. The FE forwards the RAW url
-    # (which itself contains '&' query separators from MinIO presigned
-    # signatures). Starlette's query_params.get('url') stops at the first
-    # '&', silently dropping X-Amz-Date / X-Amz-Signature -> MinIO 403.
-    # Recover the entire value from the raw query string instead.
     raw_query = request.url.query or ""
     if raw_query.startswith("url="):
         url = raw_query[4:]
@@ -638,11 +611,6 @@ async def reader_proxy(request: Request):
     url = (url or "").strip()
     if not url:
         return FastResponse(status_code=400)
-    # The FE may forward a still-percent-encoded URL (e.g. the raw
-    # upstream was single-encoded by rewriteCoverUrl, then the browser
-    # leaves it encoded in the query string). Decode once so urlparse()
-    # sees a real scheme://host. Guard against double-decode of an
-    # already-valid http(s) URL.
     import re as _re
     from urllib.parse import unquote
     _guard = 0
@@ -655,65 +623,11 @@ async def reader_proxy(request: Request):
     from urllib.parse import urlparse
 
     try:
-        p = urlparse(url)
+        urlparse(url)
     except ValueError:
         return FastResponse(status_code=400)
-    try:
-        allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
-    except Exception:
-        allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-            "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
-            "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
-        ]
-    host = (p.hostname or "").strip().lower()
-    port = p.port or (443 if p.scheme == "https" else 80)
-    host_port = f"{host}:{port}"
-    if p.scheme not in ("http", "https") or host_port not in allowed:
-        return FastResponse(status_code=403)
-    cached = _cache_get(url)
-    if cached is not None:
-        return FastResponse(
-            content=cached, status_code=200,
-            media_type=_detect_ctype(cached),
-            headers={"Cache-Control": "public, max-age=86400", "Expires": "Thu, 31 Dec 2026 23:59:59 GMT", "X-Cache": "HIT"},
-        )
-    try:
-        # Larger timeout so slow sources (ikiru) finish instead of Discord
-        # aborting the fetch (Discord's media proxy times out at ~3-5s). We buffer
-        # once, cache it, and serve from cache on every subsequent request — so
-        # Discord's retry (or its CDN) gets an instant 200 from our cache.
-        # SECURITY: cap response size to prevent upstream from exhausting memory.
-        # ikiru hotlink protection: needs Referer from its own host, else 403
-        # also follow redirects (ikiru CDN 302) and spoof browser UA
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"}
-        if "ikiru.wtf" in url:
-            headers["Referer"] = "https://07.ikiru.wtf/"
-            headers["Accept"] = "image/avif,image/webp,image/apng,*/*"
-        from urllib.parse import urljoin as _urljoin
-        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-            r = await client.get(url, headers=headers)
-            _hops = 0
-            while r.is_redirect and _hops < 3:
-                loc = r.headers.get("location", "")
-                _next = _urljoin(str(r.url), loc)
-                _p_next = urlparse(_next)
-                if _p_next.scheme not in ("http", "https") or f"{_p_next.hostname}:{_p_next.port or (443 if _p_next.scheme == 'https' else 80)}" not in allowed:
-                    return FastResponse(status_code=403)
-                r = await client.get(_next, headers=headers)
-                _hops += 1
-        if r.status_code == 200:
-            content = r.content[:_RESPONSE_SIZE_CAP]
-            _cache_put(url, content)
-            ctype = r.headers.get("content-type") or _detect_ctype(content)
-            return FastResponse(
-                content=content,
-                status_code=200,
-                media_type=ctype,
-                headers={"Cache-Control": "public, max-age=86400", "Expires": "Thu, 31 Dec 2026 23:59:59 GMT", "X-Cache": "MISS"},
-            )
-        return FastResponse(status_code=r.status_code)
-    except Exception:
-        return FastResponse(status_code=502)
+    # delegate to single seam
+    return await _fetch_image(url)
 
 
 # --- Metrics (internal-only: counts per table) ---

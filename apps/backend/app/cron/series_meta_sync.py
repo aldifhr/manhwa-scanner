@@ -12,6 +12,8 @@ Why this exists (decoupled from the per-minute chapter collect):
   shinigami's 429 / ikiru's Cloudflare 403 thresholds. No timeout pressure.
 
 It is idempotent: re-running only refreshes rows, never duplicates.
+
+ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type/origin); whitelist + recent_chapters are consumers. Sync populates canonical via bulk upsert on (title_key,source) from both whitelist and recent_chapters distinct keys — no view, rss prioritizes sm>it>wl. Do not add per-row static writes elsewhere.
 """
 from __future__ import annotations
 
@@ -107,6 +109,25 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
             slug = tk
         slug_map[key] = slug
 
+    # ponytail: also seed from whitelist so new subs without chapters yet still bootstrap series_meta
+    try:
+        wl_rows = sb.table("whitelist").select("title_key, source, series_url").limit(5000).execute().data or []
+        for r in wl_rows:
+            tk = str(r.get("title_key") or "").strip()
+            src = str(r.get("source") or "").strip()
+            if not tk or not src:
+                continue
+            key = (tk, src)
+            if key in slug_map:
+                continue
+            su = (r.get("series_url") or "").rstrip("/")
+            slug = su.split("/")[-1] if su else tk
+            if not slug:
+                slug = tk
+            slug_map[key] = slug
+    except Exception:
+        pass
+
     series = list(slug_map.items())[:limit]
 
     updated = 0
@@ -121,6 +142,7 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
         except Exception:
             meta = {}
         if meta:
+            # ponytail: series_meta canonical single source; whitelist does not store static fields — sync is sole writer
             payloads.append(
                 {
                     "title_key": tk,
@@ -130,6 +152,7 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
                     "description": meta.get("description") or "",
                     "cover": meta.get("cover"),
                     "type": meta.get("type"),
+                    "origin": meta.get("origin") or "",
                     "updated_at": "now()",
                 }
             )

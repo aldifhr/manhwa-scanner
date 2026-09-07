@@ -1,3 +1,4 @@
+# ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type/origin); whitelist is minimal (title_key, source, series_url, latest_sent_chapter) — extra static columns here are legacy compat, rss_service prioritizes sm_map > it > wl, do not add new static writes here; series_meta_sync populates canonical via upsert.
 """Whitelist storage (parity with lib/services/storage/whitelist.ts)."""
 from typing import Optional
 import re as _re
@@ -6,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.db import get_supabase
 from app.logger import get_logger
-from app.utils.text import normalize_title_key, normalize_shinigami_url
+from app.utils.text import normalize_title_key, normalize_shinigami_url, slugify_title_key
 from app.utils.cache import ttl_cache
 
 logger = get_logger("storage:whitelist")
@@ -32,6 +33,8 @@ class WhitelistRow(BaseModel):
     was the root cause of 5 audit bugs (#1-#5): missing fields,
     wrong types, and nested sources[] assumptions that never matched
     the real flat schema.
+
+    ponytail: static fields (cover/rating/genres/description/type/origin/status) are NOT canonical here — canonical is series_meta; whitelist keeps title_key, source, series_url, latest_sent_chapter (+title for display). Extra fields tolerated via extra="ignore" for back-compat, rss falls back sm>it>wl.
     """
 
     model_config = {"extra": "ignore"}  # tolerate legacy columns
@@ -58,15 +61,16 @@ class WhitelistRow(BaseModel):
         if not v:
             return ""
         raw = str(v).strip()
-        # NOTE: shinigami uses UUID model (series_id) as title_key — valid for source=shinigami
-        # ikiru/voratoon use slug (normalized title). Don't blindly reject UUID here;
-        # source-aware check is done in model_validator. Keep raw for shinigami, normalize for others.
-        # For now return raw lowercased for UUID pattern, normalized for slug.
+        # ponytail: canonical title_key = slug (lowercase, dash) via normalize_title_key
+        # UUID vs slug vs spaced lower caused merge false / delete mismatches — UUID is legacy
         if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", raw, _re.I):
-            return raw.lower()
+            logger.warn("WhitelistRow: UUID title_key not canonical, expected slug", title_key=raw[:16])
+            return raw.lower()  # keep UUID as-is for DB compat; post_whitelist now resolves UUID→slug via title
         if _re.match(r"^[0-9a-f]{8} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{12}$", raw, _re.I):
+            logger.warn("WhitelistRow: spaced UUID title_key not canonical", title_key=raw[:16])
             return raw.lower().replace(" ", "-")
-        return normalize_title_key(raw)
+        # enforce slug: normalize_title_key (alnum+space collapse) then dash — no DB migration, normalize in code
+        return slugify_title_key(raw)
 
     @field_validator("source", mode="before")
     @classmethod

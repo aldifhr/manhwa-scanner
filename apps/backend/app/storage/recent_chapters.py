@@ -119,7 +119,7 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
                 if _tk and _src and _cn:
                     existing_ch.add((_tk, _src, _cn))  # type: ignore
     except Exception as e:
-        logger.error("batchInsertRecentChapters existing lookup failed", exc=e)
+        logger.error("batchInsertRecentChapters existing lookup failed", exc=e, exc_info=True)
     # cache store
     try:
         import time as _t2
@@ -212,7 +212,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         if _r.get("genres") is None:
             _r["genres"] = []
         # Coerce nullable numeric columns to 0.0 so Postgres numeric/double
-        # doesn't reject the upsert chunk on "" or None.
+        # doesn't reject the upsert chunk on "" or None. rating stays float (0.0 default, never "").
         for _k in ("chapter_num", "rating"):
             _v = _r.get(_k)
             if _v is None or _v == "":
@@ -274,6 +274,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             # updated_time).
             CHUNK = 50
             inserted = 0
+            # ponytail: single ON CONFLICT chapter_url — idempotent upsert on PK url, covers both insert+update; no multi-constraint needed
             for i in range(0, len(new_rows), CHUNK):
                 chunk_rows = new_rows[i : i + CHUNK]
                 try:
@@ -282,10 +283,15 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     ).execute()
                     inserted += len(chunk_rows)
                 except Exception as e:
+                    # harden: log constraint + first row keys so pool closed / constraint errors are diagnosable without replay
                     logger.warn(
                         "batchInsertRecentChapters chunk failed",
                         exc=e,
+                        exc_info=True,
                         range=f"{i}-{i+len(chunk_rows)}",
+                        constraint="chapter_url",
+                        first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
+                        first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
                     )
             # Existing rows: refresh NON-time metadata only — never
             # updated_time — so an ikiru re-touch (renewed <time>) can't keep
@@ -324,7 +330,11 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                         logger.warn(
                             "batchInsertRecentChapters touch chunk failed",
                             exc=e,
+                            exc_info=True,
                             range=f"{len(chunk_rows)} rows",
+                            constraint="chapter_url",
+                            first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
+                            first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
                         )
             if len(to_upsert) < len(cleaned):
                 logger.info("batchInsertRecentChapters dedup", before=len(rows), after=len(to_upsert))
@@ -357,7 +367,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     )
                     existing_rows.extend(res.data or [])
                 except Exception as e:
-                    logger.error("origin backfill lookup chunk failed", exc=e)
+                    logger.error("origin backfill lookup chunk failed", exc=e, exc_info=True)
             # map url -> incoming origin (from deduped cleaned rows)
             incoming_origin: dict[str, str] = {}
             for d in cleaned:
@@ -377,9 +387,9 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                         chunk_rows, on_conflict="chapter_url"
                     ).execute()
         except Exception as e:
-            logger.error("batchInsertRecentChapters backfill failed", exc=e)
+            logger.error("batchInsertRecentChapters backfill failed", exc=e, exc_info=True)
     except Exception as e:
-        logger.error("batchInsertRecentChapters failed", exc=e)
+        logger.error("batchInsertRecentChapters failed", exc=e, exc_info=True, constraint="chapter_url", first_keys=list(cleaned[0].keys()) if cleaned else [])
     # P1 cache-share: invalidate RSS cache across api/cron via Redis pub key
     try:
         from app.tasks import _get_redis as _gr

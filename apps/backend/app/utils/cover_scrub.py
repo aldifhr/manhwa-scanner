@@ -42,6 +42,7 @@ def scrub_cover(url: str | None) -> str:
       (presigned params intact) through /api/v1/reader/proxy?url=<encoded>.
     - ikiru/shinigami covers are PUBLIC, so we strip the AWS presign noise and
       return the bare host/path (client can fetch directly or via proxy).
+    ponytail: contract — voratoon returns proxy?url= (presigned intact), others bare; frontend lib/cover expects this split.
     """
     if not url or not isinstance(url, str):
         return url or ""
@@ -49,7 +50,7 @@ def scrub_cover(url: str | None) -> str:
         return url
     from urllib.parse import quote
 
-    # Voratoon: private bucket -> serve presigned URL directly.
+    # Voratoon: private bucket -> serve presigned URL directly via proxy?url= (ponytail: matches frontend isDirectAllowed + X-Amz- proxy rule)
     # S3 presigned URLs are CORS-open and short-lived (6 days), so serving them
     # direct avoids an extra hop and 403 (signature mismatch when re-encoded).
     if "cvr.voratoon.id" in url:

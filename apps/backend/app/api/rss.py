@@ -13,12 +13,7 @@ from fastapi.responses import JSONResponse, Response
 
 from app.logger import get_logger
 from app.utils.request_auth import int_safe, safe_error, require_monitor_auth
-from app.utils.text import normalize_title_key
-from app.services.rss_query import (
-    build_filter,
-    map_result,
-    group_results,
-)
+from app.services.rss_query import group_results
 
 logger = get_logger("api:rss")
 router = APIRouter()
@@ -142,7 +137,7 @@ async def _rss_impl(request: Request):
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         _fetch_limit = min(1000, max(200, limit * page * 3 + 20)) if limit <= 100 else 1000
-        results, wl_map, meta_map, sm_map, dh_sent = await fetch_rss_data(
+        results, wl_map, sm_map, dh_sent = await fetch_rss_data(
             cutoff=cutoff,
             source_f=source_f,
             origin_f=origin_f,
@@ -166,7 +161,7 @@ async def _rss_impl(request: Request):
         if unread_only:
             results = [r for r in results if not r.get("isSent")]
 
-        # genres/status/rating already filtered in fetch_rss_data — skip duplicate pass
+        # genres/rating already filtered in fetch_rss_data — skip duplicate pass
         if sort_f == "rating":
             try:
                 results.sort(key=lambda x: float(x.get("rating") or 0), reverse=True)
