@@ -47,8 +47,9 @@ def get_bookmarks(session_hash: str, limit: int = 100, offset: int = 0) -> list[
         return q("""
             SELECT b.title_key, b.chapter_number, b.chapter_url, b.source, b.position_pct, b.updated_at,
                    COALESCE(NULLIF(b.title,''), w.title, b.title_key) as title,
-                   COALESCE(NULLIF(b.cover,''), w.cover, rc.cover) as cover
+                   COALESCE(NULLIF(b.cover,''), sm.cover, rc.cover) as cover
             FROM chapter_bookmarks b
+            LEFT JOIN series_meta sm ON REPLACE(LOWER(sm.title_key), '-', ' ') = REPLACE(LOWER(b.title_key), '-', ' ') AND sm.source = b.source
             LEFT JOIN whitelist w ON REPLACE(LOWER(w.title_key), '-', ' ') = REPLACE(LOWER(b.title_key), '-', ' ') AND w.source = b.source
             LEFT JOIN LATERAL (SELECT cover FROM recent_chapters rc WHERE REPLACE(LOWER(rc.title_key), '-', ' ') = REPLACE(LOWER(b.title_key), '-', ' ') ORDER BY updated_time DESC LIMIT 1) rc ON true
             WHERE b.session_hash = %s

@@ -42,6 +42,8 @@ def _claimed_urls(urls: list[str]) -> set[str]:
         )
         return {r["chapter_url"] for r in (res.data or [])}
     except Exception as e:
+        if "does not exist" in str(e):
+            return set()
         logger.error("check dispatch_claims failed", exc=e)
         return set()
 
@@ -74,6 +76,8 @@ def mark_claimed(urls: list[str], title_keys: list[str], expires_hours: int = 24
             rows, on_conflict="chapter_url"
         ).execute()
     except Exception as e:
+        if "does not exist" in str(e):
+            return
         logger.error("mark_claimed failed", exc=e)
 
 
@@ -123,6 +127,8 @@ def unclaim(chapter_url: str) -> None:
     try:
         get_supabase().table("dispatch_claims").delete().eq("chapter_url", chapter_url).execute()
     except Exception as e:
+        if "does not exist" in str(e):
+            return
         logger.error("unclaim dispatch_claims failed", exc=e)
 
 
@@ -148,6 +154,10 @@ def unclaim_stale(cutoff_iso: str) -> int:
         )
         return len(res.data or [])
     except Exception as e:
+        # 055 dropped dispatch_claims (transient) — table missing is expected after migration, not an error
+        if "does not exist" in str(e) or "dispatch_claims" in str(e) and "not exist" in str(e).lower():
+            logger.debug("unclaim_stale skip — dispatch_claims dropped (055)", exc=e)
+            return 0
         logger.error("unclaim_stale failed", exc=e)
         return 0
 
@@ -192,18 +202,27 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
             ph = ",".join(["%s"] * len(urls))
             _cur.execute(f"SELECT chapter_url FROM dispatch_history WHERE chapter_url IN ({ph})", urls)
             already |= {r["chapter_url"] for r in _cur.fetchall()}
-            _cur.execute(f"SELECT chapter_url FROM dispatch_claims WHERE chapter_url IN ({ph}) AND expires_at >= %s", urls + [now.isoformat()])
-            already |= {r["chapter_url"] for r in _cur.fetchall()}
+            try:
+                _cur.execute(f"SELECT chapter_url FROM dispatch_claims WHERE chapter_url IN ({ph}) AND expires_at >= %s", urls + [now.isoformat()])
+                already |= {r["chapter_url"] for r in _cur.fetchall()}
+            except Exception as ce:
+                if "does not exist" not in str(ce):
+                    raise
         if fcfs_keys:
             uniq = list(set([k for k in fcfs_keys if k]))
             if uniq:
                 ph2 = ",".join(["%s"] * len(uniq))
                 _cur.execute(f"SELECT fcfs_key FROM dispatch_history WHERE fcfs_key IN ({ph2})", uniq)
                 fcfs_already |= {r["fcfs_key"] for r in _cur.fetchall() if r.get("fcfs_key")}
-                _cur.execute(f"SELECT fcfs_key FROM dispatch_claims WHERE fcfs_key IN ({ph2})", uniq)
-                fcfs_already |= {r["fcfs_key"] for r in _cur.fetchall() if r.get("fcfs_key")}
+                try:
+                    _cur.execute(f"SELECT fcfs_key FROM dispatch_claims WHERE fcfs_key IN ({ph2})", uniq)
+                    fcfs_already |= {r["fcfs_key"] for r in _cur.fetchall() if r.get("fcfs_key")}
+                except Exception as ce:
+                    if "does not exist" not in str(ce):
+                        raise
     except Exception as e:
-        logger.error("claim atomic precheck failed", exc=e)
+        if "does not exist" not in str(e):
+            logger.error("claim atomic precheck failed", exc=e)
         if _pre_conn:
             try:
                 _pre_conn.rollback()
@@ -285,7 +304,8 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
                 if without_fk:
                     get_supabase().table("dispatch_claims").upsert(without_fk, on_conflict="chapter_url").execute()
         except Exception as ins_err:
-            logger.error("dispatch_claims upsert failed", exc=ins_err)
+            if "does not exist" not in str(ins_err):
+                logger.error("dispatch_claims upsert failed", exc=ins_err)
             if _pre_conn is not None:
                 try:
                     _pre_conn.rollback()

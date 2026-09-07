@@ -7,14 +7,14 @@ logger = get_logger("storage:metadata")
 
 
 def batch_get_manga_metadata(title_keys: list[str]) -> list[Optional[dict]]:
-    """Get metadata from whitelist (cover/status/rating/genres/description)."""
+    """Get metadata from series_meta (canonical, whitelist minimal since 052)."""
     if not title_keys:
         return []
     try:
         res = (
             get_supabase()
-            .table("whitelist")
-            .select("title_key, cover, status, rating, genres, description, origin")
+            .table("series_meta")
+            .select("title_key, cover, rating, genres, description, origin, type")
             .in_("title_key", title_keys)
             .execute()
         )
@@ -27,11 +27,11 @@ def batch_get_manga_metadata(title_keys: list[str]) -> list[Optional[dict]]:
 
 
 def upsert_manga_metadata(rows: list[dict]) -> None:
-    """Upsert metadata into whitelist."""
+    """Upsert metadata into series_meta (canonical since 052)."""
     if not rows:
         return
     try:
-        get_supabase().table("whitelist").upsert(rows, on_conflict="title_key,source").execute()
+        get_supabase().table("series_meta").upsert(rows, on_conflict="title_key,source").execute()
     except Exception as e:
         logger.error("upsertMangaMetadata failed", exc=e)
 
