@@ -158,7 +158,15 @@ async def health_detailed(request: Request):
     voratoon_covers: list[dict] = []
     try:
         from app.db import get_supabase as _gsb2
-        _rows = _gsb2().table("whitelist").select("title_key, title, cover").eq("source", "voratoon").limit(100).execute().data or []
+        _rows = _gsb2().table("series_meta").select("title_key, cover").eq("source", "voratoon").limit(100).execute().data or []
+        # enrich title via whitelist join (whitelist minimal since 052)
+        try:
+            _wl2 = _gsb2().table("whitelist").select("title_key, title").eq("source", "voratoon").limit(100).execute().data or []
+            _title_map = {r.get("title_key"): r.get("title") for r in _wl2}
+            for _r in _rows:
+                _r["title"] = _title_map.get(_r.get("title_key"), "")
+        except Exception:
+            pass
         for _r in _rows:
             _cover = _r.get("cover") or ""
             if "cvr.voratoon.id" not in _cover:

@@ -234,8 +234,8 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                     if url not in seen_urls:
                         seen_urls.add(url)
                         uniq_candidates.append((num, url, title))
-                # single cover fetch per gap (was per chapter N+1)
-                cur.execute("SELECT cover FROM whitelist WHERE title_key=%s AND source=%s", (tk, src))
+                # single cover fetch per gap (was per chapter N+1) — cover canonical series_meta since 052
+                cur.execute("SELECT cover FROM series_meta WHERE title_key=%s AND source=%s", (tk, src))
                 wrow = cur.fetchone()
                 cover_val = (wrow[0] if wrow else "") or ""
                 # bulk existing check 1×

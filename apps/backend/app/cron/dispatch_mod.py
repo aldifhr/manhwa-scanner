@@ -217,8 +217,9 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     try:
         from app.db import get_supabase
         _sb = get_supabase()
-        _wl_rows = _sb.table("whitelist").select("title_key, source, cover").execute().data or []
-        for _w in _wl_rows:
+        # cover canonical in series_meta since 052 — whitelist minimal
+        _sm_rows = _sb.table("series_meta").select("title_key, source, cover").execute().data or []
+        for _w in _sm_rows:
             _c = str(_w.get("cover") or "").strip()
             _tk = str(_w.get("title_key") or "").strip()
             _src = str(_w.get("source") or "").strip()
