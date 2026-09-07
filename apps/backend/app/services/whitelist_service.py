@@ -205,29 +205,34 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
     title_key = slugify_title_key(title_key) if title_key else ""
 
     entry = {"title": title, "title_key": title_key, "source": source}
+    # ponytail: whitelist minimal (052) — static fields go to series_meta, not whitelist
+    _series_meta_extra: dict = {}
     if body:
-        for f in ("cover", "rating", "origin", "genres", "description"):
+        for f in ("cover", "rating", "origin", "genres", "description", "type"):
             v = body.get(f)
             if v is None or v == "":
                 continue
-            # Reject obvious placeholder/sentinel junk the FE sometimes sends
-            # (e.g. description="d", genres=["a"]) so enrich_whitelist_entry can
-            # fetch the real metadata from the source API instead of persisting
-            # the garbage.
             if f == "description" and isinstance(v, str) and len(v.strip()) < 4:
                 continue
             if f == "genres" and isinstance(v, list) and (
                 len(v) == 0 or (len(v) == 1 and str(v[0]).strip().lower() in ("a", "x", "n/a"))
             ):
                 continue
-            entry[f] = v
+            _series_meta_extra[f] = v
         _su = body.get("seriesUrl") or body.get("series_url") or ""
         if isinstance(_su, str) and _su.strip():
             entry["series_url"] = _su.strip()
 
     # Enrich missing fields — non-blocking: insert immediately, enrich in background
     # so POST stays 0.02s instead of 0.5s (was 3 sync HTTP fetches to ikiru/voratoon/shinigami).
-    _needs_enrich = not entry.get("description") or not entry.get("cover") or not entry.get("genres")
+    # whitelist minimal — also persist static to series_meta if provided
+    if _series_meta_extra:
+        try:
+            from app.db import get_supabase as _sm_sb
+            _sm_sb().table("series_meta").upsert({"title_key": title_key, "source": source, **_series_meta_extra}, on_conflict="title_key,source").execute()
+        except Exception:
+            pass
+    _needs_enrich = not _series_meta_extra.get("description") or not _series_meta_extra.get("cover") or not _series_meta_extra.get("genres")
     res = wl_store.add_whitelist_entries([entry])
     if _needs_enrich:
         try:
@@ -239,10 +244,14 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
             def _bg_enrich():
                 try:
                     enriched = enrich_whitelist_entry(dict(_entry_copy), _url_copy, _source_copy, _title_copy)
-                    # Only update if enrich actually added something
-                    if enriched.get("cover") != _entry_copy.get("cover") or enriched.get("description") != _entry_copy.get("description") or enriched.get("genres") != _entry_copy.get("genres"):
-                        # Re-upsert with enriched fields (preserve title_key/source)
-                        wl_store.add_whitelist_entries([enriched])
+                    # Only update series_meta if enrich added static fields (whitelist minimal)
+                    _sm_update = {k: v for k, v in enriched.items() if k in ("cover","rating","genres","description","type","origin") and v not in (None,"",[])}
+                    if _sm_update:
+                        try:
+                            from app.db import get_supabase as _sm2
+                            _sm2().table("series_meta").upsert({"title_key": title_key, "source": source, **_sm_update}, on_conflict="title_key,source").execute()
+                        except Exception:
+                            pass
                 except Exception:
                     pass
             threading.Thread(target=_bg_enrich, daemon=True).start()
