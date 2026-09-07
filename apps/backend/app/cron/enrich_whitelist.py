@@ -276,14 +276,22 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         try:
             updates = enrich_whitelist_entry(tk, src, su)
             if updates:
-                updates["metadata_enriched_at"] = now.isoformat()
-                sb.table("whitelist").update(updates).eq("title_key", tk).eq("source", src).execute()
-                # voratoon: sync fresh cover ke recent_chapters juga biar RSS/feed gak expired
-                if src == "voratoon" and updates.get("cover"):
+                # whitelist minimal since 061 — static fields go to series_meta, not whitelist
+                _sm_update = {k: v for k, v in updates.items() if k in ("cover","rating","genres","description","type","origin")}
+                _wl_update: dict = {"metadata_enriched_at": now.isoformat()}
+                # keep source for whitelist update (if needed)
+                if _sm_update:
                     try:
-                        sb.table("recent_chapters").update({"cover": updates["cover"]}).eq("title_key", tk).eq("source", "voratoon").execute()
+                        sb.table("series_meta").upsert({"title_key": tk, "source": src, **_sm_update, "updated_at": now.isoformat()}, on_conflict="title_key,source").execute()
                     except Exception:
                         pass
+                    # also sync voratoon cover to recent_chapters
+                    if src == "voratoon" and _sm_update.get("cover"):
+                        try:
+                            sb.table("recent_chapters").update({"cover": _sm_update["cover"]}).eq("title_key", tk).eq("source", "voratoon").execute()
+                        except Exception:
+                            pass
+                sb.table("whitelist").update(_wl_update).eq("title_key", tk).eq("source", src).execute()
                 updated += 1
         except Exception as e:
             logger.warn("enrich failed", title_key=tk, err=str(e)[:120])
