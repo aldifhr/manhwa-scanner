@@ -663,6 +663,13 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     _meta_cov = meta_cover.get(tk) or meta_cover.get(" ".join(tk.split("-"))) or ""
     if _meta_cov:
         _meta_cov = scrub_cover(_meta_cov)
+    # ponytail: rating/genres/type/origin canonical in series_meta/rc, whitelist minimal
+    _rc_rating = rc.get("rating")
+    _rc_genres = rc.get("genres")
+    _rc_type = rc.get("type")
+    _rc_origin = rc.get("origin")
+    # meta fallback for rating/genres via series_meta (already in rc, but keep for old rows)
+    _meta_rating = meta_cover.get(f"{tk}:rating") or ""  # placeholder, actual meta_rating via _fetch
     return {
         "id": str(r.get("id") or f"{tk}:{s}" if s else tk),
         "title": html.unescape(r.get("title") or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019"),
@@ -673,11 +680,11 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
         "sources": [s] if s else [],
         "sourceUrls": {s: (_wl_series or "")} if s else {},
         
-        "rating": r.get("rating") or None,
-        "type": r.get("type") or None,
-        "origin": r.get("origin") or "",
-        "genres": r.get("genres") or [],
-        "description": desc,
+        "rating": r.get("rating") or _rc_rating or None,
+        "type": r.get("type") or _rc_type or None,
+        "origin": r.get("origin") or _rc_origin or "",
+        "genres": r.get("genres") or _rc_genres or [],
+        "description": desc or rc.get("description") or "",
         "seriesUrl": _wl_series,
         "url": _wl_series,
         "lastNotified": last_notified.get(tk) or None,
@@ -707,7 +714,7 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
             cand_keys.add(su)
 
     def _q_recent():
-        q = sb.table("recent_chapters").select("title_key, title, source, cover, origin, updated_time, series_url")
+        q = sb.table("recent_chapters").select("title_key, title, source, cover, origin, updated_time, series_url, rating, genres, description, type")
         if all_tks:
             q = q.in_("title_key", all_tks)
         return q.execute()
@@ -715,7 +722,7 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
     def _q_meta():
         if not cand_keys:
             return None
-        return sb.table("series_meta").select("title_key, description, cover").in_("title_key", list(cand_keys)).execute()
+        return sb.table("series_meta").select("title_key, description, cover, rating, genres, type, origin").in_("title_key", list(cand_keys)).execute()
 
     def _q_dh():
         tks = [r.get("title_key", "") for r in rows if r.get("title_key")]
