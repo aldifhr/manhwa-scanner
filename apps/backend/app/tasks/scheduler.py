@@ -13,6 +13,7 @@ _ENRICH_INTERVAL_S = 3600
 _ENRICH_MISSING_INTERVAL_S = 3600
 _ENRICH_REFRESH_INTERVAL_S = 604800
 _VORATOON_COVER_INTERVAL_S = 86400
+_VSERIES_REFRESH_INTERVAL_S = 3600  # ponytail: v_series MATERIALIZED REFRESH hourly (was 7d via enrich-refresh)
 
 _SCHED_THREAD: threading.Thread | None = None
 _stop = threading.Event()
@@ -26,6 +27,7 @@ def _scheduler_loop() -> None:
     last_enrich_missing = 0.0
     last_enrich_refresh = 0.0
     last_voratoon_cover = 0.0
+    last_vseries = 0.0
     last_dispatch = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
@@ -93,6 +95,12 @@ def _scheduler_loop() -> None:
                 try:
                     enqueue_cron("voratoon-cover")
                     last_voratoon_cover = _now
+                except Exception:
+                    pass
+            if _now - last_vseries >= _VSERIES_REFRESH_INTERVAL_S:
+                try:
+                    enqueue_cron("vseries-refresh")
+                    last_vseries = _now
                 except Exception:
                     pass
             try:

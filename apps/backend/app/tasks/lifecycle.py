@@ -64,6 +64,15 @@ def run_cron_inline(action: str) -> None:
         logger.info("cron voratoon-cover done", **stats)
         return
 
+    if action == "vseries-refresh":
+        from app.db import q as _q
+        try:
+            _q("REFRESH MATERIALIZED VIEW CONCURRENTLY v_series", [])
+            logger.info("cron vseries-refresh done")
+        except Exception as e:
+            logger.warn("cron vseries-refresh failed", err=str(e)[:120])
+        return
+
     max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         try:
