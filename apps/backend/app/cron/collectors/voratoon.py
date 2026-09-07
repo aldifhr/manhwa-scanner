@@ -1,6 +1,6 @@
 """Voratoon collector — extracted from collect.py inline voratoon loop."""
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key
+from app.utils.text import normalize_title_key, slugify_title_key
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 
 
@@ -30,8 +30,8 @@ def _collect_voratoon_source(latest_sent: dict) -> list[dict]:
                 continue
         except (ValueError, TypeError):
             continue
-        _ceil = latest_sent.get((str(series_title or ""), "voratoon"), latest_sent.get((normalize_title_key(series_title or ""), "voratoon"), 0))
+        _ceil = latest_sent.get((str(series_title or ""), "voratoon"), latest_sent.get((slugify_title_key(series_title or ""), "voratoon"), 0))
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
-        items.append({"title": series_title, "title_key": normalize_title_key(series_slug), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "voratoon", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "description": u.get("description") or "", "genres": u.get("genres") or [], "rating": normalize_rating(u.get("rating")), "type": u.get("type") or ""})
+        items.append({"title": series_title, "title_key": slugify_title_key(series_slug), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "voratoon", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "description": u.get("description") or "", "genres": u.get("genres") or [], "rating": normalize_rating(u.get("rating")), "type": u.get("type") or ""})
     return items

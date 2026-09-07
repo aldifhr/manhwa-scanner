@@ -1,7 +1,7 @@
 """Shinigami per-series collector — extracted from collect.py:279."""
 from app.logger import get_logger
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key
+from app.utils.text import normalize_title_key, slugify_title_key
 from app.scrapers.shinigami import _country_to_type as _country_to_type_fn
 from app.cron.collectors.common import _cached_chapter_list, _cached_series_meta, MAX_CHAPTERS_PER_SERIES
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
@@ -43,7 +43,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
             except (ValueError, TypeError):
                 pass
         _chn = _parse_chapter_num(ch_str)
-        _ceil = latest_sent.get((str(title or ""), "shinigami"), latest_sent.get((normalize_title_key(title or ""), "shinigami"), 0))
+        _ceil = latest_sent.get((str(title or ""), "shinigami"), latest_sent.get((slugify_title_key(title or ""), "shinigami"), 0))
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
         # ponytail: origin CN=manhua KR=manhwa — enforce sync (was CN/manhwa mismatch)
@@ -52,7 +52,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
             _type = "manhua"
         elif origin == "KR":
             _type = "manhwa"
-        items.append({"title": title, "title_key": normalize_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"https://11.shinigami.asia/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
+        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"https://11.shinigami.asia/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
     return items
 
 
@@ -61,7 +61,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     from app.services.rating_utils import normalize_rating as _nr
     from app.scrapers.shinigami import _country_to_type as _ctt
-    from app.utils.text import normalize_title_key as _ntk
+    from app.utils.text import normalize_title_key, slugify_title_key as _ntk
     items: list[dict] = []
     _series: list[dict] = []
     try:

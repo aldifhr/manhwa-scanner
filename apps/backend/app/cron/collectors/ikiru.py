@@ -2,7 +2,7 @@
 from app.config import settings
 from app.logger import get_logger
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key
+from app.utils.text import normalize_title_key, slugify_title_key
 from app.utils.cover_scrub import scrub_cover
 from app.cron.collectors.common import _cached_chapter_list, _cached_series_meta, MAX_CHAPTERS_PER_SERIES, _COLLECT_WORKERS, logger as _common_logger
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
@@ -56,7 +56,7 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
         _ceil = latest_sent.get((series_title, "ikiru"), latest_sent.get((normalize_title_key(series_title), "ikiru"), 0))
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
-        items.append({"title": series_title, "title_key": normalize_title_key(series_slug), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "ikiru", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "rating": _meta_rating, "genres": _meta_genres, "description": _meta.get("description", ""), "type": (u.get("type") or [""])[0].lower() if isinstance(u.get("type"), list) else (u.get("type") or "").lower()})
+        items.append({"title": series_title, "title_key": slugify_title_key(series_slug), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "ikiru", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "rating": _meta_rating, "genres": _meta_genres, "description": _meta.get("description", ""), "type": (u.get("type") or [""])[0].lower() if isinstance(u.get("type"), list) else (u.get("type") or "").lower()})
     return items
 
 
@@ -64,7 +64,7 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
     from app.scrapers import ikiru as _ikiru_scraper
     from concurrent.futures import ThreadPoolExecutor
     from app.cron.collectors.common import _COLLECT_WORKERS, preload_series_meta_bulk
-    from app.utils.text import normalize_title_key as _ntk
+    from app.utils.text import normalize_title_key, slugify_title_key as _ntk
     items: list[dict] = []
     _series = list(_ikiru_scraper.get_ikiru_latest_updates())
     if not _series:
@@ -76,7 +76,7 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
     # ponytail: bulk preload 1 query vs 150
     if fetch_meta:
         try:
-            _keys = [(normalize_title_key(u.get("title", "")), "ikiru") for u in _series]
+            _keys = [(slugify_title_key(u.get("title", "")), "ikiru") for u in _series]
             preload_series_meta_bulk(_keys)
         except Exception:
             pass
