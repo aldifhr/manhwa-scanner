@@ -38,13 +38,13 @@ def _scheduler_loop() -> None:
                 voratoon_cover_interval=_VORATOON_COVER_INTERVAL_S)
     for i, src in enumerate(_RSS_SOURCES):
         try:
-            enqueue_cron(f"rss-fetch:{src}")
+            enqueue_cron(f"rss-fetch:{src}", source=src)
         except Exception as e:
             logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
         if i < len(_RSS_SOURCES) - 1:
             _stop.wait(20)
     try:
-        enqueue_cron("enrich")
+        enqueue_cron("enrich", title="whitelist enrichment")
         last_enrich = _time.monotonic()
     except Exception:
         pass
@@ -56,7 +56,7 @@ def _scheduler_loop() -> None:
             _now = _time.monotonic()
             if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
                 try:
-                    enqueue_cron("update")
+                    enqueue_cron("update", title="dispatch chapters")
                     last_dispatch = _now
                 except Exception as e:
                     logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
@@ -67,7 +67,7 @@ def _scheduler_loop() -> None:
                             break
                         try:
                             logger.info("scheduler enqueue rss-fetch", source=src)
-                            enqueue_cron(f"rss-fetch:{src}")
+                            enqueue_cron(f"rss-fetch:{src}", source=src)
                         except Exception as e:
                             logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
                         _stop.wait(20)
@@ -75,7 +75,7 @@ def _scheduler_loop() -> None:
                 last_source = _now
             if _now - last_enrich >= _ENRICH_INTERVAL_S:
                 try:
-                    enqueue_cron("enrich")
+                    enqueue_cron("enrich", title="enrichment")
                     last_enrich = _now
                 except Exception:
                     pass

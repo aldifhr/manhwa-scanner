@@ -28,18 +28,16 @@ def _get_redis():
     return _redis
 
 
-def enqueue_cron(action: str) -> None:
-    """Push a cron pipeline job onto the Redis cron queue.
-
-    The API process enqueues; a separate ROLE=cron worker pops and runs
-    run_pipeline. If Redis is down the cron worker runs the pipeline inline.
-    The API process does NOT fall back inline — it raises so the caller
-    returns 503 instead of blocking the HTTP thread.
-    """
-    payload = {"action": action}
+def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
+    """Push a cron pipeline job onto the Redis cron queue."""
+    payload: dict = {"action": action}
+    if source:
+        payload["source"] = source
+    if title:
+        payload["title"] = title
     try:
         _get_redis().rpush(CRON_QUEUE_KEY, json.dumps(payload))
-        logger.info("enqueued cron job", action=action)
+        logger.info("enqueued cron job", action=action, source=source)
     except Exception as e:
         _role = (os.environ.get("ROLE") or "api").lower()
         if _role == "cron":
