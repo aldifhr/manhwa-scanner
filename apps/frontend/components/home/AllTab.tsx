@@ -204,13 +204,28 @@ function AllTabInner() {
             `${normalizeTitleKey(c.titleKey)}:${c.source}`
           )
       );
-    if (genreFilter) f = f.filter((c) => (c.genres || []).map((g: string) => g.toLowerCase()).includes(genreFilter.toLowerCase()));
-    if (statusFilter) f = f.filter((c) => String(c.status || "").toLowerCase() === statusFilter.toLowerCase());
+    if (genreFilter)
+      f = f.filter((c) =>
+        (c.genres || [])
+          .map((g: string) => g.toLowerCase())
+          .includes(genreFilter.toLowerCase())
+      );
+    if (statusFilter)
+      f = f.filter(
+        (c) =>
+          String(c.status || "").toLowerCase() === statusFilter.toLowerCase()
+      );
     if (minRating) {
       const mr = parseFloat(minRating);
-      if (!isNaN(mr)) f = f.filter((c) => parseFloat(String(c.rating || "0")) >= mr);
+      if (!isNaN(mr))
+        f = f.filter((c) => parseFloat(String(c.rating || "0")) >= mr);
     }
-    if (whitelistOnly) f = f.filter((c) => c.isWhitelisted || optimisticWhitelist.has(`${c.titleKey}:${c.source}`));
+    if (whitelistOnly)
+      f = f.filter(
+        (c) =>
+          c.isWhitelisted ||
+          optimisticWhitelist.has(`${c.titleKey}:${c.source}`)
+      );
     const q = searchQuery.trim().toLowerCase();
     if (q) f = f.filter((c) => (c.title || "").toLowerCase().includes(q));
     return f.map((c) => ({ ...c, seriesUrl: resolveSeriesUrl(c) }));
@@ -430,8 +445,12 @@ function AllTabInner() {
         toggleGroupMode={toggleGroupMode}
       />
       <div className="flex justify-end -mt-1">
-        <button onClick={() => setFilterOpen(true)} className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white">
-          Filters {(genreFilter || statusFilter || minRating || whitelistOnly) ? "•" : ""}
+        <button
+          onClick={() => setFilterOpen(true)}
+          className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white min-h-0 min-w-0"
+        >
+          Filters{" "}
+          {genreFilter || statusFilter || minRating || whitelistOnly ? "•" : ""}
         </button>
       </div>
       <FilterDrawer open={filterOpen} onClose={() => setFilterOpen(false)} />

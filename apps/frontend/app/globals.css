@@ -65,9 +65,11 @@ body {
 /* Horizontal scroll for filters */
 .filter-scroll {
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: none; /* ponytail: was 'x proximity' — caused sticky/unresponsive scroll on mobile */
-  touch-action: pan-y; /* let vertical scroll pass through */
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -194,6 +196,19 @@ a:not(.min-h-0) {
 button:not(.min-w-0),
 a:not(.min-w-0) {
   min-width: 44px;
+}
+
+/* Filter pills — hard override: never let global 44px or wrapping collapse the pill */
+.filter-scroll button {
+  min-height: auto !important;
+  min-width: auto !important;
+  height: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
 /* Prevent text selection on buttons */

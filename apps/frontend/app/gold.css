@@ -41,7 +41,7 @@
 }
 
 /* ── 2. TYPOGRAPHY ────────────────────────────────────────── */
-h1,
+h1:not(.text-\[20px\]):not(.text-\[22px\]),
 h2,
 h3 {
   font-family:
@@ -50,7 +50,7 @@ h3 {
   line-height: 1.05 !important;
   text-wrap: balance;
 }
-h1 {
+h1:not(.text-\[20px\]) {
   font-size: clamp(1.9rem, 4vw, 2.7rem) !important;
   font-weight: 700 !important;
 }

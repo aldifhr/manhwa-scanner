@@ -32,12 +32,14 @@ export default function AllTabFilters({
   const hasActive =
     countryFilter !== null || sourceFilter !== null || typeFilter !== null;
   return (
-    <div className="sticky top-[57px] z-10 -mx-1 px-1 py-2 flex flex-col gap-2.5 bg-[var(--gold-bg)]/80 backdrop-blur-xl border-y border-[var(--gold-border)] supports-[backdrop-filter]:bg-black/40 max-h-[40vh] overflow-y-auto">
-      {/* Row 1: Country + Source + clear — single scroll with fade */}
-      <div className="relative -mx-1 px-1">
-        <div className="filter-scroll flex gap-2 pb-0.5 pr-6 -mx-1 px-1 [mask-image:linear-gradient(to_right,black_85%,transparent)]"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-          onClick={(e) => e.stopPropagation()}>
+    <div className="sticky top-[57px] z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 flex flex-col gap-2.5 bg-[var(--gold-bg)]/80 backdrop-blur-xl border-y border-[var(--gold-border)] supports-[backdrop-filter]:bg-black/40">
+      {/* Row 1: Country + Source — single horizontal scroll */}
+      <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6">
+        <div
+          className="filter-scroll flex gap-2 pb-1 pr-6 scrollbar-hide"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => setCountryFilter(null)}
             className={filterButtonClass(countryFilter === null)}
@@ -101,8 +103,8 @@ export default function AllTabFilters({
         </div>
       </div>
 
-      {/* Row 2: Type filter + clear — compact */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Row 2: Type filter + clear — compact, scroll on narrow */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto scrollbar-hide filter-scroll py-0.5">
         <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30 shrink-0">
           Type
         </span>
@@ -135,7 +137,7 @@ export default function AllTabFilters({
               setSourceFilter(null);
               setTypeFilter(null);
             }}
-            className="ml-auto inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="ml-auto inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors min-h-0 min-w-0 shrink-0 whitespace-nowrap"
           >
             Clear
           </button>
