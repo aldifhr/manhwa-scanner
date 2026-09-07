@@ -150,9 +150,6 @@ export default function AdminDashboard() {
                   return parts.join(", ");
                 })()}
               </p>
-              <p className="text-[11px] text-white/40">
-                DLQ {(queue as any)?.dlq ?? 0}
-              </p>
             </div>
             <div className="bg-surface border border-border rounded-xl p-4">
               <p className="text-xs text-text-muted">Sources</p>

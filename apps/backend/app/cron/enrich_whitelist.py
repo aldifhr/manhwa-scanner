@@ -172,7 +172,7 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
 
 
 _ENRICH_LAST_RUN: float = 0
-_ENRICH_THROTTLE_S = 3600  # 1h — ponytail: was every 5m cron, 150 skipped but still 1 SELECT+loop; throttle saves DB
+_ENRICH_THROTTLE_S = 300  # 5m — faster metadata for new series
 
 def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
     """Enrich whitelist entries with upstream metadata (cover, rating, genres,

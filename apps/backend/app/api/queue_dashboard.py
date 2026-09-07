@@ -52,24 +52,22 @@ async def cron_list(request: Request):
 
 @router.get("/api/v1/queue/status")
 async def queue_status(request: Request):
-    """Redis queue status — pending jobs, DLQ depth, recent activity."""
+    """Redis queue status — pending jobs, breakdown, pending chapters."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     
     try:
-        from app.tasks import _get_redis, QUEUE_KEY, CRON_QUEUE_KEY, DLQ_KEY
+        from app.tasks import _get_redis, QUEUE_KEY, CRON_QUEUE_KEY
         
         r = _get_redis()
         
         # Queue depths
         main_queue = r.llen(QUEUE_KEY) or 0
         cron_queue = r.llen(CRON_QUEUE_KEY) or 0
-        dlq = r.llen(DLQ_KEY) or 0
         
         # Peek at first 5 jobs in each queue
         main_jobs = r.lrange(QUEUE_KEY, 0, 4) or []
         cron_jobs = r.lrange(CRON_QUEUE_KEY, 0, 4) or []
-        dlq_jobs = r.lrange(DLQ_KEY, 0, 4) or []
         
         # Parse job info + breakdown
         import json
@@ -163,16 +161,13 @@ async def queue_status(request: Request):
             "success": True,
             "data": {
                 "depth": main_queue + cron_queue,
-                "dlq": dlq,
                 "depths": {
                     "main_queue": main_queue,
                     "cron_queue": cron_queue,
-                    "dead_letter_queue": dlq,
                 },
                 "pending_jobs": {
                     "main": parse_jobs(main_jobs),
                     "cron": parse_jobs(cron_jobs),
-                    "dlq": parse_jobs(dlq_jobs),
                 },
                 "cron_breakdown": cron_breakdown,
                 "pending_chapters": pending_chapters,
