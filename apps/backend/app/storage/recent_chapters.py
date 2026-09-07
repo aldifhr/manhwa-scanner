@@ -151,7 +151,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         "description",
         "type",
         "genres",
-        "status",
         "rating",
     }
     # ponytail: load whitelist origins so recent_chapters.origin matches
@@ -204,7 +203,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         # Guard NOT-NULL columns: wrapper items may omit status/rating/etc
         # (ikiru/shinigami don't emit status), leaving None which Postgres
         # rejects as NULL and silently drops the whole upsert chunk.
-        for _k in ("status", "rating", "description", "type"):
+        for _k in ("rating", "description", "type"):
             if _r.get(_k) is None:
                 _r[_k] = ""
         # Origin: chk_rc_origin allows NULL but rejects "" — set after guard so it stays NULL
@@ -302,7 +301,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                 _touch_rows = []
                 for r in touch_rows:
                     _t = {"chapter_url": r["chapter_url"]}
-                    for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type", "status"):
+                    for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type"):
                         v = r.get(k)
                         if v not in (None, "", []):
                             # ponytail: also refresh rating/genres/type on touch so A launch miss gets fixed next cron (was only cover/origin)

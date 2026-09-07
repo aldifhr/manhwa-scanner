@@ -48,7 +48,7 @@ async def fetch_rss_data(
     if exclude_origin:
         excl_o = [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]
         for o in excl_o:
-            rc_q = rc_q.neq("origin", o)
+            rc_q = rc_q.neq("origin", o)  # ponytail: NULL origin not excluded — neq JP keeps NULL rows (post-filter via build_filter uses "" not in ["JP"] so shown); upgrade to `or(origin.neq.JP,origin.is.null)` if DB strips NULLs
     if type_f:
         rc_q = rc_q.eq("type", type_f.lower())
     if q:
@@ -69,7 +69,7 @@ async def fetch_rss_data(
                 _params.append(origin_f.upper())
             if exclude_origin:
                 for _o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
-                    _where.append("rc.origin != %s")
+                    _where.append("rc.origin != %s")  # ponytail: NULL origin not excluded — upgrade to `(rc.origin != %s OR rc.origin IS NULL)` if DB strips NULLs (build_filter uses "" so shown)
                     _params.append(_o)
             if type_f:
                 _where.append("rc.type = %s")

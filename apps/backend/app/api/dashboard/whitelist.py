@@ -31,7 +31,6 @@ class WhitelistCreate(BaseModel):
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
-    status: Optional[str] = Field(default=None, max_length=50)
     url: Optional[str] = Field(default=None, max_length=500)
     seriesUrl: Optional[str] = Field(default=None, max_length=500)
     series_url: Optional[str] = Field(default=None, max_length=500)
@@ -46,7 +45,6 @@ class WhitelistPatch(BaseModel):
     url: Optional[str] = Field(default=None, max_length=500)
     seriesUrl: Optional[str] = Field(default=None, max_length=500)
     series_url: Optional[str] = Field(default=None, max_length=500)
-    status: Optional[str] = Field(default=None, max_length=50)
     rating: Optional[float | str] = None
     cover: Optional[str] = Field(default=None, max_length=2000)
     origin: Optional[Literal["KR", "CN"]] = None
@@ -141,7 +139,7 @@ async def whitelist_post(request: Request):
     source = data.source
     # build body dict for service (include all validated fields, keep original keys for service compat)
     body_dict = body  # service reads many aliases, keep original but validated
-    # also ensure status/type are passed (previously silent drop)
+    # also ensure type is passed (previously silent drop)
     res = post_whitelist(title=title, url=url, source=source, body=body_dict)
     # Audit log disabled (audit.py removed 54a8ec5)
     # from app.services.audit import log_action, AuditAction
@@ -222,7 +220,7 @@ async def whitelist_patch(request: Request):
         return JSONResponse(content={"success": False, "error": "title_key required"}, status_code=400)
     source = data.source or ""
     # updatable now includes type (previously silent drop)
-    updatable = ("status", "rating", "cover", "origin", "genres", "description", "title", "series_url", "type")
+    updatable = ("rating", "cover", "origin", "genres", "description", "title", "series_url", "type")
     # map aliases to canonical keys
     alias_map = {"seriesUrl": "series_url", "titleKey": "title_key"}
     body_aliased = {}

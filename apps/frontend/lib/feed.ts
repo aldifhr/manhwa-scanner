@@ -9,7 +9,7 @@ export interface FlatChapter {
   chapter: string;
   chapterLabel: string;
   chapterNumber: number;
-  url: string;
+  url: string; // ponytail: alias for chapterUrl — prefer chapterUrl
   chapterUrl: string;
   source: string;
   cover: string;
