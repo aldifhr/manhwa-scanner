@@ -32,7 +32,7 @@ async def queue_status(request: Request):
         cron_jobs = r.lrange(CRON_QUEUE_KEY, 0, 4) or []
         dlq_jobs = r.lrange(DLQ_KEY, 0, 4) or []
         
-        # Parse job info
+        # Parse job info + breakdown
         import json
         def parse_jobs(raw_jobs):
             result = []
@@ -47,6 +47,22 @@ async def queue_status(request: Request):
                 except Exception:
                     result.append({"raw": j[:100]})
             return result
+        
+        # Breakdown cron jobs by action
+        cron_breakdown: dict[str, int] = {}
+        try:
+            all_cron = r.lrange(CRON_QUEUE_KEY, 0, -1) or []
+            for j in all_cron:
+                try:
+                    data = json.loads(j)
+                    action = data.get("action", "unknown")
+                    # Normalize: rss-fetch:ikiru → rss-fetch
+                    key = action.split(":")[0] if ":" in action else action
+                    cron_breakdown[key] = cron_breakdown.get(key, 0) + 1
+                except Exception:
+                    cron_breakdown["unknown"] = cron_breakdown.get("unknown", 0) + 1
+        except Exception:
+            pass
         
         # Pending dispatch chapters (whitelisted, unsent)
         pending_chapters = []
@@ -119,6 +135,7 @@ async def queue_status(request: Request):
                     "cron": parse_jobs(cron_jobs),
                     "dlq": parse_jobs(dlq_jobs),
                 },
+                "cron_breakdown": cron_breakdown,
                 "pending_chapters": pending_chapters,
             }
         })

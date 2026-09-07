@@ -143,6 +143,14 @@ export default function AdminDashboard() {
               <p className="text-xs text-text-muted">Queue depth</p>
               <p className="text-xl font-bold">{(queue as any)?.depth ?? 0}</p>
               <p className="text-[11px] text-white/40">
+                {(() => {
+                  const bd = (queue as any)?.cron_breakdown;
+                  if (!bd) return "";
+                  const parts = Object.entries(bd).map(([k, v]) => `${v} ${k}`);
+                  return parts.join(", ");
+                })()}
+              </p>
+              <p className="text-[11px] text-white/40">
                 DLQ {(queue as any)?.dlq ?? 0}
               </p>
             </div>
