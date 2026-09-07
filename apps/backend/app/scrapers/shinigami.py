@@ -170,12 +170,12 @@ def get_shinigami_series_meta(manga_id: str) -> dict | None:
     desc_clean = _re.sub(r"\s+", " ", desc_clean).strip()
     return {
         "cover": d.get("cover_image_url") or d.get("cover_portrait_url"),
-        "rating": normalize_rating(d.get("user_rate")),
+        "rating": normalize_rating(d.get("user_rate") if d.get("user_rate") is not None else d.get("rating")),
         "genres": genres,
         "description": desc_clean[:2000],
         "author": ", ".join(authors) if authors else None,
         "artist": ", ".join(artists) if artists else None,
-        
+        "status": status_map.get(d.get("status"), "unknown"),
         "type": _country_to_type(d.get("country_id")) or (formats or types or [""])[0].lower() if (formats or types) else None,
         "released": str(d.get("release_year") or ""),
         "origin": d.get("country_id"),
