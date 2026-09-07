@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     # NO arbitrary ports — explicit host:port pairs to prevent SSRF.
     PROXY_ALLOWED_HOSTS: list[str] = [
         "07.ikiru.wtf:443",
+        "08.ikiru.wtf:443",
         "ikiru.wtf:443",
         "g.shinigami.asia:443",
         "shinigami.asia:443",
