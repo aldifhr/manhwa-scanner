@@ -6,7 +6,8 @@ logger = logging.getLogger("tasks.retention")
 
 _DISPATCH_HISTORY_RETENTION_DAYS = 1
 _CRON_RUN_STATUS_RETENTION_DAYS = 7
-_FAILED_DISPATCHES_RETENTION_DAYS = 30
+_FAILED_DISPATCHES_RETENTION_DAYS = 7
+_RECENT_CHAPTERS_RETENTION_DAYS = 7
 _RETENTION_MAX_PER_SERIES = 500
 _SERIES_META_RETENTION_DAYS = 14  # ponytail: series_meta inactive 2 minggu auto-hapus
 
@@ -100,10 +101,15 @@ def _retention_loop(stop_event) -> None:
                     _last_whitelist_prune = _t2.time()
             except Exception as e:
                 logger.warn("retention: whitelist 30d cleanup failed", err=str(e)[:120])
-            logger.info("retention prune done",
-                        dispatch_history_days=_DISPATCH_HISTORY_RETENTION_DAYS,
-                        cron_run_status_days=_CRON_RUN_STATUS_RETENTION_DAYS,
-                        failed_dispatches_days=_FAILED_DISPATCHES_RETENTION_DAYS)
+            # recent_chapters: 7d retention
+            try:
+                _rc_cutoff = (datetime.now(timezone.utc) - timedelta(days=_RECENT_CHAPTERS_RETENTION_DAYS)).isoformat()
+                _pruned_rc = _sb.table("recent_chapters").delete().lt("updated_time", _rc_cutoff).execute()
+                _rc_count = len(_pruned_rc.data) if _pruned_rc.data else 0
+                if _rc_count:
+                    logger.info("retention: pruned recent_chapters", deleted=_rc_count, days=_RECENT_CHAPTERS_RETENTION_DAYS)
+            except Exception as e:
+                logger.warn("retention: recent_chapters cleanup failed", err=str(e)[:120])
         except Exception as e:
             logger.error("retention prune failed", exc=e)
         stop_event.wait(3600)  # hourly
