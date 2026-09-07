@@ -166,13 +166,21 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
     """
     if not rows:
         return {"status": "ok", "whitelist": []}
-    # ponytail: UUID title_key (voratoon) -> slug via title (e.g. bc135bac... + High Martial Arts... -> high-martial-arts...)
+    # ponytail: UUID title_key (voratoon) -> slug via title or series_url
     for _r in rows:
         _tk = str(_r.get("title_key") or "").strip()
         if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _tk, _re.I):
             _title = str(_r.get("title") or "").strip()
-            if _title:
-                _r["title_key"] = slugify_title_key(_title)
+            _nw = slugify_title_key(_title) if _title else ""
+            if _nw and not _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _nw, _re.I):
+                _r["title_key"] = _nw
+            else:
+                _su = str(_r.get("series_url") or _r.get("url") or "").strip()
+                if _su and "/series/" in _su:
+                    _slug2 = _su.rstrip("/").split("/")[-1].split("?")[0]
+                    _slug2 = slugify_title_key(_slug2)
+                    if _slug2 and not _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _slug2, _re.I):
+                        _r["title_key"] = _slug2
     try:
         models = [WhitelistRow.model_validate(r) for r in rows]
         payload = [m.to_db() for m in models]

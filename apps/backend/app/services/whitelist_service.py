@@ -201,6 +201,14 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
         _slug_from_title = slugify_title_key(title) if title else ""
         if _slug_from_title:
             title_key = _slug_from_title
+        # fallback: seriesUrl slug for voratoon (e.g. money-keeps-piling-up...)
+        if re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", title_key, re.I):
+            _su2 = (body.get("seriesUrl") or body.get("series_url") or url or "") if body else ""
+            if _su2 and "/series/" in _su2:
+                _slug2 = _su2.rstrip("/").split("/")[-1].split("?")[0]
+                _slug2 = slugify_title_key(_slug2)
+                if _slug2 and not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _slug2, re.I):
+                    title_key = _slug2
     # enforce canonical slug: normalize_title_key (alnum+space collapse) then dash
     title_key = slugify_title_key(title_key) if title_key else ""
 
