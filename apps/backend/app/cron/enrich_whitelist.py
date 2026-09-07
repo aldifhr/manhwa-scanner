@@ -162,7 +162,7 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
 
         meta = shinigami.get_shinigami_series_meta(mid)
         if meta:
-            for f in ("cover", "rating", "genres", "description", "status", "type"):
+            for f in ("cover", "rating", "genres", "description", "type"):
                 v = meta.get(f)
                 if v:
                     updates[f] = v
@@ -202,7 +202,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
 
     # Pull ALL fields used by the completeness check + the throttle timestamp.
     rows = sb.table("whitelist").select(
-        "title_key, source, series_url, genres, description, rating, status, cover, origin, type, metadata_enriched_at"
+        "title_key, source, series_url, genres, description, rating, cover, origin, type, metadata_enriched_at"
     ).execute().data or []
 
     from datetime import datetime, timedelta, timezone
@@ -249,7 +249,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
 
         all_present = (
             r.get("genres") and r.get("description") and r.get("rating")
-            and r.get("status") and r.get("cover") and r.get("origin")
+            and r.get("cover") and r.get("origin")
         )
         enriched_at = r.get("metadata_enriched_at")
         _ea_str = str(enriched_at) if enriched_at is not None else None

@@ -85,7 +85,6 @@ function AllTabInner() {
   const typeFilter = useUiStore((s) => s.typeFilter);
   const searchQuery = useUiStore((s) => s.searchQuery);
   const genreFilter = useUiStore((s) => s.genreFilter);
-  const statusFilter = useUiStore((s) => s.statusFilter);
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
   const setFeed = useUiStore((s) => s.setFeed);
@@ -210,11 +209,6 @@ function AllTabInner() {
           .map((g: string) => g.toLowerCase())
           .includes(genreFilter.toLowerCase())
       );
-    if (statusFilter)
-      f = f.filter(
-        (c) =>
-          String(c.status || "").toLowerCase() === statusFilter.toLowerCase()
-      );
     if (minRating) {
       const mr = parseFloat(minRating);
       if (!isNaN(mr))
@@ -235,7 +229,6 @@ function AllTabInner() {
     sourceFilter,
     typeFilter,
     genreFilter,
-    statusFilter,
     minRating,
     whitelistOnly,
     countryFilter,
@@ -450,7 +443,7 @@ function AllTabInner() {
           className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white min-h-0 min-w-0"
         >
           Filters{" "}
-          {genreFilter || statusFilter || minRating || whitelistOnly ? "•" : ""}
+          {genreFilter || minRating || whitelistOnly ? "•" : ""}
         </button>
       </div>
       <FilterDrawer open={filterOpen} onClose={() => setFilterOpen(false)} />

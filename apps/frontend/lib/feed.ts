@@ -16,7 +16,6 @@ export interface FlatChapter {
   origin: string;
   type?: string | null;
   seriesUrl: string;
-  status?: string | null;
   rating?: string | number | null;
   genres?: string[];
   isWhitelisted: boolean;

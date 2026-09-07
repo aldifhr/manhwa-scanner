@@ -103,24 +103,6 @@ export default function StatsCharts() {
 
       {/* Distributions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Status */}
-        <section className="rounded-xl bg-surface border border-border p-5 space-y-3">
-          <h2 className="text-sm font-semibold text-text">By Status</h2>
-          {d.byStatus.length === 0 ? (
-            <div className="text-xs text-text-muted">No data</div>
-          ) : (
-            d.byStatus.map((s) => (
-              <BarRow
-                key={s.label}
-                label={s.label}
-                count={s.count}
-                pct={s.percentage}
-                tone={s.label === "completed" ? "success" : s.label === "hiatus" ? "danger" : "accent"}
-              />
-            ))
-          )}
-        </section>
-
         {/* Source */}
         <section className="rounded-xl bg-surface border border-border p-5 space-y-3">
           <h2 className="text-sm font-semibold text-text">By Source</h2>

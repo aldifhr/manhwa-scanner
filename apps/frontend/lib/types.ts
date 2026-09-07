@@ -12,7 +12,6 @@ export interface WhitelistRouteItem {
   type?: string | null;
   description?: string | null;
   genres?: string[] | null;
-  status?: string | null;
   rating?: string | null;
   lastNotified?: string | null;
   createdAt?: string | null;
@@ -67,7 +66,6 @@ export interface DashboardChapter {
   cover: string;
   origin: string;
   type?: string | null;
-  status: string;
   rating: string;
   description: string;
   seriesUrl?: string;
@@ -83,7 +81,6 @@ export interface DashboardFeedItem {
   cover: string;
   origin: string;
   type?: string | null;
-  status: string;
   rating: string;
   description: string;
   isWhitelisted: boolean;
@@ -102,7 +99,6 @@ export interface DispatchHistoryItem {
   origin: string;
   type?: string | null;
   seriesUrl: string;
-  status: string | null;
   rating: string | null;
   genres: string[];
   description?: string | null;
@@ -151,7 +147,6 @@ export interface StatsData {
   total: number;
   rated: number;
   avgRating: number | null;
-  byStatus: { label: string; count: number; percentage: number }[];
   bySource: { label: string; count: number; percentage: number }[];
   ratingDistribution: { label: string; count: number; percentage: number }[];
   topRated: {
@@ -233,7 +228,6 @@ export interface AnalyticsSeriesDetail {
     cover: string;
     rating: number;
     genres: string[];
-    status: string;
     latest_sent_chapter: number;
     latest_chapter: number;
     created_at: string;
@@ -264,7 +258,6 @@ export interface RssCustomFeedItem {
   genres: string[];
   description: string;
   isWhitelisted: boolean;
-  whitelistStatus: string;
   latestSentChapter: number;
   dispatchCount: number;
   updatedTime: string;
@@ -284,5 +277,4 @@ export interface RssFilterMetadata {
   genres: string[];
   sources: string[];
   origins: string[];
-  statuses: string[];
 }

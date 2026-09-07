@@ -7,18 +7,16 @@ import { useUiStore } from "@/lib/uiStore";
 
 export default function FilterDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const genreFilter = useUiStore((s) => s.genreFilter);
-  const statusFilter = useUiStore((s) => s.statusFilter);
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
   const setGenreFilter = useUiStore((s) => s.setGenreFilter);
-  const setStatusFilter = useUiStore((s) => s.setStatusFilter);
   const setMinRating = useUiStore((s) => s.setMinRating);
   const setWhitelistOnly = useUiStore((s) => s.setWhitelistOnly);
   const resetFilters = useUiStore((s) => s.resetFilters);
 
   const { data: meta } = useQuery({
     queryKey: ["rss-filters-metadata"],
-    queryFn: () => Reader.getRssFilterMetadata() as Promise<{ genres: string[]; statuses: string[] }>,
+    queryFn: () => Reader.getRssFilterMetadata() as Promise<{ genres: string[] }>,
     staleTime: 300_000,
     enabled: open,
   });
@@ -26,7 +24,6 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
   if (!open) return null;
 
   const genres = (meta as { genres?: string[] })?.genres ?? ["Action", "Fantasy", "Romance", "Comedy", "Drama", "Adventure"];
-  const statuses = (meta as { statuses?: string[] })?.statuses ?? ["ongoing", "completed", "hiatus"];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -46,17 +43,6 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
               {genres.slice(0, 12).map((g) => (
                 <button key={g} onClick={() => setGenreFilter(genreFilter === g ? null : g)} className={filterButtonClass(genreFilter === g)}>
                   {g}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-semibold tracking-widest uppercase text-white/40 mb-2">Status</p>
-            <div className="flex flex-wrap gap-1.5">
-              <button onClick={() => setStatusFilter(null)} className={filterButtonClass(statusFilter === null)}>All</button>
-              {statuses.map((s) => (
-                <button key={s} onClick={() => setStatusFilter(statusFilter === s ? null : s)} className={filterButtonClass(statusFilter === s)}>
-                  <span className="capitalize">{s}</span>
                 </button>
               ))}
             </div>

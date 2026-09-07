@@ -161,7 +161,6 @@ def get_shinigami_series_meta(manga_id: str) -> dict | None:
     artists = [a.get("name") for a in (tax.get("Artist") or []) if a.get("name")]
     formats = [f.get("name") for f in (tax.get("Format") or []) if f.get("name")]
     types = [t.get("name") for t in (tax.get("Type") or []) if t.get("name")]
-    status_map = {1: "ongoing", 2: "completed", 3: "hiatus", 0: "unknown"}
     desc = (d.get("description") or "").strip()
     import re as _re
     import html as _html
@@ -175,7 +174,6 @@ def get_shinigami_series_meta(manga_id: str) -> dict | None:
         "description": desc_clean[:2000],
         "author": ", ".join(authors) if authors else None,
         "artist": ", ".join(artists) if artists else None,
-        "status": status_map.get(d.get("status"), "unknown"),
         "type": _country_to_type(d.get("country_id")) or (formats or types or [""])[0].lower() if (formats or types) else None,
         "released": str(d.get("release_year") or ""),
         "origin": d.get("country_id"),

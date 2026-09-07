@@ -25,7 +25,6 @@ async def fetch_rss_data(
     exclude_origin: str = "",
     type_f: str = "",
     genres_f: str = "",
-    status_f: str = "",
     min_rating: str = "",
     max_rating: str = "",
     subscribed_only: bool = False,
@@ -246,12 +245,6 @@ async def fetch_rss_data(
             wanted = {g.strip().lower() for g in genres_f.split(",") if g.strip()}
             if wanted:
                 results = [r for r in results if wanted & {str(g).lower() for g in (r.get("genres") or [])}]
-        except Exception:
-            pass
-    if status_f:
-        try:
-            sf = status_f.strip().lower()
-            results = [r for r in results if str(r.get("status") or r.get("whitelistStatus") or "").lower() == sf]
         except Exception:
             pass
     if min_rating:

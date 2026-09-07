@@ -15,7 +15,6 @@ interface UiState {
   typeFilter: string | null;
   searchQuery: string;
   genreFilter: string | null;
-  statusFilter: string | null;
   minRating: string | null;
   whitelistOnly: boolean;
   setFeed: (f: Feed) => void;
@@ -27,7 +26,6 @@ interface UiState {
   setTypeFilter: (t: string | null) => void;
   setSearchQuery: (q: string) => void;
   setGenreFilter: (g: string | null) => void;
-  setStatusFilter: (s: string | null) => void;
   setMinRating: (r: string | null) => void;
   setWhitelistOnly: (v: boolean) => void;
   resetFilters: () => void;
@@ -51,7 +49,6 @@ export const useUiStore = create<UiState>()(
       typeFilter: null,
       searchQuery: "",
       genreFilter: null,
-      statusFilter: null,
       minRating: null,
       whitelistOnly: false,
       setFeed: (feed) => set({ feed }),
@@ -63,7 +60,6 @@ export const useUiStore = create<UiState>()(
       setTypeFilter: (typeFilter) => set({ typeFilter }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setGenreFilter: (genreFilter) => set({ genreFilter }),
-      setStatusFilter: (statusFilter) => set({ statusFilter }),
       setMinRating: (minRating) => set({ minRating }),
       setWhitelistOnly: (whitelistOnly) => set({ whitelistOnly }),
       resetFilters: () =>
@@ -73,7 +69,6 @@ export const useUiStore = create<UiState>()(
           typeFilter: null,
           searchQuery: "",
           genreFilter: null,
-          statusFilter: null,
           minRating: null,
           whitelistOnly: false,
         }),
@@ -91,7 +86,6 @@ export const useUiStore = create<UiState>()(
         typeFilter: s.typeFilter,
         searchQuery: s.searchQuery,
         genreFilter: s.genreFilter,
-        statusFilter: s.statusFilter,
         minRating: s.minRating,
         whitelistOnly: s.whitelistOnly,
       }),

@@ -117,7 +117,6 @@ async def _rss_impl(request: Request):
     type_f = request.query_params.get("type", "")
     # Custom filters (merged from /rss/custom) — handled in Python post-filter for now
     genres_f = request.query_params.get("genres", "")
-    status_f = request.query_params.get("status", "")
     min_rating = request.query_params.get("min_rating", "")
     max_rating = request.query_params.get("max_rating", "")
     subscribed_only = request.query_params.get("subscribed_only", "false").lower() == "true"
@@ -152,7 +151,6 @@ async def _rss_impl(request: Request):
             exclude_origin=exclude_origin,
             type_f=type_f,
             genres_f=genres_f,
-            status_f=status_f,
             min_rating=min_rating,
             max_rating=max_rating,
             subscribed_only=subscribed_only,

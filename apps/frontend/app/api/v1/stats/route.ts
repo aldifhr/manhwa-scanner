@@ -225,7 +225,6 @@ export async function GET(request: Request) {
       total: raw.total,
       rated,
       avgRating,
-      byStatus: toPctArray(raw.statusDistribution, raw.total),
       bySource: toPctArray(raw.sourceDistribution, raw.total),
       ratingDistribution: toPctArray(
         raw.ratingBuckets?.buckets ?? {},

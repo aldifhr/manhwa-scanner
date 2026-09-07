@@ -65,7 +65,6 @@ export interface GroupedSeries {
   origin: string;
   type?: string | null;
   seriesUrl: string;
-  status?: string | null;
   rating?: string | number | null;
   genres?: string[];
   description?: string | null;
@@ -92,7 +91,6 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
         origin: it.origin,
         type: (it as unknown as { type?: string | null }).type ?? null,
         seriesUrl: it.seriesUrl,
-        status: it.status,
         rating: it.rating,
         genres: it.genres,
         description: it.description,
@@ -127,7 +125,6 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
     if ((!g!.rating || g!.rating === "") && it.rating) g!.rating = it.rating;
     if ((!g!.genres || g!.genres.length === 0) && it.genres?.length)
       g!.genres = it.genres;
-    if (g!.status == null && it.status) g!.status = it.status;
     // keep latest sentAt for label rendering
     if (
       it.sentAt &&
