@@ -165,6 +165,9 @@ export function ExcludeListClient() {
 
   const handleBulk = async () => {
     if (!bulkSource) return;
+    // ponytail: confirm bulk — pernah ke-klik tanpa sengaja +2000 row (exclude_all_by_source)
+    const ok = window.confirm(`Exclude ALL ${bulkSource} titles from recent (up to 2000)? This will hide them from RSS.`);
+    if (!ok) return;
     const before =
       queryClient.getQueryData<ExcludedTitleItem[]>(queryKeys.excludedTitles) ??
       items;
