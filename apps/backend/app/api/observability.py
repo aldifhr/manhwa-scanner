@@ -640,12 +640,7 @@ async def img(request: Request):
     """Canonical public image proxy — GET /img?url=... . Compat aliases: /reader/cover, /reader/cover-img, /reader/proxy."""
     from urllib.parse import unquote, urlparse
 
-    raw_query = request.url.query or ""
-    if raw_query.startswith("url="):
-        url = raw_query[4:]
-    else:
-        url = request.query_params.get("url", "")
-    url = (url or "").strip()
+    url = (request.query_params.get("url") or "").strip()
     if not url:
         return FastResponse(status_code=400)
     import re as _re
