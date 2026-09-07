@@ -56,7 +56,7 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
         _ceil = latest_sent.get((series_title, "ikiru"), latest_sent.get((normalize_title_key(series_title), "ikiru"), 0))
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
-        items.append({"title": series_title, "title_key": normalize_title_key(series_slug), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "ikiru", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "rating": _meta_rating, "genres": _meta_genres, "type": (u.get("type") or [""])[0].lower() if isinstance(u.get("type"), list) else (u.get("type") or "").lower()})
+        items.append({"title": series_title, "title_key": normalize_title_key(series_slug), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "ikiru", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "rating": _meta_rating, "genres": _meta_genres, "description": _meta.get("description", ""), "type": (u.get("type") or [""])[0].lower() if isinstance(u.get("type"), list) else (u.get("type") or "").lower()})
     return items
 
 

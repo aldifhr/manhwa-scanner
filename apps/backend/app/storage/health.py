@@ -86,34 +86,17 @@ def write_cron_status(status: str, chapters_sent: int = 0, matched: int = 0, dur
     try:
         from datetime import datetime, timezone
         import json as _json
-        # Always populate duration (default 0.0) so cron_run_status.duration
-        # is never NULL — previously 76% of rows had duration=None, which broke
-        # avgCronDuration and made the cron timeline show empty durations.
-        # ponytail: status column is json in 011, text in prod — send JSON-quoted string for json compat
-        _status_val: str | dict = _json.dumps(status) if status in ("ok", "error") else status
-        # try text first, fallback to JSON-quoted
-        try:
-            row = {
-                "status": status,
-                "chapters_sent": chapters_sent,
-                "matched": matched,
-                "duration": float(duration) if duration is not None else 0.0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            get_supabase().table("cron_run_status").insert(row).execute()
-            return
-        except Exception as _e1:
-            if "invalid input syntax for type json" not in str(_e1):
-                raise
-            row = {
-                "status": _status_val,
-                "chapters_sent": chapters_sent,
-                "matched": matched,
-                "duration": float(duration) if duration is not None else 0.0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            get_supabase().table("cron_run_status").insert(row).execute()
-            return
+        # status column is jsonb — send as dict so db_adapter serializes correctly
+        _status_val = {"status": status}
+        row = {
+            "status": _status_val,
+            "chapters_sent": chapters_sent,
+            "matched": matched,
+            "duration": float(duration) if duration is not None else 0.0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        get_supabase().table("cron_run_status").insert(row).execute()
+        return
     except Exception as e:
         logger.error("writeCronStatus failed", exc=e)
 

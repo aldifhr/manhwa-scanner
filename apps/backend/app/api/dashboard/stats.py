@@ -162,6 +162,7 @@ async def _build_snapshot() -> dict:
         dh_urls = [_norm_sh_url(u) or u for u in dh_urls]
         rc_by_url = {}
         wl_meta: dict[tuple[str, str], dict] = {}
+        sm_map: dict[tuple[str, str], dict] = {}
         if dh_urls:
             rc = (
                 _sb_client.table("recent_chapters")
@@ -172,18 +173,31 @@ async def _build_snapshot() -> dict:
             for r in (rc.data or []):
                 if r.get("chapter_url"):
                     rc_by_url[r["chapter_url"]] = r
-            # Enrich from whitelist (status/rating/description per (title_key, source))
+            # Enrich from whitelist (title_key, source only — static fields in series_meta)
             tks = [r.get("title_key") for r in (rc.data or []) if r.get("title_key")]
             if tks:
                 try:
                     wl_res = (
                         _sb_client.table("whitelist")
-                        .select("title_key, source, status, rating, description")
+                        .select("title_key, source")
                         .in_("title_key", tks)
                         .execute()
                     )
                     for m in (wl_res.data or []):
                         wl_meta[(m.get("title_key", ""), m.get("source", ""))] = m
+                except Exception:
+                    pass
+            # Get rating/description from series_meta
+            if tks:
+                try:
+                    sm_res = (
+                        _sb_client.table("series_meta")
+                        .select("title_key, source, rating, description")
+                        .in_("title_key", tks)
+                        .execute()
+                    )
+                    for m in (sm_res.data or []):
+                        sm_map[(m.get("title_key", ""), m.get("source", ""))] = m
                 except Exception:
                     pass
         for r in dh_recent:
@@ -231,7 +245,7 @@ async def _build_snapshot() -> dict:
         recent_feed = []
         try:
             rc_all = rc_24h  # reuse parallel-fetched 24h window
-            # Enrich from whitelist (status/rating/description per (title_key, source))
+            # Enrich from whitelist (title_key, source only — static fields in series_meta)
             feed_tks = [c.get("title_key") for c in rc_all if c.get("title_key")]
             wl_meta_feed: dict[tuple[str, str], dict] = {}
             meta_map_feed: dict[str, dict] = {}
@@ -239,7 +253,7 @@ async def _build_snapshot() -> dict:
                 try:
                     wl_res = (
                         _sb_client.table("whitelist")
-                        .select("title_key, source, status, rating, description")
+                        .select("title_key, source")
                         .in_("title_key", feed_tks)
                         .execute()
                     )
@@ -249,8 +263,8 @@ async def _build_snapshot() -> dict:
                     pass
                 try:
                     meta_res = (
-                        _sb_client.table("whitelist")
-                        .select("title_key, status, rating, description")
+                        _sb_client.table("series_meta")
+                        .select("title_key, source, rating, description")
                         .in_("title_key", feed_tks)
                         .execute()
                     )
@@ -277,8 +291,8 @@ async def _build_snapshot() -> dict:
             if series_slugs:
                 try:
                     meta_res = (
-                        _sb_client.table("whitelist")
-                        .select("title_key, status, rating, description")
+                        _sb_client.table("series_meta")
+                        .select("title_key, source, rating, description")
                         .in_("title_key", series_slugs)
                         .execute()
                     )

@@ -378,13 +378,20 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     existing_rows.extend(res.data or [])
                 except Exception as e:
                     logger.error("origin backfill lookup chunk failed", exc=e, exc_info=True)
-            # map url -> incoming origin (from deduped cleaned rows)
+            # Build lookup maps from cleaned rows
             incoming_origin: dict[str, str] = {}
+            incoming_title_key: dict[str, str] = {}
             for d in cleaned:
                 if d.get("origin"):
                     incoming_origin[d["chapter_url"]] = d["origin"]
+                if d.get("title_key"):
+                    incoming_title_key[d["chapter_url"]] = d["title_key"]
             updates = [
-                {"chapter_url": er["chapter_url"], "origin": incoming_origin[er["chapter_url"]]}
+                {
+                    "chapter_url": er["chapter_url"],
+                    "origin": incoming_origin[er["chapter_url"]],
+                    "title_key": incoming_title_key.get(er["chapter_url"]) or er.get("title_key") or "",
+                }
                 for er in existing_rows
                 if not er.get("origin") and er.get("chapter_url") in incoming_origin
             ]

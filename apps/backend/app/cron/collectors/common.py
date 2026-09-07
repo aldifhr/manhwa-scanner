@@ -9,7 +9,7 @@ from app.config import settings
 from app.logger import get_logger
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key
+from app.utils.text import normalize_title_key, slugify_title_key
 from app.utils.cover_scrub import scrub_cover
 
 logger = get_logger("cron:collect:common")
@@ -134,7 +134,8 @@ def _cached_series_meta(source: str, sid: str, tk: str | None = None) -> dict:
             c2 = cache.get(tk)
             if c2 and (now - c2[0]) < ttl:
                 return c2[1]
-    _key = tk if tk else normalize_title_key(str(sid))
+    # ponytail: slugify (dash) matches whitelist title_key format; normalize_title_key (space) would miss
+    _key = tk if tk else slugify_title_key(str(sid))
     try:
         from app.db import get_supabase as _gsb
         _existing = (

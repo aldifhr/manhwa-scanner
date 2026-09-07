@@ -120,9 +120,8 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
     total_pages = (total + page_size - 1) // page_size if page_size else 1
     has_more = page * page_size < total
 
-    rc_map, meta_desc, meta_cover, last_notified = _fetch_whitelist_enrichment(sb, rows, all_tks)
-
-    mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, last_notified) for r in rows]
+    rc_map, meta_desc, meta_cover, meta_rating, meta_genres, meta_type, meta_origin, last_notified = _fetch_whitelist_enrichment(sb, rows, all_tks)
+    mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, meta_rating, meta_genres, meta_type, meta_origin, last_notified) for r in rows]
 
     # ponytail: dedup inlined (was whitelist_dedup.py 57L single caller), extract to dedup.py when reused by second caller
 
@@ -234,7 +233,9 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
 
     # Enrich missing fields — non-blocking: insert immediately, enrich in background
     # so POST stays 0.02s instead of 0.5s (was 3 sync HTTP fetches to ikiru/voratoon/shinigami).
-    # whitelist minimal — also persist static to series_meta if provided
+    # Insert into whitelist FIRST (series_meta has FK → whitelist)
+    res = wl_store.add_whitelist_entries([entry])
+    # Now upsert static fields into series_meta (FK will be satisfied)
     if _series_meta_extra:
         try:
             from app.db import get_supabase as _sm_sb
@@ -242,7 +243,6 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
         except Exception:
             pass
     _needs_enrich = not _series_meta_extra.get("description") or not _series_meta_extra.get("cover") or not _series_meta_extra.get("genres")
-    res = wl_store.add_whitelist_entries([entry])
     if _needs_enrich:
         try:
             import threading
@@ -525,7 +525,7 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
     Called by post_whitelist when fields are missing. Fetches directly from
     source API so the whitelist response immediately has metadata.
     """
-    if not entry.get("description") or not entry.get("cover") or not entry.get("genres"):
+    if not entry.get("description") or not entry.get("cover") or not entry.get("genres") or not entry.get("rating") or not entry.get("origin"):
         try:
             _url_for_meta = entry.get("series_url") or url or ""
             if source == "shinigami" and _url_for_meta:
@@ -611,7 +611,7 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
     return entry
 
 
-def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cover: dict, last_notified: dict) -> dict:
+def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cover: dict, meta_rating: dict, meta_genres: dict, meta_type: dict, meta_origin: dict, last_notified: dict) -> dict:
     """Build a single whitelist response row with metadata joins.
 
     Shared by get_whitelist() to map storage rows to API response format.
@@ -689,10 +689,10 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
         "sources": [s] if s else [],
         "sourceUrls": {s: (_wl_series or "")} if s else {},
         
-        "rating": r.get("rating") or _rc_rating or None,
-        "type": r.get("type") or _rc_type or None,
-        "origin": r.get("origin") or _rc_origin or "",
-        "genres": r.get("genres") or _rc_genres or [],
+        "rating": r.get("rating") or _rc_rating or meta_rating.get(tk) or None,
+        "type": r.get("type") or _rc_type or meta_type.get(tk) or None,
+        "origin": r.get("origin") or _rc_origin or meta_origin.get(tk) or "",
+        "genres": r.get("genres") or _rc_genres or meta_genres.get(tk) or [],
         "description": desc or rc.get("description") or "",
         "seriesUrl": _wl_series,
         "url": _wl_series,
@@ -710,6 +710,10 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
     rc_map: dict = {}
     meta_desc: dict[str, str] = {}
     meta_cover: dict[str, str] = {}
+    meta_rating: dict[str, float] = {}
+    meta_genres: dict[str, list] = {}
+    meta_type: dict[str, str] = {}
+    meta_origin: dict[str, str] = {}
     last_notified: dict[str, str] = {}
 
     cand_keys: set[str] = set()
@@ -758,6 +762,18 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
             c = m.get("cover")
             if c:
                 meta_cover[m.get("title_key", "")] = c
+            rt = m.get("rating")
+            if rt is not None:
+                meta_rating[m.get("title_key", "")] = float(rt)
+            g = m.get("genres")
+            if g:
+                meta_genres[m.get("title_key", "")] = g
+            t = m.get("type")
+            if t:
+                meta_type[m.get("title_key", "")] = str(t)
+            o = m.get("origin")
+            if o:
+                meta_origin[m.get("title_key", "")] = str(o)
     except Exception:
         pass
     try:
@@ -769,7 +785,7 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
                 last_notified[tk] = ts
     except Exception:
         pass
-    return rc_map, meta_desc, meta_cover, last_notified
+    return rc_map, meta_desc, meta_cover, meta_rating, meta_genres, meta_type, meta_origin, last_notified
 
 def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:
     """Remove whitelist entries that were added >`days` ago AND have NEVER

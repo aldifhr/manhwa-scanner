@@ -252,10 +252,27 @@ export default function AdminDashboard() {
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold mb-2">Cron status</h3>
-          <pre className="text-xs bg-black/30 rounded-lg p-3 overflow-auto max-h-64 text-white/70">
-            {JSON.stringify(cron ?? {}, null, 2)}
-          </pre>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Pending chapters ({(queue as any)?.pending_chapters?.length ?? 0})</h3>
+            <button
+              onClick={() => readerFetch("/api/v1/queue/pending", { method: "DELETE" }).then(() => qc.invalidateQueries({ queryKey: ["admin-queue"] }))}
+              className="text-xs px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300"
+            >
+              Clear all
+            </button>
+          </div>
+          {!(queue as any)?.pending_chapters?.length ? (
+            <p className="text-xs text-white/40">No pending chapters</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {(queue as any).pending_chapters.map((c: any) => (
+                <div key={c.id} className="flex items-center gap-2 text-xs bg-black/20 rounded-lg p-2">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/60 uppercase">{c.source}</span>
+                  <span className="truncate flex-1">{c.title} — ch.{c.chapter}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-4">
