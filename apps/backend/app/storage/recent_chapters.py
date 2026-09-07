@@ -20,6 +20,17 @@ def prune_older_than(hours: int = 24) -> int:
     accumulates. Returns the number of deleted rows.
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    # ponytail: try DROP PARTITION (060) first (0.01s), fallback DELETE (0.5s) when not partitioned or <50k rows
+    try:
+        from app.db import q as _q
+        # 060 helper: tries DROP PARTITION, returns 0 if not partitioned
+        _dropped = _q("SELECT prune_recent_partition(%s::timestamptz)", [cutoff])
+        if _dropped and _dropped[0].get("prune_recent_partition", 0) > 0:
+            n = int(_dropped[0]["prune_recent_partition"])
+            logger.info("pruned recent_chapters via DROP PARTITION", hours=hours, dropped=n)
+            return n
+    except Exception:
+        pass
     try:
         sb = get_supabase()
         res = sb.table("recent_chapters").delete().lt("updated_time", cutoff).execute()
