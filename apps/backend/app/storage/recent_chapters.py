@@ -274,12 +274,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             # updated_time).
             CHUNK = 50
             inserted = 0
-            # ponytail: single ON CONFLICT chapter_url — idempotent upsert on PK url, covers both insert+update; no multi-constraint needed
+            # ponytail: DB now enforces rc_composite UNIQUE (title_key,source,chapter_num) WHERE chapter_num<>0 — Python dedup is best-effort, INSERT ON CONFLICT (title_key, source, chapter_num) DO NOTHING is the race guard; touch keeps ON CONFLICT chapter_url
             for i in range(0, len(new_rows), CHUNK):
                 chunk_rows = new_rows[i : i + CHUNK]
                 try:
                     get_supabase().table("recent_chapters").upsert(
-                        chunk_rows, on_conflict="chapter_url"
+                        chunk_rows, on_conflict="title_key,source,chapter_num"
                     ).execute()
                     inserted += len(chunk_rows)
                 except Exception as e:
@@ -289,7 +289,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                         exc=e,
                         exc_info=True,
                         range=f"{i}-{i+len(chunk_rows)}",
-                        constraint="chapter_url",
+                        constraint="title_key,source,chapter_num",
                         first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
                         first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
                     )

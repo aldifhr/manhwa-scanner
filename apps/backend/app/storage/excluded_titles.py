@@ -4,6 +4,13 @@ Mirror of whitelist.py but inverse: a title here is REMOVED from the /rss
 feed and SKIPPED by the cron collector so it is never scraped/dispatched.
 
 Keyed by composite (title_key, source); source='all' blocks every source.
+
+ponytail: cover/series_url here are bloat — canonical is series_meta.cover
+(title_key, source) (see 042_db_audit_fix.sql fix 6). JOIN series_meta at
+read time (rss_service sm>it>wl) instead of duplicating. Kept for
+back-compat list_excluded_titles fast path; idx_excluded_titles_source
+speeds the LIKE '%cvr.voratoon.id%X-Amz-%' scan which is always
+source-filtered (source='voratoon').
 """
 from __future__ import annotations
 

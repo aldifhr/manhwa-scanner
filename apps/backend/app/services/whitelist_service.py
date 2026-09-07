@@ -401,13 +401,27 @@ def patch_whitelist(title_key: str, source: str = "", updates: dict | None = Non
     if not updates:
         return {"success": True, "updated": 0, "note": "no fields to update"}
 
+    # ponytail: DB enforces chk_tk_slug (^[a-z0-9-]+$); normalize title_key in updates if present
+    if updates and "title_key" in updates and updates["title_key"]:
+        updates = dict(updates)
+        updates["title_key"] = slugify_title_key(str(updates["title_key"]))
+    # also normalize the lookup key itself (caller may pass spaced title)
+    title_key = slugify_title_key(title_key) if title_key else title_key
+
     sb = get_supabase()
-    q = sb.table("whitelist").update(updates).eq("title_key", title_key)
-    if source:
-        q = q.eq("source", source)
-    res = q.execute()
-    updated = len(res.data or []) if hasattr(res, "data") else 0
-    return {"success": True, "updated": updated, "title_key": title_key}
+    try:
+        q = sb.table("whitelist").update(updates).eq("title_key", title_key)
+        if source:
+            q = q.eq("source", source)
+        res = q.execute()
+        updated = len(res.data or []) if hasattr(res, "data") else 0
+        return {"success": True, "updated": updated, "title_key": title_key}
+    except Exception as e:
+        msg = str(e)
+        if "chk_tk_slug" in msg:
+            logger.warn("patch_whitelist: chk_tk_slug violation", err=msg[:300], title_key=title_key[:40])
+            return {"success": False, "updated": 0, "error": "title_key must be slug [a-z0-9-]", "detail": msg[:300]}
+        raise
 
 
 def normalize_whitelist_urls(dry_run: bool = False) -> dict:

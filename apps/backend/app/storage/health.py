@@ -108,37 +108,36 @@ def write_dashboard_snapshot(payload: dict) -> None:
     reads this 1 row (~20ms) instead of recomputing 5 parallel
     Supabase queries (~3s). Event-driven: only cron writes.
 
-    ponytail: Supabase primary, Redis fallback on pool closed.
+    ponytail: Redis primary (600s TTL), Supabase backup.
     """
     from datetime import datetime, timezone
 
     computed_at = datetime.now(timezone.utc).isoformat()
+    # --- Redis primary (1s timeout so missing redis doesn't stall tests/cron) ---
+    try:
+        import json
+
+        import redis
+
+        from app.config import settings
+
+        _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
+        _r.setex("dashboard_snapshot", 600, json.dumps({"payload": payload, "computed_at": computed_at}))
+    except Exception as re:
+        logger.error("write_dashboard_snapshot redis failed", exc=re)
+    # --- Supabase backup (best-effort) ---
     try:
         get_supabase().table("dashboard_snapshot").upsert(
             {"id": 1, "payload": payload, "computed_at": computed_at},
             on_conflict="id",
         ).execute()
     except Exception as e:
-        # Pool closed during deploy shutdown is expected — don't pollute error_logs
         msg = str(e).lower()
         is_pool_closed = "already closed" in msg or "pool closed" in msg or ("connection" in msg and "closed" in msg)
         if is_pool_closed:
-            try:
-                import json
-
-                import redis
-
-                from app.config import settings
-
-                # ponytail: direct redis with 1s timeout so missing redis doesn't stall tests/cron
-                _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
-                _r.setex("dashboard_snapshot", 600, json.dumps({"payload": payload, "computed_at": computed_at}))
-                logger.warn("write_dashboard_snapshot fallback to redis — pool closed", exc=e)
-            except Exception as re:
-                logger.error("write_dashboard_snapshot redis fallback failed", exc=re)
-                logger.debug("write_dashboard_snapshot skipped — pool closed", err=str(e)[:120])
+            logger.debug("write_dashboard_snapshot supabase skipped — pool closed", err=str(e)[:120])
         else:
-            logger.error("write_dashboard_snapshot failed", exc=e)
+            logger.error("write_dashboard_snapshot supabase backup failed", exc=e)
 
 
 def read_dashboard_snapshot() -> dict | None:
@@ -148,11 +147,50 @@ def read_dashboard_snapshot() -> dict | None:
     down or failed) and returns None so the caller falls back to live DB
     queries instead of serving outdated dashboard data.
 
-    ponytail: Supabase primary, Redis fallback if stale/error.
+    ponytail: Redis primary, Supabase backup.
     """
     from datetime import datetime, timezone
 
-    # --- Supabase primary ---
+    # --- Redis primary ---
+    try:
+        import json
+
+        import redis
+
+        from app.config import settings
+
+        _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
+        raw = _r.get("dashboard_snapshot")
+        if raw:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            computed = data.get("computed_at")
+            if computed:
+                try:
+                    ct = datetime.fromisoformat(computed.replace("Z", "+00:00"))
+                    if ct.tzinfo is None:
+                        ct = ct.replace(tzinfo=timezone.utc)
+                    age = (datetime.now(timezone.utc) - ct).total_seconds()
+                    if age > 300:
+                        logger.warn("dashboard_snapshot redis stale", age_seconds=int(age))
+                        raise ValueError(f"stale redis age={int(age)}s")
+                except ValueError:
+                    # stale -> fall through to supabase backup
+                    pass
+                except Exception:
+                    return data  # unparseable timestamp — return data anyway
+                else:
+                    return data
+            else:
+                return data
+        if raw is None:
+            raise ValueError("no redis snapshot")
+    except ValueError:
+        # stale/missing -> fallback to supabase (not an error)
+        pass
+    except Exception as e:
+        logger.error("read_dashboard_snapshot redis failed — trying supabase", exc=e)
+
+    # --- Supabase backup ---
     try:
         res = (
             get_supabase()
@@ -172,53 +210,15 @@ def read_dashboard_snapshot() -> dict | None:
                         ct = ct.replace(tzinfo=timezone.utc)
                     age = (datetime.now(timezone.utc) - ct).total_seconds()
                     if age > 300:  # 5-minute TTL
-                        logger.warn("dashboard_snapshot stale — trying redis", age_seconds=int(age))
-                        raise ValueError(f"stale age={int(age)}s")
-                except ValueError:
-                    # stale -> fall through to redis fallback
-                    pass
+                        logger.warn("dashboard_snapshot supabase stale", age_seconds=int(age))
+                        return None
                 except Exception:
                     return res.data  # unparseable timestamp — return data anyway
                 else:
                     return res.data
             else:
                 return res.data
-        # no data -> try redis
-        if res.data is None or not (res.data or {}).get("payload"):
-            raise ValueError("no supabase snapshot")
-    except ValueError:
-        # stale/missing -> fallback to redis (not an error)
-        pass
     except Exception as e:
-        logger.error("read_dashboard_snapshot supabase failed — trying redis", exc=e)
-
-    # --- Redis fallback ---
-    try:
-        import json
-
-        import redis
-
-        from app.config import settings
-
-        _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
-        raw = _r.get("dashboard_snapshot")
-        if raw:
-            data = json.loads(raw) if isinstance(raw, str) else raw
-            # validate staleness on redis copy too
-            computed = data.get("computed_at")
-            if computed:
-                try:
-                    ct = datetime.fromisoformat(computed.replace("Z", "+00:00"))
-                    if ct.tzinfo is None:
-                        ct = ct.replace(tzinfo=timezone.utc)
-                    age = (datetime.now(timezone.utc) - ct).total_seconds()
-                    if age > 300:
-                        logger.warn("dashboard_snapshot redis stale", age_seconds=int(age))
-                        return None
-                except Exception:
-                    pass
-            return data
-    except Exception as e:
-        logger.error("read_dashboard_snapshot redis fallback failed", exc=e)
+        logger.error("read_dashboard_snapshot supabase backup failed", exc=e)
     return None
 

@@ -3,6 +3,13 @@
 This module has been consolidated: heavy logic now lives in
 app/services/dispatch_service.py and app/services/shared.py. The symbols
 here remain exported for backward compatibility with existing call sites.
+
+DB audit fix 4: dispatch_history has UNIQUE (title_key, source,
+chapter_title) as dispatch_history_uq (042_db_audit_fix.sql) — race
+guard for concurrent runners (different URLs, same chapter). dispatch_claims
+is transient (FOR UPDATE SKIP LOCKED in app/services/claim.py); could be
+UNLOGGED/dropped, here kept as short-TTL queue only. Duplicate
+dispatch_history inserts (unique violation) are treated as already-sent.
 """
 from __future__ import annotations
 
@@ -332,6 +339,8 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 time.sleep(0.8)
 
     # Post-loop: flush dispatch_history + update whitelist markers
+    # ponytail: dispatch_history_uq (title_key, source, chapter_title) is the race guard;
+    # claim queue is FOR UPDATE SKIP LOCKED in app/services/claim.py — dispatch_claims is transient
     if _sent_urls and not dry_run:
         try:
             from app.storage import dispatch as _ds_flush
@@ -352,12 +361,21 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 if not _it:
                     continue
                 _norm = fcfs_key(_it.get("title", ""), _it.get("chapter", ""))
-                _ds_flush.complete_dispatch_claim(
-                    chapter_url=_u, duplicate_url=None, instance_id=instance_id,
-                    title_key=_it.get("title_key", ""), source=_it.get("source", ""),
-                    fcfs_key=_norm, chapter_title=_it.get("chapter", ""),
-                    cover=_cover_by_url.get(_u, ""), series_url=_it.get("series_url", "") or "",
-                )
+                try:
+                    _ds_flush.complete_dispatch_claim(
+                        chapter_url=_u, duplicate_url=None, instance_id=instance_id,
+                        title_key=_it.get("title_key", ""), source=_it.get("source", ""),
+                        fcfs_key=_norm, chapter_title=_it.get("chapter", ""),
+                        cover=_cover_by_url.get(_u, ""), series_url=_it.get("series_url", "") or "",
+                    )
+                except Exception as _e_dup:
+                    # ponytail: UNIQUE dispatch_history_uq race — another runner inserted same title+source+chapter
+                    _msg = str(_e_dup).lower()
+                    if "dispatch_history_uq" in _msg or "unique" in _msg or "duplicate" in _msg:
+                        logger.info("dispatch: history duplicate skip (race)", url=_u[:60], err=str(_e_dup)[:120])
+                        continue
+                    logger.warn("dispatch: complete_claim failed", url=_u[:60], err=str(_e_dup)[:160])
+                    continue
                 # Update whitelist marker so gap detector doesn't false-positive
                 try:
                     from app.services.dispatch_service import dispatch_service

@@ -1,4 +1,4 @@
-# ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type/origin); whitelist is minimal (title_key, source, series_url, latest_sent_chapter) — extra static columns here are legacy compat, rss_service prioritizes sm_map > it > wl, do not add new static writes here; series_meta_sync populates canonical via upsert.
+# ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type/origin); whitelist is minimal (title_key, source, series_url, latest_sent_chapter) — extra static columns here are legacy compat, rss_service prioritizes sm_map > it > wl, do not add new static writes here; series_meta_sync populates canonical via upsert. DB FK fk_series_whitelist (042_db_audit_fix.sql) enforces series_meta(title_key,source) -> whitelist(title_key,source) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED — single source, no orphan meta.
 """Whitelist storage (parity with lib/services/storage/whitelist.ts)."""
 from typing import Optional
 import re as _re
@@ -167,8 +167,14 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
         load_whitelist.invalidate()
         return {"status": "ok", "whitelist": payload}
     except Exception as e:
-        logger.error("add_whitelist_entries failed", exc=e)
-        return {"status": "error", "whitelist": []}
+        msg = str(e)
+        # ponytail: DB enforces chk_tk_slug (title_key ~ '^[a-z0-9-]+$'); WhitelistRow already slugifies via slugify_title_key (d89812b)
+        # but direct callers / stale payloads can still violate — surface clearly so caller can fix input instead of silent error.
+        if "chk_tk_slug" in msg:
+            logger.warn("add_whitelist_entries: chk_tk_slug violation, title_key must be slug [a-z0-9-]", err=msg[:300])
+        else:
+            logger.error("add_whitelist_entries failed", exc=e)
+        return {"status": "error", "whitelist": [], "error": msg[:300] if "chk_tk_slug" in msg else str(e)[:300]}
 
 
 def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:

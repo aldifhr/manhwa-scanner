@@ -286,6 +286,10 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
             logger.warn("enrich failed", title_key=tk, err=str(e)[:120])
 
     # --- refresh voratoon covers di excluded_titles & chapter_bookmarks (expire 6 hari, sama) ---
+    # ponytail: excluded_titles.cover is bloat — canonical is series_meta.cover;
+    # should JOIN series_meta instead of scanning cover. Minimal: keep LIKE but
+    # with source filter (eq source='voratoon') + idx_excluded_titles_source
+    # (042_db_audit_fix.sql fix 6) to speed scan; do not DROP column yet.
     try:
         # excluded_titles: whitelist-excluded tapi cover tetap presigned
         ex_rows = sb.table("excluded_titles").select("title_key, cover, source").eq("source", "voratoon").limit(100).execute().data or []
@@ -303,6 +307,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
                 except Exception:
                     pass
         # chapter_bookmarks: per-chapter bookmark cover juga presigned
+        # ponytail: minimal keep LIKE but source-filtered (source='voratoon')
         try:
             from app.db import q as _q2
             bm_rows = _q2("SELECT DISTINCT title_key, cover FROM chapter_bookmarks WHERE source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%' LIMIT 100", [])

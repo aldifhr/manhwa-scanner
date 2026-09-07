@@ -372,12 +372,17 @@ def complete_dispatch_claim(
                 except Exception as _e2:
                     logger.error("complete_dispatch_claim history failed (fallback)", exc=_e2, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
                     raise
+            elif "dispatch_history_uq" in str(_e) or ("duplicate" in str(_e).lower() and "dispatch_history" in str(_e).lower()):
+                # ponytail: DB audit fix 4 race — concurrent runner already inserted same (title_key, source, chapter_title)
+                logger.info("complete_dispatch_claim duplicate skip (dispatch_history_uq)", chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
             else:
                 logger.error("complete_dispatch_claim history failed", exc=_e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
                 raise
     except Exception as e:
-        # outer fallback already logged
-        if "ON CONFLICT" not in str(e):
+        # outer fallback already logged; dispatch_history_uq duplicate is not an error (already-sent)
+        if "dispatch_history_uq" in str(e) or ("duplicate" in str(e).lower() and "dispatch_history" in str(e).lower()):
+            pass
+        elif "ON CONFLICT" not in str(e):
             logger.error("complete_dispatch_claim history failed", exc=e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
     # Drop the claim so queue-depth reflects reality.
     try:
