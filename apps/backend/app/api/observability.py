@@ -43,9 +43,13 @@ async def health_status(request: Request):
     from app.db import get_supabase
     from app.storage import health as health_store
     datetime.now(timezone.utc)
-    hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
+    hm = health_store.load_source_health_map(settings.SOURCE_KEYS) or {}
+    # ponytail: ensure all SOURCE_KEYS appear even if DB row missing (voratoon was absent)
+    for _sk in settings.SOURCE_KEYS:
+        if _sk not in hm:
+            hm[_sk] = {"source": _sk, "status": "unknown", "consecutive_failures": 0, "last_error": "no data yet", "last_success_at": None, "last_checked_at": None, "response_time_ms": None}
     _api_ping = None
-    for r in (hm or {}).values():
+    for r in hm.values():
         rt = r.get("response_time_ms") or 0
         if rt and (_api_ping is None or rt < _api_ping):
             _api_ping = rt

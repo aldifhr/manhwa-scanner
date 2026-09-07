@@ -309,5 +309,8 @@ async def rss_health(request: Request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     from app.storage import health as health_store
     from app.config import settings as _settings
-    sources = health_store.load_source_health_map(_settings.SOURCE_KEYS)
+    sources = health_store.load_source_health_map(_settings.SOURCE_KEYS) or {}
+    for _sk in _settings.SOURCE_KEYS:
+        if _sk not in sources:
+            sources[_sk] = {"source": _sk, "status": "unknown", "consecutive_failures": 0}
     return JSONResponse(content={"success": True, "data": {"sources": sources}})
