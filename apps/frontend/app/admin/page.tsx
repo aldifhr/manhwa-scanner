@@ -89,6 +89,11 @@ export default function AdminDashboard() {
     },
     onError: (e) => setMsg((e as Error).message.slice(0, 120)),
   });
+  const resyncRatings = useMutation({
+    mutationFn: async () => readerFetch<{ success: boolean }>("/api/cron?action=enrich", { method: "POST" }),
+    onSuccess: () => { setMsg("Resync triggered"); setTimeout(() => setMsg(null), 3000); },
+    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
+  });
 
   const { data: failed } = useQuery({
     queryKey: ["admin-failed"],
@@ -173,6 +178,13 @@ export default function AdminDashboard() {
             className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
           >
             {refreshVor.isPending ? "..." : "Refresh Voratoon covers"}
+          </button>
+          <button
+            onClick={() => resyncRatings.mutate()}
+            disabled={resyncRatings.isPending}
+            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
+          >
+            {resyncRatings.isPending ? "..." : "Resync ratings"}
           </button>
           <Link
             href="/error-logs"

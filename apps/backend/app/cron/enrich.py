@@ -84,6 +84,12 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             return slug, None
         try:
             s = ikiru.get_ikiru_series(slug)
+            # ponytail: API list endpoint returns empty rating — fall back to
+            # get_ikiru_series_meta() which scrapes JSON-LD for aggregateRating
+            if not s or not s.get("rating"):
+                meta = ikiru.get_ikiru_series_meta(slug)
+                if meta:
+                    return slug, meta
         except Exception:
             s = None
         return slug, s

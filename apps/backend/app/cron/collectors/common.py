@@ -9,7 +9,6 @@ from app.config import settings
 from app.logger import get_logger
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key, slugify_title_key
 from app.utils.cover_scrub import scrub_cover
 
 logger = get_logger("cron:collect:common")
@@ -116,7 +115,7 @@ def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
         except Exception:
             pass
 
-def _cached_series_meta(source: str, sid: str, tk: str | None = None) -> dict:
+def _cached_series_meta(source: str, sid: str) -> dict:
     if source not in ("ikiru", "shinigami"):
         return {}
     cache, ttl, mx = (
@@ -129,13 +128,7 @@ def _cached_series_meta(source: str, sid: str, tk: str | None = None) -> dict:
         c = cache.get(sid)
         if c and (now - c[0]) < ttl:
             return c[1]
-        # also check tk alias
-        if tk:
-            c2 = cache.get(tk)
-            if c2 and (now - c2[0]) < ttl:
-                return c2[1]
-    # ponytail: slugify (dash) matches whitelist title_key format; normalize_title_key (space) would miss
-    _key = tk if tk else slugify_title_key(str(sid))
+    _key = sid
     try:
         from app.db import get_supabase as _gsb
         _existing = (
@@ -182,6 +175,8 @@ def _cached_series_meta(source: str, sid: str, tk: str | None = None) -> dict:
                 "updated_at": "now()",
             }
             _sb.table("series_meta").upsert(_row, on_conflict="title_key,source").execute()
+            # Invalidate memory cache so next read gets fresh data
+            cache.pop(sid, None)
         except Exception:
             pass
     with _CHAPTER_CACHE_LOCK:

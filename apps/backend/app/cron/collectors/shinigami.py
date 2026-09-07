@@ -18,7 +18,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
     origin = (m.get("country_id") or "").upper()
     _meta: dict = {}
     if fetch_meta:
-        _meta = _cached_series_meta("shinigami", manga_id, tk=normalize_title_key(title or ""))
+        _meta = _cached_series_meta("shinigami", manga_id)
     _meta_rating = normalize_rating(m.get("rating") or m.get("user_rate")) or normalize_rating(_meta.get("rating"))
     _meta_genres = (m.get("genre") or m.get("genres") or _meta.get("genres") or [])
     try:

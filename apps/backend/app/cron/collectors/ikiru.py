@@ -22,7 +22,7 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
         return items
     _meta: dict = {}
     if fetch_meta:
-        _meta = _cached_series_meta("ikiru", series_slug, tk=normalize_title_key(series_title))
+        _meta = _cached_series_meta("ikiru", series_slug)
     _meta_rating = normalize_rating(u.get("rating")) or normalize_rating(_meta.get("rating"))
     _meta_genres = u.get("genre") or _meta.get("genres") or []
     try:
