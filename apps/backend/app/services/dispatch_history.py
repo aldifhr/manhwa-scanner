@@ -117,7 +117,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             rc_map[rc_row["chapter_url"]] = rc_row
     wl = (
         sb.table("whitelist")
-        .select("title, title_key, status, rating, origin, genres, description")
+        .select("title, title_key")
         .in_("title_key", [r.get("title_key") or "" for r in rows if r.get("title_key")])
         .execute()
     )
