@@ -23,7 +23,7 @@ export default function AdminDashboard() {
     queryKey: ["admin-queue"],
     queryFn: async () => {
       const r = await readerFetch<{ success: boolean; data: any }>(
-        "/api/v1/queue"
+        "/api/v1/queue/status"
       );
       return r.data;
     },
