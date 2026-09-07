@@ -21,9 +21,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "voratoon.com" },
     ],
   },
-  async redirects() {
-    return [{ source: "/status", destination: "/admin", permanent: false }];
-  },
+
   async rewrites() {
     return [
       // Vercel → scanner proxy for API that lives on VPS (not on Vercel)

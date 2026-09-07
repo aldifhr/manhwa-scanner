@@ -2,14 +2,15 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
+import { useState } from "react";
+import Link from "next/link";
+
 async function getHealthDetailed() {
   const r = await readerFetch<{ success: boolean; data: unknown }>(
     "/api/v1/health/detailed"
   );
   return (r as unknown as { data: unknown }).data as unknown;
 }
-import { useState } from "react";
-import Link from "next/link";
 
 export default function AdminDashboard() {
   const qc = useQueryClient();
@@ -174,113 +175,11 @@ export default function AdminDashboard() {
             {refreshVor.isPending ? "..." : "Refresh Voratoon covers"}
           </button>
           <Link
-            href="/status"
-            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
-          >
-            Open /status
-          </Link>
-          <Link
             href="/error-logs"
             className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
           >
             Error logs →
           </Link>
-        </div>
-
-        <div className="grid gap-3">
-          <h2 className="text-sm font-semibold text-white/80">Sources</h2>
-          <div className="space-y-2">
-            {(health as any)?.sources?.map((s: any) => (
-              <div
-                key={s.name}
-                className="flex items-center justify-between gap-3 bg-surface border border-border rounded-lg p-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${s.status === "healthy" ? "bg-emerald-500" : s.status === "degraded" ? "bg-amber-400" : "bg-red-500"}`}
-                  />
-                  <span className="text-sm font-medium capitalize truncate">
-                    {s.name}
-                  </span>
-                  <span className="text-xs text-white/40 truncate hidden sm:inline">
-                    {s.lastError ?? ""}
-                  </span>
-                </div>
-                <span className="text-xs text-white/50">
-                  {s.errorRate24h?.toFixed?.(1) ?? 0}% err •{" "}
-                  {s.consecutiveFailures ?? 0} fail
-                </span>
-              </div>
-            )) ?? <p className="text-sm text-white/40">No sources</p>}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white/80">Latest errors (5)</h2>
-            <button onClick={() => clearErrors.mutate()} disabled={clearErrors.isPending} className="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50">{clearErrors.isPending ? "..." : "Clear"}</button>
-          </div>
-          {!errors || errors.length === 0 ? (
-            <p className="text-sm text-white/40 border border-dashed border-white/10 rounded-lg p-4 text-center">
-              Clean
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {errors.map((l: any) => (
-                <div
-                  key={l.id}
-                  className="bg-surface border border-border rounded-lg p-3"
-                >
-                  <div className="flex gap-2 text-xs">
-                    <span
-                      className={`px-2 py-0.5 rounded font-bold ${l.level === "error" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"}`}
-                    >
-                      {l.level}
-                    </span>
-                    <span className="text-white/50 truncate">{l.source}</span>
-                    <span className="ml-auto text-white/30 text-[11px]">
-                      {new Date(l.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-white/80 mt-1 line-clamp-2 break-words">
-                    {l.message}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-surface border border-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Pending chapters ({(queue as any)?.pending_chapters?.length ?? 0})</h3>
-            <button
-              onClick={() => readerFetch("/api/v1/queue/pending", { method: "DELETE" }).then(() => qc.invalidateQueries({ queryKey: ["admin-queue"] }))}
-              className="text-xs px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300"
-            >
-              Clear all
-            </button>
-          </div>
-          {!(queue as any)?.pending_chapters?.length ? (
-            <p className="text-xs text-white/40">No pending chapters</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-auto">
-              {(queue as any).pending_chapters.map((c: any) => (
-                <div key={c.id} className="flex items-center gap-2 text-xs bg-black/20 rounded-lg p-2">
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/60 uppercase">{c.source}</span>
-                  <span className="truncate flex-1">{c.title} — ch.{c.chapter}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-surface border border-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Failed dispatches {(failed as any)?.total ? `(${(failed as any).total})` : ""}</h3>
-            <button onClick={() => retryAll.mutate()} disabled={retryAll.isPending || !(failed as any)?.results?.length} className="text-xs px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50">{retryAll.isPending ? "..." : "Retry all"}</button>
-          </div>
-          {!(failed as any)?.results?.length ? <p className="text-xs text-white/40">No failures</p> : <div className="space-y-2">{(failed as any).results.map((r: any) => <div key={r.id} className="flex items-center gap-2 text-xs bg-black/20 rounded-lg p-2"><span className="truncate flex-1">{r.title} — {r.chapter}</span><span className="text-white/40 hidden sm:inline truncate max-w-[160px]">{r.error?.slice(0, 80)}</span><button onClick={() => retryOne.mutate(r.id)} disabled={retryOne.isPending} className="shrink-0 px-2 py-1 rounded bg-white/10 hover:bg-white/15 border border-white/10">Retry</button></div>)}</div>}
         </div>
       </div>
     </PageShell>
