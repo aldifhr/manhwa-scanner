@@ -60,16 +60,10 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         (lambda m: float(m.group(1)) if m else float("inf"))(_re.search(r"(\d+(?:\.\d+)?)", str(it.get("chapter") or "")))
     ))
 
-    # ponytail: dedupe same title_key across sources (shinigami+voratoon), keep latest chapter
-    _deduped: dict[str, dict] = {}
-    for it in to_send:
-        _tk = it.get("title_key") or ""
-        _ch = (lambda m: float(m.group(1)) if m else 0.0)(_re.search(r"(\d+(?:\.\d+)?)", str(it.get("chapter") or "")))
-        if _tk not in _deduped or _ch > (lambda m: float(m.group(1)) if m else 0.0)(_re.search(r"(\d+(?:\.\d+)?)", str(_deduped[_tk].get("chapter") or ""))):
-            _deduped[_tk] = it
-    to_send = list(_deduped.values())
-    if len(to_send) < len(items):
-        logger.info("dispatch: deduped cross-source duplicates", removed=len(items) - len(to_send))
+    # NOTE: No cross-source dedup here — FCFS dedup against dispatch_history
+    # handles duplicates. Cross-source dedup (keeping only latest chapter per
+    # title_key) is wrong: when ch.9-25 are already dispatched, dedup keeps
+    # ch.25, FCFS filters it, and ch.7-8 never get sent.
 
     # Backfill HTML-backlog items silently
     if to_backfill:

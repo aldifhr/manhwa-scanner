@@ -12,7 +12,7 @@ export async function readerFetch<T>(
   const csrfInit = init
     ? (withCsrf(init as RequestInit) as RequestInit)
     : undefined;
-  const res = await fetchImpl(path, csrfInit as RequestInit);
+  const res = await fetchImpl(path, { ...(csrfInit as RequestInit), credentials: "include" });
   if (res.status === 204) return { success: true, data: { results: [] } } as T;
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
