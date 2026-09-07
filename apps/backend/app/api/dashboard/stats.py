@@ -470,6 +470,23 @@ async def _build_snapshot() -> dict:
         }
         for src, h in (hm or {}).items()
     ]
+    # Per-source breakdown (24h)
+    chapters_by_source_24h: dict[str, int] = {}
+    try:
+        _src_rows = (
+            _sb_client.table("recent_chapters")
+            .select("source")
+            .gte("updated_time", (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat())
+            .execute()
+            .data
+            or []
+        )
+        for r in _src_rows:
+            src = str(r.get("source") or "unknown")
+            chapters_by_source_24h[src] = chapters_by_source_24h.get(src, 0) + 1
+    except Exception:
+        pass
+
     payload = {
         "success": True,
         "data": {
@@ -482,6 +499,7 @@ async def _build_snapshot() -> dict:
             "queueLength": overview["queueLength"],
             "cronStatus": cron_status_data,
             "lastDelivery": last_delivery,
+            "chaptersBySource24h": chapters_by_source_24h,
         },
     }
     _SNAP_CACHE[0] = time.monotonic()

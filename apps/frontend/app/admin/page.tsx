@@ -205,6 +205,34 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Chapters by Source (24h)</h3>
+          {(() => {
+            const srcData = (snapshot as any)?.chaptersBySource24h;
+            if (!srcData || Object.keys(srcData).length === 0) {
+              return <p className="text-xs text-white/40">No data</p>;
+            }
+            const counts = Object.values(srcData) as number[];
+            const maxVal = Math.max(...counts);
+            return (
+              <div className="space-y-2">
+                {Object.entries(srcData).map(([src, count]) => (
+                  <div key={src} className="flex items-center gap-2">
+                    <span className="text-xs text-white/60 w-20 capitalize">{src}</span>
+                    <div className="flex-1 h-5 bg-black/30 rounded overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500/60 rounded"
+                        style={{ width: `${((count as number) / maxVal) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-white/50 w-8 text-right">{count as number}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
         <div className="grid gap-3">
           <h2 className="text-sm font-semibold text-white/80">Sources</h2>
           <div className="space-y-2">

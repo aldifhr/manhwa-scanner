@@ -58,10 +58,17 @@ def _stats() -> dict:
         except Exception:
             out["sources"] = {}
             out["sources_active"] = 0
+        # per-source breakdown
+        cur.execute(
+            """SELECT source, COUNT(*) AS c FROM recent_chapters 
+               WHERE updated_time >= now() - interval '24 hours' 
+               GROUP BY 1 ORDER BY 2 DESC"""
+        )
+        out["chapters_by_source_24h"] = {r["source"]: r["c"] for r in cur.fetchall()}
         # per-origin breakdown
         cur.execute(
             """SELECT COALESCE(NULLIF(origin,''),'other') AS o, COUNT(*) AS c
-                   FROM whitelist GROUP BY 1 ORDER BY 2 DESC"""
+               FROM whitelist GROUP BY 1 ORDER BY 2 DESC"""
         )
         out["by_origin"] = {r["o"]: r["c"] for r in cur.fetchall()}
         return out
