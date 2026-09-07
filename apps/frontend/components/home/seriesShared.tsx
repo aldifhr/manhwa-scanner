@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { cn, safeUrl } from "@/lib/utils";
 import { decodeHtml } from "@/lib/utils";
 import { Check, Eye, EyeSlash, CheckCircle, Plus } from "@phosphor-icons/react";
@@ -357,70 +358,93 @@ export function ChapterChips({
       </div>
     );
   }
+  // ponytail: collapse 44 pills -> neat grid, dedup source label, show 12 by default
+  const [expanded, setExpanded] = useState(false);
+  const allSameSource = chapters.length > 0 && chapters.every((c) => c.source === chapters[0].source);
+  const visible = expanded ? chapters : chapters.slice(0, 12);
+  const hiddenCount = chapters.length - visible.length;
   return (
-    <div className="flex gap-1.5 flex-wrap mt-1.5">
-      {chapters.map((ch) => {
-        const label = getChapterLabel(ch);
-        if (label === "?") return null;
-        const chHref = safeUrl(ch.chapterUrl || ch.url) || "#";
-        const src = ch.source?.toLowerCase();
-        const isRead = !!(
-          readUrls &&
-          (readUrls.has(ch.url) ||
-            readUrls.has(ch.chapterUrl) ||
-            readUrls.has(chHref))
-        );
-        const chipColor =
-          src === "shinigami"
-            ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-            : src === "ikiru"
-              ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
-              : src === "voratoon"
-                ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
-                : "bg-white/10 text-white/80 hover:bg-white/20 border-[var(--gold-border)]";
-        return (
-          <span key={ch.key} className="inline-flex items-center gap-1">
-            <a
-              href={chHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                trackChapter({
-                  title: seriesTitle,
-                  titleKey: seriesTitleKey,
-                  cover: seriesCover,
-                  source: ch.source,
-                  chapter: ch.chapter,
-                  chapterLabel: ch.chapterLabel,
-                  chapterNumber: ch.chapterNumber,
-                  chapterUrl: chHref !== "#" ? chHref : ch.chapterUrl || ch.url,
-                  seriesUrl,
-                  origin,
-                })
-              }
-              title={`${ch.source} · Ch. ${label}${ch.sentAt ? ` · ${new Date(ch.sentAt).toLocaleDateString()}` : ""}`}
-              className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors whitespace-nowrap ${chipColor} ${isRead ? "opacity-50" : ""}`}
-            >
-              <span className="capitalize">{ch.source}</span> Ch. {label}{" "}
-              {isRead ? "✓" : ""}
-            </a>
-            {onToggleRead && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleRead(
-                    chHref !== "#" ? chHref : ch.chapterUrl || ch.url
-                  );
-                }}
-                title={isRead ? "Mark unread" : "Mark read"}
-                className={`inline-flex items-center justify-center w-6 h-6 rounded-full border text-[10px] ${isRead ? "bg-white/10 border-white/20 text-white/60 hover:bg-white/15" : "bg-white/5 border-[var(--gold-border)] text-white/40 hover:text-white hover:bg-white/10"}`}
+    <div className="mt-1.5 space-y-1.5">
+      <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+        {visible.map((ch) => {
+          const label = getChapterLabel(ch);
+          if (label === "?") return null;
+          const chHref = safeUrl(ch.chapterUrl || ch.url) || "#";
+          const src = ch.source?.toLowerCase();
+          const isRead = !!(
+            readUrls &&
+            (readUrls.has(ch.url) ||
+              readUrls.has(ch.chapterUrl) ||
+              readUrls.has(chHref))
+          );
+          const chipColor =
+            src === "shinigami"
+              ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
+              : src === "ikiru"
+                ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
+                : src === "voratoon"
+                  ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
+                  : "bg-white/10 text-white/80 hover:bg-white/20 border-[var(--gold-border)]";
+          return (
+            <span key={ch.key} className="inline-flex items-center gap-1 min-w-0">
+              <a
+                href={chHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() =>
+                  trackChapter({
+                    title: seriesTitle,
+                    titleKey: seriesTitleKey,
+                    cover: seriesCover,
+                    source: ch.source,
+                    chapter: ch.chapter,
+                    chapterLabel: ch.chapterLabel,
+                    chapterNumber: ch.chapterNumber,
+                    chapterUrl: chHref !== "#" ? chHref : ch.chapterUrl || ch.url,
+                    seriesUrl,
+                    origin,
+                  })
+                }
+                title={`${ch.source} · Ch. ${label}${ch.sentAt ? ` · ${new Date(ch.sentAt).toLocaleDateString()}` : ""}`}
+                className={`flex-1 inline-flex items-center justify-center gap-1 text-[11px] font-semibold px-2 py-1.5 rounded-full border transition-colors whitespace-nowrap min-w-0 truncate ${chipColor} ${isRead ? "opacity-40 line-through" : ""}`}
               >
-                {isRead ? <EyeSlash size={12} /> : <Eye size={12} />}
-              </button>
-            )}
-          </span>
-        );
-      })}
+                {allSameSource ? `Ch. ${label}` : <><span className="capitalize hidden sm:inline">{ch.source}</span> {label}</>}
+                {isRead ? " ✓" : ""}
+              </a>
+              {onToggleRead && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleRead(
+                      chHref !== "#" ? chHref : ch.chapterUrl || ch.url
+                    );
+                  }}
+                  title={isRead ? "Mark unread" : "Mark read"}
+                  className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full border text-[10px] ${isRead ? "bg-white/10 border-white/20 text-white/60 hover:bg-white/15" : "bg-white/5 border-[var(--gold-border)] text-white/40 hover:text-white hover:bg-white/10"}`}
+                >
+                  {isRead ? <EyeSlash size={12} /> : <Eye size={12} />}
+                </button>
+              )}
+            </span>
+          );
+        })}
+      </div>
+      {hiddenCount > 0 && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          +{hiddenCount} more
+        </button>
+      )}
+      {expanded && chapters.length > 12 && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          Show less
+        </button>
+      )}
     </div>
   );
 }
