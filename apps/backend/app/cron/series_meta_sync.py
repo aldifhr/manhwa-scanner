@@ -177,6 +177,13 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
                     failed += 1
             updated = updated - failed if updated else 0
 
+    # ponytail: refresh MATERIALIZED VIEW CONCURRENTLY if materialized — no-op if still plain VIEW; CONCURRENTLY needs UNIQUE INDEX on (title_key, source)
+    try:
+        from app.db import q as _q
+        _q("REFRESH MATERIALIZED VIEW CONCURRENTLY v_series")
+    except Exception as e:
+        logger.warn("v_series refresh skipped/failed (view may not be materialized yet)", err=str(e)[:160])
+
     duration = round(time.time() - start, 1)
     stats = {
         "ok": True,

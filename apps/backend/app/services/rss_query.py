@@ -189,18 +189,10 @@ def map_result(
                 _genres_seen.add(_gl)
                 _genres.append(g.strip())
 
-    def _to_num(v):
-        if v is None or v == "":
-            return None
-        try:
-            return float(v)
-        except (ValueError, TypeError):
-            return None
+    from app.services.rating_utils import normalize_rating as _nr  # 1-10 contract
 
     # ponytail: canonical sm > it > wl — sm is single source, wl/it only legacy fallback; add DB view if richer joins needed
-    _rating = _to_num(sm.get("rating")) if sm.get("rating") not in (None, "") else (
-        _to_num(it.get("rating")) if it.get("rating") is not None else _to_num(wl.get("rating"))
-    )
+    _rating = _nr(sm.get("rating")) if sm.get("rating") not in (None, "") else (_nr(it.get("rating")) if it.get("rating") not in (None, "") else _nr(wl.get("rating")))
     _type = normalize_type(sm.get("type") or it.get("type") or wl.get("type") or None)
     _raw_origin = it.get("origin") or wl.get("origin") or sm.get("origin") or ""
     origin = normalize_origin(_raw_origin)

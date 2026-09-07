@@ -25,7 +25,7 @@ export function isDirectAllowed(hostname: string): boolean {
   return DIRECT_HOSTS.has(hostname);
 }
 export function toProxy(url: string): string {
-  return `/api/v1/reader/proxy?url=${encodeURIComponent(url)}`;
+  return `/api/img?url=${encodeURIComponent(url)}`;
 }
 
 // Extract inner URL from any cover-img form: /cover-img?url=… or ?series=…
@@ -112,18 +112,23 @@ export function resolveCoverUrl(
 
   // 4. Proxy prefix: normalize double-encode, direct hosts bypass proxy
   // ponytail: already proxied -> don't double-wrap, just normalize single encode
-  const PROXY_PREFIX = "/api/v1/reader/proxy?url=";
-  if (cover.startsWith(PROXY_PREFIX)) {
-    const inner = decodeURIComponent(cover.slice(PROXY_PREFIX.length));
-    let raw = inner;
-    try {
-      if (/%[0-9A-Fa-f]{2}/.test(inner) && !inner.startsWith("http"))
-        raw = decodeURIComponent(inner);
-    } catch {}
-    try {
-      if (isDirectAllowed(new URL(raw).hostname)) return putCover(cover, raw);
-    } catch {}
-    return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
+  // canonical seam is /api/img?url= (BE @router.get("/img") -> /api/img); keep /api/v1/reader/proxy?url= compat
+  const PROXY_PREFIX = "/api/img?url=";
+  const LEGACY_PROXY_PREFIX = "/api/v1/reader/proxy?url=";
+  const LEGACY_V1_IMG_PREFIX = "/api/v1/img?url=";
+  for (const prefix of [PROXY_PREFIX, LEGACY_PROXY_PREFIX, LEGACY_V1_IMG_PREFIX]) {
+    if (cover.startsWith(prefix)) {
+      const inner = decodeURIComponent(cover.slice(prefix.length));
+      let raw = inner;
+      try {
+        if (/%[0-9A-Fa-f]{2}/.test(inner) && !inner.startsWith("http"))
+          raw = decodeURIComponent(inner);
+      } catch {}
+      try {
+        if (isDirectAllowed(new URL(raw).hostname)) return putCover(cover, raw);
+      } catch {}
+      return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
+    }
   }
 
   if (!/^https?:\/\//.test(cover)) return putCover(cover, null);
