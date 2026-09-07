@@ -273,12 +273,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             # updated_time).
             CHUNK = 50
             inserted = 0
-            # ponytail: DB now enforces rc_composite UNIQUE (title_key,source,chapter_num) WHERE chapter_num<>0 — Python dedup is best-effort, INSERT ON CONFLICT (title_key, source, chapter_num) DO NOTHING is the race guard; touch keeps ON CONFLICT chapter_url
+            # ponytail: ON CONFLICT chapter_url (stable unique), rc_composite is race guard via 057 ensure, not CONFLICT target until backfill stable
             for i in range(0, len(new_rows), CHUNK):
                 chunk_rows = new_rows[i : i + CHUNK]
                 try:
                     get_supabase().table("recent_chapters").upsert(
-                        chunk_rows, on_conflict="title_key,source,chapter_num"
+                        chunk_rows, on_conflict="chapter_url"
                     ).execute()
                     inserted += len(chunk_rows)
                 except Exception as e:
