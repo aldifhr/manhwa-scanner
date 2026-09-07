@@ -1,5 +1,6 @@
 """Whitelist storage (parity with lib/services/storage/whitelist.ts)."""
 from typing import Optional
+import re as _re
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -10,8 +11,11 @@ from app.utils.cache import ttl_cache
 
 logger = get_logger("storage:whitelist")
 
-# Canonical sources (keep in sync with settings.SOURCE_KEYS).
-_VALID_SOURCES = ("ikiru", "shinigami", "voratoon")
+from app.config import VALID_SOURCES, VALID_SOURCES_WITH_ALL
+
+# Use config constants — add a source? One file change in config.py
+_VALID_SOURCES = VALID_SOURCES
+_VALID_SOURCES_WITH_ALL = VALID_SOURCES_WITH_ALL
 
 
 class WhitelistRow(BaseModel):
@@ -58,7 +62,6 @@ class WhitelistRow(BaseModel):
         # ikiru/voratoon use slug (normalized title). Don't blindly reject UUID here;
         # source-aware check is done in model_validator. Keep raw for shinigami, normalize for others.
         # For now return raw lowercased for UUID pattern, normalized for slug.
-        import re as _re
         if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", raw, _re.I):
             return raw.lower()
         if _re.match(r"^[0-9a-f]{8} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{12}$", raw, _re.I):
@@ -125,7 +128,15 @@ def load_whitelist(force: bool = False) -> list[dict]:
             .limit(5000)
             .execute()
         )
-        return [_norm_row(r) for r in (res.data or [])]
+        rows = res.data or []
+        out = []
+        for r in rows:
+            try:
+                out.append(_norm_row(r))
+            except Exception as e:
+                logger.warn("load_whitelist: _norm_row failed, using raw row", err=str(e)[:120])
+                out.append(r)
+        return out
     except Exception as e:
         logger.error("Failed to load whitelist", exc=e)
         return []

@@ -67,7 +67,8 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
             return keys
         except Exception as e:
             logger.error("load_excluded_keys failed", exc=e)
-            return _CACHE or set()
+            # First call + DB error → empty set (don't mask outage with stale data)
+            return _CACHE if _CACHE is not None else set()
 
 
 def is_excluded(title_key: str, source: str) -> bool:
@@ -240,11 +241,16 @@ def exclude_all_by_source(source: str) -> dict:
                 payload["series_url"] = v["series_url"]
             batch.append(payload)
         
+        total_inserted = 0
         if batch:
+            CHUNK = 50
             try:
-                get_supabase().table("excluded_titles").upsert(
-                    batch, on_conflict="title_key,source"
-                ).execute()
+                for i in range(0, len(batch), CHUNK):
+                    chunk = batch[i:i + CHUNK]
+                    get_supabase().table("excluded_titles").upsert(
+                        chunk, on_conflict="title_key,source"
+                    ).execute()
+                    total_inserted += len(chunk)
                 global _CACHE_TS
                 _CACHE_TS = 0.0
                 try:
@@ -256,7 +262,7 @@ def exclude_all_by_source(source: str) -> dict:
                 logger.error("exclude_all_by_source batch upsert failed", exc=e)
                 return {"status": "error", "error": "internal error"}
         
-        return {"status": "ok", "excluded": len(batch), "source": src}
+        return {"status": "ok", "excluded": total_inserted, "source": src}
     except Exception as e:
         logger.error("exclude_all_by_source failed", exc=e)
         return {"status": "error", "error": "internal error"}

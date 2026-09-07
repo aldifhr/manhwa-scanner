@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.logger import get_logger
 from app.utils.request_auth import require_cron_auth, require_monitor_auth
+from app.config import CRON_ACTIONS
 
 logger = get_logger("api:system")
 router = APIRouter()
@@ -16,12 +17,14 @@ router = APIRouter()
 import collections
 _cron_locks: dict[str, threading.Lock] = collections.defaultdict(threading.Lock)  # type: ignore[assignment]
 # preload known actions so introspection still works
-for _k in ("update","rss-fetch","dispatch","health","rss-fetch:ikiru","rss-fetch:shinigami","rss-fetch:voratoon","enrich","enrich-missing","enrich-refresh","voratoon-cover"):
+for _k in CRON_ACTIONS:
     _cron_locks[_k]  # touch
+import hashlib as _hl
+
 _cron_running = False
-# ponytail: hash() replaces sha256 (per-process seed, collision risk) — restore sha256 when cross-process advisory collisions cause duplicate cron runs
 def _advisory_key(action: str) -> int:
-    return hash(action) & 0x7FFFFFFF
+    # Deterministic across processes (hash() is per-process seeded)
+    return int(_hl.sha256(action.encode()).hexdigest()[:8], 16) & 0x7FFFFFFF
 
 _CRON_ADVISORY_KEY = 424242  # legacy fallback (not used directly, kept for compat)
 

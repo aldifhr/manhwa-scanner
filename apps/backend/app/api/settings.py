@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from app.utils.request_auth import safe_error
+from app.utils.request_auth import safe_error, require_monitor_auth
 from app.cron.dispatch_mod import load_guild_settings
 from app.logger import get_logger
 

@@ -16,10 +16,11 @@ from fastapi import APIRouter, Request
 
 from app.tasks import get_cron_status
 from app.utils.request_auth import safe_error
+from app.config import settings
 
 router = APIRouter()
 
-_CRON_WORKER_URL = "http://127.0.0.1:3001/api/v1/cron/status"
+_CRON_WORKER_URL = f"http://127.0.0.1:{settings.CRON_PORT}/api/v1/cron/status"
 
 
 @router.get("/cron/status")

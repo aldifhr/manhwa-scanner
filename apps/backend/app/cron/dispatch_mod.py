@@ -148,7 +148,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             _uniq3 = list(set(k for k in _all_keys if k))
             claimed_keys = set()
             if _uniq3:
-                ", ".join(["%s"] * len(_uniq3))
                 _rows3 = _sb3.table("dispatch_history").select("fcfs_key").in_("fcfs_key", _uniq3).execute().data or []
                 claimed_keys = {r["fcfs_key"] for r in _rows3 if r.get("fcfs_key")}
         except Exception:

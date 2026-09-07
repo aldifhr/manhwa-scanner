@@ -14,7 +14,7 @@ export function getCsp(isDev: boolean): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self'",
+    "connect-src 'self' https://scanner.aldifhr.fun https://manhwa.aldifhr.fun",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",

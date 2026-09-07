@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from app.logger import get_logger
 from app.storage import excluded_titles as excl_store
 from app.utils.request_auth import require_monitor_auth, safe_error, int_safe
+from app.config import VALID_SOURCES
 
 logger = get_logger("api:excluded-titles")
 router = APIRouter()
@@ -233,7 +234,7 @@ async def post_excluded_bulk(request: Request):
         source = (body.get("source") or "").strip()
         if not source:
             return JSONResponse(content={"success": False, "error": "source required"}, status_code=400)
-        if source not in ("ikiru", "shinigami"):
+        if source not in VALID_SOURCES:
             return JSONResponse(content={"success": False, "error": f"invalid source: {source}"}, status_code=400)
         res = excl_store.exclude_all_by_source(source)
         if res.get("status") == "error":

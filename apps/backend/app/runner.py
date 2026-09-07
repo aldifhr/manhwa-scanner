@@ -2,10 +2,11 @@
 import sys
 
 import uvicorn
+from app.config import settings
 
 
 def run(app):
-    port = 3000
+    port = settings.API_PORT
     if "--port" in sys.argv:
         idx = sys.argv.index("--port")
         if idx + 1 < len(sys.argv):

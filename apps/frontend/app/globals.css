@@ -66,7 +66,10 @@ body {
 .filter-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: none; /* ponytail: was 'x proximity' — caused sticky/unresponsive scroll on mobile */
+  touch-action: pan-y; /* let vertical scroll pass through */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .filter-scroll::-webkit-scrollbar {
   display: none;

@@ -221,7 +221,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                 except (TypeError, ValueError):
                     _r[_k] = 0.0
         _r["chapter_url"] = row["chapter_url"]
-        _r["origin"] = _norm
+        _r["origin"] = _norm or None  # ponytail: empty→NULL (chk_rc_origin rejects "")
         cleaned.append(_r)
     # Note: we do NOT dedupe ACROSS sources here because the design is
     # flat-per-source — the same chapter on ikiru AND shinigami must both
@@ -402,20 +402,18 @@ def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:
             SELECT
                 rc.title_key,
                 rc.source,
-                rc.title,
-                rc.origin,
-                rc.cover,
-                rc.series_url,
+                MAX(rc.title) AS title,
+                MAX(rc.origin) AS origin,
+                MAX(rc.cover) AS cover,
+                MAX(rc.series_url) AS series_url,
                 COUNT(*) AS chapter_count,
                 MAX(rc.updated_time) AS last_update,
-                w.rating AS rating
+                MAX(w.rating) AS rating
             FROM recent_chapters rc
             LEFT JOIN whitelist w
                 ON w.title_key = rc.title_key AND w.source = rc.source
             WHERE rc.updated_time >= %s
-            GROUP BY
-                rc.title_key, rc.source, rc.title, rc.origin,
-                rc.cover, rc.series_url, w.rating
+            GROUP BY rc.title_key, rc.source  # ponytail: MAX() aggregates, single row per series (was leaking duplicate trending rows)
             ORDER BY chapter_count DESC, last_update DESC
             LIMIT %s
         """

@@ -276,8 +276,8 @@ def _emit_series(results: list[dict], s: dict) -> None:
     rating = data.get("rating")
     genres = [g.get("data", {}).get("name", "") for g in data.get("genres", [])]
     fmt = data.get("format", "manhwa")
-    # Fallback to per-series detail if rating is missing from list endpoint
-    if not rating:
+    # Fallback to per-series detail if rating or synopsis is missing from list endpoint
+    if not rating or not synopsis:
         try:
             _detail = fetch_series_detail(slug)
             if _detail:
@@ -288,6 +288,8 @@ def _emit_series(results: list[dict], s: dict) -> None:
                 if not cover:
                     cover = _detail_data.get("coverImage", "")
                     cover = scrub_cover(cover) if cover else ""
+                if not synopsis:
+                    synopsis = _detail_data.get("synopsis", "")
         except Exception:
             pass
 

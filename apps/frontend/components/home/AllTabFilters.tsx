@@ -32,10 +32,12 @@ export default function AllTabFilters({
   const hasActive =
     countryFilter !== null || sourceFilter !== null || typeFilter !== null;
   return (
-    <div className="sticky top-[57px] z-10 -mx-1 px-1 py-2 flex flex-col gap-2.5 bg-[var(--gold-bg)]/80 backdrop-blur-xl border-y border-[var(--gold-border)] supports-[backdrop-filter]:bg-black/40">
+    <div className="sticky top-[57px] z-10 -mx-1 px-1 py-2 flex flex-col gap-2.5 bg-[var(--gold-bg)]/80 backdrop-blur-xl border-y border-[var(--gold-border)] supports-[backdrop-filter]:bg-black/40 max-h-[40vh] overflow-y-auto">
       {/* Row 1: Country + Source + clear — single scroll with fade */}
       <div className="relative -mx-1 px-1">
-        <div className="filter-scroll flex gap-2 pb-0.5 pr-6 -mx-1 px-1 [mask-image:linear-gradient(to_right,black_85%,transparent)]">
+        <div className="filter-scroll flex gap-2 pb-0.5 pr-6 -mx-1 px-1 [mask-image:linear-gradient(to_right,black_85%,transparent)]"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+          onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setCountryFilter(null)}
             className={filterButtonClass(countryFilter === null)}

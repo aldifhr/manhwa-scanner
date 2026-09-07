@@ -25,8 +25,6 @@ def normalize_type(raw) -> str | None:
     # tolerate 'Manhwa', 'MANHWA', etc.
     if t.startswith("manh"):
         return "manhwa" if t.endswith("wa") else "manhua"
-    if t == "manga":
-        return "manga"
     return t or None
 
 # Live fallback cache for series meta when DB has no entry.
@@ -214,7 +212,7 @@ def map_result(
     ls = wl.get("latest_sent_chapter")
 
     # Fix broken ikiru chapter URLs (e.g. "?chapter" without slug)
-    chapter_url = it.get("chapter_url", "")
+    chapter_url = it.get("chapter_url") or ""  # ponytail: None→"" guard for .startswith
     if chapter_url == "?chapter" or (chapter_url.startswith(f"{settings.IKIRU_BASE_URL.rstrip(chr(47))}/") and "/chapter-" not in chapter_url and "?" in chapter_url):
         # Reconstruct from series_url + chapter info
         series_url = it.get("series_url") or ""
@@ -263,6 +261,11 @@ def map_result(
     _raw_origin = it.get("origin") or wl.get("origin") or _meta.get("origin") or ""
     origin = normalize_origin(_raw_origin)
 
+    _raw_chapter_num = it.get("chapter_num")
+    try:
+        _chapter_num_f = float(_raw_chapter_num) if _raw_chapter_num is not None else 0.0
+    except (ValueError, TypeError):
+        _chapter_num_f = 0.0
     return {
         "id": slug,
         "title": _title,
@@ -285,9 +288,9 @@ def map_result(
         "chapterUrl": chapter_url,
         "sentAt": it.get("updated_time") or it.get("created_at"),
         "isSent": _is_sent(it, tk, src, dh_sent),
-        "lastCheckedChapter": float(it.get("chapter_num") or 0),
+        "lastCheckedChapter": _chapter_num_f,
         "latestSentChapter": float(ls) if ls else None,
-        "latestChapter": float(it.get("chapter_num") or 0),
+        "latestChapter": _chapter_num_f,
         "createdAt": it.get("updated_time") or it.get("created_at"),
     }
 

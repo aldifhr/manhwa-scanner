@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # and proxy endpoints. Defaults to the deployed scanner host.
     PUBLIC_BASE_URL: str = "https://scanner.aldifhr.fun"
 
+    # Network
+    API_PORT: int = 3000
+    CRON_PORT: int = 3001
+
     # Sources — support both old (IKIRU_BASE_URL etc.) and new (.env) names.
     # New .env uses IKIRU_PUBLIC_URL / SHINIGAMI_API_URL / SHINIGAMI_PUBLIC_URL.
     # Old code uses IKIRU_BASE_URL / SECONDARY_SOURCE_URL / SECONDARY_PUBLIC_BASE.
@@ -115,6 +119,16 @@ class Settings(BaseSettings):
     # NOTE: This is a no-op placeholder — pydantic-settings doesn't support
     # "warn" mode natively. Documented for future migration to extra="forbid" in dev.
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
+
+
+# Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
+VALID_SOURCES = ("ikiru", "shinigami", "voratoon")
+VALID_SOURCES_WITH_ALL = ("ikiru", "shinigami", "voratoon", "all")
+CRON_ACTIONS = (
+    "update", "rss-fetch", "dispatch", "health",
+    "rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon",
+    "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover",
+)
 
 
 settings = Settings()

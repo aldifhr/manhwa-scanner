@@ -46,7 +46,7 @@ def save_source_health_map(health_map: dict) -> None:
                 du = cooldown
         rows.append({
             "source": key,
-            "status": h.get("status", "healthy"),
+            "status": h.get("status", "healthy") if h.get("status") in ("healthy", "degraded") else "degraded",
             "consecutive_failures": consec,
             "disabled_until": du,
             "last_error": h.get("lastError") or h.get("last_error"),
@@ -157,5 +157,5 @@ def read_dashboard_snapshot() -> dict | None:
             return res.data
     except Exception as e:
         logger.error("read_dashboard_snapshot failed", exc=e)
-    return None
+        return None  # DB error → None (don't mask outage with stale data)
 
