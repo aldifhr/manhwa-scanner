@@ -200,10 +200,15 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         return 0
     sb = get_supabase()
 
-    # Pull ALL fields used by the completeness check + the throttle timestamp.
-    rows = sb.table("whitelist").select(
-        "title_key, source, series_url, genres, description, rating, cover, origin, type, metadata_enriched_at"
-    ).execute().data or []
+    # Pull minimal from whitelist (cover/rating canonical in series_meta since 052) + completeness via series_meta
+    try:
+        rows = sb.table("whitelist").select(
+            "title_key, source, series_url, metadata_enriched_at"
+        ).execute().data or []
+    except Exception:
+        rows = sb.table("whitelist").select("title_key, source, series_url").execute().data or []
+        for _r in rows:
+            _r["metadata_enriched_at"] = None
 
     from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
@@ -247,10 +252,8 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
         # voratoon pakai window 5 hari (cover 6 hari), lainnya pakai refresh_days (7)
         effective_cutoff = voratoon_cutoff if src == "voratoon" else refresh_cutoff
 
-        all_present = (
-            r.get("genres") and r.get("description") and r.get("rating")
-            and r.get("cover") and r.get("origin")
-        )
+        # whitelist minimal since 052 — all_present via series_meta completeness, fallback False until 053 VIEW stable
+        all_present = False
         enriched_at = r.get("metadata_enriched_at")
         _ea_str = str(enriched_at) if enriched_at is not None else None
 

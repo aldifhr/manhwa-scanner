@@ -353,11 +353,12 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
         _cur = _conn.cursor()
         _cur.execute(
             """
-            SELECT title_key, source, cover, series_url, updated_at
-            FROM whitelist
-            WHERE source='voratoon'
-              AND (cover LIKE '%%X-Amz-%%' OR updated_at IS NULL OR updated_at < %s)
-            ORDER BY updated_at ASC NULLS FIRST
+            SELECT w.title_key, w.source, sm.cover, w.series_url, sm.updated_at
+            FROM whitelist w
+            JOIN series_meta sm ON sm.title_key=w.title_key AND sm.source=w.source
+            WHERE w.source='voratoon'
+              AND (sm.cover LIKE '%%X-Amz-%%' OR sm.updated_at IS NULL OR sm.updated_at < %s)
+            ORDER BY sm.updated_at ASC NULLS FIRST
             LIMIT %s
             """,
             (cutoff, limit),
@@ -399,8 +400,7 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             new_cover = _scrub(raw_cover) if raw_cover else ""
             # scrub returns proxy?url=presigned for voratoon private - keep it
             if new_cover and new_cover != r.get("cover"):
-                sb.table("whitelist").update({"cover": new_cover, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("title_key", tk).eq("source", "voratoon").execute()
-                # also sync series_meta
+                # whitelist minimal since 052 — cover canonical in series_meta
                 try:
                     sb.table("series_meta").upsert({"title_key": tk, "source": "voratoon", "cover": new_cover, "updated_at": datetime.now(timezone.utc).isoformat()}, on_conflict="title_key,source").execute()
                 except Exception:
