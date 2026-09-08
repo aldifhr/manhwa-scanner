@@ -1,3 +1,4 @@
+import { env } from "$env/dynamic/private";
 export async function proxyToScanner(event: import("@sveltejs/kit").RequestEvent, path: string): Promise<Response> {
   const target = `https://scanner.aldifhr.fun${path}${event.url.search}`;
   const headers: Record<string, string> = {};
@@ -5,8 +6,14 @@ export async function proxyToScanner(event: import("@sveltejs/kit").RequestEvent
     if (k.toLowerCase() === "host") continue;
     headers[k] = v;
   }
-  const cookie = event.request.headers.get("cookie");
+  const cookie = event.request.headers.get("cookie") || "";
   if (cookie) headers["cookie"] = cookie;
+  // anon image proxy needs API_TOKEN fallback (Next server-api authHeaders)
+  const hasSession = /(?:^|;\s*)ikiru_dashboard_session=/.test(cookie);
+  if (!hasSession) {
+    const token = (env as any).API_TOKEN || (env as any).BACKEND_API_TOKEN || "manhwascan";
+    if (token && !headers["authorization"] && !headers["Authorization"]) headers["Authorization"] = `Bearer ${token}`;
+  }
   const init: RequestInit = {
     method: event.request.method,
     headers
