@@ -15,11 +15,9 @@ import {
   MagnifyingGlass,
   Plus,
   CheckCircle,
-  BookBookmark,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
 import { useReadItems } from "@/components/home/useReadItems";
-import { saveBookmark, getBookmarks } from "@/lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
@@ -133,13 +131,11 @@ function HomeGroupedCard({
   isWhitelisted,
   adding,
   onAdd,
-  isBookmarked,
 }: {
   series: GroupedSeries;
   isWhitelisted?: boolean;
   adding?: boolean;
   onAdd?: () => void;
-  isBookmarked?: boolean;
 }) {
   const origin = normalizeOrigin(series.origin);
   const t = (series.type || "").toLowerCase().trim();
@@ -201,38 +197,77 @@ function HomeGroupedCard({
           </h3>
         </a>
 
-        <div className="flex flex-wrap items-center gap-1 mt-1">
-          {flag && (series as unknown as { type?: string | null }).type && (
-            <img
-              src={flag}
-              alt={origin}
-              className="w-4 h-3 rounded-sm object-cover block shrink-0"
-            />
-          )}
-          <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/80">
-            {series.chapters.length} ch
-          </span>
-          {series.chapters[0] &&
-            (() => {
-              const src = series.chapters[0].source?.toLowerCase();
-              const chipColor =
-                src === "shinigami"
-                  ? "bg-red-500/15 text-red-400"
-                  : src === "ikiru"
-                    ? "bg-green-500/15 text-green-400"
-                    : "bg-white/10 text-white/80";
-              return (
-                <span
-                  className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded capitalize ${chipColor}`}
-                >
-                  {series.chapters[0].source}
-                </span>
-              );
-            })()}
-          {isBookmarked && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              <BookBookmark size={10} weight="fill" /> BM
-            </span>
+        {/* Chapter pills — rounded-full, Ch. X · source */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {series.chapters.slice(0, 4).map((ch) => {
+            const label = getChapterLabel(
+              ch as unknown as {
+                chapterLabel?: string | null;
+                chapterNumber?: number | string | null;
+                chapter?: string | null;
+                url?: string | null;
+                chapterUrl?: string | null;
+              }
+            );
+            if (label === "?") return null;
+            const href = ch.chapterUrl || ch.url || series.seriesUrl || "#";
+            const src = ch.source?.toLowerCase();
+            const chipColor =
+              src === "shinigami"
+                ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
+                : src === "ikiru"
+                  ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
+                  : src === "voratoon"
+                    ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
+                    : "bg-white/10 text-white/80 hover:bg-white/20 border-[var(--gold-border)]";
+            return (
+              <a
+                key={ch.key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() =>
+                  trackChapter({
+                    title: series.title,
+                    titleKey: series.titleKey,
+                    cover: series.cover,
+                    source: ch.source,
+                    chapter:
+                      (ch as unknown as { chapter?: string }).chapter ??
+                      ch.chapterLabel,
+                    chapterLabel: ch.chapterLabel,
+                    chapterNumber: ch.chapterNumber,
+                    chapterUrl: href !== "#" ? href : ch.chapterUrl || ch.url,
+                    seriesUrl: series.seriesUrl,
+                    origin: series.origin,
+                  })
+                }
+                className={`inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-full transition-colors ${chipColor}`}
+              >
+                Ch. {label} · {ch.source}
+              </a>
+            );
+          })}
+          {series.chapters.every(
+            (c) =>
+              getChapterLabel(
+                c as unknown as {
+                  chapterLabel?: string | null;
+                  chapterNumber?: number | string | null;
+                  chapter?: string | null;
+                  url?: string | null;
+                  chapterUrl?: string | null;
+                }
+              ) === "?"
+          ) && (
+            <a
+              href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+            >
+              View Series
+            </a>
           )}
         </div>
 
@@ -294,33 +329,6 @@ function HomeGroupedCard({
                   <span className="capitalize">{ch.source}</span>
                   Ch. {label}
                 </a>
-                <button
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    try {
-                      const num =
-                        Number(String(label).replace(/[^0-9.]/g, "")) || 0;
-                      await saveBookmark({
-                        title_key: series.titleKey,
-                        chapter_number: num || 1,
-                        chapter_url: href,
-                        source: ch.source,
-                        title: series.title,
-                        cover: series.cover,
-                      });
-                      toast.success("Bookmarked Ch. " + label);
-                    } catch (err) {
-                      toast.error(
-                        err instanceof Error ? err.message : "Bookmark failed"
-                      );
-                    }
-                  }}
-                  title={`Bookmark Ch. ${label}`}
-                  className="inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-medium leading-none rounded-md bg-white/5 hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-colors"
-                >
-                  Bookmark
-                </button>
               </span>
             );
           })}
@@ -348,11 +356,10 @@ function HomeGroupedCard({
         </div>
 
         {/* Actions — Add WL */}
-        <div className="flex items-center gap-2 mt-3">
+        <div className="mt-auto pt-2">
           {isWhitelisted ? (
-            <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-green-500/15 text-green-400 border border-green-500/20 font-medium ml-auto">
-              <CheckCircle size={13} weight="fill" />
-              Added
+            <span className="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/20">
+              ✓ Verified
             </span>
           ) : (
             <button
@@ -362,10 +369,9 @@ function HomeGroupedCard({
                 onAdd?.();
               }}
               disabled={adding}
-              className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+              className="text-[11px] px-3 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] font-semibold transition-colors disabled:opacity-50 min-h-0 min-w-0 shadow-[0_2px_10px_var(--gold-accent-soft)]"
             >
-              <Plus size={13} weight="bold" />
-              {adding ? "..." : "Add WL"}
+              {adding ? "..." : "+ Add WL"}
             </button>
           )}
         </div>
@@ -409,21 +415,7 @@ export default function HomePage() {
 
   const { optimisticWhitelist, addingKey, handleAddGroup } = useFeedActions();
 
-  const { data: bookmarks } = useQuery({
-    queryKey: ["bookmarks"],
-    queryFn: () => getBookmarks(),
-    staleTime: 60_000,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-  const bookmarkSet = useMemo(() => {
-    const s = new Set<string>();
-    for (const b of bookmarks ?? []) {
-      s.add(b.title_key);
-      s.add(`${b.title_key}:${b.chapter_number}`);
-    }
-    return s;
-  }, [bookmarks]);
+
 
   const isLoggedInForSnapshot =
     typeof document !== "undefined" &&
@@ -496,13 +488,11 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Bookmark */}
       {continueReading.size > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <BookBookmark size={18} className="text-white" weight="fill" />
             <h2 className="text-lg sm:text-xl font-bold text-white">
-              Bookmark
+              Continue Reading
             </h2>
             <span className="text-xs text-white/50">
               ({continueReading.size})
@@ -649,22 +639,14 @@ export default function HomePage() {
               ) ||
               optimisticWhitelist.has(s.titleKey);
             const adding = addingKey === s.titleKey;
-            const isBM =
-              bookmarkSet.has(s.titleKey) ||
-              s.chapters.some(
-                (c: { titleKey: string; chapterNumber: number }) =>
-                  bookmarkSet.has(
-                    `${c.titleKey || s.titleKey}:${c.chapterNumber}`
-                  ) || bookmarkSet.has(c.titleKey || s.titleKey)
-              );
+            const isBM = false;
             return (
               <HomeGroupedCard
                 series={s}
                 isWhitelisted={isWL}
                 adding={adding}
                 onAdd={() => handleAddGroup(s)}
-                isBookmarked={isBM}
-              />
+                />
             );
           }}
         />
@@ -680,14 +662,7 @@ export default function HomePage() {
               ) ||
               optimisticWhitelist.has(series.titleKey);
             const adding = addingKey === series.titleKey;
-            const isBM =
-              bookmarkSet.has(series.titleKey) ||
-              series.chapters.some(
-                (c: { titleKey: string; chapterNumber: number }) =>
-                  bookmarkSet.has(
-                    `${c.titleKey || series.titleKey}:${c.chapterNumber}`
-                  ) || bookmarkSet.has(c.titleKey || series.titleKey)
-              );
+            const isBM = false;
             return (
               <motion.div
                 key={series.titleKey + String(i)}
@@ -700,8 +675,7 @@ export default function HomePage() {
                   isWhitelisted={isWL}
                   adding={adding}
                   onAdd={() => handleAddGroup(series)}
-                  isBookmarked={isBM}
-                />
+                    />
               </motion.div>
             );
           })}
