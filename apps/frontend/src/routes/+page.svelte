@@ -10,14 +10,29 @@
   async function addWL(series: any) {
     adding = series.titleKey;
     try {
+      // replicate Next useFeedActions: title_key snake_case + per-source
+      const payload = {
+        title_key: series.titleKey,
+        title: series.title,
+        source: series.chapters[0]?.source || "unknown",
+        cover: series.cover,
+        series_url: series.seriesUrl,
+        seriesUrl: series.seriesUrl,
+        origin: series.origin,
+        genres: series.genres,
+        description: series.description
+      };
       const res = await fetch("/api/v1/reader/whitelist", withCsrf({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titleKey: series.titleKey, title: series.title, source: series.chapters[0]?.source, cover: series.cover, seriesUrl: series.seriesUrl })
+        body: JSON.stringify(payload)
       }));
-      if (!res.ok) throw new Error(await res.text());
-      alert("Added to whitelist");
-    } catch (e: any) { alert(e?.message || "Add WL failed (login required)"); }
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      alert("Added to whitelist — check /whitelist");
+    } catch (e: any) { alert(e?.message?.slice(0,300) || "Add WL failed (login required)"); }
     finally { adding = null; }
   }
 </script>
