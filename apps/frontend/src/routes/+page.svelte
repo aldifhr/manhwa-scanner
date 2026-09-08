@@ -217,7 +217,7 @@
     </div>
   {:else if view==="list"}
     <div class="mt-8 flex flex-col gap-3">
-      {#each shown as s (s.titleKey + '|' + (s.seriesUrl || s.chapters?.[0]?.seriesUrl || '')) }}
+      {#each shown as s (s.titleKey + '|' + (s.seriesUrl || s.chapters?.[0]?.seriesUrl || ''))}
         <div class="group flex gap-4 p-4 rounded-xl border border-white/[0.08] bg-[#18181b] hover:border-white/[0.14] hover:bg-[#27272a] transition-colors">
           <a href={s.seriesUrl || s.chapters[0]?.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="shrink-0">
             {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={decodeHtml(s.title)} class="w-20 h-28 object-cover rounded-lg bg-[#27272a]" loading="lazy" />{:else}<div class="w-20 h-28 rounded-lg bg-[#27272a] flex items-center justify-center text-zinc-500 text-xs">—</div>{/if}
