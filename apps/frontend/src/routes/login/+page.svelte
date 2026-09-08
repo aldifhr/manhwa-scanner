@@ -46,7 +46,7 @@
       <div>
         <label for="password" class="block text-[13px] font-medium text-white/70 mb-2">Password</label>
         <div class="relative">
-          <input id="password" type={show ? "text" : "password"} bind:value={password} placeholder="Password" autocomplete="current-password" required autofocus class="w-full bg-black border border-white/10 rounded-lg px-3.5 py-2.5 pr-10 text-sm placeholder:text-white/30 focus:outline-none focus:border-[var(--gold-accent)]" />
+          <input id="password" type={show ? "text" : "password"} bind:value={password} placeholder="Password" autocomplete="current-password" required class="w-full bg-black border border-white/10 rounded-lg px-3.5 py-2.5 pr-10 text-sm placeholder:text-white/30 focus:outline-none focus:border-[var(--gold-accent)]" />
           <button type="button" onclick={() => show = !show} class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white text-xs">{show ? "Hide" : "Show"}</button>
         </div>
       </div>
