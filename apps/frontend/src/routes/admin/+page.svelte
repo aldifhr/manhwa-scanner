@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { withCsrf } from "$lib/csrf";
   let { data }: any = $props();
   let snap: any = $derived(data?.snap?.data ?? data?.snap ?? {});
   let queue: any = $derived(data?.queue?.data ?? data?.queue ?? {});
@@ -10,6 +11,18 @@
   let whitelistCount = $derived(snap?.whitelistCount ?? snap?.whitelist_count ?? health?.whitelistCount ?? "-");
   let queueLen = $derived(queue?.depth ?? queue?.queueLength ?? queue?.queue_length ?? snap?.queueLength ?? "-");
   let cronStatus: any = $derived(snap?.cronStatus ?? snap?.cron_status ?? cron ?? {});
+  let msg = $state<string | null>(null);
+  async function post(url: string, body?: any) {
+    const res = await fetch(url, withCsrf({ method:"POST", headers: body?{"Content-Type":"application/json"}:{}, body: body?JSON.stringify(body):undefined }));
+    const j = await res.json().catch(()=>({}));
+    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+    return j;
+  }
+  async function doCron(){ try{ await post("/api/cron?action=update"); msg="Cron triggered"; setTimeout(()=>msg=null,3000); location.reload(); }catch(e:any){msg=e.message} }
+  async function doRefresh(){ try{ const j:any = await post("/api/v1/health/refresh-voratoon"); msg=`Refreshed ${j?.data?.refreshed ?? 0} covers`; setTimeout(()=>msg=null,3000);}catch(e:any){msg=e.message} }
+  async function doResync(){ try{ await post("/api/cron?action=enrich"); msg="Resync triggered"; setTimeout(()=>msg=null,3000);}catch(e:any){msg=e.message} }
+  async function doClear(){ try{ await fetch("/api/v1/logs/errors", withCsrf({method:"DELETE"})); msg="Logs cleared"; setTimeout(()=>msg=null,2000); location.reload(); }catch(e:any){msg=e.message} }
+  async function doRetryAll(){ try{ await post("/api/v1/failed-dispatches?action=retry-all"); msg="Retry-all triggered"; setTimeout(()=>msg=null,2000);}catch(e:any){msg=e.message} }
 </script>
 <div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
   <h1 class="text-xl font-bold">Admin</h1>
@@ -21,10 +34,19 @@
     <div class="p-4 rounded-xl bg-[var(--gold-surface)] border border-[var(--gold-border)]"><div class="text-xs text-white/50">Health</div><div class="text-sm font-medium truncate">{health?.status ?? health?.overall ?? "-"}</div></div>
     <div class="p-4 rounded-xl bg-[var(--gold-surface)] border border-[var(--gold-border)]"><div class="text-xs text-white/50">Cron</div><div class="text-xs font-medium truncate">{cronStatus?.outcome ?? cronStatus?.status ?? "-"}</div></div>
   </div>
-  <!-- cron actions -->
+  {#if msg}<div class="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">{msg}</div>{/if}
+  <!-- actions -->
+  <div class="flex flex-wrap gap-2">
+    <button onclick={doCron} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-[var(--gold-accent)] text-black">Trigger Cron</button>
+    <button onclick={doRefresh} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Refresh Voratoon</button>
+    <button onclick={doResync} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Resync Ratings</button>
+    <button onclick={doRetryAll} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Retry Failed All</button>
+    <button onclick={doClear} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-red-500/20 text-red-300">Clear Errors</button>
+  </div>
+  <!-- cron status -->
   <div class="p-4 rounded-xl border border-white/10 bg-white/5">
     <h2 class="text-sm font-semibold">Cron</h2>
-    <p class="text-xs text-white/50 mt-1">Last: {cronStatus?.timestamp ?? cronStatus?.last_run ?? "-"} · {cronStatus?.matched ?? 0} matched / {cronStatus?.sent ?? 0} sent</p>
+    <p class="text-xs text-white/50 mt-1">Last: {cronStatus?.timestamp ?? cronStatus?.last_run ?? "-"} · {cronStatus?.matched ?? 0} matched / {cronStatus?.sent ?? 0} sent · outcome: {cronStatus?.outcome ?? "-"}</p>
   </div>
   <!-- health source -->
   {#if health?.sourceHealth || health?.sources}
