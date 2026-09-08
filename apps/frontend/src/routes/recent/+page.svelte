@@ -122,12 +122,12 @@
             <div class="flex items-center gap-2">
               {#if getOriginFlag(ch.origin)}<img src={getOriginFlag(ch.origin)} alt={ch.origin} class="w-4 h-3 rounded-sm object-cover shrink-0" />{/if}
               <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="text-sm font-medium truncate hover:text-white/80 leading-none">{decodeHtml(ch.title)}</a>
-              {#if ch.isWhitelisted}<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 leading-none">WL</span>{/if}
+              {#if ch.isWhitelisted}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">WL</span>{/if}
             </div>
             <div class="flex gap-1 flex-wrap mt-1">
-              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded leading-none" style="line-height:1">Ch. {getChapterLabel(ch as any)} · {ch.source}</a>
-              {#if ch.type}<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 capitalize">{ch.type}</span>{/if}
-              {#if ch.rating && Number(ch.rating)>0}<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(ch.rating).toFixed(1)}</span>{/if}
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 bg-white/10 hover:bg-white/20 rounded" style="line-height:1">Ch. {getChapterLabel(ch as any)} · {ch.source}</a>
+              {#if ch.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{ch.type}</span>{/if}
+              {#if ch.rating && Number(ch.rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(ch.rating).toFixed(1)}</span>{/if}
             </div>
             {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{/if}
             {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}

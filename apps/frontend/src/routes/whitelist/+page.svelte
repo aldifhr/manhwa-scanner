@@ -50,10 +50,10 @@
           <div class="text-sm flex-1 min-w-0">
             <div class="font-medium line-clamp-2 leading-tight">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div>
             <div class="flex flex-wrap gap-1 mt-1">
-              {#if src}<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 capitalize">{src}</span>{/if}
-              {#if origin}<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 uppercase">{String(origin).slice(0,3)}</span>{/if}
-              {#if it.type}<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 capitalize">{it.type}</span>{/if}
-              {#if rating && Number(rating)>0}<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(rating).toFixed(1)}</span>{/if}
+              {#if src}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{src}</span>{/if}
+              {#if origin}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 uppercase">{String(origin).slice(0,3)}</span>{/if}
+              {#if it.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{it.type}</span>{/if}
+              {#if rating && Number(rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(rating).toFixed(1)}</span>{/if}
             </div>
             {#if Array.isArray(genres) && genres.length}<div class="text-[10px] text-white/40 mt-1 line-clamp-1">{genres.slice(0,3).join(" · ")}</div>{/if}
             {#if desc}<p class="text-[11px] text-white/50 line-clamp-2 mt-1">{String(desc).replace(/<[^>]+>/g," ").slice(0,120)}</p>{/if}
