@@ -8,7 +8,7 @@ from app.config import settings
 from app.logger import get_logger
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key
+from app.utils.text import normalize_title_key, slugify_title_key
 from app.storage import health, whitelist as wl_store
 from app.cron.collectors.common import _SOURCE_TIMEOUT, _parse_types
 from app.cron.collectors.ikiru import _collect_ikiru_source
@@ -166,7 +166,7 @@ def collect_recent_chapters(
 
     try:
         from app.storage import excluded_titles as excl_store
-        from app.utils.text import normalize_title_key as _ntk_c
+        from app.utils.text import normalize_title_key, slugify_title_key as _ntk_c
         _excl = excl_store.load_excluded_keys()
         if _excl:
             _before = len(items)
@@ -183,13 +183,13 @@ def collect_recent_chapters(
 def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
     allowed: set[str] = set()
     for w in whitelist:
-        wk = normalize_title_key(w.get("title_key", ""))
+        wk = slugify_title_key(w.get("title_key", ""))
         src = w.get("source")
         if src:
             allowed.add(f"{wk}:{src}")
     result = []
     for it in items:
-        key = f"{normalize_title_key(it.get('title_key', ''))}:{it.get('source')}"
+        key = f"{slugify_title_key(it.get('title_key', ''))}:{it.get('source')}"
         if key in allowed:
             result.append(it)
     return result
