@@ -24,6 +24,7 @@
       <a href="/recent" class="inline-flex items-center h-7 px-1">Recent</a>
       <a href="/whitelist" class="inline-flex items-center h-7 px-1">Whitelist</a>
       <a href="/exclude-list" class="inline-flex items-center h-7 px-1">Exclude</a>
+      <a href="/dispatch-history" class="inline-flex items-center h-7 px-1">History</a>
       <a href="/bookmarks" class="inline-flex items-center h-7 px-1">Bookmarks</a>
       {#if isAuthed}
         <button onclick={logout} class="min-h-0 min-w-0 inline-flex items-center justify-center text-xs px-3 h-7 rounded-full bg-white/10 hover:bg-white/20">Logout</button>
