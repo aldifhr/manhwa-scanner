@@ -1,17 +1,65 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
-  import { sourceChipClass } from "$lib/styles";
+  import { sourceChipClass, chapterSourceClass } from "$lib/styles";
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
   import { toast } from "$lib/toast.svelte";
+  import { saveBookmark } from "$lib/api";
   let { data }: any = $props();
   let feed = $derived(data.feed);
   let results: any[] = $derived(feed?.data?.results ?? []);
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
   let q = $state("");
-  let filtered = $derived(q ? groupedAll.filter(s=> (s.title||"").toLowerCase().includes(q.toLowerCase())) : groupedAll);
+  let sortBy: "latest"|"rating"|"alpha" = $state("latest");
+  onMount(()=>{
+    const p = new URLSearchParams(location.search);
+    if (p.get("q")) q = p.get("q")!;
+    const s = p.get("sort");
+    if (s === "rating" || s === "alpha") sortBy = s;
+  });
+  function syncUrl(){
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (sortBy !== "latest") p.set("sort", sortBy);
+    const qs = p.toString();
+    history.replaceState(null, "", `${location.pathname}${qs ? `?${qs}` : ""}`);
+  }
+  function setQ(v: string){ q = v; syncUrl(); }
+  function setSort(v: "latest"|"rating"|"alpha"){ sortBy = v; syncUrl(); }
+  function clearFilters(){ q=""; sortBy="latest"; syncUrl(); }
+  let hasActiveFilters = $derived(!!q || sortBy!=="latest");
+  function sortGrouped(arr: any[]){
+    if (sortBy==="rating") return [...arr].sort((a,b)=> (Number(b.rating)||0) - (Number(a.rating)||0));
+    if (sortBy==="alpha") return [...arr].sort((a,b)=> (a.title||"").localeCompare(b.title||""));
+    return [...arr].sort((a,b)=>{
+      const da = a.chapters?.[0]?.sentAt || a.sentAt || "";
+      const db = b.chapters?.[0]?.sentAt || b.sentAt || "";
+      return db.localeCompare(da);
+    });
+  }
+  let filteredRaw = $derived(q ? groupedAll.filter(s=> (s.title||"").toLowerCase().includes(q.toLowerCase())) : groupedAll);
+  let filtered = $derived(sortGrouped(filteredRaw));
+  let visible = $state(18);
+  let loadingMore = $state(false);
+  let shown = $derived(filtered.slice(0, visible));
+  $effect(()=>{ void filtered.length; void sortBy; void q; visible=18; });
+  let sentinel: HTMLDivElement | null = $state(null);
+  $effect(()=>{
+    if (!sentinel) return;
+    const io = new IntersectionObserver((entries)=>{
+      if (entries[0]?.isIntersecting && visible < filtered.length){
+        loadingMore = true;
+        setTimeout(()=>{ visible = Math.min(visible+18, filtered.length); loadingMore = false; }, 300);
+      }
+    }, { rootMargin: "400px" });
+    io.observe(sentinel);
+    return ()=>io.disconnect();
+  });
   let adding = $state<string | null>(null);
   let optimistic = $state<Set<string>>(new Set());
+  let bookmarking: string | null = $state(null);
+  let bookmarked = $state<Set<string>>(new Set());
   function sourceFromUrl(url: string): string {
     if (!url) return "";
     const h = url.toLowerCase();
@@ -30,6 +78,17 @@
       toast("Added to whitelist","success");
     }catch(e:any){ toast(e?.message?.slice(0,200)||"Add failed","error"); } finally{ adding=null; }
   }
+  async function doBookmark(s:any){
+    const key = s.titleKey;
+    if (bookmarked.has(key)) return;
+    bookmarking = key;
+    try{
+      const ch = s.chapters?.[0];
+      await saveBookmark({ title_key: key, chapter_number: Number(ch?.chapterNumber ?? ch?.chapter ?? 1), chapter_url: ch?.chapterUrl || ch?.url || s.seriesUrl || "", source: ch?.source || "", title: s.title, cover: s.cover || null });
+      bookmarked = new Set([...bookmarked, key]);
+      toast("Bookmarked","success");
+    }catch(e:any){ toast(e?.message?.slice(0,200)||"Bookmark failed","error"); } finally{ bookmarking=null; }
+  }
 </script>
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -38,20 +97,32 @@
       <h1 class="text-[28px] sm:text-[32px] font-semibold tracking-[-0.03em]">ManhwaScan</h1>
       <p class="text-sm text-zinc-400 mt-1">Latest updates — {filtered.length} series · {results.length} chapters</p>
     </div>
-    <input type="text" placeholder="Search title" bind:value={q} class="w-full sm:w-64 bg-[#18181b] border border-white/[0.08] rounded-lg px-3 py-2 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
+    <div class="flex gap-2 w-full sm:w-auto">
+      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 sm:w-64 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 py-1.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
+      <div class="flex gap-1 shrink-0">
+        <button onclick={()=>setSort("latest")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+(sortBy==="latest"?"bg-white text-black":"bg-white/10 text-white/60")}>Latest</button>
+        <button onclick={()=>setSort("rating")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+(sortBy==="rating"?"bg-white text-black":"bg-white/10 text-white/60")}>Rating</button>
+        <button onclick={()=>setSort("alpha")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+(sortBy==="alpha"?"bg-white text-black":"bg-white/10 text-white/60")}>A–Z</button>
+      </div>
+    </div>
   </div>
 
   {#if data.error}
     <div class="mt-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{data.error}</div>
   {:else if !feed}
-    <div class="mt-8 grid grid-cols-2 lg:grid-cols-3 gap-4">
-      {#each Array(6) as _, i}<div class="h-44 rounded-xl bg-[#18181b] border border-white/[0.08] animate-pulse"></div>{/each}
+    <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {#each Array(6) as _}<div class="h-44 rounded-xl border border-white/[0.08] bg-[#18181b] animate-pulse flex gap-3 p-3"><div class="w-16 h-24 rounded-lg bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="flex gap-1"><div class="h-5 w-12 bg-white/5 rounded"></div><div class="h-5 w-12 bg-white/5 rounded"></div></div><div class="h-6 w-16 bg-white/5 rounded-full mt-auto"></div></div></div>{/each}
     </div>
   {:else if filtered.length===0}
-    <div class="mt-12 text-center text-zinc-500 text-sm">No results{ q ? ` for "${q}"` : ""}</div>
+    <div class="mt-10 flex flex-col items-center text-center py-8 rounded-xl border border-dashed border-white/10 bg-white/[0.02]">
+      <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 text-lg">∅</div>
+      <p class="text-sm text-white/60 mt-3 font-medium">No results found</p>
+      <p class="text-xs text-white/30 mt-1 max-w-xs">{q ? `No match for "${q}"` : "No series available"} — try adjusting your search or filters</p>
+      {#if hasActiveFilters}<button onclick={clearFilters} class="mt-4 text-xs px-4 py-1.5 rounded-full bg-white text-black font-medium hover:bg-zinc-200 transition-colors">Clear filters</button>{/if}
+    </div>
   {:else}
     <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {#each filtered as s (s.titleKey)}
+      {#each shown as s (s.titleKey)}
         <div class="group flex gap-3 p-3 rounded-xl border border-white/[0.08] bg-[#18181b] hover:border-white/[0.14] hover:bg-[#27272a] transition-colors">
           <a href={s.seriesUrl || s.chapters[0]?.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="shrink-0">
             {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={decodeHtml(s.title)} class="w-16 h-24 object-cover rounded-lg bg-[#27272a]" loading="lazy" />{:else}<div class="w-16 h-24 rounded-lg bg-[#27272a] flex items-center justify-center text-zinc-500 text-xs">—</div>{/if}
@@ -64,24 +135,35 @@
             {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{/if}
             <div class="flex items-center gap-1.5 mt-1">
               {#if s.rating && Number(s.rating)>0}<span class="text-[10px] text-amber-300">★ {Number(s.rating).toFixed(1)}</span>{/if}
-              {#each [...new Set(s.chapters.map(c=>c.source))] as src}<span class={"text-[9px] px-1.5 py-0.5 rounded "+sourceChipClass(src)}>{src}</span>{/each}
+              {#each [...new Set(s.chapters.map((c:any)=>c.source))] as src}<span class={"text-[9px] px-1.5 py-0.5 rounded "+sourceChipClass(src as string)}>{src}</span>{/each}
             </div>
             <div class="flex gap-1 flex-wrap mt-2">
               {#each s.chapters.slice(0,3) as ch}
                 {@const label=getChapterLabel(ch as any)}
-                {#if label!=="?" }<a href={ch.chapterUrl||ch.url||"#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded bg-white/[0.06] hover:bg-white/10 text-zinc-300 transition-colors">Ch. {label}</a>{/if}
+                {#if label!=="?" }<a href={ch.chapterUrl||ch.url||"#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded transition-colors "+chapterSourceClass(ch.source)}>Ch. {label}</a>{/if}
               {/each}
             </div>
-            <div class="mt-auto pt-3">
+            <div class="mt-auto pt-3 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium">✓ Added</span>
               {:else}
                 <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white text-black hover:bg-zinc-200 disabled:opacity-50 font-medium transition-colors">{adding===s.titleKey ? "..." : "+ Add"}</button>
+              {/if}
+              {#if bookmarked.has(s.titleKey)}
+                <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
+              {:else}
+                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
               {/if}
             </div>
           </div>
         </div>
       {/each}
     </div>
+    <div bind:this={sentinel} class="h-8"></div>
+    {#if loadingMore}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {#each Array(3) as _}<div class="flex gap-3 p-3 rounded-xl border border-white/[0.08] bg-[#18181b] animate-pulse"><div class="w-16 h-24 rounded-lg bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="flex gap-1"><div class="h-5 w-12 bg-white/5 rounded"></div><div class="h-5 w-12 bg-white/5 rounded"></div></div></div></div>{/each}
+      </div>
+    {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {/if}
 </div>

@@ -5,37 +5,65 @@
   import { withCsrf } from "$lib/csrf";
   import { toast } from "$lib/toast.svelte";
   import { getOriginFlag } from "$lib/constants";
+  import { chapterSourceClass } from "$lib/styles";
+  import { saveBookmark } from "$lib/api";
   let { data }: any = $props();
   let results: any[] = $derived(data?.feed?.data?.results ?? []);
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
+  let q = $state("");
   let sourceFilter: string | null = $state(null);
   let countryFilter: string | null = $state(null);
   let wlFilter: "all"|"wl"|"non" = $state("all");
   let groupedMode = $state(true);
+  let sortBy: "latest"|"rating"|"alpha" = $state("latest");
   onMount(()=>{
     const p = new URLSearchParams(location.search);
+    if (p.get("q")) q = p.get("q")!;
     if (p.get("source")) sourceFilter = p.get("source");
     const c = p.get("country");
     if (c === "korean" || c === "chinese") countryFilter = c;
     const w = p.get("wl");
     if (w === "wl" || w === "non") wlFilter = w;
     if (p.get("view") === "flat") groupedMode = false;
+    const s = p.get("sort");
+    if (s === "rating" || s === "alpha") sortBy = s;
   });
   function syncUrl(){
     const p = new URLSearchParams();
+    if (q) p.set("q", q);
     if (sourceFilter) p.set("source", sourceFilter);
     if (countryFilter) p.set("country", countryFilter);
     if (wlFilter !== "all") p.set("wl", wlFilter);
     if (!groupedMode) p.set("view", "flat");
+    if (sortBy !== "latest") p.set("sort", sortBy);
     const qs = p.toString();
     history.replaceState(null, "", `${location.pathname}${qs ? `?${qs}` : ""}`);
   }
+  function setQ(v: string){ q = v; syncUrl(); }
   function setSource(v: string | null){ sourceFilter = v; syncUrl(); }
   function setCountry(v: string | null){ countryFilter = v; syncUrl(); }
   function setWl(v: "all"|"wl"|"non"){ wlFilter = v; syncUrl(); }
   function setGrouped(v: boolean){ groupedMode = v; syncUrl(); }
+  function setSort(v: "latest"|"rating"|"alpha"){ sortBy = v; syncUrl(); }
+  function clearFilters(){ q=""; sourceFilter=null; countryFilter=null; wlFilter="all"; sortBy="latest"; syncUrl(); }
+  let hasActiveFilters = $derived(!!q || !!sourceFilter || !!countryFilter || wlFilter!=="all" || sortBy!=="latest");
+  function sortGrouped(arr: any[]){
+    if (sortBy==="rating") return [...arr].sort((a,b)=> (Number(b.rating)||0) - (Number(a.rating)||0));
+    if (sortBy==="alpha") return [...arr].sort((a,b)=> (a.title||"").localeCompare(b.title||""));
+    return [...arr].sort((a,b)=>{
+      const da = a.chapters?.[0]?.sentAt || a.sentAt || "";
+      const db = b.chapters?.[0]?.sentAt || b.sentAt || "";
+      return db.localeCompare(da);
+    });
+  }
+  function sortFlat(arr: any[]){
+    if (sortBy==="rating") return [...arr].sort((a,b)=> (Number(b.rating)||0) - (Number(a.rating)||0));
+    if (sortBy==="alpha") return [...arr].sort((a,b)=> (a.title||"").localeCompare(b.title||""));
+    return [...arr].sort((a,b)=> (b.sentAt||"").localeCompare(a.sentAt||""));
+  }
   let sources: string[] = $derived([...new Set(groupedAll.flatMap(s=>s.chapters.map(c=>c.source)))].sort());
-  let flatFiltered = $derived(results.filter((r:any)=>{
+  let flatFiltered = $derived(sortFlat(results.filter((r:any)=>{
+    if (q && !(r.title||"").toLowerCase().includes(q.toLowerCase())) return false;
     if (sourceFilter && r.source!==sourceFilter) return false;
     const o=(r.origin||"").toLowerCase();
     if (countryFilter==="korean" && o!=="kr" && o!=="korean") return false;
@@ -43,8 +71,9 @@
     if (wlFilter==="wl" && !r.isWhitelisted) return false;
     if (wlFilter==="non" && r.isWhitelisted) return false;
     return true;
-  }));
-  let filtered = $derived(groupedMode ? groupedAll.filter(s=>{
+  })));
+  let filtered = $derived(groupedMode ? sortGrouped(groupedAll.filter(s=>{
+    if (q && !(s.title||"").toLowerCase().includes(q.toLowerCase())) return false;
     if (sourceFilter && !s.chapters.some(c=>c.source===sourceFilter)) return false;
     if (countryFilter) {
       const o=(s.origin||"").toLowerCase();
@@ -54,14 +83,17 @@
     if (wlFilter==="wl" && !s.isWhitelisted) return false;
     if (wlFilter==="non" && s.isWhitelisted) return false;
     return true;
-  }) : []);
+  })) : []);
   let visible = $state(30);
+  let loadingMore = $state(false);
   let grouped = $derived(groupedMode ? filtered.slice(0, visible) : []);
   let flatVisible = $derived(!groupedMode ? flatFiltered.slice(0, visible) : []);
-  // reset visible when filters/mode change
-  $effect(()=>{ void filtered.length; void flatFiltered.length; void groupedMode; visible=30; });
+  // reset visible when filters/sort/mode change
+  $effect(()=>{ void filtered.length; void flatFiltered.length; void groupedMode; void sortBy; void q; visible=30; });
   let adding: string | null = $state(null);
   let optimistic = $state<Set<string>>(new Set());
+  let bookmarking: string | null = $state(null);
+  let bookmarked = $state<Set<string>>(new Set());
   function sourceFromUrl(url: string): string {
     if (!url) return "";
     const h = url.toLowerCase();
@@ -80,13 +112,37 @@
       toast("Added to whitelist", "success");
     } catch(e:any){ toast(e?.message?.slice(0,300) || "Add WL failed", "error"); } finally { adding=null; }
   }
+  async function doBookmark(s: any){
+    const key = s.titleKey;
+    if (bookmarked.has(key)) return;
+    bookmarking = key;
+    try{
+      const ch = s.chapters?.[0];
+      await saveBookmark({ title_key: key, chapter_number: Number(ch?.chapterNumber ?? ch?.chapter ?? 1), chapter_url: ch?.chapterUrl || ch?.url || s.seriesUrl || "", source: ch?.source || "", title: s.title, cover: s.cover || null });
+      bookmarked = new Set([...bookmarked, key]);
+      toast("Bookmarked","success");
+    }catch(e:any){ toast(e?.message?.slice(0,200)||"Bookmark failed","error"); } finally{ bookmarking=null; }
+  }
+  async function doBookmarkFlat(ch: any){
+    const key = `${ch.titleKey}:${ch.chapter}`;
+    if (bookmarked.has(key)) return;
+    bookmarking = key;
+    try{
+      await saveBookmark({ title_key: ch.titleKey, chapter_number: Number(ch.chapterNumber ?? ch.chapter ?? 1), chapter_url: ch.chapterUrl || ch.url || "", source: ch.source || "", title: ch.title, cover: ch.cover || null });
+      bookmarked = new Set([...bookmarked, key]);
+      toast("Bookmarked","success");
+    }catch(e:any){ toast(e?.message?.slice(0,200)||"Bookmark failed","error"); } finally{ bookmarking=null; }
+  }
   function btnActive(active: boolean){ return active ? "bg-white text-black" : "bg-white/[0.06] text-white/70 hover:bg-white/10"; }
   let sentinel: HTMLDivElement | null = $state(null);
   $effect(()=>{
     if (!sentinel) return;
     const io = new IntersectionObserver((entries)=>{
       const total = groupedMode ? filtered.length : flatFiltered.length;
-      if (entries[0]?.isIntersecting && visible < total) visible = Math.min(visible+30, total);
+      if (entries[0]?.isIntersecting && visible < total){
+        loadingMore = true;
+        setTimeout(()=>{ visible = Math.min(visible+30, total); loadingMore = false; }, 300);
+      }
     }, { rootMargin: "400px" });
     io.observe(sentinel);
     return ()=>io.disconnect();
@@ -95,6 +151,15 @@
 <div class="max-w-4xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Recent</h1>
   <p class="text-white/60 text-sm mt-1">{groupedMode ? `Grouped — ${grouped.length} / ${filtered.length} series` : `Flat — ${flatVisible.length} / ${flatFiltered.length} ch`} · total {groupedAll.length} series / {results.length} ch</p>
+  <!-- search + sort -->
+  <div class="mt-3 flex flex-col sm:flex-row gap-2">
+    <input type="text" placeholder="Search title..." value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />
+    <div class="flex gap-1 shrink-0">
+      <button onclick={()=>setSort("latest")} class={"min-h-0 px-3 py-1.5 text-xs rounded-full "+(sortBy==="latest"?"bg-white text-black":"bg-white/10 text-white/60")}>Latest</button>
+      <button onclick={()=>setSort("rating")} class={"min-h-0 px-3 py-1.5 text-xs rounded-full "+(sortBy==="rating"?"bg-white text-black":"bg-white/10 text-white/60")}>Rating</button>
+      <button onclick={()=>setSort("alpha")} class={"min-h-0 px-3 py-1.5 text-xs rounded-full "+(sortBy==="alpha"?"bg-white text-black":"bg-white/10 text-white/60")}>A–Z</button>
+    </div>
+  </div>
   <!-- grouped toggle -->
   <div class="mt-3 inline-flex rounded-full bg-white/5 border border-white/10 p-1">
     <button onclick={()=>setGrouped(true)} class={"min-h-0 px-4 py-1 text-xs rounded-full "+(groupedMode?"bg-white text-black":"text-white/60")}>Grouped</button>
@@ -121,7 +186,12 @@
   {#if data.error}
     <div class="mt-4 p-3 rounded bg-red-500/10 text-red-400 text-sm">{data.error}</div>
   {:else if (groupedMode ? filtered.length===0 : flatFiltered.length===0)}
-    <div class="mt-8 text-center text-white/40">No data</div>
+    <div class="mt-10 flex flex-col items-center text-center py-8 rounded-xl border border-dashed border-white/10 bg-white/[0.02]">
+      <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/30 text-lg">∅</div>
+      <p class="text-sm text-white/60 mt-3 font-medium">No results found</p>
+      <p class="text-xs text-white/30 mt-1 max-w-xs">{q ? `No match for "${q}"` : "No series match the current filters"} — try adjusting your filters or search</p>
+      {#if hasActiveFilters}<button onclick={clearFilters} class="mt-4 text-xs px-4 py-1.5 rounded-full bg-white text-black font-medium hover:bg-zinc-200 transition-colors">Clear filters</button>{/if}
+    </div>
   {:else if groupedMode}
     <div class="mt-4 flex flex-col gap-3">
       {#each grouped as s (s.titleKey)}
@@ -132,20 +202,31 @@
               {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 mt-0.5" loading="lazy" />{/if}
               <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm leading-tight hover:text-white/80">{decodeHtml(s.title)}</a>
             </div>
-            <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded leading-none" style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
+            <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] px-2 py-1 rounded leading-none transition-colors "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
             {#if s.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
             {#if s.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{/if}
-            {#if s.isWhitelisted || optimistic.has(s.titleKey)}
-              <span class="min-h-0 mt-2 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
-            {:else}
-              <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
-            {/if}
+            <div class="flex gap-2 mt-2">
+              {#if s.isWhitelisted || optimistic.has(s.titleKey)}
+                <span class="min-h-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
+              {:else}
+                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
+              {/if}
+              {#if bookmarked.has(s.titleKey)}
+                <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
+              {:else}
+                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
+              {/if}
+            </div>
           </div>
         </div>
       {/each}
     </div>
     <div bind:this={sentinel} class="h-8"></div>
-    {#if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">Loading more... ({visible}/{filtered.length})</div>{/if}
+    {#if loadingMore}
+      <div class="flex flex-col gap-3">
+        {#each Array(3) as _}<div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5 animate-pulse"><div class="w-16 h-24 rounded bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="h-8 bg-white/5 rounded w-20"></div></div></div>{/each}
+      </div>
+    {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {:else}
     <div class="mt-4 flex flex-col gap-3">
       {#each flatVisible as ch (ch.titleKey + ch.chapter + ch.source)}
@@ -158,18 +239,29 @@
               {#if ch.isWhitelisted}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">WL</span>{/if}
             </div>
             <div class="flex gap-1 flex-wrap mt-1">
-              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 bg-white/10 hover:bg-white/20 rounded" style="line-height:1">Ch. {getChapterLabel(ch as any)} · {ch.source}</a>
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded transition-colors "+chapterSourceClass(ch.source)} style="line-height:1">Ch. {getChapterLabel(ch as any)} · {ch.source}</a>
               {#if ch.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{ch.type}</span>{/if}
               {#if ch.rating && Number(ch.rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(ch.rating).toFixed(1)}</span>{/if}
             </div>
             {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{/if}
             {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
-            <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center mt-2 text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg">Read</a>
+            <div class="flex gap-2 mt-2">
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-full">Read</a>
+              {#if bookmarked.has(`${ch.titleKey}:${ch.chapter}`)}
+                <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
+              {:else}
+                <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===`${ch.titleKey}:${ch.chapter}`?"...":"☆ Bookmark"}</button>
+              {/if}
+            </div>
           </div>
         </div>
       {/each}
     </div>
     <div bind:this={sentinel} class="h-8"></div>
-    {#if visible < flatFiltered.length}<div class="text-center text-xs text-white/30 py-2">Loading more... ({visible}/{flatFiltered.length})</div>{/if}
+    {#if loadingMore}
+      <div class="flex flex-col gap-3">
+        {#each Array(3) as _}<div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5 animate-pulse"><div class="w-16 h-24 rounded bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="h-8 bg-white/5 rounded w-20"></div></div></div>{/each}
+      </div>
+    {:else if visible < flatFiltered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {flatFiltered.length} — scroll for more</div>{/if}
   {/if}
 </div>

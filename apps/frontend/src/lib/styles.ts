@@ -53,6 +53,14 @@ export function sourceBadgeClass(source: string): string {
 export function sourceChipClass(source: string): string {
   return SOURCE_MAP[source.toLowerCase()]?.chip ?? "bg-white/[0.06] text-white/70";
 }
+const CHAPTER_SOURCE_MAP: Record<string, string> = {
+  shinigami: "bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/20",
+  ikiru: "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/20",
+  voratoon: "bg-orange-500/15 text-orange-300 hover:bg-orange-500/25 border border-orange-500/20",
+};
+export function chapterSourceClass(source: string): string {
+  return CHAPTER_SOURCE_MAP[source.toLowerCase()] ?? "bg-white/10 text-white/70 hover:bg-white/20 border border-white/10";
+}
 
 // Canonical status / severity colors (single source of truth).
 // Use these instead of hardcoding hex in components.
