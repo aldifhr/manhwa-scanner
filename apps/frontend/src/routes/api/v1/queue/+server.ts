@@ -1,7 +1,12 @@
 import type { RequestHandler } from "./$types";
-import { proxyToScanner } from "$lib/proxy";
-export const GET: RequestHandler = async (event) => proxyToScanner(event, "/api/v1/queue");
-export const POST: RequestHandler = async (event) => proxyToScanner(event, "/api/v1/queue");
-export const DELETE: RequestHandler = async (event) => proxyToScanner(event, "/api/v1/queue");
-export const PUT: RequestHandler = async (event) => proxyToScanner(event, "/api/v1/queue");
-
+import { backendUrl, authHeaders, TIMEOUT } from "$lib/server-api";
+export const GET: RequestHandler = async ({ request }) => {
+  try {
+    const res = await fetch(`${backendUrl()}/api/failed-dispatches/queue`, {
+      headers: authHeaders(request),
+      signal: AbortSignal.timeout(TIMEOUT.QUEUE)
+    });
+    const body = await res.text();
+    return new Response(body, { status: res.status, headers: { "Content-Type":"application/json" } });
+  } catch (e:any) { return Response.json({ success:false, error: e?.message||String(e) }, { status: 502 }); }
+};
