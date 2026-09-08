@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   let { data }: any = $props();
   // handle all backend shapes: {data:[...]}, {data:{results:[...]}}, {data:{data:[...]}}, {results:[...]}, {whitelists:[...]}
   let raw: any = $derived(data?.raw ?? data?.data);
@@ -23,6 +24,47 @@
     return true;
   }));
   function btnActive(a:boolean){ return a? "bg-white text-black" : "bg-white/[0.06] text-white/70 hover:bg-white/10"; }
+  // Search-to-add state
+  let addQ = $state("");
+  let addResults: any[] = $state([]);
+  let addLoading = $state(false);
+  let addOptimistic = $state<Set<string>>(new Set());
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  function onAddQ(v: string) {
+    addQ = v;
+    if (searchTimer) clearTimeout(searchTimer);
+    if (!v.trim()) { addResults = []; return; }
+    searchTimer = setTimeout(async () => {
+      addLoading = true;
+      try {
+        const res = await fetch(`/api/v1/catalog/search?q=${encodeURIComponent(v)}`);
+        if (res.ok) {
+          const j = await res.json();
+          addResults = j?.data?.results ?? [];
+        }
+      } catch {}
+      addLoading = false;
+    }, 300);
+  }
+  async function addWL(item: any) {
+    try {
+      const res = await fetch("/api/v1/reader/whitelist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title_key: item.titleKey,
+          title: item.title,
+          source: item.source,
+          cover: item.cover,
+          series_url: item.url,
+          origin: item.origin,
+        }),
+      });
+      if (res.ok) {
+        addOptimistic = new Set([...addOptimistic, item.titleKey]);
+      }
+    } catch {}
+  }
 </script>
 <div class="max-w-5xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Whitelist</h1>
@@ -64,6 +106,32 @@
       {#if filtered.length===0}
         <div class="text-white/40 text-sm mt-6">Empty — no whitelist yet. Add from Home via + Add WL</div>
         <details class="mt-3 text-xs"><summary class="text-white/30 cursor-pointer">debug raw</summary><pre class="mt-2 p-2 bg-white/5 rounded overflow-auto max-h-64">{JSON.stringify(raw, null, 2).slice(0,2000)}</pre></details>
+      {/if}
+    </div>
+    <!-- Add new WL section -->
+    <div class="mt-6 p-4 rounded-xl border border-white/10 bg-white/5">
+      <h2 class="text-sm font-semibold">Add to Whitelist</h2>
+      <p class="text-xs text-white/40 mt-1">Search by title, select source, then add.</p>
+      <div class="mt-3 flex gap-2">
+        <input type="text" placeholder="Search title..." value={addQ} oninput={(e)=>onAddQ((e.target as HTMLInputElement).value)} class="flex-1 bg-[#18181b] border border-white/[0.08] rounded-full px-3 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />
+        {#if addLoading}<span class="text-xs text-white/40 self-center">...</span>{/if}
+      </div>
+      {#if addResults.length > 0}
+        <div class="mt-3 space-y-2 max-h-64 overflow-y-auto">
+          {#each addResults as r}
+            <div class="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/5">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm truncate">{r.title}</div>
+                <div class="text-[10px] text-white/40 capitalize">{r.source} · {r.origin}</div>
+              </div>
+              {#if r.isInWhitelist || addOptimistic.has(r.titleKey)}
+                <span class="text-[10px] px-2 py-0.5 rounded bg-green-500/15 text-green-400">Added</span>
+              {:else}
+                <button onclick={()=>addWL(r)} class="min-h-0 text-[10px] px-2 py-1 rounded bg-white text-black">+ Add</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
       {/if}
     </div>
   {/if}

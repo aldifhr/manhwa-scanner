@@ -3,6 +3,8 @@ import { COOKIE_NAME, verifyToken } from "$lib/auth";
 import { getSecurityHeaders } from "$lib/security/headers";
 
 const PUBLIC_EXACT = new Set<string>([
+  "/",
+  "/recent",
   "/login",
   "/sw.js",
   "/manifest.json",

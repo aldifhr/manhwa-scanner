@@ -18,6 +18,7 @@
   let sortBy: "latest"|"rating"|"alpha" = $state("latest");
   let refreshing = $state(false);
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  // Restore filters from localStorage
   onMount(()=>{
     const p = new URLSearchParams(location.search);
     if (p.get("q")) q = p.get("q")!;
@@ -29,7 +30,21 @@
     if (p.get("view") === "flat") groupedMode = false;
     const s = p.get("sort");
     if (s === "rating" || s === "alpha") sortBy = s;
-    // Poll every 30s to match old React Query refetchInterval
+    // Fallback to localStorage if URL has no params
+    if (!p.toString()) {
+      try {
+        const saved = localStorage.getItem("recent_filters");
+        if (saved) {
+          const f = JSON.parse(saved);
+          q = f.q || "";
+          sourceFilter = f.sourceFilter || null;
+          countryFilter = f.countryFilter || null;
+          wlFilter = f.wlFilter || "all";
+          groupedMode = f.groupedMode !== false;
+          sortBy = f.sortBy || "latest";
+        }
+      } catch {}
+    }
     pollTimer = setInterval(async () => {
       try {
         refreshing = true;
@@ -50,6 +65,14 @@
   onDestroy(() => {
     if (pollTimer) clearInterval(pollTimer);
   });
+  // Persist filters to localStorage
+  function saveFilters() {
+    try {
+      localStorage.setItem("recent_filters", JSON.stringify({
+        q, sourceFilter, countryFilter, wlFilter, groupedMode, sortBy
+      }));
+    } catch {}
+  }
   function syncUrl(){
     const p = new URLSearchParams();
     if (q) p.set("q", q);
@@ -60,6 +83,7 @@
     if (sortBy !== "latest") p.set("sort", sortBy);
     const qs = p.toString();
     history.replaceState(null, "", `${location.pathname}${qs ? `?${qs}` : ""}`);
+    saveFilters();
   }
   function setQ(v: string){ q = v; syncUrl(); }
   function setSource(v: string | null){ sourceFilter = v; syncUrl(); }

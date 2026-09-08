@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { withCsrf } from "$lib/csrf";
   let { data }: any = $props();
   let snap: any = $derived(data?.snap?.data ?? data?.snap ?? {});
@@ -12,6 +13,7 @@
   let queueLen = $derived(queue?.depth ?? queue?.queueLength ?? queue?.queue_length ?? snap?.queueLength ?? "-");
   let cronStatus: any = $derived(snap?.cronStatus ?? snap?.cron_status ?? cron ?? {});
   let msg = $state<string | null>(null);
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
   async function post(url: string, body?: any) {
     const res = await fetch(url, withCsrf({ method:"POST", headers: body?{"Content-Type":"application/json"}:{}, body: body?JSON.stringify(body):undefined }));
     const j = await res.json().catch(()=>({}));
@@ -23,6 +25,22 @@
   async function doResync(){ try{ await post("/api/cron?action=enrich"); msg="Resync triggered"; setTimeout(()=>msg=null,3000);}catch(e:any){msg=e.message} }
   async function doClear(){ try{ await fetch("/api/v1/logs/errors", withCsrf({method:"DELETE"})); msg="Logs cleared"; setTimeout(()=>msg=null,2000); location.reload(); }catch(e:any){msg=e.message} }
   async function doRetryAll(){ try{ await post("/api/v1/failed-dispatches?action=retry-all"); msg="Retry-all triggered"; setTimeout(()=>msg=null,2000);}catch(e:any){msg=e.message} }
+  onMount(() => {
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/dashboard/snapshot?_=${Date.now()}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.data) {
+            data = { ...data, snap: { data: json.data } };
+          }
+        }
+      } catch {}
+    }, 30_000);
+  });
+  onDestroy(() => {
+    if (pollTimer) clearInterval(pollTimer);
+  });
 </script>
 <div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
   <h1 class="text-xl font-bold">Admin</h1>
@@ -55,6 +73,24 @@
       <div class="mt-2 grid gap-2">
         {#each (()=>{ const raw = health.sourceHealth ?? health.sources ?? []; if(Array.isArray(raw)) return raw.map((h:any,i:number)=>[h.source ?? h.name ?? `#${i+1}`, h] as const); return Object.entries(raw); })() as [src, h] }
           <div class="flex justify-between text-xs"><span class="text-white/70 capitalize">{src}</span><span class={String((h as any).status).toLowerCase().includes("healthy")||String((h as any).status).toLowerCase()==="ok"?"text-green-400":"text-amber-400"}>{String((h as any).status)}</span></div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+  <!-- chapters by source chart -->
+  {#if snap?.chaptersBySource24h && Object.keys(snap.chaptersBySource24h).length > 0}
+    <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+      <h2 class="text-sm font-semibold">Chapters by Source (24h)</h2>
+      <div class="mt-3 space-y-2">
+        {@const srcMax = Math.max(...Object.values(snap.chaptersBySource24h))}
+        {#each Object.entries(snap.chaptersBySource24h).sort((a: any, b: any) => b[1] - a[1]) as [src, cnt]}
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-white/60 w-16 capitalize">{src}</span>
+            <div class="flex-1 h-5 bg-white/5 rounded overflow-hidden">
+              <div class="h-full bg-amber-500/80 rounded" style="width: {srcMax ? (Number(cnt) / srcMax * 100) : 0}%"></div>
+            </div>
+            <span class="text-xs text-white/70 w-10 text-right">{cnt}</span>
+          </div>
         {/each}
       </div>
     </div>

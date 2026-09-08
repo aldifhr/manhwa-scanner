@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { withCsrf } from "$lib/csrf";
   let { data }: any = $props();
   let cron: any = $derived(data?.cron?.data ?? data?.cron ?? {});
@@ -7,6 +8,7 @@
   let cronStatus: any = $derived(cron?.cronStatus ?? cron?.cron_status ?? snap?.cronStatus ?? snap?.cron_status ?? cron ?? {});
   let msg = $state<string | null>(null);
   let loading = $state<string | null>(null);
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
   async function post(url: string, body?: any){
     loading = url;
     try{
@@ -22,6 +24,24 @@
   async function doEnrich(){ await post("/api/cron?action=enrich"); }
   async function doHealthCheck(){ await post("/api/v1/health/refresh-voratoon"); }
   let isError = $derived(String(cronStatus?.outcome ?? "").toLowerCase()==="error");
+  onMount(() => {
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/queue?limit=1&_=${Date.now()}`);
+        if (res.ok) {
+          // Trigger Svelte reactivity by reassigning data
+          const newRes = await fetch(`/api/v1/queue?limit=1`);
+          if (newRes.ok) {
+            // Force reload of page data via invalidate
+            location.reload();
+          }
+        }
+      } catch {}
+    }, 30_000);
+  });
+  onDestroy(() => {
+    if (pollTimer) clearInterval(pollTimer);
+  });
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
