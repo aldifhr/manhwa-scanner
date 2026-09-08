@@ -97,7 +97,7 @@
           {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={s.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-4 h-3 rounded-sm object-cover shrink-0" loading="lazy" />{/if}
+              {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 translate-y-px" loading="lazy" />{/if}
               <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm truncate hover:text-white/80 leading-none">{decodeHtml(s.title)}</a>
             </div>
             <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded leading-none" style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
@@ -131,7 +131,7 @@
             </div>
             {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{/if}
             {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
-            <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center mt-2 text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-full">Read</a>
+            <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center mt-2 text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg">Read</a>
           </div>
         </div>
       {/each}
