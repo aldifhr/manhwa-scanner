@@ -79,10 +79,10 @@
   {/if}
   <!-- chapters by source chart -->
   {#if snap?.chaptersBySource24h && Object.keys(snap.chaptersBySource24h).length > 0}
+    {@const srcMax = Math.max(...Object.values(snap.chaptersBySource24h as Record<string,number>))}
     <div class="p-4 rounded-xl border border-white/10 bg-white/5">
       <h2 class="text-sm font-semibold">Chapters by Source (24h)</h2>
       <div class="mt-3 space-y-2">
-        {@const srcMax = Math.max(...Object.values(snap.chaptersBySource24h))}
         {#each Object.entries(snap.chaptersBySource24h).sort((a: any, b: any) => b[1] - a[1]) as [src, cnt]}
           <div class="flex items-center gap-2">
             <span class="text-xs text-white/60 w-16 capitalize">{src}</span>

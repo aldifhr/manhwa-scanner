@@ -78,7 +78,7 @@
     const wlCount = groupedAll.filter(s=>s.isWhitelisted).length;
     return { total, avg, topGenres, wlCount, rated: ratings.length };
   })());
-  let filteredRaw = $derived(q ? groupedAll.filter(s=> (s.title||"").toLowerCase().includes(q.toLowerCase())) : groupedAll);
+  let filteredRaw = $derived((q ? groupedAll.filter(s=> (s.title||"").toLowerCase().includes(q.toLowerCase())) : groupedAll).filter(s=> !excluded.has(s.titleKey)));
   let filtered = $derived(sortGrouped(filteredRaw));
   let visible = $state(18);
   let loadingMore = $state(false);
@@ -100,6 +100,8 @@
   let optimistic = $state<Set<string>>(new Set());
   let bookmarking: string | null = $state(null);
   let bookmarked = $state<Set<string>>(new Set());
+  let excluded = $state<Set<string>>(new Set());
+  let excluding: string | null = $state(null);
   function sourceFromUrl(url: string): string {
     if (!url) return "";
     const h = url.toLowerCase();
@@ -107,6 +109,21 @@
     if (h.includes("shinigami")) return "shinigami";
     if (h.includes("voratoon")) return "voratoon";
     return "";
+  }
+  async function excludeTitle(titleKey: string, title: string, source: string) {
+    excluding = titleKey;
+    try {
+      const res = await fetch("/api/v1/excluded-titles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title_key: titleKey, title, source }),
+      });
+      if (res.ok) {
+        excluded = new Set([...excluded, titleKey]);
+        toast("Excluded from feed", "success");
+      }
+    } catch {}
+    excluding = null;
   }
   async function addWL(s:any){
     adding=s.titleKey;
@@ -228,6 +245,11 @@
               {:else}
                 <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="text-xs px-3 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
               {/if}
+              {#if excluded.has(s.titleKey)}
+                <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20">✕</span>
+              {:else}
+                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>
+              {/if}
             </div>
           </div>
         </div>
@@ -272,6 +294,11 @@
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
                 <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
+              {/if}
+              {#if excluded.has(s.titleKey)}
+                <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20">✕</span>
+              {:else}
+                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>
               {/if}
             </div>
           </div>

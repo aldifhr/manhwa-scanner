@@ -18,6 +18,8 @@
   let sortBy: "latest"|"rating"|"alpha" = $state("latest");
   let refreshing = $state(false);
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let excluded = $state<Set<string>>(new Set());
+  let excluding: string | null = $state(null);
   // Restore filters from localStorage
   onMount(()=>{
     const p = new URLSearchParams(location.search);
@@ -73,6 +75,21 @@
       }));
     } catch {}
   }
+  async function excludeTitle(titleKey: string, title: string, source: string) {
+    excluding = titleKey;
+    try {
+      const res = await fetch("/api/v1/excluded-titles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title_key: titleKey, title, source }),
+      });
+      if (res.ok) {
+        excluded = new Set([...excluded, titleKey]);
+        toast("Excluded from feed", "success");
+      }
+    } catch {}
+    excluding = null;
+  }
   function syncUrl(){
     const p = new URLSearchParams();
     if (q) p.set("q", q);
@@ -116,6 +133,7 @@
     if (countryFilter==="chinese" && o!=="cn" && o!=="chinese") return false;
     if (wlFilter==="wl" && !r.isWhitelisted) return false;
     if (wlFilter==="non" && r.isWhitelisted) return false;
+    if (excluded.has(r.titleKey)) return false;
     return true;
   })));
   let filtered = $derived(groupedMode ? sortGrouped(groupedAll.filter(s=>{
@@ -128,6 +146,7 @@
     }
     if (wlFilter==="wl" && !s.isWhitelisted) return false;
     if (wlFilter==="non" && s.isWhitelisted) return false;
+    if (excluded.has(s.titleKey)) return false;
     return true;
   })) : []);
   let visible = $state(30);
@@ -262,6 +281,11 @@
               {:else}
                 <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
               {/if}
+              {#if excluded.has(s.titleKey)}
+                <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
+              {:else}
+                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕ Exclude"}</button>
+              {/if}
             </div>
           </div>
         </div>
@@ -297,6 +321,11 @@
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
                 <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===`${ch.titleKey}:${ch.chapter}`?"...":"☆ Bookmark"}</button>
+              {/if}
+              {#if excluded.has(ch.titleKey)}
+                <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
+              {:else}
+                <button onclick={()=>excludeTitle(ch.titleKey, ch.title, ch.source)} disabled={excluding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===ch.titleKey?"...":"✕ Exclude"}</button>
               {/if}
             </div>
           </div>
