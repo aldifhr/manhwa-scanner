@@ -238,7 +238,7 @@
             </div>
             <div class="mt-auto pt-3 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
-                <span class="inline-flex items-center text-xs px-3 py-1 rounded bg-white text-black font-medium">✓ Added</span>
+                <span class="inline-flex items-center text-xs px-3 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
                 <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="text-xs px-3 py-1 rounded bg-white text-black hover:bg-zinc-200 disabled:opacity-50 font-medium transition-colors">{adding===s.titleKey ? "..." : "+ Add"}</button>
               {/if}
@@ -288,7 +288,7 @@
             </div>
             <div class="mt-auto pt-3 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
-                <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium">✓ Added</span>
+                <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
                 <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white text-black hover:bg-zinc-200 disabled:opacity-50 font-medium transition-colors">{adding===s.titleKey ? "..." : "+ Add"}</button>
               {/if}
