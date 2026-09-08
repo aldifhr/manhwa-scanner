@@ -1,10 +1,25 @@
 <script lang="ts">
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
   import { groupChapters } from "$lib/groupChapters";
+  import { withCsrf } from "$lib/csrf";
   let { data }: any = $props();
   let feed = $derived(data.feed);
   let results: any[] = $derived(feed?.data?.results ?? []);
   let grouped = $derived(results.length ? groupChapters(results as any) : []);
+  let adding = $state<string | null>(null);
+  async function addWL(series: any) {
+    adding = series.titleKey;
+    try {
+      const res = await fetch("/api/v1/reader/whitelist", withCsrf({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titleKey: series.titleKey, title: series.title, source: series.chapters[0]?.source, cover: series.cover, seriesUrl: series.seriesUrl })
+      }));
+      if (!res.ok) throw new Error(await res.text());
+      alert("Added to whitelist");
+    } catch (e: any) { alert(e?.message || "Add WL failed (login required)"); }
+    finally { adding = null; }
+  }
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-6">
@@ -45,6 +60,7 @@
             {#if series.description}
               <p class="text-[11px] text-white/55 line-clamp-2 mt-1.5">{decodeHtml(series.description)}</p>
             {/if}
+            <button onclick={() => addWL(series)} disabled={adding===series.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] disabled:opacity-50">{adding===series.titleKey ? "..." : "+ Add WL"}</button>
           </div>
         </div>
       {/each}
