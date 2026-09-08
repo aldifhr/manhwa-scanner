@@ -264,29 +264,30 @@
       </div>
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {:else}
-    <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
       {#each shown as s (s.titleKey + '|' + (s.seriesUrl || s.chapters?.[0]?.seriesUrl || ''))}
-        <div class="group flex gap-3 p-3 rounded-xl border border-white/[0.08] bg-[#18181b] hover:border-white/[0.14] hover:bg-[#27272a] transition-colors">
-          <a href={s.seriesUrl || s.chapters[0]?.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="shrink-0">
-            {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={decodeHtml(s.title)} class="w-16 h-24 object-cover rounded-lg bg-[#27272a]" loading="lazy" />{:else}<div class="w-16 h-24 rounded-lg bg-[#27272a] flex items-center justify-center text-zinc-500 text-xs">—</div>{/if}
+        <div class="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#18181b] hover:border-white/15 transition-colors">
+          <a href={s.seriesUrl || s.chapters[0]?.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="relative block aspect-[3/4] overflow-hidden bg-black">
+            {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={decodeHtml(s.title)} class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />{:else}<div class="absolute inset-0 bg-[#27272a] flex items-center justify-center text-zinc-500 text-xs">—</div>{/if}
+            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3">
+              <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{decodeHtml(s.title)}</div>
+              <div class="flex items-center gap-1 mt-1.5 flex-wrap">
+                {#if s.rating && Number(s.rating)>0}<span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-amber-500/90 text-white">★ {Number(s.rating).toFixed(1)}</span>{/if}
+                {#each [...new Set(s.chapters.map((c:any)=>c.source))] as src}<span class={"text-[9px] px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white "+(src?"":"hidden")}>{src}</span>{/each}
+              </div>
+              {#if s.genres?.length}<p class="text-[10px] text-white/70 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
+            </div>
           </a>
-          <div class="flex-1 min-w-0 flex flex-col">
-            <div class="flex items-start gap-2">
-              <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="text-sm font-medium leading-tight line-clamp-1 hover:text-white">{decodeHtml(s.title)}</a>
-            </div>
-            {#if s.genres?.length}<p class="text-[10px] text-zinc-500 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
-            {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{:else}<p class="text-[11px] text-zinc-500 mt-1">—</p>{/if}
-            <div class="flex items-center gap-1.5 mt-1">
-              {#if s.rating && Number(s.rating)>0}<span class="text-[10px] text-amber-300">★ {Number(s.rating).toFixed(1)}</span>{/if}
-              {#each [...new Set(s.chapters.map((c:any)=>c.source))] as src}<span class={"text-[9px] px-1.5 py-0.5 rounded "+sourceChipClass(src as string)}>{src}</span>{/each}
-            </div>
-            <div class="flex gap-1 flex-wrap mt-2">
+          <div class="p-3 flex flex-col gap-2 flex-1">
+            {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 leading-snug">{decodeHtml(s.description)}</p>{/if}
+            <div class="flex gap-1 flex-wrap">
               {#each s.chapters.slice(0,3) as ch}
                 {@const label=getChapterLabel(ch as any)}
                 {#if label!=="?" }<a href={ch.chapterUrl||ch.url||"#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded transition-colors "+chapterSourceClass(ch.source)}>Ch. {label}</a>{/if}
               {/each}
             </div>
-            <div class="mt-auto pt-3 flex gap-2">
+            <div class="mt-auto pt-2 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
@@ -297,11 +298,7 @@
               {:else}
                 <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
               {/if}
-              {#if excluded.has(s.titleKey)}
-                <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20">✕</span>
-              {:else}
-                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>
-              {/if}
+              {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto text-[10px] w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
           </div>
         </div>
