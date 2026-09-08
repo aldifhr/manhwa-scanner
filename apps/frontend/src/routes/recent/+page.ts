@@ -1,7 +1,7 @@
 import type { PageLoad } from "./$types";
 export const load: PageLoad = async ({ fetch }) => {
   try {
-    const res = await fetch("/api/v1/reader/rss?limit=50&group=false");
+    const res = await fetch("/api/v1/reader/rss?limit=1000&group=false");
     const json = await res.json();
     return { feed: json, error: null };
   } catch (e) {

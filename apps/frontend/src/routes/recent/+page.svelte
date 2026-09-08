@@ -7,6 +7,7 @@
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
   let sourceFilter: string | null = $state(null);
   let countryFilter: string | null = $state(null);
+  let wlFilter: "all"|"wl"|"non" = $state("all");
   let sources: string[] = $derived([...new Set(groupedAll.flatMap(s=>s.chapters.map(c=>c.source)))].sort());
   let filtered = $derived(groupedAll.filter(s=>{
     if (sourceFilter && !s.chapters.some(c=>c.source===sourceFilter)) return false;
@@ -15,9 +16,14 @@
       if (countryFilter==="korean" && o!=="kr" && o!=="korean") return false;
       if (countryFilter==="chinese" && o!=="cn" && o!=="chinese") return false;
     }
+    if (wlFilter==="wl" && !s.isWhitelisted) return false;
+    if (wlFilter==="non" && s.isWhitelisted) return false;
     return true;
   }));
-  let grouped = $derived(filtered);
+  let visible = $state(30);
+  let grouped = $derived(filtered.slice(0, visible));
+  // reset visible when filters change
+  $effect(()=>{ void filtered.length; visible=30; });
   let adding: string | null = $state(null);
   async function addWL(s: any) {
     adding = s.titleKey;
@@ -28,24 +34,40 @@
     } catch(e:any){ alert(e?.message?.slice(0,300) || "Add WL failed"); } finally { adding=null; }
   }
   function btnActive(active: boolean){ return active ? "bg-[var(--gold-accent)] text-black" : "bg-white/10 text-white/70 hover:bg-white/20"; }
+  let sentinel: HTMLDivElement | null = $state(null);
+  $effect(()=>{
+    if (!sentinel) return;
+    const io = new IntersectionObserver((entries)=>{
+      if (entries[0]?.isIntersecting && visible < filtered.length) visible = Math.min(visible+30, filtered.length);
+    }, { rootMargin: "400px" });
+    io.observe(sentinel);
+    return ()=>io.disconnect();
+  });
 </script>
 <div class="max-w-4xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Recent</h1>
   <p class="text-white/60 text-sm mt-1">Latest grouped feed — {grouped.length} / {groupedAll.length} series</p>
   <!-- filters -->
-  <div class="mt-3 flex flex-wrap gap-2">
-    <button onclick={()=>countryFilter=null} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter===null)}>All Countries</button>
-    <button onclick={()=>countryFilter=countryFilter==="korean"?null:"korean"} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="korean")}>Korea</button>
-    <button onclick={()=>countryFilter=countryFilter==="chinese"?null:"chinese"} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="chinese")}>China</button>
-    <span class="w-px h-4 bg-white/10 self-center mx-1"></span>
-    <button onclick={()=>sourceFilter=null} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(sourceFilter===null)}>All Sources</button>
-    {#each sources as s}
-      <button onclick={()=>sourceFilter=sourceFilter===s?null:s} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+btnActive(sourceFilter===s)}>{s}</button>
-    {/each}
+  <div class="mt-3 flex flex-col gap-2">
+    <div class="flex flex-wrap gap-2">
+      <button onclick={()=>wlFilter="all"} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="all")}>All</button>
+      <button onclick={()=>wlFilter="non"} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="non")}>Non-WL</button>
+      <button onclick={()=>wlFilter="wl"} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="wl")}>WL</button>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button onclick={()=>countryFilter=null} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter===null)}>All Countries</button>
+      <button onclick={()=>countryFilter=countryFilter==="korean"?null:"korean"} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="korean")}>Korea</button>
+      <button onclick={()=>countryFilter=countryFilter==="chinese"?null:"chinese"} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="chinese")}>China</button>
+      <span class="w-px h-4 bg-white/10 self-center mx-1"></span>
+      <button onclick={()=>sourceFilter=null} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(sourceFilter===null)}>All Sources</button>
+      {#each sources as s}
+        <button onclick={()=>sourceFilter=sourceFilter===s?null:s} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+btnActive(sourceFilter===s)}>{s}</button>
+      {/each}
+    </div>
   </div>
   {#if data.error}
     <div class="mt-4 p-3 rounded bg-red-500/10 text-red-400 text-sm">{data.error}</div>
-  {:else if grouped.length === 0}
+  {:else if filtered.length === 0}
     <div class="mt-8 text-center text-white/40">No data</div>
   {:else}
     <div class="mt-4 flex flex-col gap-3">
@@ -61,5 +83,7 @@
         </div>
       {/each}
     </div>
+    <div bind:this={sentinel} class="h-8"></div>
+    {#if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">Loading more... ({visible}/{filtered.length})</div>{/if}
   {/if}
 </div>
