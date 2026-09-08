@@ -306,8 +306,8 @@
     </div>
     <div bind:this={sentinel} class="h-8"></div>
     {#if loadingMore}
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {#each Array(3) as _}<div class="flex gap-3 p-3 rounded-xl border border-white/[0.08] bg-[#18181b] animate-pulse"><div class="w-16 h-24 rounded-lg bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="flex gap-1"><div class="h-5 w-12 bg-white/5 rounded"></div><div class="h-5 w-12 bg-white/5 rounded"></div></div></div></div>{/each}
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
       </div>
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {/if}

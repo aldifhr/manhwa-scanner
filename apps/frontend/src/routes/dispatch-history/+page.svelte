@@ -23,7 +23,7 @@
     }catch{} finally{ loading=false; }
   }
   onMount(load);
-  let filtered = $derived(source==="all" ? items : items.filter((i:any)=>i.source===source));
+  let filtered = $derived(items);
 </script>
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-4">
   <h1 class="text-xl font-bold">Dispatch History</h1>
