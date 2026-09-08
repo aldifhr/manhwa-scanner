@@ -27,12 +27,12 @@
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-4">
   <h1 class="text-xl font-bold">Dispatch History</h1>
   <div class="flex flex-wrap gap-2">
-    <input type="text" placeholder="Search title..." bind:value={q} oninput={()=>{ page=1; setTimeout(load,300); }} class="flex-1 min-w-40 bg-black border border-white/10 rounded-full px-3 py-1.5 text-sm" />
+    <input type="text" placeholder="Search title..." bind:value={q} oninput={()=>{ page=1; setTimeout(load,300); }} class="flex-1 min-w-40 bg-[#18181b] border border-white/[0.08] rounded-full px-3 py-1.5 text-sm" />
     <button onclick={()=>{page=1; load()}} class="min-h-0 px-3 py-1 text-xs rounded-full bg-white/10">Search</button>
   </div>
   <div class="flex gap-2 flex-wrap">
     {#each ["all","ikiru","shinigami","voratoon"] as s}
-      <button onclick={()=>{source=s;}} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+(source===s?"bg-[var(--gold-accent)] text-black":"bg-white/10")}>{s}</button>
+      <button onclick={()=>{source=s;}} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+(source===s?"bg-white text-black":"bg-white/[0.06]")}>{s}</button>
     {/each}
   </div>
   <p class="text-xs text-white/40">{total} total · {filtered.length} shown · page {page}</p>

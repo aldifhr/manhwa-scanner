@@ -3,7 +3,7 @@
   let { variant = "default", size = "default", class: className = "", children, ...rest }: any = $props();
   const base = "inline-flex items-center justify-center rounded-lg font-medium transition-colors disabled:opacity-50";
   const variants: Record<string,string> = {
-    default: "bg-white text-black hover:bg-white/90",
+    default: "bg-white text-black hover:bg-zinc-200",
     ghost: "bg-transparent hover:bg-white/10",
     outline: "border border-white/10 hover:bg-white/10"
   };

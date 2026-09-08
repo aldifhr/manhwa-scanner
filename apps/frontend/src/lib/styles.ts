@@ -16,12 +16,12 @@ export function filterButtonClass(
     );
   }
 
-  // pill variant (default) — gold accent when active
+  // pill variant (default) — white accent when active
   return cn(
     "px-3 py-1.5 text-xs font-medium rounded-full transition-colors cursor-pointer border shrink-0 whitespace-nowrap min-h-0 min-w-0",
     active
-      ? "bg-[var(--gold-accent)] text-black border-transparent shadow-[0_2px_10px_var(--gold-accent-soft)]"
-      : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:border-white/20 hover:bg-white/10"
+      ? "bg-white text-black border-transparent"
+      : "bg-white/[0.06] border-white/[0.08] text-white/60 hover:text-white hover:border-white/20 hover:bg-white/10"
   );
 }
 
@@ -47,11 +47,11 @@ const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
 export function sourceBadgeClass(source: string): string {
   return (
     SOURCE_MAP[source.toLowerCase()]?.badge ??
-    "bg-white/10 text-white/80 border border-white/10"
+    "bg-white/[0.06] text-white/70 border border-white/[0.08]"
   );
 }
 export function sourceChipClass(source: string): string {
-  return SOURCE_MAP[source.toLowerCase()]?.chip ?? "bg-white/10 text-white/80";
+  return SOURCE_MAP[source.toLowerCase()]?.chip ?? "bg-white/[0.06] text-white/70";
 }
 
 // Canonical status / severity colors (single source of truth).
@@ -61,5 +61,3 @@ export const STATUS_COLORS: Record<string, string> = {
   degraded: "#f59e0b",
   down: "#ef4444",
 };
-
-

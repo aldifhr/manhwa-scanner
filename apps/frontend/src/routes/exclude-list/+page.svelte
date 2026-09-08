@@ -28,8 +28,8 @@
   <h1 class="text-xl font-bold">Exclude List</h1>
   <p class="text-white/60 text-sm mt-1">{arr.length} titles · hidden from feed</p>
   <div class="mt-4 flex gap-2">
-    <input bind:value={q} placeholder="title_key or title" class="flex-1 bg-black border border-white/10 rounded-lg px-3 py-2 text-sm" />
-    <button onclick={add} disabled={adding||!q.trim()} class="min-h-0 px-4 py-2 text-sm rounded-lg bg-[var(--gold-accent)] text-black disabled:opacity-50">Add</button>
+    <input bind:value={q} placeholder="title_key or title" class="flex-1 bg-[#18181b] border border-white/[0.08] rounded-lg px-3 py-2 text-sm" />
+    <button onclick={add} disabled={adding||!q.trim()} class="min-h-0 px-4 py-2 text-sm rounded-lg bg-white text-black font-medium disabled:opacity-50">Add</button>
   </div>
   {#if data.error}<div class="mt-3 p-2 bg-red-500/10 text-red-400 text-sm rounded">{data.error}</div>{/if}
   <div class="mt-4 grid gap-2">

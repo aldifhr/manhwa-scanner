@@ -29,15 +29,15 @@
   {#if data.error}<div class="p-3 bg-red-500/10 text-red-400 text-sm rounded">{data.error}</div>{/if}
   <!-- overview -->
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-    <div class="p-4 rounded-xl bg-[var(--gold-surface)] border border-[var(--gold-border)]"><div class="text-xs text-white/50">Whitelist</div><div class="text-lg font-bold">{whitelistCount}</div></div>
-    <div class="p-4 rounded-xl bg-[var(--gold-surface)] border border-[var(--gold-border)]"><div class="text-xs text-white/50">Queue</div><div class="text-lg font-bold">{queueLen}</div></div>
-    <div class="p-4 rounded-xl bg-[var(--gold-surface)] border border-[var(--gold-border)]"><div class="text-xs text-white/50">Health</div><div class="text-sm font-medium truncate">{health?.status ?? health?.overall ?? "-"}</div></div>
-    <div class="p-4 rounded-xl bg-[var(--gold-surface)] border border-[var(--gold-border)]"><div class="text-xs text-white/50">Cron</div><div class="text-xs font-medium truncate">{cronStatus?.outcome ?? cronStatus?.status ?? "-"}</div></div>
+    <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Whitelist</div><div class="text-lg font-bold">{whitelistCount}</div></div>
+    <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Queue</div><div class="text-lg font-bold">{queueLen}</div></div>
+    <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Health</div><div class="text-sm font-medium truncate">{health?.status ?? health?.overall ?? "-"}</div></div>
+    <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Cron</div><div class="text-xs font-medium truncate">{cronStatus?.outcome ?? cronStatus?.status ?? "-"}</div></div>
   </div>
   {#if msg}<div class="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">{msg}</div>{/if}
   <!-- actions -->
   <div class="flex flex-wrap gap-2">
-    <button onclick={doCron} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-[var(--gold-accent)] text-black">Trigger Cron</button>
+    <button onclick={doCron} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white text-black font-medium">Trigger Cron</button>
     <button onclick={doRefresh} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Refresh Voratoon</button>
     <button onclick={doResync} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Resync Ratings</button>
     <button onclick={doRetryAll} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Retry Failed All</button>

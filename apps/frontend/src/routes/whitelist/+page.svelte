@@ -22,7 +22,7 @@
     if (srcFilter && s!==srcFilter) return false;
     return true;
   }));
-  function btnActive(a:boolean){ return a? "bg-[var(--gold-accent)] text-black" : "bg-white/10 text-white/70 hover:bg-white/20"; }
+  function btnActive(a:boolean){ return a? "bg-white text-black" : "bg-white/[0.06] text-white/70 hover:bg-white/10"; }
 </script>
 <div class="max-w-5xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Whitelist</h1>
@@ -31,7 +31,7 @@
     <div class="mt-4 p-4 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">Login required — <a href="/login?redirect=/whitelist" class="underline">login</a> to see whitelist</div>
   {:else}
     <div class="mt-3 flex flex-col gap-2">
-      <input type="text" placeholder="Search title..." bind:value={q} class="w-full sm:w-64 bg-black border border-white/10 rounded-full px-3 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-[var(--gold-accent)]" />
+      <input type="text" placeholder="Search title..." bind:value={q} class="w-full sm:w-64 bg-[#18181b] border border-white/[0.08] rounded-full px-3 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />
       <div class="flex flex-wrap gap-2">
         <button onclick={()=>srcFilter=null} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(srcFilter===null)}>All Sources</button>
         {#each sources as s}<button onclick={()=>srcFilter=srcFilter===s?null:s} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+btnActive(srcFilter===s)}>{s}</button>{/each}

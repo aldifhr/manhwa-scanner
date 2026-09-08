@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
@@ -11,6 +12,28 @@
   let countryFilter: string | null = $state(null);
   let wlFilter: "all"|"wl"|"non" = $state("all");
   let groupedMode = $state(true);
+  onMount(()=>{
+    const p = new URLSearchParams(location.search);
+    if (p.get("source")) sourceFilter = p.get("source");
+    const c = p.get("country");
+    if (c === "korean" || c === "chinese") countryFilter = c;
+    const w = p.get("wl");
+    if (w === "wl" || w === "non") wlFilter = w;
+    if (p.get("view") === "flat") groupedMode = false;
+  });
+  function syncUrl(){
+    const p = new URLSearchParams();
+    if (sourceFilter) p.set("source", sourceFilter);
+    if (countryFilter) p.set("country", countryFilter);
+    if (wlFilter !== "all") p.set("wl", wlFilter);
+    if (!groupedMode) p.set("view", "flat");
+    const qs = p.toString();
+    history.replaceState(null, "", `${location.pathname}${qs ? `?${qs}` : ""}`);
+  }
+  function setSource(v: string | null){ sourceFilter = v; syncUrl(); }
+  function setCountry(v: string | null){ countryFilter = v; syncUrl(); }
+  function setWl(v: "all"|"wl"|"non"){ wlFilter = v; syncUrl(); }
+  function setGrouped(v: boolean){ groupedMode = v; syncUrl(); }
   let sources: string[] = $derived([...new Set(groupedAll.flatMap(s=>s.chapters.map(c=>c.source)))].sort());
   let flatFiltered = $derived(results.filter((r:any)=>{
     if (sourceFilter && r.source!==sourceFilter) return false;
@@ -39,16 +62,25 @@
   $effect(()=>{ void filtered.length; void flatFiltered.length; void groupedMode; visible=30; });
   let adding: string | null = $state(null);
   let optimistic = $state<Set<string>>(new Set());
+  function sourceFromUrl(url: string): string {
+    if (!url) return "";
+    const h = url.toLowerCase();
+    if (h.includes("ikiru")) return "ikiru";
+    if (h.includes("shinigami")) return "shinigami";
+    if (h.includes("voratoon")) return "voratoon";
+    return "";
+  }
   async function addWL(s: any) {
     adding = s.titleKey;
     try {
-      const res = await fetch("/api/v1/reader/whitelist", withCsrf({ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: s.titleKey, title: s.title, source: s.chapters[0]?.source, cover: s.cover, series_url: s.seriesUrl, origin: s.origin, genres: s.genres, description: s.description }) }));
+      const src = sourceFromUrl(s.seriesUrl) || s.chapters[0]?.source || "";
+      const res = await fetch("/api/v1/reader/whitelist", withCsrf({ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: s.titleKey, title: s.title, source: src, cover: s.cover, series_url: s.seriesUrl, origin: s.origin, genres: s.genres, description: s.description }) }));
       if (!res.ok) throw new Error(await res.text());
       optimistic = new Set([...optimistic, s.titleKey]);
       toast("Added to whitelist", "success");
     } catch(e:any){ toast(e?.message?.slice(0,300) || "Add WL failed", "error"); } finally { adding=null; }
   }
-  function btnActive(active: boolean){ return active ? "bg-[var(--gold-accent)] text-black" : "bg-white/10 text-white/70 hover:bg-white/20"; }
+  function btnActive(active: boolean){ return active ? "bg-white text-black" : "bg-white/[0.06] text-white/70 hover:bg-white/10"; }
   let sentinel: HTMLDivElement | null = $state(null);
   $effect(()=>{
     if (!sentinel) return;
@@ -65,24 +97,24 @@
   <p class="text-white/60 text-sm mt-1">{groupedMode ? `Grouped — ${grouped.length} / ${filtered.length} series` : `Flat — ${flatVisible.length} / ${flatFiltered.length} ch`} · total {groupedAll.length} series / {results.length} ch</p>
   <!-- grouped toggle -->
   <div class="mt-3 inline-flex rounded-full bg-white/5 border border-white/10 p-1">
-    <button onclick={()=>groupedMode=true} class={"min-h-0 px-4 py-1 text-xs rounded-full "+(groupedMode?"bg-[var(--gold-accent)] text-black":"text-white/60")}>Grouped</button>
-    <button onclick={()=>groupedMode=false} class={"min-h-0 px-4 py-1 text-xs rounded-full "+(!groupedMode?"bg-[var(--gold-accent)] text-black":"text-white/60")}>Flat</button>
+    <button onclick={()=>setGrouped(true)} class={"min-h-0 px-4 py-1 text-xs rounded-full "+(groupedMode?"bg-white text-black":"text-white/60")}>Grouped</button>
+    <button onclick={()=>setGrouped(false)} class={"min-h-0 px-4 py-1 text-xs rounded-full "+(!groupedMode?"bg-white text-black":"text-white/60")}>Flat</button>
   </div>
   <!-- filters -->
   <div class="mt-3 flex flex-col gap-2">
     <div class="flex flex-wrap gap-2">
-      <button onclick={()=>wlFilter="all"} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="all")}>All</button>
-      <button onclick={()=>wlFilter="non"} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="non")}>Non-WL</button>
-      <button onclick={()=>wlFilter="wl"} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="wl")}>WL</button>
+      <button onclick={()=>setWl("all")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="all")}>All</button>
+      <button onclick={()=>setWl("non")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="non")}>Non-WL</button>
+      <button onclick={()=>setWl("wl")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(wlFilter==="wl")}>WL</button>
     </div>
     <div class="flex flex-wrap gap-2">
-      <button onclick={()=>countryFilter=null} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter===null)}>All Countries</button>
-      <button onclick={()=>countryFilter=countryFilter==="korean"?null:"korean"} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="korean")}>Korea</button>
-      <button onclick={()=>countryFilter=countryFilter==="chinese"?null:"chinese"} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="chinese")}>China</button>
+      <button onclick={()=>setCountry(null)} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter===null)}>All Countries</button>
+      <button onclick={()=>setCountry(countryFilter==="korean"?null:"korean")} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="korean")}>Korea</button>
+      <button onclick={()=>setCountry(countryFilter==="chinese"?null:"chinese")} class={"min-h-0 inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full "+btnActive(countryFilter==="chinese")}>China</button>
       <span class="w-px h-4 bg-white/10 self-center mx-1"></span>
-      <button onclick={()=>sourceFilter=null} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(sourceFilter===null)}>All Sources</button>
+      <button onclick={()=>setSource(null)} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(sourceFilter===null)}>All Sources</button>
       {#each sources as s}
-        <button onclick={()=>sourceFilter=sourceFilter===s?null:s} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+btnActive(sourceFilter===s)}>{s}</button>
+        <button onclick={()=>setSource(sourceFilter===s?null:s)} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+btnActive(sourceFilter===s)}>{s}</button>
       {/each}
     </div>
   </div>
@@ -106,7 +138,7 @@
             {#if s.isWhitelisted || optimistic.has(s.titleKey)}
               <span class="min-h-0 mt-2 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
             {:else}
-              <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-[var(--gold-accent)] text-black disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
+              <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
             {/if}
           </div>
         </div>

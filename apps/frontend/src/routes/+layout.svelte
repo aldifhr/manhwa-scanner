@@ -16,20 +16,20 @@
   <meta name="theme-color" content="#000000" />
 </svelte:head>
 
-<div class="min-h-dvh bg-black text-white">
-  <nav class="sticky top-0 z-40 flex items-center justify-between px-4 h-14 border-b border-white/10 bg-black/80 backdrop-blur">
-    <a href="/" class="font-bold tracking-tighter text-lg inline-flex items-center">ManhwaScan</a>
-    <div class="flex items-center gap-4 text-sm text-white/70 *:min-h-0 *:min-w-0">
-      <a href="/" class="inline-flex items-center h-7 px-1">Home</a>
-      <a href="/recent" class="inline-flex items-center h-7 px-1">Recent</a>
-      <a href="/whitelist" class="inline-flex items-center h-7 px-1">Whitelist</a>
-      <a href="/exclude-list" class="inline-flex items-center h-7 px-1">Exclude</a>
-      <a href="/dispatch-history" class="inline-flex items-center h-7 px-1">History</a>
-      <a href="/bookmarks" class="inline-flex items-center h-7 px-1">Bookmarks</a>
+<div class="min-h-dvh bg-[#09090b] text-white">
+  <nav class="sticky top-0 z-40 flex items-center justify-between px-4 h-14 border-b border-white/[0.08] bg-[#09090b]">
+    <a href="/" class="font-bold tracking-tight text-lg inline-flex items-center">ManhwaScan</a>
+    <div class="flex items-center gap-4 text-sm text-white/60 *:min-h-0 *:min-w-0">
+      <a href="/" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Home</a>
+      <a href="/recent" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Recent</a>
+      <a href="/whitelist" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Whitelist</a>
+      <a href="/exclude-list" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Exclude</a>
+      <a href="/dispatch-history" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">History</a>
+      <a href="/bookmarks" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Bookmarks</a>
       {#if isAuthed}
-        <button onclick={logout} class="min-h-0 min-w-0 inline-flex items-center justify-center text-xs px-3 h-7 rounded-full bg-white/10 hover:bg-white/20">Logout</button>
+        <button onclick={logout} class="min-h-0 min-w-0 inline-flex items-center justify-center text-xs px-3 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] hover:bg-white/10 transition-colors">Logout</button>
       {:else}
-        <a href="/login" class="inline-flex items-center h-7 px-1">Login</a>
+        <a href="/login" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Login</a>
       {/if}
     </div>
   </nav>

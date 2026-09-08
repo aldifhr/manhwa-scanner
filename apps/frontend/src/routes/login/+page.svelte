@@ -38,19 +38,19 @@
 <div class="relative min-h-[calc(100dvh-56px)] flex items-center justify-center px-4 py-8">
   <div class="w-full max-w-sm mx-auto">
     <div class="flex flex-col items-center mb-6">
-      <h1 class="text-2xl font-bold tracking-tight">Manhwa<span class="text-[var(--gold-accent)]">Scanner</span></h1>
+      <h1 class="text-2xl font-bold tracking-tight">Manhwa<span class="text-white">Scanner</span></h1>
       <p class="text-white/50 text-sm mt-1 tracking-wide uppercase">dashboard</p>
     </div>
-    <form onsubmit={handleSubmit} class="bg-[var(--gold-surface)] border border-[var(--gold-border)] rounded-xl p-6 space-y-5">
+    <form onsubmit={handleSubmit} class="bg-[#18181b] border border-white/[0.08] rounded-xl p-6 space-y-5">
       {#if error}<div class="rounded-lg px-3 py-2 text-sm bg-red-500/10 border border-red-500/20 text-red-400">{error}</div>{/if}
       <div>
         <label for="password" class="block text-[13px] font-medium text-white/70 mb-2">Password</label>
         <div class="relative">
-          <input id="password" type={show ? "text" : "password"} bind:value={password} placeholder="Password" autocomplete="current-password" required class="w-full bg-black border border-white/10 rounded-lg px-3.5 py-2.5 pr-10 text-sm placeholder:text-white/30 focus:outline-none focus:border-[var(--gold-accent)]" />
+          <input id="password" type={show ? "text" : "password"} bind:value={password} placeholder="Password" autocomplete="current-password" required class="w-full bg-[#09090b] border border-white/[0.08] rounded-lg px-3.5 py-2.5 pr-10 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />
           <button type="button" onclick={() => show = !show} class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white text-xs">{show ? "Hide" : "Show"}</button>
         </div>
       </div>
-      <button type="submit" disabled={loading || !password} class="w-full bg-[var(--gold-accent)] hover:bg-[var(--gold-accent-hover)] text-black text-sm font-medium rounded-lg px-4 py-2.5 flex items-center justify-center gap-2 disabled:opacity-40">
+      <button type="submit" disabled={loading || !password} class="w-full bg-white hover:bg-zinc-200 text-black text-sm font-medium rounded-lg px-4 py-2.5 flex items-center justify-center gap-2 disabled:opacity-40">
         {#if loading}<span class="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>{:else}Sign in →{/if}
       </button>
     </form>
