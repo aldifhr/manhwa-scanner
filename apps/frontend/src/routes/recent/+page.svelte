@@ -78,14 +78,19 @@
   async function excludeTitle(titleKey: string, title: string, source: string) {
     excluding = titleKey;
     try {
-      const res = await fetch("/api/v1/excluded-titles", {
+      const res = await fetch("/api/v1/excluded-titles", withCsrf({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title_key: titleKey, title, source }),
-      });
+      }));
       if (res.ok) {
         excluded = new Set([...excluded, titleKey]);
         toast("Excluded from feed", "success");
+      } else if (res.status === 401 || res.status === 403) {
+        toast("Login required to exclude", "error");
+      } else {
+        const t = await res.text().catch(()=>"");
+        toast(t.slice(0,120) || "Exclude failed", "error");
       }
     } catch {}
     excluding = null;
