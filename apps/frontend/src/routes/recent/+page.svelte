@@ -225,7 +225,7 @@
     return ()=>io.disconnect();
   });
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6 overflow-x-hidden">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 overflow-x-hidden">
   <h1 class="text-xl font-bold">Recent</h1>
   <p class="text-white/60 text-sm mt-1">{groupedMode ? `Grouped — ${grouped.length} / ${filtered.length} series` : `Flat — ${flatVisible.length} / ${flatFiltered.length} ch`} · total {groupedAll.length} series / {results.length} ch {#if !refreshing}<span class="text-white/30"> · auto-refresh 30s</span>{/if}</p>
   <!-- search + sort -->
