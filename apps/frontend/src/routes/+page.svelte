@@ -19,6 +19,11 @@
   let continueReading = $state<any[]>([]);
   onMount(()=>{
     continueReading = loadContinueReading();
+    fetch("/api/v1/excluded-titles").then(r=>r.json()).then(j=>{
+      if (j?.data?.results) {
+        excluded = new Set(j.data.results.map((r:any)=>r.titleKey||r.title_key).filter(Boolean));
+      }
+    }).catch(()=>{});
     const p = new URLSearchParams(location.search);
     if (p.get("q")) q = p.get("q")!;
     const s = p.get("sort");
