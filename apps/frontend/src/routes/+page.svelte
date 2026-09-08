@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
   import { sourceChipClass, chapterSourceClass } from "$lib/styles";
   import { groupChapters } from "$lib/groupChapters";
@@ -12,11 +12,26 @@
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
   let q = $state("");
   let sortBy: "latest"|"rating"|"alpha" = $state("latest");
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
   onMount(()=>{
     const p = new URLSearchParams(location.search);
     if (p.get("q")) q = p.get("q")!;
     const s = p.get("sort");
     if (s === "rating" || s === "alpha") sortBy = s;
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/reader/rss?limit=36&group=false&_=${Date.now()}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.data?.results) {
+            data = { feed: json, error: null };
+          }
+        }
+      } catch {}
+    }, 30_000);
+  });
+  onDestroy(() => {
+    if (pollTimer) clearInterval(pollTimer);
   });
   function syncUrl(){
     const p = new URLSearchParams();

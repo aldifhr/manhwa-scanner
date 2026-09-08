@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
@@ -16,6 +16,8 @@
   let wlFilter: "all"|"wl"|"non" = $state("all");
   let groupedMode = $state(true);
   let sortBy: "latest"|"rating"|"alpha" = $state("latest");
+  let refreshing = $state(false);
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
   onMount(()=>{
     const p = new URLSearchParams(location.search);
     if (p.get("q")) q = p.get("q")!;
@@ -27,6 +29,26 @@
     if (p.get("view") === "flat") groupedMode = false;
     const s = p.get("sort");
     if (s === "rating" || s === "alpha") sortBy = s;
+    // Poll every 30s to match old React Query refetchInterval
+    pollTimer = setInterval(async () => {
+      try {
+        refreshing = true;
+        const res = await fetch(`/api/v1/reader/rss?limit=1000&group=false&_=${Date.now()}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.data?.results) {
+            data = { feed: json, error: null };
+          }
+        }
+      } catch {
+        // silent fail on poll
+      } finally {
+        refreshing = false;
+      }
+    }, 30_000);
+  });
+  onDestroy(() => {
+    if (pollTimer) clearInterval(pollTimer);
   });
   function syncUrl(){
     const p = new URLSearchParams();
@@ -150,7 +172,7 @@
 </script>
 <div class="max-w-4xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Recent</h1>
-  <p class="text-white/60 text-sm mt-1">{groupedMode ? `Grouped — ${grouped.length} / ${filtered.length} series` : `Flat — ${flatVisible.length} / ${flatFiltered.length} ch`} · total {groupedAll.length} series / {results.length} ch</p>
+  <p class="text-white/60 text-sm mt-1">{groupedMode ? `Grouped — ${grouped.length} / ${filtered.length} series` : `Flat — ${flatVisible.length} / ${flatFiltered.length} ch`} · total {groupedAll.length} series / {results.length} ch {#if !refreshing}<span class="text-white/30"> · auto-refresh 30s</span>{/if}</p>
   <!-- search + sort -->
   <div class="mt-3 flex flex-col sm:flex-row gap-2">
     <input type="text" placeholder="Search title..." value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />

@@ -49,7 +49,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         return 0
     if guild_rows is None:
         guild_rows = load_guild_settings()
-    from app.utils.text import normalize_title_key as _normalize_title_key
+    from app.utils.text import normalize_title_key, slugify_title_key
 
     to_send, to_backfill = _split_send_backfill(items)
 
@@ -84,7 +84,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # ponytail: ceiling guard — drop chapters at/below whitelist.latest_sent_chapter even when legacy fcfs_key is NULL/mismatched
     try:
         from app.db import get_supabase as _gs_ceil
-        from app.utils.text import normalize_title_key as _ntk_ceil
+        from app.utils.text import slugify_title_key as _ntk_ceil
         _wl_c = _gs_ceil().table("whitelist").select("title_key,source,latest_sent_chapter").execute().data or []
         _ceil_map: dict[tuple[str, str], float] = {}
         for _w in _wl_c:
@@ -228,7 +228,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         # the channel has no guild_settings row (e.g. explicit channel_ids arg).
         _gs_row = next((g for g in guild_rows if str(g.get("channel_id")) == str(ch)), {})
         _origin_f = {o.strip().upper() for o in str(_gs_row.get("origin_filter") or "").split(",") if o.strip()}
-        _excl_titles = {_normalize_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
+        _excl_titles = {slugify_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
         seen_key_run: set[str] = set()
         _consec_fail = 0  # ponytail: burst guard — stop flooding after 3 gateway fails
         for it in to_send:
@@ -239,7 +239,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             if _origin_f and str(it.get("origin") or "").upper() not in _origin_f:
                 continue
             # per-guild excluded titles
-            if _excl_titles and _normalize_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:
+            if _excl_titles and slugify_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:
                 continue
             norm = fcfs_key(it.get("title", ""), it.get("chapter", ""))
             if norm in claimed_keys or norm in seen_key_run or url in _claimed_urls_set:
