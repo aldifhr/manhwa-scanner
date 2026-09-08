@@ -8,3 +8,4 @@ export const load: PageLoad = async ({ fetch }) => {
     return { feed: null, error: e instanceof Error ? e.message : String(e) };
   }
 };
+

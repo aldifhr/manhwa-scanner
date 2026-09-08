@@ -1,0 +1,11 @@
+<script lang="ts">
+  let { data }: any = $props();
+</script>
+<div class="max-w-4xl mx-auto px-4 py-6">
+  <h1 class="text-xl font-bold capitalize">bookmarks</h1>
+  <p class="text-white/60 text-sm mt-2">Svelte page bookmarks — parity stub (data from +page.ts).</p>
+  {#if data}
+    <pre class="mt-4 text-xs bg-white/5 p-3 rounded overflow-auto">{JSON.stringify(data, null, 2).slice(0,800)}</pre>
+  {/if}
+  <a href="/" class="inline-block mt-4 text-sm text-gold-accent">? Home</a>
+</div>
