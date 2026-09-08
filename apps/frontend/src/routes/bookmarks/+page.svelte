@@ -15,7 +15,7 @@
     toast("Cleared","success"); await load();
   }
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-6xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Bookmarks</h1>
   {#if loading}<div class="mt-4 text-sm text-white/40">Loading...</div>
   {:else if items.length===0}<div class="mt-4 text-sm text-white/40">No bookmarks yet. Use Bookmark button on Home chapters or Recent.</div>

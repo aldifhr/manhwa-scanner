@@ -42,7 +42,7 @@
   });
 </script>
 
-<div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+<div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-bold">Cron {#if refreshing}<span class="text-xs font-normal text-white/30">· refreshing…</span>{/if}</h1>
     <a href="/admin" class="text-xs text-white/40 hover:text-white/70">→ Admin</a>

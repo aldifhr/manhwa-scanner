@@ -42,7 +42,7 @@
     if (pollTimer) clearInterval(pollTimer);
   });
 </script>
-<div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+<div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
   <h1 class="text-xl font-bold">Admin</h1>
   {#if data.error}<div class="p-3 bg-red-500/10 text-red-400 text-sm rounded">{data.error}</div>{/if}
   <!-- overview -->

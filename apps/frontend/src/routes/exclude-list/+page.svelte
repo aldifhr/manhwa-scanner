@@ -31,7 +31,7 @@
     }catch(e:any){ toast(e.message,"error"); }
   }
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-6xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Exclude List</h1>
   <p class="text-white/60 text-sm mt-1">{arr.length} titles · hidden from feed</p>
   <div class="mt-4 flex gap-2">

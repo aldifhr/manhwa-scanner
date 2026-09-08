@@ -25,7 +25,7 @@
   onMount(load);
   let filtered = $derived(items);
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6 space-y-4">
+<div class="max-w-6xl mx-auto px-4 py-6 space-y-4">
   <h1 class="text-xl font-bold">Dispatch History</h1>
   <div class="flex flex-wrap gap-2">
     <input type="text" placeholder="Search title..." bind:value={q} oninput={()=>{ page=1; setTimeout(load,300); }} class="flex-1 min-w-40 bg-[#18181b] border border-white/[0.08] rounded-full px-3 py-1.5 text-sm" />

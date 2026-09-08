@@ -67,7 +67,7 @@
     } catch {}
   }
 </script>
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="max-w-6xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Whitelist</h1>
   {#if data.error && !isUnauthorized}<div class="mt-3 p-3 bg-red-500/10 text-red-400 text-sm">{data.error}</div>{/if}
   {#if isUnauthorized}

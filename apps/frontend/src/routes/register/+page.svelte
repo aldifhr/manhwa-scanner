@@ -1,7 +1,7 @@
 <script lang="ts">
   let { data }: any = $props();
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-6xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold capitalize">register</h1>
   <p class="text-white/60 text-sm mt-2">Svelte page register � parity stub (data from +page.ts).</p>
   {#if data}
