@@ -2,6 +2,7 @@
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
+  import { toast } from "$lib/toast.svelte";
   let { data }: any = $props();
   let feed = $derived(data.feed);
   let results: any[] = $derived(feed?.data?.results ?? []);
@@ -31,8 +32,8 @@
         const t = await res.text();
         throw new Error(t || `HTTP ${res.status}`);
       }
-      alert("Added to whitelist — check /whitelist");
-    } catch (e: any) { alert(e?.message?.slice(0,300) || "Add WL failed (login required)"); }
+      toast("Added to whitelist — check /whitelist", "success");
+    } catch (e: any) { toast(e?.message?.slice(0,300) || "Add WL failed (login required)", "error"); }
     finally { adding = null; }
   }
 </script>

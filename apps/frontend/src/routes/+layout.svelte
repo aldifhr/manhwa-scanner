@@ -1,5 +1,6 @@
 <script lang="ts">
   import "../app.css";
+  import Toaster from "$components/ui/Toaster.svelte";
   let { children, data }: any = $props();
   let isAuthed = $derived(!!data?.isAuthed);
   async function logout() {
@@ -33,4 +34,5 @@
   <main class="min-h-dvh pb-safe">
     {@render children()}
   </main>
+  <Toaster />
 </div>

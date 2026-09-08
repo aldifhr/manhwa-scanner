@@ -2,6 +2,7 @@
   import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "$lib/utils";
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
+  import { toast } from "$lib/toast.svelte";
   let { data }: any = $props();
   let results: any[] = $derived(data?.feed?.data?.results ?? []);
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
@@ -30,8 +31,8 @@
     try {
       const res = await fetch("/api/v1/reader/whitelist", withCsrf({ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: s.titleKey, title: s.title, source: s.chapters[0]?.source, cover: s.cover, series_url: s.seriesUrl, origin: s.origin, genres: s.genres, description: s.description }) }));
       if (!res.ok) throw new Error(await res.text());
-      alert("Added to whitelist");
-    } catch(e:any){ alert(e?.message?.slice(0,300) || "Add WL failed"); } finally { adding=null; }
+      toast("Added to whitelist", "success");
+    } catch(e:any){ toast(e?.message?.slice(0,300) || "Add WL failed", "error"); } finally { adding=null; }
   }
   function btnActive(active: boolean){ return active ? "bg-[var(--gold-accent)] text-black" : "bg-white/10 text-white/70 hover:bg-white/20"; }
   let sentinel: HTMLDivElement | null = $state(null);
