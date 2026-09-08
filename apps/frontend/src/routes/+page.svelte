@@ -284,7 +284,7 @@
             {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 leading-snug">{decodeHtml(s.description)}</p>{/if}
             <div class="flex gap-1 flex-wrap">
               {#each s.chapters.slice(0,3) as c}
-                {#if getChapterLabel(c as any)!=="?" }<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white" style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/if}
+                {#if getChapterLabel(c as any)!=="?" }<a href={c.chapterUrl||c.url||"#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white hover:bg-white/25 transition-colors" style="line-height:1">Ch. {getChapterLabel(c as any)}</a>{/if}
               {/each}
             </div>
             <div class="mt-auto pt-2 flex gap-2">
