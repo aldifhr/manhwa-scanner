@@ -187,9 +187,6 @@
       <p class="text-sm text-zinc-400 mt-1">Latest updates — {filtered.length} series · {results.length} chapters</p>
       <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <span class="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60">{stats.total} series</span>
-        <span class="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60">★ {stats.avg} avg · {stats.rated} rated</span>
-        {#if stats.wlCount>0}<span class="px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-300">{stats.wlCount} whitelisted</span>{/if}
-        {#each stats.topGenres as [g,c]}<span class="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-white/40">{g} · {c}</span>{/each}
       </div>
     </div>
       <div class="flex gap-2 w-full sm:w-auto">

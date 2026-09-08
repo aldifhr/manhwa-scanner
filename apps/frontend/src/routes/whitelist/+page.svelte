@@ -87,7 +87,7 @@
         {@const genres = it.genres ?? it.tags ?? []}
         {@const desc = it.description}
         {@const src = it.source ?? (Array.isArray(it.sources) ? (typeof it.sources[0]==="string"? it.sources[0] : (it.sources[0] as any)?.source) : "")}
-        <a href={it.series_url ?? it.seriesUrl ?? it.url ?? "#"} target="_blank" rel="noopener noreferrer" class="group p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col gap-2">
+        <a href={it.series_url ?? it.seriesUrl ?? it.url ?? "#"} target="_blank" rel="noopener noreferrer" class="group p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/[0.07] flex flex-col gap-2">
           {#if it.cover || it.cover_url}<img src={it.cover ?? it.cover_url} alt={it.title ?? it.title_key} class="w-full aspect-[3/4] object-cover rounded-lg bg-white/5 group-hover:scale-[1.02] transition-transform" loading="lazy" />{/if}
           <div class="text-sm flex-1 min-w-0">
             <div class="font-medium line-clamp-2 leading-tight">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div>
