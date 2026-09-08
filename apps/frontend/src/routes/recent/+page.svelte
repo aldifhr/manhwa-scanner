@@ -96,9 +96,9 @@
         <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
           {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={s.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 translate-y-px" loading="lazy" />{/if}
-              <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm truncate hover:text-white/80 leading-none">{decodeHtml(s.title)}</a>
+            <div class="flex items-start gap-2">
+              {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 mt-0.5" loading="lazy" />{/if}
+              <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm leading-tight hover:text-white/80">{decodeHtml(s.title)}</a>
             </div>
             <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded leading-none" style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
             {#if s.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
