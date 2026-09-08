@@ -1,8 +1,6 @@
 // Global image pool — persists via globalThis (HMR/serverless reuse)
 // Fresh 1h, stale 24h, coalesced fetch. Evicts oldest-first, no byte counter/sweeper.
 
-import { NextResponse } from "next/server";
-
 export interface CacheEntry {
   data: ArrayBuffer;
   contentType: string;
@@ -72,7 +70,7 @@ export function cacheHitResponse(
   entry: CacheEntry,
   extraHeaders?: Record<string, string>
 ) {
-  return new NextResponse(entry.data, {
+  return new Response(entry.data, {
     headers: {
       "Content-Type": entry.contentType,
       "Cache-Control": IMAGE_CACHE_CONTROL,
@@ -85,7 +83,7 @@ export function imageResponse(
   contentType: string,
   extraHeaders?: Record<string, string>
 ) {
-  return new NextResponse(data, {
+  return new Response(data, {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": IMAGE_CACHE_CONTROL,

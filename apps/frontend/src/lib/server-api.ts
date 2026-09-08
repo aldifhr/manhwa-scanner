@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { withCsrf } from "$lib/csrf";
 import { openapi } from "@manhwa-scanner/shared";
 
@@ -96,7 +95,7 @@ export const TIMEOUT = {
 } as const;
 
 export function errorResponse(message: string, status = 500) {
-  return NextResponse.json({ success: false, error: message }, { status });
+  return Response.json({ success: false, error: message }, { status });
 }
 
 export async function refreshSession(): Promise<boolean> {
