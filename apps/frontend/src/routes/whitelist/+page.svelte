@@ -12,16 +12,34 @@
     : []
   );
   let isUnauthorized = $derived(data?.status === 401 || String(data?.error||"").toLowerCase().includes("unauthorized"));
+  let q = $state("");
+  let srcFilter: string | null = $state(null);
+  let sources: string[] = $derived([...new Set(arr.map(a=> a.source ?? (Array.isArray(a.sources)? (typeof a.sources[0]==="string"?a.sources[0]:(a.sources[0] as any)?.source): "")).filter(Boolean))].sort());
+  let filtered: any[] = $derived(arr.filter(it=>{
+    const t = (it.title ?? it.titleKey ?? it.title_key ?? "").toLowerCase();
+    if (q && !t.includes(q.toLowerCase())) return false;
+    const s = it.source ?? (Array.isArray(it.sources)? (typeof it.sources[0]==="string"?it.sources[0]:(it.sources[0] as any)?.source): "");
+    if (srcFilter && s!==srcFilter) return false;
+    return true;
+  }));
+  function btnActive(a:boolean){ return a? "bg-[var(--gold-accent)] text-black" : "bg-white/10 text-white/70 hover:bg-white/20"; }
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-5xl mx-auto px-4 py-6">
   <h1 class="text-xl font-bold">Whitelist</h1>
   {#if data.error && !isUnauthorized}<div class="mt-3 p-3 bg-red-500/10 text-red-400 text-sm">{data.error}</div>{/if}
   {#if isUnauthorized}
     <div class="mt-4 p-4 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">Login required — <a href="/login?redirect=/whitelist" class="underline">login</a> to see whitelist</div>
   {:else}
-    <p class="text-white/60 text-sm mt-1">{arr.length} titles</p>
+    <div class="mt-3 flex flex-col gap-2">
+      <input type="text" placeholder="Search title..." bind:value={q} class="w-full sm:w-64 bg-black border border-white/10 rounded-full px-3 py-1.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-[var(--gold-accent)]" />
+      <div class="flex flex-wrap gap-2">
+        <button onclick={()=>srcFilter=null} class={"min-h-0 px-3 py-1 text-xs rounded-full "+btnActive(srcFilter===null)}>All Sources</button>
+        {#each sources as s}<button onclick={()=>srcFilter=srcFilter===s?null:s} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+btnActive(srcFilter===s)}>{s}</button>{/each}
+      </div>
+    </div>
+    <p class="text-white/60 text-sm mt-3">{filtered.length} / {arr.length} titles</p>
     <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-      {#each arr.slice(0,100) as it}
+      {#each filtered.slice(0,100) as it}
         {@const rating = it.rating ?? it.score}
         {@const origin = it.origin ?? it.country}
         {@const genres = it.genres ?? it.tags ?? []}
@@ -43,7 +61,7 @@
           </div>
         </a>
       {/each}
-      {#if arr.length===0}
+      {#if filtered.length===0}
         <div class="text-white/40 text-sm mt-6">Empty — no whitelist yet. Add from Home via + Add WL</div>
         <details class="mt-3 text-xs"><summary class="text-white/30 cursor-pointer">debug raw</summary><pre class="mt-2 p-2 bg-white/5 rounded overflow-auto max-h-64">{JSON.stringify(raw, null, 2).slice(0,2000)}</pre></details>
       {/if}
