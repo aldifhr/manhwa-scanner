@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { rewriteCoverUrl } from "$lib/utils";
   let { data }: any = $props();
   // handle all backend shapes: {data:[...]}, {data:{results:[...]}}, {data:{data:[...]}}, {results:[...]}, {whitelists:[...]}
   let raw: any = $derived(data?.raw ?? data?.data);
@@ -88,7 +89,7 @@
         {@const desc = it.description}
         {@const src = it.source ?? (Array.isArray(it.sources) ? (typeof it.sources[0]==="string"? it.sources[0] : (it.sources[0] as any)?.source) : "")}
         <a href={it.series_url ?? it.seriesUrl ?? it.url ?? "#"} target="_blank" rel="noopener noreferrer" class="group relative overflow-hidden rounded-xl border border-white/10 bg-black aspect-[3/4] block">
-          {#if it.cover || it.cover_url}<img src={it.cover ?? it.cover_url} alt={it.title ?? it.title_key} class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />{/if}
+          {#if it.cover || it.cover_url}<img src={rewriteCoverUrl((it.cover ?? it.cover_url) as string)||""} alt={it.title ?? it.title_key} class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />{/if}
           <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90"></div>
           <div class="absolute bottom-0 inset-x-0 p-3 flex flex-col gap-1">
             <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div>
@@ -104,7 +105,6 @@
       {/each}
       {#if filtered.length===0}
         <div class="text-white/40 text-sm mt-6">Empty — no whitelist yet. Add from Home via + Add WL</div>
-        <details class="mt-3 text-xs"><summary class="text-white/30 cursor-pointer">debug raw</summary><pre class="mt-2 p-2 bg-white/5 rounded overflow-auto max-h-64">{JSON.stringify(raw, null, 2).slice(0,2000)}</pre></details>
       {/if}
     </div>
     <!-- Add new WL section -->

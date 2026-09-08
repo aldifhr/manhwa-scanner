@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getBookmarks, deleteBookmark } from "$lib/api";
+  import { rewriteCoverUrl } from "$lib/utils";
   import { toast } from "$lib/toast.svelte";
   let items: any[] = $state([]);
   let loading = $state(true);
@@ -24,7 +25,7 @@
       {#each items as b}
         <div class="p-3 rounded border border-white/10 bg-white/5 flex gap-3">
           <a href={b.chapter_url} target="_blank" rel="noopener noreferrer" class="flex gap-3 flex-1 min-w-0">
-            {#if b.cover}<img src={b.cover} alt={b.title} class="w-12 h-16 object-cover rounded" />{/if}
+            {#if b.cover}<img src={rewriteCoverUrl(b.cover)||""} alt={b.title} class="w-12 h-16 object-cover rounded" loading="lazy" />{/if}
             <div class="text-sm"><div class="font-medium">{b.title ?? b.title_key}</div><div class="text-white/50 text-xs">Ch. {b.chapter_number} · {b.source}</div></div>
           </a>
           <button onclick={()=>del(b)} class="min-h-0 self-center text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20">Remove</button>

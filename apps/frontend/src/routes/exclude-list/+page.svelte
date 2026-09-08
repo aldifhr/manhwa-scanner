@@ -1,5 +1,6 @@
 <script lang="ts">
   import { withCsrf } from "$lib/csrf";
+  import { rewriteCoverUrl } from "$lib/utils";
   import { toast } from "$lib/toast.svelte";
   let { data }: any = $props();
   let raw:any = $derived(data?.data?.data ?? data?.data ?? {});
@@ -41,7 +42,7 @@
   <div class="mt-4 grid gap-2">
     {#each arr as it}
       <div class="flex items-center gap-3 p-3 rounded border border-white/10 bg-white/5">
-        {#if it.cover}<img src={it.cover} alt={it.title} class="w-12 h-16 object-cover rounded shrink-0" />{/if}
+        {#if it.cover}<img src={rewriteCoverUrl(it.cover)||""} alt={it.title} class="w-12 h-16 object-cover rounded shrink-0" loading="lazy" />{/if}
         <div class="text-sm flex-1 min-w-0"><div class="font-medium truncate">{it.title ?? it.title_key}</div><div class="text-white/40 text-xs truncate">{it.title_key ?? it.titleKey}</div></div>
         <button onclick={()=>del(it)} class="min-h-0 shrink-0 text-xs px-2 py-1 rounded bg-red-500/20 text-red-300">Remove</button>
       </div>

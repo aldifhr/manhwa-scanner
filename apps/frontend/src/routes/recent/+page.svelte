@@ -263,7 +263,7 @@
       {#if hasActiveFilters}<button onclick={clearFilters} class="mt-4 text-xs px-4 py-1.5 rounded-full bg-white text-black font-medium hover:bg-zinc-200 transition-colors">Clear filters</button>{/if}
     </div>
   {:else if groupedMode}
-    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
       {#each grouped as s (s.titleKey + '|' + (s.source || s.chapters?.[0]?.source || ''))}
         <div class="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#18181b] hover:border-white/15 transition-colors">
           <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="relative block aspect-[3/4] overflow-hidden bg-black">
@@ -297,12 +297,12 @@
     </div>
     <div bind:this={sentinel} class="h-8"></div>
     {#if loadingMore}
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
       </div>
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {:else}
-    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
       {#each flatVisible as ch (ch.chapterUrl || (ch.titleKey + '|' + ch.chapter + '|' + ch.source))}
         <div class="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#18181b] hover:border-white/15 transition-colors">
           <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="relative block aspect-[3/4] overflow-hidden bg-black">
@@ -341,7 +341,7 @@
     </div>
     <div bind:this={sentinel} class="h-8"></div>
     {#if loadingMore}
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
       </div>
     {:else if visible < flatFiltered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {flatFiltered.length} — scroll for more</div>{/if}

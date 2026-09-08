@@ -20,10 +20,10 @@
     if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
     return j;
   }
-  async function doCron(){ try{ await post("/api/cron?action=update"); msg="Cron triggered"; setTimeout(()=>msg=null,3000); location.reload(); }catch(e:any){msg=e.message} }
+  async function doCron(){ try{ await post("/api/cron?action=update"); msg="Cron triggered"; setTimeout(()=>msg=null,3000); }catch(e:any){msg=e.message} }
   async function doRefresh(){ try{ const j:any = await post("/api/v1/health/refresh-voratoon"); msg=`Refreshed ${j?.data?.refreshed ?? 0} covers`; setTimeout(()=>msg=null,3000);}catch(e:any){msg=e.message} }
   async function doResync(){ try{ await post("/api/cron?action=enrich"); msg="Resync triggered"; setTimeout(()=>msg=null,3000);}catch(e:any){msg=e.message} }
-  async function doClear(){ try{ await fetch("/api/v1/logs/errors", withCsrf({method:"DELETE"})); msg="Logs cleared"; setTimeout(()=>msg=null,2000); location.reload(); }catch(e:any){msg=e.message} }
+  async function doClear(){ try{ await fetch("/api/v1/logs/errors", withCsrf({method:"DELETE"})); msg="Logs cleared"; setTimeout(()=>msg=null,2000); }catch(e:any){msg=e.message} }
   async function doRetryAll(){ try{ await post("/api/v1/failed-dispatches?action=retry-all"); msg="Retry-all triggered"; setTimeout(()=>msg=null,2000);}catch(e:any){msg=e.message} }
   onMount(() => {
     pollTimer = setInterval(async () => {

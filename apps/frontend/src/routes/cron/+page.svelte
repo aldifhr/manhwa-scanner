@@ -21,7 +21,7 @@
       return j;
     }catch(e:any){ msg = e.message; setTimeout(()=>msg=null,4000); throw e; } finally{ loading=null; }
   }
-  async function doCron(){ await post("/api/cron?action=update"); location.reload(); }
+  async function doCron(){ await post("/api/cron?action=update"); msg="Cron triggered"; setTimeout(()=>msg=null,3000); }
   async function doEnrich(){ await post("/api/cron?action=enrich"); }
   async function doHealthCheck(){ await post("/api/v1/health/refresh-voratoon"); }
   let isError = $derived(String(cronStatus?.outcome ?? "").toLowerCase()==="error");

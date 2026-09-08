@@ -205,8 +205,8 @@
   {#if data.error}
     <div class="mt-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{data.error}</div>
   {:else if !feed}
-    <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {#each Array(6) as _}<div class="h-44 rounded-xl border border-white/[0.08] bg-[#18181b] animate-pulse flex gap-3 p-3"><div class="w-16 h-24 rounded-lg bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="flex gap-1"><div class="h-5 w-12 bg-white/5 rounded"></div><div class="h-5 w-12 bg-white/5 rounded"></div></div><div class="h-6 w-16 bg-white/5 rounded-full mt-auto"></div></div></div>{/each}
+    <div class="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
     </div>
   {:else if filtered.length===0}
     <div class="mt-10 flex flex-col items-center text-center py-8 rounded-xl border border-dashed border-white/10 bg-white/[0.02]">
