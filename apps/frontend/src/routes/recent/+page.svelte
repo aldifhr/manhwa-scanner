@@ -282,12 +282,12 @@
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
-                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
+                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add WL</span>{/if}</button>
               {/if}
               {#if bookmarked.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
-                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
+                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{#if bookmarking===s.titleKey}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
               {/if}
               {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto min-h-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 text-[10px] disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
@@ -327,7 +327,7 @@
               {#if bookmarked.has(`${ch.titleKey}:${ch.chapter}`)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
-                <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===`${ch.titleKey}:${ch.chapter}`?"...":"☆ Bookmark"}</button>
+                <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{#if bookmarking===`${ch.titleKey}:${ch.chapter}`}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
               {/if}
               {#if excluded.has(ch.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
