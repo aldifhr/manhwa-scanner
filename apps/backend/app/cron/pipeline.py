@@ -272,7 +272,7 @@ def _probe_source_health(force: bool = False) -> dict:
     from curl_cffi import requests as cffi_req
 
     probes = {
-        "ikiru": str(_s.IKIRU_BASE_URL).rstrip("/") + "/",
+        "ikiru": str(_s.IKIRU_BASE_URL).rstrip("/") + "/wp-json/readerkiru/v1/list/latest?page=1&per_page=1",
         "shinigami": str(_s.SECONDARY_SOURCE_URL).rstrip("/") + "/v1/manga/list?page=1&page_size=1&is_update=true&sort=latest",
         "voratoon": f"{settings.VORATOON_API_URL.rstrip(chr(47))}/backend/series?take=1&page=1&sort=latest&sortOrder=desc&includeMeta=true",
     }
