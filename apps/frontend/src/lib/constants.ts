@@ -10,12 +10,12 @@ export function normalizeOrigin(origin: string | null | undefined): string {
 }
 
 const ORIGIN_FLAG: Record<string, string> = {
-  korean: "https://flagsapi.com/KR/flat/64.png",
+  korean: "https://flagsapi.com/KR/flat/24.png",
   japanese: "/jp.png",
-  chinese: "https://flagsapi.com/CN/flat/64.png",
-  manhwa: "https://flagsapi.com/KR/flat/64.png",
+  chinese: "https://flagsapi.com/CN/flat/24.png",
+  manhwa: "https://flagsapi.com/KR/flat/24.png",
   manga: "/jp.png",
-  manhua: "https://flagsapi.com/CN/flat/64.png",
+  manhua: "https://flagsapi.com/CN/flat/24.png",
 };
 
 export function getOriginFlag(origin: string | null | undefined): string {
