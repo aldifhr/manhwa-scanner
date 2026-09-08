@@ -63,7 +63,9 @@ function isPublicPath(pathname: string, method: string): boolean {
 
 function applySecurityHeaders(headers: Headers, isDev: boolean) {
   const h = getSecurityHeaders(isDev);
-  for (const [k, v] of Object.entries(h)) headers.set(k, v);
+  for (const [k, v] of Object.entries(h)) {
+    try { headers.set(k, v); } catch {}
+  }
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -79,18 +81,19 @@ export const handle: Handle = async ({ event, resolve }) => {
   const token = event.cookies.get(COOKIE_NAME);
   if (!token || !verifyToken(token)) {
     if (pathname.startsWith("/api/")) {
+      const h = getSecurityHeaders(isDev);
       const res = new Response(JSON.stringify({ success: false, error: "unauthorized" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json", ...h }
       });
-      applySecurityHeaders(res.headers, isDev);
       return res;
     }
     const loginUrl = new URL("/login", event.url);
     loginUrl.searchParams.set("redirect", pathname);
-    const res = Response.redirect(loginUrl.toString(), 302);
-    applySecurityHeaders(res.headers, isDev);
-    return res;
+    const h = getSecurityHeaders(isDev);
+    const headers = new Headers(h);
+    headers.set("Location", loginUrl.toString());
+    return new Response(null, { status: 302, headers });
   }
 
   const res = await resolve(event);
