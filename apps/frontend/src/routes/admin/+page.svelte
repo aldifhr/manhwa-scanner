@@ -32,7 +32,7 @@
     <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Whitelist</div><div class="text-lg font-bold">{whitelistCount}</div></div>
     <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Queue</div><div class="text-lg font-bold">{queueLen}</div></div>
     <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Health</div><div class="text-sm font-medium truncate">{health?.status ?? health?.overall ?? "-"}</div></div>
-    <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Cron</div><div class="text-xs font-medium truncate">{cronStatus?.outcome ?? cronStatus?.status ?? "-"}</div></div>
+    <div class="p-4 rounded-xl bg-[#18181b] border border-white/[0.08]"><div class="text-xs text-white/50">Cron</div><div class="text-xs font-medium truncate {String(cronStatus?.outcome ?? cronStatus?.status ?? '').toLowerCase()==='error'?'text-red-400':'text-white'}">{cronStatus?.outcome ?? cronStatus?.status ?? "-"}</div></div>
   </div>
   {#if msg}<div class="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">{msg}</div>{/if}
   <!-- actions -->
@@ -44,17 +44,17 @@
     <button onclick={doClear} class="min-h-0 text-xs px-3 py-1.5 rounded-full bg-red-500/20 text-red-300">Clear Errors</button>
   </div>
   <!-- cron status -->
-  <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+  <div class="p-4 rounded-xl border {String(cronStatus?.outcome).toLowerCase()==='error'?'border-red-500/20 bg-red-500/5':'border-white/10 bg-white/5'}">
     <h2 class="text-sm font-semibold">Cron</h2>
-    <p class="text-xs text-white/50 mt-1">Last: {cronStatus?.timestamp ?? cronStatus?.last_run ?? "-"} · {cronStatus?.matched ?? 0} matched / {cronStatus?.sent ?? 0} sent · outcome: {cronStatus?.outcome ?? "-"}</p>
+    <p class="text-xs text-white/50 mt-1">Last: {cronStatus?.timestamp ?? cronStatus?.last_run ?? "-"} · {cronStatus?.matched ?? 0} matched / {cronStatus?.sent ?? 0} sent · outcome: <span class={String(cronStatus?.outcome).toLowerCase()==='error'?'text-red-400 font-medium':'text-white/70'}>{cronStatus?.outcome ?? "-"}</span></p>
   </div>
   <!-- health source -->
-  {#if health?.sourceHealth || health?.sources}
+  {#if health?.sourceHealth || health?.sources || Array.isArray(health?.sourceHealth) || Array.isArray(health?.sources)}
     <div class="p-4 rounded-xl border border-white/10 bg-white/5">
       <h2 class="text-sm font-semibold">Source Health</h2>
       <div class="mt-2 grid gap-2">
-        {#each Object.entries(health.sourceHealth ?? health.sources ?? {}) as [src, h] }
-          <div class="flex justify-between text-xs"><span class="text-white/70">{src}</span><span class={String((h as any).status).toLowerCase().includes("ok")?"text-green-400":"text-amber-400"}>{String((h as any).status)}</span></div>
+        {#each (()=>{ const raw = health.sourceHealth ?? health.sources ?? []; if(Array.isArray(raw)) return raw.map((h:any,i:number)=>[h.source ?? h.name ?? `#${i+1}`, h] as const); return Object.entries(raw); })() as [src, h] }
+          <div class="flex justify-between text-xs"><span class="text-white/70 capitalize">{src}</span><span class={String((h as any).status).toLowerCase().includes("healthy")||String((h as any).status).toLowerCase()==="ok"?"text-green-400":"text-amber-400"}>{String((h as any).status)}</span></div>
         {/each}
       </div>
     </div>

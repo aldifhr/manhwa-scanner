@@ -226,7 +226,7 @@
             </div>
             <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] px-2 py-1 rounded leading-none transition-colors "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
             {#if s.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
-            {#if s.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{/if}
+            {#if s.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{:else}<p class="text-[11px] text-white/20 mt-1">—</p>{/if}
             <div class="flex gap-2 mt-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
@@ -265,7 +265,7 @@
               {#if ch.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{ch.type}</span>{/if}
               {#if ch.rating && Number(ch.rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(ch.rating).toFixed(1)}</span>{/if}
             </div>
-            {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{/if}
+            {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{:else}<p class="text-[11px] text-white/20 mt-1">—</p>{/if}
             {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
             <div class="flex gap-2 mt-2">
               <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-full">Read</a>
