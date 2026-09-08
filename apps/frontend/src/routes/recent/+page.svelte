@@ -3,6 +3,7 @@
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
   import { toast } from "$lib/toast.svelte";
+  import { getOriginFlag } from "$lib/constants";
   let { data }: any = $props();
   let results: any[] = $derived(data?.feed?.data?.results ?? []);
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
@@ -95,7 +96,10 @@
         <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
           {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={s.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
-            <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm truncate hover:text-white/80">{decodeHtml(s.title)}</a>
+            <div class="flex items-center gap-2">
+              {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-5 h-3 rounded-sm object-cover shrink-0" loading="lazy" />{/if}
+              <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm truncate hover:text-white/80">{decodeHtml(s.title)}</a>
+            </div>
             <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded leading-none" style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
             {#if s.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{/if}
             {#if s.isWhitelisted || optimistic.has(s.titleKey)}
@@ -110,14 +114,24 @@
     <div bind:this={sentinel} class="h-8"></div>
     {#if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">Loading more... ({visible}/{filtered.length})</div>{/if}
   {:else}
-    <div class="mt-4 flex flex-col gap-2">
+    <div class="mt-4 flex flex-col gap-3">
       {#each flatVisible as ch (ch.titleKey + ch.chapter + ch.source)}
         <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
-          {#if ch.cover}<img src={rewriteCoverUrl(ch.cover)||""} alt={ch.title} class="w-12 h-16 object-cover rounded" />{/if}
+          {#if ch.cover}<img src={rewriteCoverUrl(ch.cover)||""} alt={ch.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
-            <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="text-sm font-medium truncate">{decodeHtml(ch.title)}</a>
-            <div class="text-xs text-white/60">Ch. {getChapterLabel(ch as any)} · {ch.source} · {ch.origin}</div>
-            <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center mt-1 text-[11px] px-2 py-1 bg-white/10 rounded">Read</a>
+            <div class="flex items-center gap-2">
+              {#if getOriginFlag(ch.origin)}<img src={getOriginFlag(ch.origin)} alt={ch.origin} class="w-5 h-3 rounded-sm object-cover shrink-0" />{/if}
+              <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="text-sm font-medium truncate hover:text-white/80">{decodeHtml(ch.title)}</a>
+              {#if ch.isWhitelisted}<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">WL</span>{/if}
+            </div>
+            <div class="flex gap-1 flex-wrap mt-1">
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2 py-1 bg-white/10 hover:bg-white/20 rounded leading-none" style="line-height:1">Ch. {getChapterLabel(ch as any)} · {ch.source}</a>
+              {#if ch.type}<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 capitalize">{ch.type}</span>{/if}
+              {#if ch.rating && Number(ch.rating)>0}<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(ch.rating).toFixed(1)}</span>{/if}
+            </div>
+            {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{/if}
+            {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
+            <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center mt-2 text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-full">Read</a>
           </div>
         </div>
       {/each}
