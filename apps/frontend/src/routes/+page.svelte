@@ -75,7 +75,11 @@
             {#if series.description}
               <p class="text-[11px] text-white/55 line-clamp-2 mt-1.5">{decodeHtml(series.description)}</p>
             {/if}
-            <button onclick={() => addWL(series)} disabled={adding===series.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] disabled:opacity-50">{adding===series.titleKey ? "..." : "+ Add WL"}</button>
+            {#if series.isWhitelisted}
+              <span class="min-h-0 mt-2 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
+            {:else}
+              <button onclick={() => addWL(series)} disabled={adding===series.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] disabled:opacity-50">{adding===series.titleKey ? "..." : "+ Add WL"}</button>
+            {/if}
           </div>
         </div>
       {/each}
