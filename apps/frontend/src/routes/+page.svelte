@@ -278,27 +278,27 @@
               </div>
               {#if s.genres?.length}<p class="text-[10px] text-white/70 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
             </div>
+            {#if s.origin}<img src={"https://flagsapi.com/"+s.origin+"/flat/24.png"} alt={s.origin} class="absolute top-2 left-2 w-4 h-3 rounded-sm object-cover" loading="lazy" />{/if}
           </a>
           <div class="p-3 flex flex-col gap-2 flex-1">
             {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 leading-snug">{decodeHtml(s.description)}</p>{/if}
             <div class="flex gap-1 flex-wrap">
-              {#each s.chapters.slice(0,3) as ch}
-                {@const label=getChapterLabel(ch as any)}
-                {#if label!=="?" }<a href={ch.chapterUrl||ch.url||"#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded transition-colors "+chapterSourceClass(ch.source)}>Ch. {label}</a>{/if}
+              {#each s.chapters.slice(0,3) as c}
+                {#if getChapterLabel(c as any)!=="?" }<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white" style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/if}
               {/each}
             </div>
             <div class="mt-auto pt-2 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
-                <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white text-black hover:bg-zinc-200 disabled:opacity-50 font-medium transition-colors">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add</span>{/if}</button>
+                <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add WL</span>{/if}</button>
               {/if}
               {#if bookmarked.has(s.titleKey)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
-                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="text-[11px] px-3 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">{#if bookmarking===s.titleKey}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
+                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{#if bookmarking===s.titleKey}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
               {/if}
-              {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto text-[10px] w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
+              {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto min-h-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 text-[10px] disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
           </div>
         </div>
