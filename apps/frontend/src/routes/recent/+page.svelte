@@ -218,12 +218,12 @@
     return ()=>io.disconnect();
   });
 </script>
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-4xl mx-auto px-4 py-6 overflow-x-hidden">
   <h1 class="text-xl font-bold">Recent</h1>
   <p class="text-white/60 text-sm mt-1">{groupedMode ? `Grouped — ${grouped.length} / ${filtered.length} series` : `Flat — ${flatVisible.length} / ${flatFiltered.length} ch`} · total {groupedAll.length} series / {results.length} ch {#if !refreshing}<span class="text-white/30"> · auto-refresh 30s</span>{/if}</p>
   <!-- search + sort -->
-  <div class="mt-3 flex flex-col sm:flex-row gap-2">
-    <input type="text" placeholder="Search title..." value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />
+  <div class="mt-3 flex flex-col sm:flex-row gap-2 min-w-0">
+    <input type="text" placeholder="Search title..." value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 min-w-0 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20" />
     <div class="flex gap-1 shrink-0">
       <button onclick={()=>setSort("latest")} class={"min-h-0 px-3 py-1.5 text-xs rounded-full "+(sortBy==="latest"?"bg-white text-black":"bg-white/10 text-white/60")}>Latest</button>
       <button onclick={()=>setSort("rating")} class={"min-h-0 px-3 py-1.5 text-xs rounded-full "+(sortBy==="rating"?"bg-white text-black":"bg-white/10 text-white/60")}>Rating</button>

@@ -154,7 +154,7 @@
   }
 </script>
 
-<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 overflow-x-hidden">
   {#if (!isOnline || data.error) && !offlineDismissed}
     <div class="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border text-sm {isOnline ? 'bg-amber-500/10 border-amber-500/20 text-amber-300' : 'bg-red-500/10 border-red-500/20 text-red-300'}">
       <span class="flex items-center gap-2">{isOnline ? "⚠ Feed failed to load — showing cached data or try refreshing" : "● Offline — check your connection"}</span>
@@ -181,16 +181,16 @@
       </div>
     </div>
   {/if}
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-    <div>
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 min-w-0">
+    <div class="min-w-0">
       <h1 class="text-[28px] sm:text-[32px] font-semibold tracking-[-0.03em]">ManhwaScan</h1>
       <p class="text-sm text-zinc-400 mt-1">Latest updates — {filtered.length} series · {results.length} chapters</p>
       <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <span class="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60">{stats.total} series</span>
       </div>
     </div>
-      <div class="flex gap-2 w-full sm:w-auto items-center">
-      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 sm:w-64 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
+      <div class="flex gap-2 w-full sm:w-auto items-center min-w-0">
+      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 min-w-0 sm:w-64 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
       <div class="flex gap-1 shrink-0 items-center">
         <button onclick={()=>setSort('latest')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='latest'?'bg-white text-black':'bg-white/10 text-white/60')}>Latest</button>
         <button onclick={()=>setSort('rating')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='rating'?'bg-white text-black':'bg-white/10 text-white/60')}>Rating</button>
