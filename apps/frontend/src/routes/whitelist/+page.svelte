@@ -20,12 +20,12 @@
     <div class="mt-4 p-4 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">Login required — <a href="/login?redirect=/whitelist" class="underline">login</a> to see whitelist</div>
   {:else}
     <p class="text-white/60 text-sm mt-1">{arr.length} titles</p>
-    <div class="mt-4 grid gap-3">
-      {#each arr.slice(0,50) as it}
-        <div class="p-3 rounded border border-white/10 bg-white/5 flex gap-3">
-          {#if it.cover || it.cover_url}<img src={it.cover ?? it.cover_url} alt={it.title ?? it.title_key} class="w-12 h-16 object-cover rounded" />{/if}
-          <div class="text-sm"><div class="font-medium">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div><div class="text-white/50 text-xs">{it.source ?? (it.sources?.[0] as any)?.source ?? ""} · {it.titleKey ?? it.title_key}</div></div>
-        </div>
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {#each arr.slice(0,100) as it}
+        <a href={it.series_url ?? it.seriesUrl ?? "#"} target="_blank" rel="noopener noreferrer" class="group p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col gap-2">
+          {#if it.cover || it.cover_url}<img src={it.cover ?? it.cover_url} alt={it.title ?? it.title_key} class="w-full aspect-[3/4] object-cover rounded-lg bg-white/5 group-hover:scale-[1.02] transition-transform" loading="lazy" />{/if}
+          <div class="text-sm"><div class="font-medium line-clamp-2 leading-tight">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div><div class="text-white/50 text-xs mt-1 truncate">{it.source ?? (it.sources?.[0] as any)?.source ?? ""} · {it.titleKey ?? it.title_key}</div></div>
+        </a>
       {/each}
       {#if arr.length===0}
         <div class="text-white/40 text-sm mt-6">Empty — no whitelist yet. Add from Home via + Add WL</div>
