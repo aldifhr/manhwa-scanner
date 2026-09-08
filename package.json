@@ -4,15 +4,13 @@
   "version": "1.0.0",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
-    "dev:frontend": "pnpm --filter manhwa-reader dev",
-    "dev:frontend:svelte": "pnpm --filter manhwa-svelte dev",
+    "dev:frontend": "pnpm --filter manhwa-svelte dev",
     "dev:backend": "echo \"backend: cd apps/backend && uv run uvicorn app.main:app --reload\"",
-    "dev": "pnpm --filter manhwa-reader dev",
-    "build": "pnpm --recursive build",
-    "build:svelte": "pnpm --filter manhwa-svelte build",
+    "dev": "pnpm --filter manhwa-svelte dev",
+    "build": "pnpm --filter manhwa-svelte build",
     "lint": "pnpm --recursive lint",
     "typecheck": "pnpm --recursive typecheck",
-    "test": "pnpm --filter manhwa-reader test"
+    "test": "pnpm --filter manhwa-svelte test"
   },
   "dependencies": {
     "@dietrichgebert/ponytail": "^4.9.0"
