@@ -23,6 +23,9 @@ fe-cookies.txt
 
 # vercel
 .vercel/
+.svelte-kit/
+.superpowers/
+.output/
 
 # misc
 .slim/
