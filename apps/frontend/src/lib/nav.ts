@@ -8,7 +8,6 @@ export const NAV = [
   { href: "/whitelist", label: "Whitelist", icon: "Books" } as const,
   { href: "/exclude-list", label: "Exclude", icon: "EyeSlash" } as const,
   { href: "/dispatch-history", label: "History", icon: "Clock" } as const,
-  { href: "/bookmarks", label: "Bookmarks", icon: "BookBookmark" },
 ] as const;
 
 export function isNavActive(href: string, pathname: string): boolean {

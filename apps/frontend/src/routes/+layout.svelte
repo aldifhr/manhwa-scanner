@@ -37,7 +37,6 @@
       <a href="/whitelist" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Whitelist</a>
       <a href="/exclude-list" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Exclude</a>
       <a href="/dispatch-history" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">History</a>
-      <a href="/bookmarks" class="inline-flex items-center h-7 px-1 hover:text-white transition-colors">Bookmarks</a>
       {#if isAuthed}
         <button onclick={logout} class="min-h-0 min-w-0 inline-flex items-center justify-center text-xs px-3 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] hover:bg-white/10 transition-colors">Logout</button>
       {:else}
@@ -65,7 +64,6 @@
         <a href="/whitelist" onclick={closeMenu} class="flex items-center px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm">Whitelist</a>
         <a href="/exclude-list" onclick={closeMenu} class="flex items-center px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm">Exclude</a>
         <a href="/dispatch-history" onclick={closeMenu} class="flex items-center px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm">History</a>
-        <a href="/bookmarks" onclick={closeMenu} class="flex items-center px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm">Bookmarks</a>
         <div class="border-t border-white/[0.08] my-2"></div>
         {#if isAuthed}
           <button onclick={()=>{closeMenu(); logout();}} class="flex items-center justify-center px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/10 text-sm">Logout</button>

@@ -6,7 +6,6 @@
   import { toast } from "$lib/toast.svelte";
   import { getOriginFlag } from "$lib/constants";
   import { chapterSourceClass } from "$lib/styles";
-  import { saveBookmark } from "$lib/api";
   let { data }: any = $props();
   let results: any[] = $derived(data?.feed?.data?.results ?? []);
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
@@ -169,9 +168,7 @@
   $effect(()=>{ void filtered.length; void flatFiltered.length; void groupedMode; void sortBy; void q; visible=30; });
   let adding: string | null = $state(null);
   let optimistic = $state<Set<string>>(new Set());
-  let bookmarking: string | null = $state(null);
-  let bookmarked = $state<Set<string>>(new Set());
-  function sourceFromUrl(url: string): string {
+function sourceFromUrl(url: string): string {
     if (!url) return "";
     const h = url.toLowerCase();
     if (h.includes("ikiru")) return "ikiru";
@@ -188,27 +185,6 @@
       optimistic = new Set([...optimistic, s.titleKey]);
       toast("Added to whitelist", "success");
     } catch(e:any){ toast(e?.message?.slice(0,300) || "Add WL failed", "error"); } finally { adding=null; }
-  }
-  async function doBookmark(s: any){
-    const key = s.titleKey;
-    if (bookmarked.has(key)) return;
-    bookmarking = key;
-    try{
-      const ch = s.chapters?.[0];
-      await saveBookmark({ title_key: key, chapter_number: Number(ch?.chapterNumber ?? ch?.chapter ?? 1), chapter_url: ch?.chapterUrl || ch?.url || s.seriesUrl || "", source: ch?.source || "", title: s.title, cover: s.cover || null });
-      bookmarked = new Set([...bookmarked, key]);
-      toast("Bookmarked","success");
-    }catch(e:any){ toast(e?.message?.slice(0,200)||"Bookmark failed","error"); } finally{ bookmarking=null; }
-  }
-  async function doBookmarkFlat(ch: any){
-    const key = `${ch.titleKey}:${ch.chapter}`;
-    if (bookmarked.has(key)) return;
-    bookmarking = key;
-    try{
-      await saveBookmark({ title_key: ch.titleKey, chapter_number: Number(ch.chapterNumber ?? ch.chapter ?? 1), chapter_url: ch.chapterUrl || ch.url || "", source: ch.source || "", title: ch.title, cover: ch.cover || null });
-      bookmarked = new Set([...bookmarked, key]);
-      toast("Bookmarked","success");
-    }catch(e:any){ toast(e?.message?.slice(0,200)||"Bookmark failed","error"); } finally{ bookmarking=null; }
   }
   function btnActive(active: boolean){ return active ? "bg-white text-black" : "bg-white/[0.06] text-white/70 hover:bg-white/10"; }
   let sentinel: HTMLDivElement | null = $state(null);
@@ -291,11 +267,6 @@
               {:else}
                 <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add WL</span>{/if}</button>
               {/if}
-              {#if bookmarked.has(s.titleKey)}
-                <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
-              {:else}
-                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{#if bookmarking===s.titleKey}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
-              {/if}
               {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto min-h-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 text-[10px] disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
           </div>
@@ -336,11 +307,6 @@
                 <button onclick={()=>addWL({titleKey:ch.titleKey,title:ch.title,source:ch.source,cover:ch.cover,seriesUrl:ch.seriesUrl,chapters:[ch]})} disabled={adding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===ch.titleKey}...{:else}+{/if}</button>
               {/if}
               <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white text-black rounded font-medium hover:bg-zinc-200">Read</a>
-              {#if bookmarked.has(`${ch.titleKey}:${ch.chapter}`)}
-                <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
-              {:else}
-                <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{#if bookmarking===`${ch.titleKey}:${ch.chapter}`}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
-              {/if}
               {#if excluded.has(ch.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
               {:else}

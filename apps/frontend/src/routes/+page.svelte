@@ -5,8 +5,6 @@
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
   import { toast } from "$lib/toast.svelte";
-  import { saveBookmark, getBookmarks } from "$lib/api";
-  import type { BookmarkEntry } from "$lib/api";
   let { data }: any = $props();
   let feed = $derived(data.feed);
   let results: any[] = $derived(feed?.data?.results ?? []);
@@ -15,7 +13,6 @@
   let sortBy: "latest"|"rating"|"alpha" = $state("latest");
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let view: "grid"|"list" = $state("grid");
-  let bookmarks: BookmarkEntry[] = $state([]);
   let isOnline = $state(true);
   let offlineDismissed = $state(false);
   onMount(()=>{
@@ -40,7 +37,6 @@
     const onOffline = () => isOnline = false;
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
-    getBookmarks(1, 10).then(r => bookmarks = r).catch(()=>{});
     return ()=>{ window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
   });
   onDestroy(() => {
@@ -98,9 +94,7 @@
   });
   let adding = $state<string | null>(null);
   let optimistic = $state<Set<string>>(new Set());
-  let bookmarking: string | null = $state(null);
-  let bookmarked = $state<Set<string>>(new Set());
-  let excluded = $state<Set<string>>(new Set());
+let excluded = $state<Set<string>>(new Set());
   let excluding: string | null = $state(null);
   function sourceFromUrl(url: string): string {
     if (!url) return "";
@@ -140,18 +134,6 @@
       toast("Added to whitelist","success");
     }catch(e:any){ toast(e?.message?.slice(0,200)||"Add failed","error"); } finally{ adding=null; }
   }
-  async function doBookmark(s:any){
-    const key = s.titleKey;
-    if (bookmarked.has(key)) return;
-    bookmarking = key;
-    try{
-      const ch = s.chapters?.[0];
-      await saveBookmark({ title_key: key, chapter_number: Number(ch?.chapterNumber ?? ch?.chapter ?? 1), chapter_url: ch?.chapterUrl || ch?.url || s.seriesUrl || "", source: ch?.source || "", title: s.title, cover: s.cover || null });
-      bookmarked = new Set([...bookmarked, key]);
-      toast("Bookmarked","success");
-      getBookmarks(1, 10).then(r => bookmarks = r).catch(()=>{});
-    }catch(e:any){ toast(e?.message?.slice(0,200)||"Bookmark failed","error"); } finally{ bookmarking=null; }
-  }
 </script>
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 overflow-x-hidden">
@@ -161,45 +143,12 @@
       <button onclick={()=>offlineDismissed=true} class="shrink-0 text-xs opacity-60 hover:opacity-100">✕</button>
     </div>
   {/if}
-  {#if bookmarks.length > 0}
-    <div class="mb-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-white/80">Continue reading</h2>
-        <a href="/bookmarks" class="text-xs text-white/40 hover:text-white/70">View all →</a>
-      </div>
-      <div class="mt-3 flex gap-3 overflow-x-auto scrollbar-hide filter-scroll pb-1">
-        {#each bookmarks.slice(0, 8) as bm}
-          <a href={bm.chapter_url} target="_blank" rel="noopener noreferrer" class="group flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-[#18181b] hover:bg-[#27272a] hover:border-white/[0.14] transition-colors shrink-0 min-w-[200px] max-w-[260px]">
-            {#if bm.cover}<img src={rewriteCoverUrl(bm.cover)||""} alt={bm.title} class="w-10 h-14 object-cover rounded bg-[#27272a] shrink-0" loading="lazy" />{:else}<div class="w-10 h-14 rounded bg-[#27272a] flex items-center justify-center text-zinc-500 text-[10px] shrink-0">—</div>{/if}
-            <div class="min-w-0">
-              <div class="text-xs font-medium leading-tight line-clamp-1 group-hover:text-white">{decodeHtml(bm.title || bm.title_key)}</div>
-              <div class="text-[11px] text-zinc-500 mt-0.5">Ch. {bm.chapter_number} · {bm.source || "—"}</div>
-              <div class="text-[10px] text-white/30 mt-0.5">Continue →</div>
-            </div>
-          </a>
-        {/each}
-      </div>
-    </div>
-  {/if}
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 min-w-0">
-    <div class="min-w-0">
-      <h1 class="text-[28px] sm:text-[32px] font-semibold tracking-[-0.03em]">ManhwaScan</h1>
-      <p class="text-sm text-zinc-400 mt-1">Latest updates — {filtered.length} series · {results.length} chapters</p>
-      <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-        <span class="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60">{stats.total} series</span>
-      </div>
-    </div>
-      <div class="flex gap-2 w-full sm:w-auto items-center min-w-0">
-      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 min-w-0 sm:w-64 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
-      <div class="flex gap-1 shrink-0 items-center">
         <button onclick={()=>setSort('latest')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='latest'?'bg-white text-black':'bg-white/10 text-white/60')}>Latest</button>
         <button onclick={()=>setSort('rating')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='rating'?'bg-white text-black':'bg-white/10 text-white/60')}>Rating</button>
         <button onclick={()=>setSort('alpha')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='alpha'?'bg-white text-black':'bg-white/10 text-white/60')}>A–Z</button>
         <span class="w-px h-8 bg-white/10 mx-1"></span>
         <button onclick={()=>setView('grid')} class={'min-h-0 w-8 h-8 flex items-center justify-center rounded-full text-xs '+(view==='grid'?'bg-white text-black':'bg-white/10 text-white/60')}>⊞</button>
         <button onclick={()=>setView('list')} class={'min-h-0 w-8 h-8 flex items-center justify-center rounded-full text-xs '+(view==='list'?'bg-white text-black':'bg-white/10 text-white/60')}>☰</button>
-      </div>
-    </div>
   </div>
 
   {#if data.error}
@@ -239,13 +188,6 @@
             <div class="mt-auto pt-3 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="inline-flex items-center text-xs px-3 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
-              {:else}
-                <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="text-xs px-3 py-1 rounded bg-white text-black hover:bg-zinc-200 disabled:opacity-50 font-medium transition-colors">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add</span>{/if}</button>
-              {/if}
-              {#if bookmarked.has(s.titleKey)}
-                <span class="inline-flex items-center text-xs px-3 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
-              {:else}
-                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="text-xs px-3 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">{#if bookmarking===s.titleKey}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
               {/if}
               {#if excluded.has(s.titleKey)}
                 <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20">✕</span>
@@ -290,13 +232,6 @@
             <div class="mt-auto pt-2 flex gap-2">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
-              {:else}
-                <button onclick={()=>addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add WL</span>{/if}</button>
-              {/if}
-              {#if bookmarked.has(s.titleKey)}
-                <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
-              {:else}
-                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{#if bookmarking===s.titleKey}...{:else}☆<span class="hidden sm:inline"> Bookmark</span>{/if}</button>
               {/if}
               {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto min-h-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 text-[10px] disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
@@ -311,4 +246,3 @@
       </div>
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {/if}
-</div>
