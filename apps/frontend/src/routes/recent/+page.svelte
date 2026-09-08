@@ -278,7 +278,7 @@
             <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
             <div class="absolute bottom-0 inset-x-0 p-3">
               <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{decodeHtml(s.title)}</div>
-              <div class="flex gap-1 flex-wrap mt-1.5">{#each s.chapters.slice(0,3) as c}<span class={"inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/each}</div>
+              <div class="flex gap-1 flex-wrap mt-1.5">{#if s.rating && Number(s.rating)>0}<span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-amber-500/90 text-white">★ {Number(s.rating).toFixed(1)}</span>{/if}{#each s.chapters.slice(0,3) as c}<span class={"inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/each}</div>
               {#if s.genres?.length}<p class="text-[10px] text-white/70 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
             </div>
             {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="absolute top-2 left-2 w-4 h-3 rounded-sm object-cover" loading="lazy" />{/if}
