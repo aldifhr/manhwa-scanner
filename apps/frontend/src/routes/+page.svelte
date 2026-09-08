@@ -189,15 +189,15 @@
         <span class="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60">{stats.total} series</span>
       </div>
     </div>
-      <div class="flex gap-2 w-full sm:w-auto">
-      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 sm:w-64 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 py-1.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
-      <div class="flex gap-1 shrink-0">
-        <button onclick={()=>setSort("latest")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+(sortBy==="latest"?"bg-white text-black":"bg-white/10 text-white/60")}>Latest</button>
-        <button onclick={()=>setSort("rating")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+(sortBy==="rating"?"bg-white text-black":"bg-white/10 text-white/60")}>Rating</button>
-        <button onclick={()=>setSort("alpha")} class={"min-h-0 px-3 py-1 text-xs rounded-full "+(sortBy==="alpha"?"bg-white text-black":"bg-white/10 text-white/60")}>A–Z</button>
-        <span class="w-px bg-white/10 self-stretch mx-1"></span>
-        <button onclick={()=>setView("grid")} class={"min-h-0 w-7 h-7 flex items-center justify-center rounded-full text-xs "+(view==="grid"?"bg-white text-black":"bg-white/10 text-white/60")} title="Grid view">⊞</button>
-        <button onclick={()=>setView("list")} class={"min-h-0 w-7 h-7 flex items-center justify-center rounded-full text-xs "+(view==="list"?"bg-white text-black":"bg-white/10 text-white/60")} title="List view">☰</button>
+      <div class="flex gap-2 w-full sm:w-auto items-center">
+      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 sm:w-64 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
+      <div class="flex gap-1 shrink-0 items-center">
+        <button onclick={()=>setSort('latest')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='latest'?'bg-white text-black':'bg-white/10 text-white/60')}>Latest</button>
+        <button onclick={()=>setSort('rating')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='rating'?'bg-white text-black':'bg-white/10 text-white/60')}>Rating</button>
+        <button onclick={()=>setSort('alpha')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='alpha'?'bg-white text-black':'bg-white/10 text-white/60')}>A–Z</button>
+        <span class="w-px h-8 bg-white/10 mx-1"></span>
+        <button onclick={()=>setView('grid')} class={'min-h-0 w-8 h-8 flex items-center justify-center rounded-full text-xs '+(view==='grid'?'bg-white text-black':'bg-white/10 text-white/60')}>⊞</button>
+        <button onclick={()=>setView('list')} class={'min-h-0 w-8 h-8 flex items-center justify-center rounded-full text-xs '+(view==='list'?'bg-white text-black':'bg-white/10 text-white/60')}>☰</button>
       </div>
     </div>
   </div>
