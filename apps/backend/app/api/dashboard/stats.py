@@ -426,8 +426,11 @@ async def _build_snapshot() -> dict:
         try:
             if cron_stats:
                 lr = cron_stats[0]
+                # status is jsonb {"status": "ok"}, extract nested string
+                _lr_status = lr.get("status", {})
+                _lr_ok = (isinstance(_lr_status, dict) and _lr_status.get("status") == "ok") or str(_lr_status).lower() == "ok"
                 cron_status_data = {
-                    "outcome": "ok" if lr.get("status") == "ok" else "error",
+                    "outcome": "ok" if _lr_ok else "error",
                     "timestamp": lr.get("created_at")
                     or lr.get("updated_at")
                     or datetime.now(timezone.utc).isoformat(),
@@ -435,15 +438,16 @@ async def _build_snapshot() -> dict:
                     "matched": lr.get("matched") or 0,
                     "sent": lr.get("chapters_sent") or 0,
                 }
-                # Most recent run with chapters_sent > 0 (real delivery proof).
                 for _r in cron_stats:
                     try:
                         _sent = int(_r.get("chapters_sent") or 0)
                     except (TypeError, ValueError):
                         _sent = 0
                     if _sent > 0:
+                        _r_status = _r.get("status", {})
+                        _r_ok = (isinstance(_r_status, dict) and _r_status.get("status") == "ok") or str(_r_status).lower() == "ok"
                         last_delivery = {
-                            "outcome": "ok" if _r.get("status") == "ok" else "error",
+                            "outcome": "ok" if _r_ok else "error",
                             "timestamp": _r.get("created_at")
                             or _r.get("updated_at")
                             or datetime.now(timezone.utc).isoformat(),

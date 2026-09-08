@@ -531,40 +531,90 @@ div[class*="bg-white/5"][class*="rounded-xl"][class*="border-white/10"] {
   background: #3f3f46 !important;
 }
 
-/* ── 4. MOTION ─────────────────────────────────────────────── */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.enter-gold {
-  animation: fade-in 0.4s var(--ease) both;
-}
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(12px);
+/* ── MICRO-INTERACTIONS ───────────────────────────────────── */
+.group\/card, [class*="bg-white/5"][class*="border-white/10"] {
   transition:
-    opacity 0.5s var(--ease),
-    transform 0.5s var(--ease);
+    transform 0.2s var(--ease),
+    border-color 0.2s ease,
+    background 0.2s ease !important;
 }
-[data-reveal].is-visible {
-  opacity: 1;
-  transform: translateY(0);
+.group\/card:hover, [class*="bg-white/5"][class*="border-white/10"]:hover {
+  transform: translateY(-1px) !important;
 }
 
+/* Chapter chips — tighter */
+[class*="bg-white/10"][class*="rounded-full"][class*="text-[10px]"],
+[class*="bg-white/10"][class*="rounded-full"][class*="text-\[10px\]"] {
+  font-size: 10px !important;
+  padding: 2px 7px !important;
+  border-radius: 9999px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+/* Source pills — monospace-ish feel */
+span[class*="-500/15"][class*="rounded"] {
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase !important;
+}
+
+/* ── LAYOUT POLISH ────────────────────────────────────────── */
+
+/* Section headers */
+h2[class*="text-sm"][class*="font-semibold"] {
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: var(--text-muted) !important;
+  font-weight: 600 !important;
+}
+
+/* Stats cards — tighter numbers */
+[class*="text-lg"][class*="font-bold"] {
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Better focus rings */
+*:focus-visible {
+  outline: 2px solid rgba(250, 250, 250, 0.5) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px !important;
+}
+
+/* Touch feedback */
+button:active, a:active {
+  transform: scale(0.98) !important;
+  transition: transform 0.1s ease !important;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth !important;
+}
+
+/* Loading state — reduce motion respect */
 @media (prefers-reduced-motion: reduce) {
-  .enter-gold,
-  [data-reveal] {
-    animation: none !important;
-    opacity: 1 !important;
+  button:active, a:active {
     transform: none !important;
-    transition: none !important;
   }
 }
 
-/* Touch targets remain 44px — but compact pills opt-out via min-h-0 stays */
+/* ── FILTER BAR — STICKY ───────────────────────────────────── */
+[class*="mt-3"][class*="flex"][class*="gap-2"][class*="flex-wrap"] {
+  position: sticky !important;
+  top: 57px !important;
+  z-index: 20 !important;
+  background: linear-gradient(180deg, #09090b 80%, transparent 100%) !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  margin-top: 0 !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Badge row gap */
+[class*="mt-2"][class*="flex-wrap"][class*="items-center"][class*="gap-2"][class*="text-xs"] {
+  gap: 6px !important;
+}
