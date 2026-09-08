@@ -15,7 +15,6 @@ export async function proxyToScanner(event: import("@sveltejs/kit").RequestEvent
     init.body = await event.request.text();
   }
   const res = await fetch(target, init);
-  const body = await res.arrayBuffer();
   const out = new Headers();
   for (const [k, v] of res.headers) out.set(k, v);
   if (path.includes("/reader/cover") || path.includes("/reader/proxy")) {
@@ -23,5 +22,10 @@ export async function proxyToScanner(event: import("@sveltejs/kit").RequestEvent
     out.set("Cache-Control", "public, max-age=86400, s-maxage=86400");
   }
   if (path.includes("/dispatch-history") || path.includes("/dashboard")) out.set("Cache-Control", "no-store");
+  // 304/204 must not have body — Node's Response throws Invalid status code with body
+  if (res.status === 304 || res.status === 204) {
+    return new Response(null, { status: res.status, headers: out });
+  }
+  const body = await res.arrayBuffer();
   return new Response(body, { status: res.status, headers: out });
 }
