@@ -20,8 +20,13 @@
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let excluded = $state<Set<string>>(new Set());
   let excluding: string | null = $state(null);
+  let showTop = $state(false);
+  let onScroll: () => void;
   // Restore filters from localStorage
   onMount(()=>{
+    onScroll = () => showTop = window.scrollY > 400;
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     const p = new URLSearchParams(location.search);
     if (p.get("q")) q = p.get("q")!;
     if (p.get("source")) sourceFilter = p.get("source");
@@ -66,7 +71,9 @@
   });
   onDestroy(() => {
     if (pollTimer) clearInterval(pollTimer);
+    if (onScroll) window.removeEventListener("scroll", onScroll);
   });
+  function toTop(){ window.scrollTo({ top: 0, behavior: "smooth" }); }
   // Persist filters to localStorage
   function saveFilters() {
     try {
@@ -345,5 +352,8 @@
         {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
       </div>
     {:else if visible < flatFiltered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {flatFiltered.length} — scroll for more</div>{/if}
+  {/if}
+  {#if showTop}
+    <button onclick={toTop} class="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-white text-black shadow-lg flex items-center justify-center text-sm hover:bg-zinc-200 transition-colors" aria-label="Back to top">↑</button>
   {/if}
 </div>
