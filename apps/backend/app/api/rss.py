@@ -192,11 +192,9 @@ async def _rss_impl(request: Request):
             except Exception:
                 pass
 
-        # BUG1: dedupe flat mode by (canonicalTitleKey, chapterNumber).
-        # Cross-source duplicates (same chapter scraped from ikiru + voratoon,
-        # or voratoon + shinigami) collapse to ONE row; sources[] aggregates.
+        # Per-source split: dedupe by (canonicalTitleKey, chapterNumber, source) — keep per-source rows
         if not group:
-            _seen: dict[tuple[str, float], dict] = {}
+            _seen: dict[tuple[str, float, str], dict] = {}
             _deduped: list[dict] = []
             for r in results:
                 ctk = r.get("canonicalTitleKey") or ""
@@ -204,7 +202,7 @@ async def _rss_impl(request: Request):
                 if cn is None:
                     _deduped.append(r)
                     continue
-                key = (ctk, float(cn))
+                key = (ctk, float(cn), r.get("source") or "")
                 if key in _seen:
                     # merge source into existing row's sources[]
                     _existing = _seen[key]
