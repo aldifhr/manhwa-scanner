@@ -333,7 +333,7 @@
               {#if ch.isWhitelisted}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
-                <button onclick={()=>addWL({titleKey:ch.titleKey,title:ch.title,source:ch.source,cover:ch.cover,seriesUrl:ch.seriesUrl,chapters:[ch]})} disabled={adding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===ch.titleKey}...{:else}+<span class="hidden sm:inline"> Add WL</span>{/if}</button>
+                <button onclick={()=>addWL({titleKey:ch.titleKey,title:ch.title,source:ch.source,cover:ch.cover,seriesUrl:ch.seriesUrl,chapters:[ch]})} disabled={adding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===ch.titleKey}...{:else}+{/if}</button>
               {/if}
               <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white text-black rounded font-medium hover:bg-zinc-200">Read</a>
               {#if bookmarked.has(`${ch.titleKey}:${ch.chapter}`)}
