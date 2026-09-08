@@ -35,8 +35,8 @@
   }
 </script>
 
-<div class="relative min-h-[70vh] flex items-center justify-center px-4">
-  <div class="w-full max-w-sm">
+<div class="relative min-h-[calc(100dvh-56px)] flex items-center justify-center px-4 py-8">
+  <div class="w-full max-w-sm mx-auto">
     <div class="flex flex-col items-center mb-6">
       <h1 class="text-2xl font-bold tracking-tight">Manhwa<span class="text-[var(--gold-accent)]">Scanner</span></h1>
       <p class="text-white/50 text-sm mt-1 tracking-wide uppercase">dashboard</p>
@@ -54,6 +54,6 @@
         {#if loading}<span class="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>{:else}Sign in →{/if}
       </button>
     </form>
-    <p class="text-center text-white/30 text-xs mt-4">secured access only</p>
+    <p class="text-center w-full text-white/30 text-xs mt-4 tracking-widest uppercase">secured access only</p>
   </div>
 </div>
