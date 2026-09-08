@@ -14,6 +14,7 @@
     try{
       const params = new URLSearchParams({ page: String(page), page_size:"50" });
       if (q) params.set("search", q);
+      if (source !== "all") params.set("source", source);
       const res = await fetch(`/api/v1/dispatch-history?${params}`);
       const j:any = await res.json().catch(()=>({}));
       const d=j?.data ?? j;
@@ -32,7 +33,7 @@
   </div>
   <div class="flex gap-2 flex-wrap">
     {#each ["all","ikiru","shinigami","voratoon"] as s}
-      <button onclick={()=>{source=s;}} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+(source===s?"bg-white text-black":"bg-white/[0.06]")}>{s}</button>
+      <button onclick={()=>{source=s; page=1; load();}} class={"min-h-0 px-3 py-1 text-xs rounded-full capitalize "+(source===s?"bg-white text-black":"bg-white/[0.06]")}>{s}</button>
     {/each}
   </div>
   <p class="text-xs text-white/40">{total} total · {filtered.length} shown · page {page}</p>
@@ -62,7 +63,7 @@
     </div>
     <div class="flex gap-2">
       <button onclick={()=>{ if(page>1){page--; load();} }} disabled={page<=1} class="min-h-0 px-3 py-1 text-xs rounded-full bg-white/10 disabled:opacity-30">Prev</button>
-      <button onclick={()=>{ page++; load(); }} class="min-h-0 px-3 py-1 text-xs rounded-full bg-white/10">Next</button>
+      <button onclick={()=>{ page++; load(); }} disabled={page*50 >= total} class="min-h-0 px-3 py-1 text-xs rounded-full bg-white/10 disabled:opacity-30">Next</button>
     </div>
   {/if}
 </div>

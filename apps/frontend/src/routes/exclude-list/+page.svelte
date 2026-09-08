@@ -3,16 +3,21 @@
   import { toast } from "$lib/toast.svelte";
   let { data }: any = $props();
   let raw:any = $derived(data?.data?.data ?? data?.data ?? {});
-  let arr:any[] = $derived(Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : []);
+  let serverArr:any[] = $derived(Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : []);
+  let arr:any[] = $state([]);
+  $effect(()=>{ arr = [...serverArr]; });
   let q=$state("");
   let adding=$state(false);
   async function add(){
     if(!q.trim()) return;
     adding=true;
+    const key=q.trim();
     try{
-      const res=await fetch("/api/v1/excluded-titles", withCsrf({method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: q.trim(), title: q.trim() })}));
+      const res=await fetch("/api/v1/excluded-titles", withCsrf({method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: key, title: key })}));
       if(!res.ok) throw new Error(await res.text());
-      toast("Excluded","success"); location.reload();
+      arr = [...arr, { title: key, title_key: key }];
+      q="";
+      toast("Excluded","success");
     }catch(e:any){ toast(e.message,"error"); } finally{ adding=false; }
   }
   async function del(it:any){
@@ -20,7 +25,8 @@
     try{
       const res=await fetch("/api/v1/excluded-titles", withCsrf({method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: key })}));
       if(!res.ok) throw new Error(await res.text());
-      toast("Removed","success"); location.reload();
+      arr = arr.filter((x:any)=>(x.title_key ?? x.titleKey ?? x.title) !== key);
+      toast("Removed","success");
     }catch(e:any){ toast(e.message,"error"); }
   }
 </script>

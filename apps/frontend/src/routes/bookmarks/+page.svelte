@@ -10,7 +10,7 @@
     try{ await deleteBookmark(b.title_key, b.chapter_number); toast("Bookmark removed","success"); await load(); }catch(e:any){ toast(e.message,"error"); }
   }
   async function clearAll(){
-    for(const b of [...items]) try{ await deleteBookmark(b.title_key, b.chapter_number);}catch{}
+    await Promise.all([...items].map(b=>deleteBookmark(b.title_key, b.chapter_number).catch(()=>{})));
     toast("Cleared","success"); await load();
   }
 </script>
