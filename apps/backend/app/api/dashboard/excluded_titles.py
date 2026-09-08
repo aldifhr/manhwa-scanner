@@ -49,12 +49,13 @@ async def get_excluded(request: Request):
         tks = [r.get("title_key") for r in rows if r.get("title_key")]
         cover_map: dict[str, str] = {}
         series_url_map: dict[str, str] = {}
+        type_map: dict[str, str] = {}
         if tks:
+            # LEFT JOIN whitelist — cover/series_url/type
             try:
                 from app.db import get_supabase as _gsb
                 sb = _gsb()
-                # LEFT JOIN whitelist
-                wl = sb.table("whitelist").select("title_key, cover, series_url").in_("title_key", tks).execute()
+                wl = sb.table("whitelist").select("title_key, cover, series_url, type").in_("title_key", tks).limit(500).execute()
                 for w in (wl.data or []):
                     tk = w.get("title_key") or ""
                     if not tk:
@@ -65,44 +66,42 @@ async def get_excluded(request: Request):
                     su = w.get("series_url")
                     if su and tk not in series_url_map:
                         series_url_map[tk] = su
+                    t = w.get("type")
+                    if t and tk not in type_map:
+                        type_map[tk] = t
             except Exception:
                 pass
-            # LEFT JOIN recent_chapters fallback
-            if not cover_map:
-                try:
-                    from app.db import get_supabase as _gsb2
-                    sb2 = _gsb2()
-                    rc = sb2.table("recent_chapters").select("title_key, cover, series_url").in_("title_key", tks).execute()
-                    for r in (rc.data or []):
-                        tk = r.get("title_key") or ""
-                        if not tk:
-                            continue
-                        c = r.get("cover")
-                        if c and tk not in cover_map:
-                            cover_map[tk] = c
-                        su = r.get("series_url")
-                        if su and tk not in series_url_map:
-                            series_url_map[tk] = su
-                except Exception:
-                    pass
-            # LEFT JOIN whitelist fallback for cover/series_url
-            if not cover_map:
-                try:
-                    from app.db import get_supabase as _gsb3
-                    sb3 = _gsb3()
-                    mm = sb3.table("whitelist").select("title_key, cover, series_url").in_("title_key", tks).execute()
-                    for m in (mm.data or []):
-                        tk = m.get("title_key") or ""
-                        if not tk:
-                            continue
-                        c = m.get("cover")
-                        if c and tk not in cover_map:
-                            cover_map[tk] = c
-                        su = m.get("series_url")
-                        if su and tk not in series_url_map:
-                            series_url_map[tk] = su
-                except Exception:
-                    pass
+            # LEFT JOIN recent_chapters — always fill missing cover/series_url
+            try:
+                from app.db import get_supabase as _gsb2
+                sb2 = _gsb2()
+                rc = sb2.table("recent_chapters").select("title_key, cover, series_url").in_("title_key", tks).limit(500).execute()
+                for r in (rc.data or []):
+                    tk = r.get("title_key") or ""
+                    if not tk:
+                        continue
+                    c = r.get("cover")
+                    if c and tk not in cover_map:
+                        cover_map[tk] = c
+                    su = r.get("series_url")
+                    if su and tk not in series_url_map:
+                        series_url_map[tk] = su
+            except Exception:
+                pass
+            # LEFT JOIN series_meta — last resort
+            try:
+                from app.db import get_supabase as _gsb3
+                sb3 = _gsb3()
+                sm = sb3.table("series_meta").select("title_key, cover").in_("title_key", tks).limit(500).execute()
+                for m in (sm.data or []):
+                    tk = m.get("title_key") or ""
+                    if not tk:
+                        continue
+                    c = m.get("cover")
+                    if c and tk not in cover_map:
+                        cover_map[tk] = c
+            except Exception:
+                pass
 
         results = []
         for r in rows:
