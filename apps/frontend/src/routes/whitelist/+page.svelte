@@ -87,19 +87,18 @@
         {@const genres = it.genres ?? it.tags ?? []}
         {@const desc = it.description}
         {@const src = it.source ?? (Array.isArray(it.sources) ? (typeof it.sources[0]==="string"? it.sources[0] : (it.sources[0] as any)?.source) : "")}
-        <a href={it.series_url ?? it.seriesUrl ?? it.url ?? "#"} target="_blank" rel="noopener noreferrer" class="group p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/[0.07] flex flex-col gap-2">
-          {#if it.cover || it.cover_url}<img src={it.cover ?? it.cover_url} alt={it.title ?? it.title_key} class="w-full aspect-[3/4] object-cover rounded-lg bg-white/5 group-hover:scale-[1.02] transition-transform" loading="lazy" />{/if}
-          <div class="text-sm flex-1 min-w-0">
-            <div class="font-medium line-clamp-2 leading-tight">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div>
-            <div class="flex flex-wrap gap-1 mt-1">
-              {#if src}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{src}</span>{/if}
-              {#if origin}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 uppercase">{String(origin).slice(0,3)}</span>{/if}
-              {#if it.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{it.type}</span>{/if}
-              {#if rating && Number(rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(rating).toFixed(1)}</span>{/if}
+        <a href={it.series_url ?? it.seriesUrl ?? it.url ?? "#"} target="_blank" rel="noopener noreferrer" class="group relative overflow-hidden rounded-xl border border-white/10 bg-black aspect-[3/4] block">
+          {#if it.cover || it.cover_url}<img src={it.cover ?? it.cover_url} alt={it.title ?? it.title_key} class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />{/if}
+          <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90"></div>
+          <div class="absolute bottom-0 inset-x-0 p-3 flex flex-col gap-1">
+            <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{it.title ?? it.titleKey ?? it.title_key ?? it.canonical_title_key}</div>
+            <div class="flex flex-wrap gap-1">
+              {#if src}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/15 backdrop-blur capitalize text-white">{src}</span>{/if}
+              {#if origin}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/15 backdrop-blur uppercase text-white">{String(origin).slice(0,3)}</span>{/if}
+              {#if it.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/15 backdrop-blur capitalize text-white">{it.type}</span>{/if}
+              {#if rating && Number(rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/90 text-white">★ {Number(rating).toFixed(1)}</span>{/if}
             </div>
-            {#if Array.isArray(genres) && genres.length}<div class="text-[10px] text-white/40 mt-1 line-clamp-1">{genres.slice(0,3).join(" · ")}</div>{/if}
-            {#if desc}<p class="text-[11px] text-white/50 line-clamp-2 mt-1">{String(desc).replace(/<[^>]+>/g," ").slice(0,120)}</p>{/if}
-            <div class="text-white/30 text-[10px] mt-1 truncate">{it.titleKey ?? it.title_key}</div>
+            {#if Array.isArray(genres) && genres.length}<div class="text-[10px] text-white/70 line-clamp-1">{genres.slice(0,3).join(" · ")}</div>{/if}
           </div>
         </a>
       {/each}
