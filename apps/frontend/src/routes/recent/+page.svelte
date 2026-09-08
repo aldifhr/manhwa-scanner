@@ -274,17 +274,17 @@
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
               {:else}
-                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
+                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
               {/if}
               {#if bookmarked.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
-                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
+                <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
               {/if}
               {#if excluded.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
               {:else}
-                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕ Exclude"}</button>
+                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕ Exclude"}</button>
               {/if}
             </div>
           </div>
@@ -303,8 +303,8 @@
         <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
           {#if ch.cover}<img src={rewriteCoverUrl(ch.cover)||""} alt={ch.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              {#if getOriginFlag(ch.origin)}<img src={getOriginFlag(ch.origin)} alt={ch.origin} class="w-4 h-3 rounded-sm object-cover shrink-0" />{/if}
+            <div class="flex items-start gap-2">
+              {#if getOriginFlag(ch.origin)}<img src={getOriginFlag(ch.origin)} alt={ch.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 mt-0.5" />{/if}
               <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="text-sm font-medium truncate hover:text-white/80 leading-none">{decodeHtml(ch.title)}</a>
               {#if ch.isWhitelisted}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">WL</span>{/if}
             </div>
@@ -316,16 +316,16 @@
             {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{:else}<p class="text-[11px] text-white/20 mt-1">—</p>{/if}
             {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
             <div class="flex gap-2 mt-2">
-              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-full">Read</a>
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded">Read</a>
               {#if bookmarked.has(`${ch.titleKey}:${ch.chapter}`)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
-                <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===`${ch.titleKey}:${ch.chapter}`?"...":"☆ Bookmark"}</button>
+                <button onclick={()=>doBookmarkFlat(ch)} disabled={bookmarking===`${ch.titleKey}:${ch.chapter}`} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===`${ch.titleKey}:${ch.chapter}`?"...":"☆ Bookmark"}</button>
               {/if}
               {#if excluded.has(ch.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
               {:else}
-                <button onclick={()=>excludeTitle(ch.titleKey, ch.title, ch.source)} disabled={excluding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===ch.titleKey?"...":"✕ Exclude"}</button>
+                <button onclick={()=>excludeTitle(ch.titleKey, ch.title, ch.source)} disabled={excluding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===ch.titleKey?"...":"✕ Exclude"}</button>
               {/if}
             </div>
           </div>
