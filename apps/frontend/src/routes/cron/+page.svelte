@@ -8,6 +8,7 @@
   let cronStatus: any = $derived(cron?.cronStatus ?? cron?.cron_status ?? snap?.cronStatus ?? snap?.cron_status ?? cron ?? {});
   let msg = $state<string | null>(null);
   let loading = $state<string | null>(null);
+  let refreshing = $state(false);
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   async function post(url: string, body?: any){
     loading = url;
@@ -27,16 +28,13 @@
   onMount(() => {
     pollTimer = setInterval(async () => {
       try {
-        const res = await fetch(`/api/v1/queue?limit=1&_=${Date.now()}`);
+        refreshing = true;
+        const res = await fetch(`/api/v1/queue/cron?_=${Date.now()}`);
         if (res.ok) {
-          // Trigger Svelte reactivity by reassigning data
-          const newRes = await fetch(`/api/v1/queue?limit=1`);
-          if (newRes.ok) {
-            // Force reload of page data via invalidate
-            location.reload();
-          }
+          const j = await res.json().catch(()=>null);
+          if (j?.data) cron = j.data;
         }
-      } catch {}
+      } catch {} finally { refreshing = false; }
     }, 30_000);
   });
   onDestroy(() => {
@@ -46,7 +44,7 @@
 
 <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
   <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold">Cron</h1>
+    <h1 class="text-xl font-bold">Cron {#if refreshing}<span class="text-xs font-normal text-white/30">· refreshing…</span>{/if}</h1>
     <a href="/admin" class="text-xs text-white/40 hover:text-white/70">→ Admin</a>
   </div>
 

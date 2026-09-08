@@ -263,19 +263,22 @@
       {#if hasActiveFilters}<button onclick={clearFilters} class="mt-4 text-xs px-4 py-1.5 rounded-full bg-white text-black font-medium hover:bg-zinc-200 transition-colors">Clear filters</button>{/if}
     </div>
   {:else if groupedMode}
-    <div class="mt-4 flex flex-col gap-3">
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
       {#each grouped as s (s.titleKey + '|' + (s.source || s.chapters?.[0]?.source || ''))}
-        <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
-          {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={s.title} class="w-16 h-24 object-cover rounded" />{/if}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-start gap-2">
-              {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 mt-0.5" loading="lazy" />{/if}
-              <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="font-semibold text-sm leading-tight hover:text-white/80">{decodeHtml(s.title)}</a>
+        <div class="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#18181b] hover:border-white/15 transition-colors">
+          <a href={s.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="relative block aspect-[3/4] overflow-hidden bg-black">
+            {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={s.title} class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />{:else}<div class="absolute inset-0 bg-[#27272a] flex items-center justify-center text-zinc-500 text-xs">—</div>{/if}
+            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3">
+              <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{decodeHtml(s.title)}</div>
+              <div class="flex gap-1 flex-wrap mt-1.5">{#each s.chapters.slice(0,3) as c}<span class={"inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/each}</div>
+              {#if s.genres?.length}<p class="text-[10px] text-white/70 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
             </div>
-            <div class="flex gap-1 flex-wrap mt-1">{#each s.chapters.slice(0,5) as c}<a href={c.chapterUrl || c.url || "#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] px-2 py-1 rounded leading-none transition-colors "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)} · {c.source}</a>{/each}</div>
-            {#if s.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
-            {#if s.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(s.description)}</p>{:else}<p class="text-[11px] text-white/20 mt-1">—</p>{/if}
-            <div class="flex gap-2 mt-2">
+            {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="absolute top-2 left-2 w-4 h-3 rounded-sm object-cover" loading="lazy" />{/if}
+          </a>
+          <div class="p-3 flex flex-col gap-2 flex-1">
+            {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 leading-snug">{decodeHtml(s.description)}</p>{/if}
+            <div class="flex gap-2 mt-auto pt-1">
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
@@ -286,11 +289,7 @@
               {:else}
                 <button onclick={()=>doBookmark(s)} disabled={bookmarking===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-50">{bookmarking===s.titleKey?"...":"☆ Bookmark"}</button>
               {/if}
-              {#if excluded.has(s.titleKey)}
-                <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
-              {:else}
-                <button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===s.titleKey?"...":"✕ Exclude"}</button>
-              {/if}
+              {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto min-h-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 text-[10px] disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
           </div>
         </div>
@@ -298,31 +297,33 @@
     </div>
     <div bind:this={sentinel} class="h-8"></div>
     {#if loadingMore}
-      <div class="flex flex-col gap-3">
-        {#each Array(3) as _}<div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5 animate-pulse"><div class="w-16 h-24 rounded bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="h-8 bg-white/5 rounded w-20"></div></div></div>{/each}
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
       </div>
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {:else}
-    <div class="mt-4 flex flex-col gap-3">
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
       {#each flatVisible as ch (ch.chapterUrl || (ch.titleKey + '|' + ch.chapter + '|' + ch.source))}
-        <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
-          {#if ch.cover}<img src={rewriteCoverUrl(ch.cover)||""} alt={ch.title} class="w-16 h-24 object-cover rounded" />{/if}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-start gap-2">
-              {#if getOriginFlag(ch.origin)}<img src={getOriginFlag(ch.origin)} alt={ch.origin} class="w-4 h-3 rounded-sm object-cover shrink-0 mt-0.5" />{/if}
-              <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="text-sm font-medium truncate hover:text-white/80 leading-none">{decodeHtml(ch.title)}</a>
-              {#if ch.isWhitelisted}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">WL</span>{/if}
+        <div class="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#18181b] hover:border-white/15 transition-colors">
+          <a href={ch.seriesUrl || "#"} target="_blank" rel="noopener noreferrer" class="relative block aspect-[3/4] overflow-hidden bg-black">
+            {#if ch.cover}<img src={rewriteCoverUrl(ch.cover)||""} alt={ch.title} class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />{:else}<div class="absolute inset-0 bg-[#27272a] flex items-center justify-center text-zinc-500 text-xs">—</div>{/if}
+            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3">
+              <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{decodeHtml(ch.title)}</div>
+              <div class="flex gap-1 flex-wrap mt-1.5">
+                <span class={"inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white"}>Ch. {getChapterLabel(ch as any)}</span>
+                {#if ch.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/15 backdrop-blur text-white capitalize">{ch.type}</span>{/if}
+                {#if ch.rating && Number(ch.rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/90 text-white">★ {Number(ch.rating).toFixed(1)}</span>{/if}
+              </div>
+              {#if ch.genres?.length}<p class="text-[10px] text-white/70 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
             </div>
-            <div class="flex gap-1 flex-wrap mt-1">
-              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded transition-colors "+chapterSourceClass(ch.source)} style="line-height:1">Ch. {getChapterLabel(ch as any)} · {ch.source}</a>
-              {#if ch.type}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-white/10 capitalize">{ch.type}</span>{/if}
-              {#if ch.rating && Number(ch.rating)>0}<span class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">★ {Number(ch.rating).toFixed(1)}</span>{/if}
-            </div>
-            {#if ch.description}<p class="text-[11px] text-white/55 line-clamp-2 mt-1">{decodeHtml(ch.description)}</p>{:else}<p class="text-[11px] text-white/20 mt-1">—</p>{/if}
-            {#if ch.genres?.length}<p class="text-[10px] text-white/40 mt-1 line-clamp-1">{ch.genres.slice(0,3).join(" · ")}</p>{/if}
-            <div class="flex gap-2 mt-2">
-              {#if ch.isWhitelisted}<span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>{/if}
-              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded">Read</a>
+            {#if getOriginFlag(ch.origin)}<img src={getOriginFlag(ch.origin)} alt={ch.origin} class="absolute top-2 left-2 w-4 h-3 rounded-sm object-cover" />{/if}
+            {#if ch.isWhitelisted}<span class="absolute top-2 right-2 inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-sky-500/90 text-white">✓ Verified</span>{/if}
+          </a>
+          <div class="p-3 flex flex-col gap-2 flex-1">
+            {#if ch.description}<p class="text-[11px] text-zinc-400 line-clamp-2 leading-snug">{decodeHtml(ch.description)}</p>{/if}
+            <div class="flex gap-2 mt-auto pt-1">
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white text-black rounded font-medium hover:bg-zinc-200">Read</a>
               {#if bookmarked.has(`${ch.titleKey}:${ch.chapter}`)}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">★ Saved</span>
               {:else}
@@ -340,8 +341,8 @@
     </div>
     <div bind:this={sentinel} class="h-8"></div>
     {#if loadingMore}
-      <div class="flex flex-col gap-3">
-        {#each Array(3) as _}<div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5 animate-pulse"><div class="w-16 h-24 rounded bg-white/5 shrink-0"></div><div class="flex-1 space-y-2"><div class="h-4 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div><div class="h-8 bg-white/5 rounded w-20"></div></div></div>{/each}
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {#each Array(6) as _}<div class="rounded-xl border border-white/10 bg-[#18181b] animate-pulse overflow-hidden"><div class="aspect-[3/4] bg-white/5"></div><div class="p-3 space-y-2"><div class="h-3 bg-white/5 rounded w-3/4"></div><div class="h-3 bg-white/5 rounded w-1/2"></div></div></div>{/each}
       </div>
     {:else if visible < flatFiltered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {flatFiltered.length} — scroll for more</div>{/if}
   {/if}
