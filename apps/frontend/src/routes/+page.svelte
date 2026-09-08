@@ -68,7 +68,7 @@
               {#each series.chapters.slice(0,4) as ch}
                 {@const label = getChapterLabel(ch as any)}
                 {#if label !== "?"}
-                  <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="text-[11px] font-semibold px-2 py-1 rounded bg-white/10 hover:bg-white/20">Ch. {label} · {ch.source}</a>
+                  <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] font-semibold px-2 py-1 rounded bg-white/10 hover:bg-white/20 leading-none">Ch. {label} · {ch.source}</a>
                 {/if}
               {/each}
             </div>
