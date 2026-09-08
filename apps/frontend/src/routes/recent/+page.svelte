@@ -259,7 +259,7 @@
     </div>
   {:else if groupedMode}
     <div class="mt-4 flex flex-col gap-3">
-      {#each grouped as s (s.titleKey)}
+      {#each grouped as s (s.titleKey + '|' + (s.source || s.chapters?.[0]?.source || ''))}
         <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
           {#if s.cover}<img src={rewriteCoverUrl(s.cover)||""} alt={s.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
@@ -299,7 +299,7 @@
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {:else}
     <div class="mt-4 flex flex-col gap-3">
-      {#each flatVisible as ch (ch.titleKey + ch.chapter + ch.source)}
+      {#each flatVisible as ch (ch.chapterUrl || (ch.titleKey + '|' + ch.chapter + '|' + ch.source))}
         <div class="flex gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
           {#if ch.cover}<img src={rewriteCoverUrl(ch.cover)||""} alt={ch.title} class="w-16 h-24 object-cover rounded" />{/if}
           <div class="flex-1 min-w-0">
