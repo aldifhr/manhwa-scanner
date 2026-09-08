@@ -233,11 +233,11 @@ def map_result(
 
 
 def group_results(results: list[dict]) -> list[dict]:
-    """Group RSS results by canonicalTitleKey with chapter sub-lists."""
+    """Group RSS results by (canonicalTitleKey, source) — per-source split."""
     groups: dict[str, dict] = {}
     for r in results:
         gk_raw = r.get("canonicalTitleKey") or r.get("titleKey") or r.get("title") or ""
-        gk = group_key(gk_raw)
+        gk = f"{group_key(gk_raw)}|{r.get('source') or ''}"
         if gk not in groups:
             groups[gk] = {
                 "title": r["title"],
