@@ -1,11 +1,13 @@
 import type { PageLoad } from "./$types";
 export const load: PageLoad = async ({ fetch }) => {
-  try {
-    const [snap, queue, cron] = await Promise.all([
-      fetch("/api/v1/dashboard/snapshot").then(r=>r.json().catch(()=>null)),
-      fetch("/api/v1/queue").then(r=>r.json().catch(()=>null)),
-      fetch("/api/v1/cron/status").then(r=>r.json().catch(()=>null))
-    ]);
-    return { snap, queue, cron, error: null };
-  } catch (e) { return { snap:null, queue:null, cron:null, error: String(e) }; }
+  const j = async (url:string)=> fetch(url).then(r=>r.json().catch(()=>null)).catch(()=>null);
+  const [snap, queue, cron, health, errors, failed] = await Promise.all([
+    j("/api/v1/dashboard/snapshot"),
+    j("/api/v1/queue"),
+    j("/api/v1/cron/status"),
+    j("/api/v1/health/detailed"),
+    j("/api/v1/logs/errors?page=1&page_size=20"),
+    j("/api/v1/failed-dispatches?limit=20")
+  ]);
+  return { snap, queue, cron, health, errors, failed, error: null };
 };
