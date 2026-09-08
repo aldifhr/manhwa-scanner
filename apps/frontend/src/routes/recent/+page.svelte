@@ -6,6 +6,7 @@
   import { toast } from "$lib/toast.svelte";
   import { getOriginFlag } from "$lib/constants";
   import { chapterSourceClass } from "$lib/styles";
+  import { trackChapter } from "$lib/continueReading";
   let { data }: any = $props();
   let results: any[] = $derived(data?.feed?.data?.results ?? []);
   let groupedAll = $derived(results.length ? groupChapters(results as any) : []);
@@ -168,7 +169,7 @@
   $effect(()=>{ void filtered.length; void flatFiltered.length; void groupedMode; void sortBy; void q; visible=30; });
   let adding: string | null = $state(null);
   let optimistic = $state<Set<string>>(new Set());
-function sourceFromUrl(url: string): string {
+  function sourceFromUrl(url: string): string {
     if (!url) return "";
     const h = url.toLowerCase();
     if (h.includes("ikiru")) return "ikiru";
@@ -200,6 +201,9 @@ function sourceFromUrl(url: string): string {
     io.observe(sentinel);
     return ()=>io.disconnect();
   });
+  function onChapterClick(ch: any) {
+    trackChapter(ch);
+  }
 </script>
 <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 overflow-x-hidden">
   <h1 class="text-xl font-bold">Recent</h1>
@@ -254,7 +258,11 @@ function sourceFromUrl(url: string): string {
             <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
             <div class="absolute bottom-0 inset-x-0 p-3">
               <div class="font-medium text-sm leading-tight line-clamp-2 text-white drop-shadow">{decodeHtml(s.title)}</div>
-              <div class="flex gap-1 flex-wrap mt-1.5">{#if s.rating && Number(s.rating)>0}<span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-amber-500/90 text-white">★ {Number(s.rating).toFixed(1)}</span>{/if}{#if s.type}<span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-white/15 backdrop-blur text-white capitalize">{s.type}</span>{/if}{#each s.chapters.slice(0,3) as c}<span class={"inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/each}</div>
+              <div class="flex gap-1 flex-wrap mt-1.5">
+                {#if s.rating && Number(s.rating)>0}<span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-amber-500/90 text-white">★ {Number(s.rating).toFixed(1)}</span>{/if}
+                {#if s.type}<span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-white/15 backdrop-blur text-white capitalize">{s.type}</span>{/if}
+                {#each s.chapters.slice(0,3) as c}<span class={"inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white "+chapterSourceClass(c.source)} style="line-height:1">Ch. {getChapterLabel(c as any)}</span>{/each}
+              </div>
               {#if s.genres?.length}<p class="text-[10px] text-white/70 mt-1 line-clamp-1">{s.genres.slice(0,3).join(" · ")}</p>{/if}
             </div>
             {#if getOriginFlag(s.origin)}<img src={getOriginFlag(s.origin)} alt={s.origin} class="absolute top-2 left-2 w-4 h-3 rounded-sm object-cover" loading="lazy" />{/if}
@@ -265,7 +273,7 @@ function sourceFromUrl(url: string): string {
               {#if s.isWhitelisted || optimistic.has(s.titleKey)}
                 <span class="min-h-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
-                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===s.titleKey}...{:else}+<span class="hidden sm:inline"> Add WL</span>{/if}</button>
+                <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
               {/if}
               {#if !excluded.has(s.titleKey)}<button onclick={()=>excludeTitle(s.titleKey, s.title, s.source)} disabled={excluding===s.titleKey} class="ml-auto min-h-0 w-6 h-6 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:bg-red-500/20 hover:text-red-300 text-[10px] disabled:opacity-50">{excluding===s.titleKey?"...":"✕"}</button>{/if}
             </div>
@@ -304,13 +312,13 @@ function sourceFromUrl(url: string): string {
               {#if ch.isWhitelisted}
                 <span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span>
               {:else}
-                <button onclick={()=>addWL({titleKey:ch.titleKey,title:ch.title,source:ch.source,cover:ch.cover,seriesUrl:ch.seriesUrl,chapters:[ch]})} disabled={adding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{#if adding===ch.titleKey}...{:else}+{/if}</button>
+                <button onclick={()=>addWL({titleKey:ch.titleKey,title:ch.title,source:ch.source,cover:ch.cover,seriesUrl:ch.seriesUrl,chapters:[ch]})} disabled={adding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-white text-black font-medium disabled:opacity-50">{adding===ch.titleKey?"...":"+"}</button>
               {/if}
-              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white text-black rounded font-medium hover:bg-zinc-200">Read</a>
+              <a href={ch.chapterUrl || ch.url || "#"} target="_blank" rel="noopener noreferrer" onclick={()=>onChapterClick(ch)} class="inline-flex items-center justify-center text-[11px] px-2.5 py-1 bg-white text-black rounded font-medium hover:bg-zinc-200">Read</a>
               {#if excluded.has(ch.titleKey)}
                 <span class="min-h-0 inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">✕ Excluded</span>
               {:else}
-                <button onclick={()=>excludeTitle(ch.titleKey, ch.title, ch.source)} disabled={excluding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===ch.titleKey?"...":"✕ Exclude"}</button>
+                <button onclick={()=>excludeTitle(ch.titleKey, ch.title, ch.source)} disabled={excluding===ch.titleKey} class="min-h-0 text-[11px] px-2.5 py-1 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-50">{excluding===ch.titleKey?"...":"✕"}</button>
               {/if}
             </div>
           </div>

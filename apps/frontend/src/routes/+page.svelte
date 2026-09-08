@@ -5,6 +5,7 @@
   import { groupChapters } from "$lib/groupChapters";
   import { withCsrf } from "$lib/csrf";
   import { toast } from "$lib/toast.svelte";
+  import { trackChapter, loadContinueReading } from "$lib/continueReading";
   let { data }: any = $props();
   let feed = $derived(data.feed);
   let results: any[] = $derived(feed?.data?.results ?? []);
@@ -15,7 +16,9 @@
   let view: "grid"|"list" = $state("grid");
   let isOnline = $state(true);
   let offlineDismissed = $state(false);
+  let continueReading = $state<any[]>([]);
   onMount(()=>{
+    continueReading = loadContinueReading();
     const p = new URLSearchParams(location.search);
     if (p.get("q")) q = p.get("q")!;
     const s = p.get("sort");
@@ -94,7 +97,7 @@
   });
   let adding = $state<string | null>(null);
   let optimistic = $state<Set<string>>(new Set());
-let excluded = $state<Set<string>>(new Set());
+  let excluded = $state<Set<string>>(new Set());
   let excluding: string | null = $state(null);
   function sourceFromUrl(url: string): string {
     if (!url) return "";
@@ -134,6 +137,10 @@ let excluded = $state<Set<string>>(new Set());
       toast("Added to whitelist","success");
     }catch(e:any){ toast(e?.message?.slice(0,200)||"Add failed","error"); } finally{ adding=null; }
   }
+  function onChapterClick(ch: any) {
+    trackChapter(ch);
+    continueReading = loadContinueReading();
+  }
 </script>
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 overflow-x-hidden">
@@ -143,12 +150,42 @@ let excluded = $state<Set<string>>(new Set());
       <button onclick={()=>offlineDismissed=true} class="shrink-0 text-xs opacity-60 hover:opacity-100">✕</button>
     </div>
   {/if}
+  {#if continueReading.length > 0}
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold text-white/80">Continue reading</h2>
+      <div class="mt-3 flex gap-3 overflow-x-auto scrollbar-hide filter-scroll pb-1">
+        {#each continueReading.slice(0, 8) as bm}
+          <a href={bm.chapterUrl} target="_blank" rel="noopener noreferrer" class="group flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/[0.08] bg-[#18181b] hover:bg-[#27272a] hover:border-white/[0.14] transition-colors shrink-0 min-w-[200px] max-w-[260px]">
+            {#if bm.cover}<img src={rewriteCoverUrl(bm.cover)||""} alt={bm.title} class="w-10 h-14 object-cover rounded bg-[#27272a] shrink-0" loading="lazy" />{:else}<div class="w-10 h-14 rounded bg-[#27272a] flex items-center justify-center text-zinc-500 text-[10px] shrink-0">—</div>{/if}
+            <div class="min-w-0">
+              <div class="text-xs font-medium leading-tight line-clamp-1 group-hover:text-white">{bm.title}</div>
+              <div class="text-[11px] text-zinc-500 mt-0.5">Ch. {bm.lastChapter} · {bm.source || "—"}</div>
+              <div class="text-[10px] text-white/30 mt-0.5">Continue →</div>
+            </div>
+          </a>
+        {/each}
+      </div>
+    </div>
+  {/if}
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 min-w-0">
+    <div class="min-w-0">
+      <h1 class="text-[28px] sm:text-[32px] font-semibold tracking-[-0.03em]">ManhwaScan</h1>
+      <p class="text-sm text-zinc-400 mt-1">Latest updates — {filtered.length} series · {results.length} chapters</p>
+      <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <span class="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60">{stats.total} series</span>
+      </div>
+    </div>
+      <div class="flex gap-2 w-full sm:w-auto items-center min-w-0">
+      <input type="text" placeholder="Search title" value={q} oninput={(e)=>setQ((e.target as HTMLInputElement).value)} class="flex-1 min-w-0 sm:w-64 h-8 bg-[#18181b] border border-white/[0.08] rounded-full px-3.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-white/20" />
+      <div class="flex gap-1 shrink-0 items-center">
         <button onclick={()=>setSort('latest')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='latest'?'bg-white text-black':'bg-white/10 text-white/60')}>Latest</button>
         <button onclick={()=>setSort('rating')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='rating'?'bg-white text-black':'bg-white/10 text-white/60')}>Rating</button>
         <button onclick={()=>setSort('alpha')} class={'min-h-0 h-8 px-3 text-xs rounded-full '+(sortBy==='alpha'?'bg-white text-black':'bg-white/10 text-white/60')}>A–Z</button>
         <span class="w-px h-8 bg-white/10 mx-1"></span>
         <button onclick={()=>setView('grid')} class={'min-h-0 w-8 h-8 flex items-center justify-center rounded-full text-xs '+(view==='grid'?'bg-white text-black':'bg-white/10 text-white/60')}>⊞</button>
         <button onclick={()=>setView('list')} class={'min-h-0 w-8 h-8 flex items-center justify-center rounded-full text-xs '+(view==='list'?'bg-white text-black':'bg-white/10 text-white/60')}>☰</button>
+      </div>
+    </div>
   </div>
 
   {#if data.error}
@@ -182,7 +219,7 @@ let excluded = $state<Set<string>>(new Set());
             <div class="flex gap-1 flex-wrap mt-3">
               {#each s.chapters.slice(0,5) as ch}
                 {@const label=getChapterLabel(ch as any)}
-                {#if label!=="?" }<a href={ch.chapterUrl||ch.url||"#"} target="_blank" rel="noopener noreferrer" class={"inline-flex items-center justify-center text-xs leading-none px-2.5 py-1 rounded transition-colors "+chapterSourceClass(ch.source)}>Ch. {label}</a>{/if}
+                {#if label!=="?" }<a href={ch.chapterUrl||ch.url||"#"} target="_blank" rel="noopener noreferrer" onclick={()=>onChapterClick(ch)} class={"inline-flex items-center justify-center text-xs leading-none px-2.5 py-1 rounded transition-colors "+chapterSourceClass(ch.source)}>Ch. {label}</a>{/if}
               {/each}
             </div>
             <div class="mt-auto pt-3 flex gap-2">
@@ -226,7 +263,7 @@ let excluded = $state<Set<string>>(new Set());
             {#if s.description}<p class="text-[11px] text-zinc-400 line-clamp-2 leading-snug">{decodeHtml(s.description)}</p>{/if}
             <div class="flex gap-1 flex-wrap">
               {#each s.chapters.slice(0,3) as c}
-                {#if getChapterLabel(c as any)!=="?" }<a href={c.chapterUrl||c.url||"#"} target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white hover:bg-white/25 transition-colors" style="line-height:1">Ch. {getChapterLabel(c as any)}</a>{/if}
+                {#if getChapterLabel(c as any)!=="?" }<a href={c.chapterUrl||c.url||"#"} target="_blank" rel="noopener noreferrer" onclick={()=>onChapterClick(c)} class="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-0.5 rounded backdrop-blur bg-white/15 text-white hover:bg-white/25 transition-colors" style="line-height:1">Ch. {getChapterLabel(c as any)}</a>{/if}
               {/each}
             </div>
             <div class="mt-auto pt-2 flex gap-2">
@@ -246,3 +283,4 @@ let excluded = $state<Set<string>>(new Set());
       </div>
     {:else if visible < filtered.length}<div class="text-center text-xs text-white/30 py-2">{visible} / {filtered.length} — scroll for more</div>{/if}
   {/if}
+</div>
