@@ -14,6 +14,9 @@
   function closeMenu() {
     menuOpen = false;
   }
+  function onKey(e: KeyboardEvent) {
+    if (e.key === "Escape") menuOpen = false;
+  }
 </script>
 
 <svelte:head>
@@ -23,6 +26,7 @@
   <meta name="theme-color" content="#000000" />
 </svelte:head>
 
+<svelte:window onkeydown={onKey} />
 <div class="min-h-dvh bg-[#09090b] text-white">
   <nav class="sticky top-0 z-40 flex items-center justify-between px-4 h-14 border-b border-white/[0.08] bg-[#09090b]">
     <a href="/" class="font-bold tracking-tight text-lg inline-flex items-center">ManhwaScan</a>
@@ -53,7 +57,7 @@
   </nav>
   <!-- Mobile menu overlay -->
   {#if menuOpen}
-    <div class="fixed inset-0 z-50 md:hidden" transition:fade>
+    <div class="fixed inset-0 z-50 md:hidden">
       <div class="absolute inset-0 bg-black/60" onclick={closeMenu}></div>
       <div class="absolute right-0 top-14 bottom-0 w-64 bg-[#09090b] border-l border-white/[0.08] p-4 flex flex-col gap-2 animate-slide-in">
         <a href="/" onclick={closeMenu} class="flex items-center px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm">Home</a>
