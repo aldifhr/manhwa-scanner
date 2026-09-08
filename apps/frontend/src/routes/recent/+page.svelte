@@ -26,11 +26,13 @@
   // reset visible when filters change
   $effect(()=>{ void filtered.length; visible=30; });
   let adding: string | null = $state(null);
+  let optimistic = $state<Set<string>>(new Set());
   async function addWL(s: any) {
     adding = s.titleKey;
     try {
       const res = await fetch("/api/v1/reader/whitelist", withCsrf({ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title_key: s.titleKey, title: s.title, source: s.chapters[0]?.source, cover: s.cover, series_url: s.seriesUrl, origin: s.origin, genres: s.genres, description: s.description }) }));
       if (!res.ok) throw new Error(await res.text());
+      optimistic = new Set([...optimistic, s.titleKey]);
       toast("Added to whitelist", "success");
     } catch(e:any){ toast(e?.message?.slice(0,300) || "Add WL failed", "error"); } finally { adding=null; }
   }
@@ -82,7 +84,11 @@
             {#if s.isWhitelisted}
               <span class="min-h-0 mt-2 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
             {:else}
+              {#if s.isWhitelisted || optimistic.has(s.titleKey)}
+              <span class="min-h-0 mt-2 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
+            {:else}
               <button onclick={() => addWL(s)} disabled={adding===s.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-[var(--gold-accent)] text-black disabled:opacity-50">{adding===s.titleKey?"...":"+ Add WL"}</button>
+            {/if}
             {/if}
           </div>
         </div>

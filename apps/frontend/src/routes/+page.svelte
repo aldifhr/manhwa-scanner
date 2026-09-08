@@ -8,6 +8,7 @@
   let results: any[] = $derived(feed?.data?.results ?? []);
   let grouped = $derived(results.length ? groupChapters(results as any) : []);
   let adding = $state<string | null>(null);
+  let optimistic = $state<Set<string>>(new Set());
   async function addWL(series: any) {
     adding = series.titleKey;
     try {
@@ -32,6 +33,7 @@
         const t = await res.text();
         throw new Error(t || `HTTP ${res.status}`);
       }
+      optimistic = new Set([...optimistic, series.titleKey]);
       toast("Added to whitelist — check /whitelist", "success");
     } catch (e: any) { toast(e?.message?.slice(0,300) || "Add WL failed (login required)", "error"); }
     finally { adding = null; }
@@ -76,7 +78,7 @@
             {#if series.description}
               <p class="text-[11px] text-white/55 line-clamp-2 mt-1.5">{decodeHtml(series.description)}</p>
             {/if}
-            {#if series.isWhitelisted}
+            {#if series.isWhitelisted || optimistic.has(series.titleKey)}
               <span class="min-h-0 mt-2 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">✓ Added</span>
             {:else}
               <button onclick={() => addWL(series)} disabled={adding===series.titleKey} class="min-h-0 mt-2 text-[11px] px-2.5 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] disabled:opacity-50">{adding===series.titleKey ? "..." : "+ Add WL"}</button>
