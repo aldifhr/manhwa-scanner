@@ -42,12 +42,6 @@ export function WhitelistGrid() {
     staleTime: 30_000,
   });
 
-  const { data: badgeCounts } = useQuery({
-    queryKey: ["reader-badge-counts"],
-    queryFn: Reader.getReaderBadgeCounts,
-    staleTime: 60_000,
-  });
-
   const items = data ?? [];
   const filtered = useWhitelistFilters(items, {
     sourceFilter,
@@ -113,7 +107,6 @@ export function WhitelistGrid() {
     );
   }
 
-  const badges = (badgeCounts ?? {}) as Record<string, number>;
   const catalogItems = Array.isArray(catalogResults) ? catalogResults : [];
   const isCatalogSearching = debouncedCatalogSearch.length > 0;
 
@@ -136,20 +129,7 @@ export function WhitelistGrid() {
           />
         </div>
 
-        {/* Badge counts */}
-        {Object.keys(badges).length > 0 && (
-          <div className="flex items-center gap-2">
-            {Object.entries(badges).map(([key, count]) => (
-              <span
-                key={key}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-accent/10 text-accent border border-accent/20"
-              >
-                <span className="capitalize">{key.replaceAll("_", " ")}</span>
-                <span className="font-mono font-semibold">{count}</span>
-              </span>
-            ))}
-          </div>
-        )}
+
       </div>
 
       <div className="flex items-center justify-between gap-2">

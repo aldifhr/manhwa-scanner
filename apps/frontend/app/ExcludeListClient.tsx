@@ -6,10 +6,8 @@ import { Reader } from "@/lib/reader";
 import type { ExcludedTitleItem } from "@/lib/types";
 import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
-import { MagnifyingGlass, Prohibit, Trash, Plus } from "@phosphor-icons/react";
-import Button from "@/components/ui/Button";
+import { MagnifyingGlass, Prohibit, Trash } from "@phosphor-icons/react";
 import EmptyState from "@/components/EmptyState";
-import { Select } from "@/components/ui/Select";
 import { useDebounced } from "@/lib/useDebounced";
 import { decodeHtml } from "@/lib/utils";
 import { PageShell } from "@/components/PageShell";
@@ -40,11 +38,8 @@ export function ExcludeListClient() {
   });
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("All");
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [bulkSource, setBulkSource] = useState("ikiru");
-  const [bulkLoading, setBulkLoading] = useState(false);
 
   const items: ExcludedTitleItem[] = data ?? [];
 
@@ -54,11 +49,9 @@ export function ExcludeListClient() {
         const t = (it.title || it.titleKey || "").toLowerCase();
         if (!t.includes(debouncedSearch.toLowerCase())) return false;
       }
-      if (sourceFilter !== "All" && (it.source || "all") !== sourceFilter)
-        return false;
       return true;
     });
-  }, [items, debouncedSearch, sourceFilter]);
+  }, [items, debouncedSearch]);
 
   const displayTitle = (it: ExcludedTitleItem) =>
     decodeHtml(it.title || it.titleKey || "Unknown title");
@@ -84,12 +77,6 @@ export function ExcludeListClient() {
     });
     return present;
   }, [grouped]);
-
-  const sources = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((i) => set.add(i.source || "all"));
-    return [...set].sort();
-  }, [items]);
 
   const handleRemove = async (it: ExcludedTitleItem) => {
     const key = `${it.titleKey || it.id}:${it.source || "all"}`;
@@ -163,63 +150,6 @@ export function ExcludeListClient() {
     }
   };
 
-  const handleBulk = async () => {
-    if (!bulkSource) return;
-    // ponytail: confirm bulk — pernah ke-klik tanpa sengaja +2000 row (exclude_all_by_source)
-    const ok = window.confirm(`Exclude ALL ${bulkSource} titles from recent (up to 2000)? This will hide them from RSS.`);
-    if (!ok) return;
-    const before =
-      queryClient.getQueryData<ExcludedTitleItem[]>(queryKeys.excludedTitles) ??
-      items;
-    setBulkLoading(true);
-    try {
-      const res = await Reader.bulkExcludeBySource(bulkSource);
-      queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
-      // Fetch new list to diff for undo
-      let added: ExcludedTitleItem[] = [];
-      try {
-        const fresh = (await Reader.getExcludedTitles()) as ExcludedTitleItem[];
-        const beforeSet = new Set(
-          before.map((x) => `${x.titleKey || x.id}:${x.source || "all"}`)
-        );
-        added = fresh.filter(
-          (x) => !beforeSet.has(`${x.titleKey || x.id}:${x.source || "all"}`)
-        );
-      } catch {}
-      toast(`Excluded ${res.excluded} titles from ${bulkSource}`, {
-        type: "success",
-        action:
-          added.length > 0
-            ? {
-                label: "Undo",
-                onClick: async () => {
-                  let undone = 0;
-                  for (const it of added) {
-                    try {
-                      await Reader.removeExcludedTitle({
-                        title_key: it.titleKey || it.id || "",
-                        source: it.source,
-                      } as Record<string, unknown>);
-                      undone++;
-                    } catch {}
-                  }
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.excludedTitles,
-                  });
-                  toast(`Undid ${undone} excludes`, { type: "info" });
-                },
-              }
-            : undefined,
-      });
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Bulk exclude failed", {
-        type: "error",
-      });
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
   return (
     <PageShell>
       <div className="flex items-center justify-between gap-2">
@@ -235,7 +165,7 @@ export function ExcludeListClient() {
         )}
       </div>
 
-      {/* Search + bulk-exclude */}
+      {/* Search */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-xs">
           <MagnifyingGlass
@@ -250,37 +180,6 @@ export function ExcludeListClient() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
           />
-        </div>
-
-        <Select
-          ariaLabel="Filter by source"
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value)}
-          options={[
-            { value: "All", label: "Source: All" },
-            ...sources.map((s) => ({ value: s, label: s })),
-          ]}
-        />
-
-        <div className="flex items-center gap-1.5 ml-auto">
-          <Select
-            ariaLabel="Bulk exclude source"
-            value={bulkSource}
-            onChange={(e) => setBulkSource(e.target.value)}
-            options={[
-              { value: "ikiru", label: "ikiru" },
-              { value: "shinigami", label: "shinigami" },
-            ]}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={handleBulk}
-            disabled={bulkLoading}
-          >
-            <Plus size={14} />
-            {bulkLoading ? "Excluding..." : "Exclude all"}
-          </Button>
         </div>
       </div>
 
