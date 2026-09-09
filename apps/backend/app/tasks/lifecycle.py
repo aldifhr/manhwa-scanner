@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-import logging
 import threading
 import time as _time
 
-from app.tasks.queue import _get_redis, QUEUE_KEY, DLQ_KEY, CRON_QUEUE_KEY
+from app.tasks.queue import _get_redis, QUEUE_KEY, DLQ_KEY, CRON_QUEUE_KEY, CRON_QUEUE_SET, QUEUE_PROCESSING_KEY, CRON_PROCESSING_KEY
 from app.tasks.retention import _retention_loop
+from app.logger import get_logger
 
-logger = logging.getLogger("tasks.lifecycle")
+logger = get_logger("tasks.lifecycle")
 
 _worker_thread: threading.Thread | None = None
 _retention_thread: threading.Thread | None = None
@@ -102,25 +102,75 @@ def run_cron_inline(action: str) -> None:
             pass
 
 
+def _recover_processing() -> None:
+    """On startup, move any orphaned processing jobs back to main queue (crash recovery)."""
+    try:
+        r = _get_redis()
+        for proc_key, main_key in [(CRON_PROCESSING_KEY, CRON_QUEUE_KEY), (QUEUE_PROCESSING_KEY, QUEUE_KEY)]:
+            while True:
+                job = r.rpoplpush(proc_key, main_key)
+                if not job:
+                    break
+                logger.warn("recovered orphaned job from processing", queue=main_key)
+                if main_key == CRON_QUEUE_KEY:
+                    try:
+                        r.sadd(CRON_QUEUE_SET, job)
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.warn("processing recovery failed", err=str(e)[:120])
+
+
 def run_cron_worker() -> None:
-    """Blocking worker for the cron queue (ROLE=cron process only)."""
+    """Blocking worker for the cron queue (ROLE=cron process only). Crash-safe via processing list."""
     logger.info("cron worker started")
+    _recover_processing()
     while not _stop.is_set():
         try:
-            result = _get_redis().blpop(CRON_QUEUE_KEY, timeout=5)
+            r = _get_redis()
+            # ponytail: BRPOPLPUSH semantics — atomically move to processing so crash doesn't lose job
+            # Use brpoplpush if available, fallback to blpop+lpush for mock compat
+            try:
+                raw = r.brpoplpush(CRON_QUEUE_KEY, CRON_PROCESSING_KEY, timeout=5)
+                result = (CRON_QUEUE_KEY, raw) if raw else None
+            except AttributeError:
+                result = r.blpop(CRON_QUEUE_KEY, timeout=5)
+                if result:
+                    _k, _raw = result
+                    raw = _raw
+                    try:
+                        r.lpush(CRON_PROCESSING_KEY, raw)
+                    except Exception:
+                        pass
+                    result = (_k, raw)
         except Exception as e:
             logger.warn("redis unavailable in cron worker, retrying", err=str(e)[:160])
             _stop.wait(10)
             continue
         if not result:
             continue
-        _key, raw = result
+        _key, raw = result if isinstance(result, (list, tuple)) else (CRON_QUEUE_KEY, result)
+        # dedup set cleanup — job left queue, remove from set so future enqueue allowed
+        try:
+            _get_redis().srem(CRON_QUEUE_SET, raw)
+        except Exception:
+            pass
         try:
             item = json.loads(raw)
         except json.JSONDecodeError:
             logger.error("bad cron payload, dropping", raw=raw[:200])
+            try:
+                _get_redis().lrem(CRON_PROCESSING_KEY, 1, raw)
+            except Exception:
+                pass
             continue
-        run_cron_inline(item.get("action", "update"))
+        try:
+            run_cron_inline(item.get("action", "update"))
+        finally:
+            try:
+                _get_redis().lrem(CRON_PROCESSING_KEY, 1, raw)
+            except Exception:
+                pass
 
 
 def get_cron_status() -> dict:
@@ -199,11 +249,25 @@ def get_cron_status() -> dict:
 
 
 def worker_loop() -> None:
-    """Blocking worker: pops jobs, processes them, retries on failure."""
+    """Blocking worker: pops jobs, processes them, retries on failure. Crash-safe via processing list."""
     _fail_streak = 0
+    _recover_processing()
     while not _stop.is_set():
         try:
-            result = _get_redis().blpop(QUEUE_KEY, timeout=5)
+            r = _get_redis()
+            try:
+                raw = r.brpoplpush(QUEUE_KEY, QUEUE_PROCESSING_KEY, timeout=5)
+                result = (QUEUE_KEY, raw) if raw else None
+            except AttributeError:
+                result = r.blpop(QUEUE_KEY, timeout=5)
+                if result:
+                    _k, _raw = result
+                    raw = _raw
+                    try:
+                        r.lpush(QUEUE_PROCESSING_KEY, raw)
+                    except Exception:
+                        pass
+                    result = (_k, raw)
             _fail_streak = 0
         except Exception as e:
             _fail_streak += 1
@@ -216,13 +280,22 @@ def worker_loop() -> None:
             continue
         if not result:
             continue
-        _key, raw = result
+        _key, raw = result if isinstance(result, (list, tuple)) else (QUEUE_KEY, result)
         try:
             item = json.loads(raw)
         except json.JSONDecodeError:
             logger.error("bad payload, dropping", raw=raw[:200])
+            try:
+                _get_redis().lrem(QUEUE_PROCESSING_KEY, 1, raw)
+            except Exception:
+                pass
             continue
         ok = _process(item)
+        # ack — remove from processing regardless of outcome (requeue/DLQ handles retry)
+        try:
+            _get_redis().lrem(QUEUE_PROCESSING_KEY, 1, raw)
+        except Exception:
+            pass
         if not ok:
             item["attempts"] = item.get("attempts", 0) + 1
             if item["attempts"] >= 3:

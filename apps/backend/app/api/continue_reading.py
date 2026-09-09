@@ -6,9 +6,43 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, Dict, Any
 
 from app.logger import get_logger
 from app.utils.request_auth import require_monitor_auth
+
+
+class ContinueReadingEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    titleKey: Optional[str] = Field(default=None, max_length=200)
+    title_key: Optional[str] = Field(default=None, max_length=200)
+    title: Optional[str] = Field(default=None, max_length=200)
+    cover: Optional[str] = Field(default=None, max_length=2000)
+    source: Optional[str] = Field(default=None, max_length=50)
+    chapterUrl: Optional[str] = Field(default=None, max_length=500)
+    chapter_url: Optional[str] = Field(default=None, max_length=500)
+    chapter: Optional[str] = Field(default=None, max_length=50)
+    chapterNumber: Optional[float] = None
+    seriesUrl: Optional[str] = Field(default=None, max_length=500)
+    isRead: Optional[bool] = None
+    readAt: Optional[float] = None
+    updatedAt: Optional[float] = None
+    updated_at: Optional[str] = Field(default=None, max_length=50)
+
+
+class MarkReadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    titleKey: Optional[str] = Field(default=None, max_length=200)
+    title_key: Optional[str] = Field(default=None, max_length=200)
+    chapterUrl: Optional[str] = Field(default=None, max_length=500)
+    chapter_url: Optional[str] = Field(default=None, max_length=500)
+    chapter: Optional[str] = Field(default=None, max_length=50)
+    chapterNumber: Optional[float] = None
+    source: Optional[str] = Field(default=None, max_length=50)
+    title: Optional[str] = Field(default=None, max_length=200)
+    cover: Optional[str] = Field(default=None, max_length=2000)
+    seriesUrl: Optional[str] = Field(default=None, max_length=500)
 
 logger = get_logger("api:continue_reading")
 router = APIRouter()
@@ -72,6 +106,29 @@ async def put_continue_reading(request: Request):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
     if len(body) == 0:
         return JSONResponse(content={"success": True, "data": {}})
+    # Pydantic validation: each entry must satisfy limits (DTO layer)
+    try:
+        # detect batch vs single to choose validation path
+        _is_batch = body and all(isinstance(v, dict) and (v.get("titleKey") or v.get("title_key") or v.get("chapterUrl")) for v in body.values()) and not (body.get("titleKey") or body.get("title_key") or body.get("chapterUrl"))
+        if _is_batch:
+            for k, v in body.items():
+                ContinueReadingEntry.model_validate(v)
+        else:
+            # single entry may be the body itself
+            if not (body.get("titleKey") or body.get("title_key") or body.get("chapterUrl") or body.get("chapter_url")) and len(body) == 1:
+                # batch single-key wrapper already handled
+                pass
+            else:
+                # try single validation, but allow batch-style single key
+                if len(body) == 1 and isinstance(next(iter(body.values())), dict):
+                    pass
+                else:
+                    ContinueReadingEntry.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
     sid_hash = _get_session_hash(request)
     if not sid_hash:
         return JSONResponse(content={"success": False, "error": "no session"}, status_code=401)
@@ -165,9 +222,18 @@ async def mark_as_read(request: Request):
         body = await request.json()
     except Exception:
         return JSONResponse(content={"success": False, "error": "invalid JSON"}, status_code=400)
-
-    title_key = body.get("titleKey") or body.get("title_key") or ""
-    chapter_url = body.get("chapterUrl") or body.get("chapter_url") or ""
+    if not isinstance(body, dict):
+        return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+    try:
+        validated = MarkReadRequest.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    title_key = validated.titleKey or validated.title_key or ""
+    chapter_url = validated.chapterUrl or validated.chapter_url or ""
+    # validated DTO ensures limits; keep original body dict for service compatibility
 
     if not title_key:
         return JSONResponse(content={"success": False, "error": "titleKey required"}, status_code=400)

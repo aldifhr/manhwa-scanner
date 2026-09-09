@@ -7,6 +7,9 @@ import { backendUrl } from "@/lib/server-api";
  * the /debug page can show the real login failure root cause.
  */
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV !== "development") {
+    return new NextResponse(null, { status: 404 });
+  }
   const started = Date.now();
   let password = "";
   try {

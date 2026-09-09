@@ -97,23 +97,48 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _sync_aliases(self):
-        # New .env names take precedence; keep both aliases in sync for code that reads either.
+        # Canonical: IKIRU_PUBLIC_URL / SHINIGAMI_API_URL / SHINIGAMI_PUBLIC_URL
+        # Aliases (deprecated): IKIRU_BASE_URL, SECONDARY_SOURCE_URL, SECONDARY_PUBLIC_BASE
+        # Migration: 2026-09-09 → 2026-12-09 warn period, then remove alias branches + code refs.
+        # ponytail: keep sync minimal; do not add new aliases.
+        import os as _os
+
+        def _warn(old: str, canonical: str):
+            try:
+                from app.logger import get_logger as _gl
+                _gl("config").warn(f"DEPRECATED env alias {old} → use {canonical} (removal 2026-12-09)")
+            except Exception:
+                pass
+
+        _has_old_ikiru = bool(_os.environ.get("IKIRU_BASE_URL"))
+        _has_new_ikiru = bool(_os.environ.get("IKIRU_PUBLIC_URL"))
+        _has_old_api = bool(_os.environ.get("SECONDARY_SOURCE_URL"))
+        _has_new_api = bool(_os.environ.get("SHINIGAMI_API_URL"))
+        _has_old_pub = bool(_os.environ.get("SECONDARY_PUBLIC_BASE"))
+        _has_new_pub = bool(_os.environ.get("SHINIGAMI_PUBLIC_URL"))
+
+        # New names take precedence; sync both so code reading either still works during migration.
         if self.IKIRU_PUBLIC_URL:
             object.__setattr__(self, "IKIRU_BASE_URL", self.IKIRU_PUBLIC_URL)
         elif self.IKIRU_BASE_URL:
+            _warn("IKIRU_BASE_URL (alias)", "IKIRU_PUBLIC_URL")
             object.__setattr__(self, "IKIRU_PUBLIC_URL", self.IKIRU_BASE_URL)
         if self.SHINIGAMI_API_URL:
             object.__setattr__(self, "SECONDARY_SOURCE_URL", self.SHINIGAMI_API_URL)
         elif self.SECONDARY_SOURCE_URL:
+            _warn("SECONDARY_SOURCE_URL (alias)", "SHINIGAMI_API_URL")
             object.__setattr__(self, "SHINIGAMI_API_URL", self.SECONDARY_SOURCE_URL)
         if self.SHINIGAMI_PUBLIC_URL:
             object.__setattr__(self, "SECONDARY_PUBLIC_BASE", self.SHINIGAMI_PUBLIC_URL)
         elif self.SECONDARY_PUBLIC_BASE:
+            _warn("SECONDARY_PUBLIC_BASE (alias)", "SHINIGAMI_PUBLIC_URL")
             object.__setattr__(self, "SHINIGAMI_PUBLIC_URL", self.SECONDARY_PUBLIC_BASE)
-        # normalize trailing slash for ikiru
-        if self.IKIRU_BASE_URL and not self.IKIRU_BASE_URL.endswith("/"):
-            object.__setattr__(self, "IKIRU_BASE_URL", self.IKIRU_BASE_URL + "/")
-            object.__setattr__(self, "IKIRU_PUBLIC_URL", self.IKIRU_BASE_URL)
+        # normalize trailing slash for canonical ikiru (and mirror to alias)
+        _canonical_ikiru = self.IKIRU_PUBLIC_URL or self.IKIRU_BASE_URL
+        if _canonical_ikiru and not _canonical_ikiru.endswith("/"):
+            _canonical_ikiru = _canonical_ikiru + "/"
+            object.__setattr__(self, "IKIRU_PUBLIC_URL", _canonical_ikiru)
+            object.__setattr__(self, "IKIRU_BASE_URL", _canonical_ikiru)
         return self
 
     # M4 FIX: Warn on unrecognized env vars (extra="ignore" silently drops typos)

@@ -15,7 +15,12 @@ def require_monitor_auth(request: Request) -> bool:
 def require_cron_auth(request: Request) -> bool:
     from app.utils.auth import check_cron_auth
 
-    return check_cron_auth(request.query_params.get("token", ""))
+    # Support both ?token= and ?key= (FastCron uses ?key=) — both deprecated, Bearer preferred
+    token_q = request.query_params.get("token", "") or request.query_params.get("key", "")
+    return check_cron_auth(
+        token_q,
+        authorization=request.headers.get("authorization", ""),
+    )
 
 
 

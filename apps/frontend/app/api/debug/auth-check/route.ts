@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { backendUrl } from "@/lib/server-api";
 
 export async function GET() {
+  if (process.env.NODE_ENV !== "development") {
+    return new NextResponse(null, { status: 404 });
+  }
   const url = backendUrl();
   const started = Date.now();
   let health:

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.logger import get_logger
 from app.utils.request_auth import require_cron_auth, require_monitor_auth
 from app.config import CRON_ACTIONS
+from app.services.audit import log_action, AuditAction
 
 logger = get_logger("api:system")
 router = APIRouter()
@@ -209,6 +210,10 @@ async def cron_trigger(request: Request):
     from app.tasks import enqueue_cron
     try:
         enqueue_cron(action)
+        try:
+            log_action(AuditAction.CRON_TRIGGER, request=request, resource="cron", resource_id=action, metadata={"action": action, "source": source or ""})
+        except Exception:
+            pass
     except Exception as e:
         return JSONResponse(
             content={"success": False, "error": f"cron queue unavailable: {e!s:.120}"},

@@ -14,6 +14,7 @@ from app.services.whitelist_service import (
     normalize_whitelist_urls,
 )
 from app.utils.request_auth import require_monitor_auth, int_safe, safe_error
+from app.services.audit import log_action, AuditAction
 
 logger = get_logger("api:whitelist")
 router = APIRouter()
@@ -51,6 +52,21 @@ class WhitelistPatch(BaseModel):
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
+
+
+class WhitelistDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title_key: Optional[str] = Field(default=None, max_length=200)
+    titleKey: Optional[str] = Field(default=None, max_length=200)
+    title: Optional[str] = Field(default=None, max_length=200)
+    source: Optional[str] = Field(default=None, max_length=50)
+    id: Optional[str] = Field(default=None, max_length=500)
+    url: Optional[str] = Field(default=None, max_length=500)
+
+
+class WhitelistNormalizeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dry_run: Optional[bool] = None
 
 
 @router.get("/dispatch-history")
@@ -141,9 +157,10 @@ async def whitelist_post(request: Request):
     body_dict = body  # service reads many aliases, keep original but validated
     # also ensure type is passed (previously silent drop)
     res = post_whitelist(title=title, url=url, source=source, body=body_dict)
-    # Audit log disabled (audit.py removed 54a8ec5)
-    # from app.services.audit import log_action, AuditAction
-    # log_action(AuditAction.WHITELIST_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title, details={"source": source, "status": res.get("status")})
+    try:
+        log_action(AuditAction.WHITELIST_ADD, request=request, resource="whitelist", resource_id=title or data.title_key or "", metadata={"source": source, "status": res.get("status")})
+    except Exception:
+        pass
     return JSONResponse(content=res)
 
 
@@ -157,13 +174,19 @@ async def whitelist_delete(request: Request):
         return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
-
+    try:
+        validated_del = WhitelistDeleteRequest.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
     # Accept any identifier the FE might send (id/title_key/title/url/source).
-    title_key = body.get("title_key") or ""
-    source = body.get("source") or ""
-    entry_id = body.get("id") or ""
-    title = body.get("title") or ""
-    url = body.get("url") or ""
+    title_key = validated_del.title_key or validated_del.titleKey or ""
+    source = validated_del.source or ""
+    entry_id = validated_del.id or ""
+    title = validated_del.title or ""
+    url = validated_del.url or ""
     if not any([title_key, entry_id, title, url]):
         # Fall back to deriving title_key from url/title (legacy behavior).
         if url:
@@ -180,9 +203,10 @@ async def whitelist_delete(request: Request):
             title=title,
             url=url,
         )
-        # Audit log disabled
-        # from app.services.audit import log_action, AuditAction
-        # log_action(AuditAction.WHITELIST_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key or title, details={"source": source, "status": result.get("status")})
+        try:
+            log_action(AuditAction.WHITELIST_DELETE, request=request, resource="whitelist", resource_id=title_key or title or entry_id, metadata={"source": source, "status": result.get("status")})
+        except Exception:
+            pass
         # Map not_found -> 404 so the FE gets a real signal instead of 200 ok.
         if result.get("status") == "not_found":
             return JSONResponse(content=result, status_code=404)
@@ -233,6 +257,10 @@ async def whitelist_patch(request: Request):
             updates[f] = v
     try:
         result = patch_whitelist(title_key, source, updates)
+        try:
+            log_action(AuditAction.WHITELIST_UPDATE, request=request, resource="whitelist", resource_id=title_key, metadata={"source": source, "updates": list(updates.keys())})
+        except Exception:
+            pass
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
@@ -246,5 +274,20 @@ async def whitelist_normalize_urls(request: Request):
         body = await request.json()
     except Exception:
         body = {}
-    dry_run = bool(body.get("dry_run") if isinstance(body, dict) else False)
-    return JSONResponse(content=normalize_whitelist_urls(dry_run=dry_run))
+    if not isinstance(body, dict):
+        return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+    try:
+        validated_norm = WhitelistNormalizeRequest.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    dry_run = bool(validated_norm.dry_run)
+    res = normalize_whitelist_urls(dry_run=dry_run)
+    try:
+        if not dry_run:
+            log_action(AuditAction.WHITELIST_NORMALIZE, request=request, resource="whitelist", resource_id="normalize-urls", metadata={"result": str(res)[:500]})
+    except Exception:
+        pass
+    return JSONResponse(content=res)

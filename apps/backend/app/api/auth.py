@@ -11,10 +11,16 @@ import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 import jwt as _jwt
 
 from app.config import settings
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    password: str = Field(..., min_length=1, max_length=200)
 
 router = APIRouter()
 
@@ -111,8 +117,16 @@ async def auth_handler(request: Request):
         body = await request.json()
     except Exception:
         return JSONResponse({"success": False, "error": "Invalid body"}, status_code=400)
-
-    password = str(body.get("password", "")).strip() if isinstance(body, dict) else ""
+    if not isinstance(body, dict):
+        return JSONResponse({"success": False, "error": "Invalid body"}, status_code=400)
+    try:
+        data = LoginRequest.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    password = str(data.password).strip()
 
     if not password or not _password_ok(password):
         return JSONResponse({"success": False, "error": "Invalid credentials"}, status_code=401)

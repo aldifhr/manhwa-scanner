@@ -384,6 +384,12 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             logger.warn("dispatch_history flush failed", err=str(e)[:160])
 
     logger.info("dispatch: send-pass done", sent=sent, dry_run=dry_run)
+    if sent and not dry_run:
+        try:
+            from app.services.audit import log_action, AuditAction
+            log_action(AuditAction.DISPATCH, resource="dispatch", resource_id=f"{instance_id}", metadata={"sent": sent, "channels": len(channel_ids)})
+        except Exception:
+            pass
     return sent
 
 

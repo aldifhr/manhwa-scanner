@@ -4,9 +4,23 @@ import threading
 
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional
 
 from app.logger import get_logger
 from app.utils.request_auth import require_monitor_auth, int_safe, safe_error
+from app.services.audit import log_action, AuditAction
+
+
+class FailedDispatchRetryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: Optional[str] = Field(default=None, max_length=500)
+
+
+class FailedDispatchDeleteBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chapter_url: Optional[str] = Field(default=None, max_length=500)
+    id: Optional[str] = Field(default=None, max_length=500)
 
 logger = get_logger("api:dispatches")
 router = APIRouter()
@@ -101,10 +115,19 @@ async def failed_dispatches_action(request: Request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     action = request.query_params.get("action", "")
     try:
-        body = await request.json() if request.headers.get("content-length") else {}
+        raw_body = await request.json() if request.headers.get("content-length") else {}
     except Exception:
-        body = {}
-    dispatch_id = body.get("id") if isinstance(body, dict) else None
+        raw_body = {}
+    if not isinstance(raw_body, dict):
+        return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+    try:
+        validated = FailedDispatchRetryBody.model_validate(raw_body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    dispatch_id = validated.id
     if not dispatch_id:
         dispatch_id = request.query_params.get("id")
     if action == "retry" and dispatch_id:
@@ -142,6 +165,10 @@ async def failed_dispatches_action(request: Request):
                 sb.table("failed_dispatches").delete().eq("chapter_url", dispatch_id).execute()
             except Exception as _e:
                 logger.warn("retry: failed_dispatches delete failed", err=str(_e)[:120])
+            try:
+                log_action(AuditAction.DISPATCH_RETRY, request=request, resource="failed_dispatches", resource_id=dispatch_id, metadata={"sent": sent})
+            except Exception:
+                pass
             return JSONResponse(content={"success": True, "retried": dispatch_id, "sent": sent})
         return JSONResponse(content={"success": False, "error": "dispatch returned 0", "retried": dispatch_id}, status_code=502)
     if action == "retry-all":
@@ -160,6 +187,10 @@ async def failed_dispatches_action(request: Request):
             )
         try:
             run_pipeline(action="update", do_dispatch=True)
+            try:
+                log_action(AuditAction.DISPATCH_RETRY_ALL, request=request, resource="dispatch", resource_id="retry-all", metadata={"action": "update"})
+            except Exception:
+                pass
         except Exception as e:
             logger.warn("retry-all failed", err=str(e)[:200])
             return JSONResponse(content=safe_error(e), status_code=500)
@@ -176,9 +207,21 @@ async def failed_dispatches_delete(request: Request):
     chapter_url = request.query_params.get("id", "") or request.query_params.get("chapter_url", "")
     if not chapter_url:
         try:
-            body = await request.json()
-            chapter_url = body.get("chapter_url") or body.get("id", "")
-        except Exception:
+            raw_body = await request.json()
+            if not isinstance(raw_body, dict):
+                return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+            try:
+                validated_del = FailedDispatchDeleteBody.model_validate(raw_body)
+            except Exception as ve:
+                from pydantic import ValidationError as _VE2
+                if isinstance(ve, _VE2):
+                    return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+                raise
+            chapter_url = validated_del.chapter_url or validated_del.id or ""
+        except Exception as e:
+            # keep 400 for missing body vs 422 for validation; re-raise validation already handled
+            if "validation_error" in str(e):
+                raise
             pass
     from app.db import get_supabase
 
@@ -187,6 +230,10 @@ async def failed_dispatches_delete(request: Request):
     try:
         get_supabase().table("failed_dispatches").delete().eq("chapter_url", chapter_url).execute()
         get_supabase().table("dispatch_history").delete().eq("chapter_url", chapter_url).execute()
+        try:
+            log_action(AuditAction.QUEUE_CLEAR, request=request, resource="failed_dispatches", resource_id=chapter_url, metadata={"action": "delete"})
+        except Exception:
+            pass
         return JSONResponse(content={"success": True})
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)

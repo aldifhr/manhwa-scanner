@@ -118,6 +118,8 @@ async def refresh_voratoon(request: Request):
 
 @router.get("/health/detailed")
 async def health_detailed(request: Request):
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami, cb_voratoon
     from app.db import get_pool_stats
     from app.storage import health as health_store

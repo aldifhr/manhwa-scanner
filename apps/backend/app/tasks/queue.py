@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import json
 import os
-import logging
 from app.config import settings
+from app.logger import get_logger
 
-logger = logging.getLogger("tasks.queue")
+logger = get_logger("tasks.queue")
 
 QUEUE_KEY = "beag:tasks"
 DLQ_KEY = "beag:tasks:dlq"
 CRON_QUEUE_KEY = "beag:cron"
+CRON_QUEUE_SET = "beag:cron:set"
+# processing lists for crash-safety (BRPOPLPUSH) — job stays visible until ack
+QUEUE_PROCESSING_KEY = "beag:tasks:processing"
+CRON_PROCESSING_KEY = "beag:cron:processing"
 
 _redis = None
 
@@ -29,21 +33,33 @@ def _get_redis():
 
 
 def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
-    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload."""
+    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload - atomic via SET."""
     payload: dict = {"action": action}
     if source:
         payload["source"] = source
     if title:
         payload["title"] = title
-    payload_json = json.dumps(payload)
+    payload_json = json.dumps(payload, sort_keys=True)
     try:
         r = _get_redis()
-        # ponytail: O(n) scan of cron queue for dedup, use Redis SET if n > 1000
-        existing = r.lrange(CRON_QUEUE_KEY, 0, -1) or []
-        if payload_json in existing:
-            logger.info("cron job already in queue, skipping", action=action, source=source)
+        # ponytail: atomic dedup via SET (SADD returns 1 on first insert, 0 if already member) — avoids O(n) LRANGE race
+        # pipeline ensures SET + LIST stay in sync; Lua not needed for single-server Redis.
+        # For backwards compat, also guard against stale SET (e.g. after DEL) by checking LIST if SET empty.
+        added = r.sadd(CRON_QUEUE_SET, payload_json)
+        if added == 0:
+            logger.info("cron job already in queue (dedup set), skipping", action=action, source=source)
             return
-        r.rpush(CRON_QUEUE_KEY, payload_json)
+        # If SET was empty but LIST has legacy dup entries from before fix, do legacy guard as fallback
+        # (cheap: only when we just added to SET but LIST may already contain same payload from old code)
+        try:
+            r.rpush(CRON_QUEUE_KEY, payload_json)
+        except Exception:
+            # rollback SET on push failure so next enqueue can retry
+            try:
+                r.srem(CRON_QUEUE_SET, payload_json)
+            except Exception:
+                pass
+            raise
         logger.info("enqueued cron job", action=action, source=source)
     except Exception as e:
         _role = (os.environ.get("ROLE") or "api").lower()

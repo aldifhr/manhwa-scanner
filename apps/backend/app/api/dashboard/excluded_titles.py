@@ -10,11 +10,34 @@ import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional
 
 from app.logger import get_logger
 from app.storage import excluded_titles as excl_store
 from app.utils.request_auth import require_monitor_auth, safe_error, int_safe
 from app.config import VALID_SOURCES
+from app.services.audit import log_action, AuditAction
+
+
+class ExcludedAddRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title_key: str = Field(..., min_length=1, max_length=200)
+    title: Optional[str] = Field(default=None, max_length=200)
+    source: Optional[str] = Field(default="all", max_length=50)
+    cover: Optional[str] = Field(default=None, max_length=2000)
+    series_url: Optional[str] = Field(default=None, max_length=500)
+
+
+class ExcludedDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title_key: str = Field(..., min_length=1, max_length=200)
+    source: Optional[str] = Field(default="all", max_length=50)
+
+
+class ExcludedBulkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: str = Field(..., min_length=1, max_length=50)
 
 logger = get_logger("api:excluded-titles")
 router = APIRouter()
@@ -155,13 +178,18 @@ async def post_excluded(request: Request):
             return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
         if not isinstance(body, dict):
             return JSONResponse(content={"success": False, "error": "body must be a JSON object"}, status_code=400)
-        title_key = (body.get("title_key") or "").strip()
-        title = body.get("title")
-        source = body.get("source") or "all"
-        cover = body.get("cover")
-        series_url = body.get("series_url")
-        if not title_key:
-            return JSONResponse(content={"success": False, "error": "title_key required"}, status_code=400)
+        try:
+            data = ExcludedAddRequest.model_validate(body)
+        except Exception as ve:
+            from pydantic import ValidationError as _VE
+            if isinstance(ve, _VE):
+                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            raise
+        title_key = data.title_key.strip()
+        title = data.title
+        source = data.source or "all"
+        cover = data.cover
+        series_url = data.series_url
         res = excl_store.add_excluded_title(
             title_key=title_key, title=title, source=source,
             cover=cover, series_url=series_url
@@ -176,9 +204,10 @@ async def post_excluded(request: Request):
             _rss_mod.invalidate_rss_cache()
         except Exception:
             pass
-        # Audit log disabled
-        # from app.services.audit import log_action, AuditAction
-        # log_action(AuditAction.EXCLUDE_ADD, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
+        try:
+            log_action(AuditAction.EXCLUDED_ADD, request=request, resource="excluded_titles", resource_id=title_key, metadata={"source": source})
+        except Exception:
+            pass
         return JSONResponse(content={"success": True, "data": res})
     except Exception as e:
         logger.error("post_excluded failed", exc=e)
@@ -196,10 +225,15 @@ async def delete_excluded(request: Request):
             return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
         if not isinstance(body, dict):
             return JSONResponse(content={"success": False, "error": "body must be a JSON object"}, status_code=400)
-        title_key = (body.get("title_key") or "").strip()
-        source = body.get("source") or "all"
-        if not title_key:
-            return JSONResponse(content={"success": False, "error": "title_key required"}, status_code=400)
+        try:
+            data = ExcludedDeleteRequest.model_validate(body)
+        except Exception as ve:
+            from pydantic import ValidationError as _VE
+            if isinstance(ve, _VE):
+                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            raise
+        title_key = data.title_key.strip()
+        source = data.source or "all"
         res = excl_store.remove_excluded_title(title_key=title_key, source=source)
         if res.get("status") == "error":
             return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
@@ -210,9 +244,10 @@ async def delete_excluded(request: Request):
             _rss_mod.invalidate_rss_cache()
         except Exception:
             pass
-        # Audit log disabled
-        # from app.services.audit import log_action, AuditAction
-        # log_action(AuditAction.EXCLUDE_REMOVE, actor=request.headers.get("x-forwarded-for", "system"), target=title_key, details={"source": source})
+        try:
+            log_action(AuditAction.EXCLUDED_DELETE, request=request, resource="excluded_titles", resource_id=title_key, metadata={"source": source})
+        except Exception:
+            pass
         return JSONResponse(content={"success": True, "data": res})
     except Exception as e:
         logger.error("delete_excluded failed", exc=e)
@@ -230,9 +265,14 @@ async def post_excluded_bulk(request: Request):
             return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
         if not isinstance(body, dict):
             return JSONResponse(content={"success": False, "error": "body must be a JSON object"}, status_code=400)
-        source = (body.get("source") or "").strip()
-        if not source:
-            return JSONResponse(content={"success": False, "error": "source required"}, status_code=400)
+        try:
+            data = ExcludedBulkRequest.model_validate(body)
+        except Exception as ve:
+            from pydantic import ValidationError as _VE
+            if isinstance(ve, _VE):
+                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            raise
+        source = data.source.strip()
         if source not in VALID_SOURCES:
             return JSONResponse(content={"success": False, "error": f"invalid source: {source}"}, status_code=400)
         res = excl_store.exclude_all_by_source(source)
@@ -243,6 +283,10 @@ async def post_excluded_bulk(request: Request):
             excl_store._CACHE_TS = 0.0
             from app.api import rss as _rss_mod
             _rss_mod.invalidate_rss_cache()
+        except Exception:
+            pass
+        try:
+            log_action(AuditAction.EXCLUDED_BULK, request=request, resource="excluded_titles", resource_id=source, metadata={"source": source})
         except Exception:
             pass
         return JSONResponse(content={"success": True, "data": res})

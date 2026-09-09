@@ -14,6 +14,9 @@ from app.tasks.queue import (
     QUEUE_KEY,
     DLQ_KEY,
     CRON_QUEUE_KEY,
+    CRON_QUEUE_SET,
+    QUEUE_PROCESSING_KEY,
+    CRON_PROCESSING_KEY,
 )
 from app.tasks.scheduler import start_cron_scheduler
 from app.tasks.lifecycle import start_worker, stop_worker, run_cron_worker, get_cron_status
@@ -25,6 +28,9 @@ __all__ = [
     "QUEUE_KEY",
     "DLQ_KEY",
     "CRON_QUEUE_KEY",
+    "CRON_QUEUE_SET",
+    "QUEUE_PROCESSING_KEY",
+    "CRON_PROCESSING_KEY",
     "start_cron_scheduler",
     "start_worker",
     "stop_worker",

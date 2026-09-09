@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.logger import get_logger
 from app.utils.request_auth import require_monitor_auth
+from app.services.audit import log_action, AuditAction
 
 logger = get_logger("api:queue_dashboard")
 router = APIRouter()
@@ -194,6 +195,10 @@ async def retry_dlq(request: Request):
             if not job:
                 break
             count += 1
+        try:
+            log_action(AuditAction.QUEUE_RETRY, request=request, resource="queue", resource_id="dlq", metadata={"retried": count})
+        except Exception:
+            pass
         
         return JSONResponse(content={"success": True, "data": {"retried": count}})
     except Exception as e:
@@ -261,6 +266,10 @@ async def clear_pending(request: Request):
             })
         if history_rows:
             sb.table("dispatch_history").insert(history_rows).execute()
+        try:
+            log_action(AuditAction.QUEUE_CLEAR, request=request, resource="queue", resource_id="pending", metadata={"cleared": len(history_rows)})
+        except Exception:
+            pass
         
         return JSONResponse(content={"success": True, "data": {"cleared": len(history_rows)}})
     except Exception as e:
@@ -275,11 +284,20 @@ async def clear_cron_queue(request: Request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
 
     try:
-        from app.tasks import _get_redis, CRON_QUEUE_KEY
+        from app.tasks import _get_redis, CRON_QUEUE_KEY, CRON_QUEUE_SET, CRON_PROCESSING_KEY
 
         r = _get_redis()
         count = r.llen(CRON_QUEUE_KEY) or 0
         r.delete(CRON_QUEUE_KEY)
+        try:
+            r.delete(CRON_QUEUE_SET)
+            r.delete(CRON_PROCESSING_KEY)
+        except Exception:
+            pass
+        try:
+            log_action(AuditAction.QUEUE_CLEAR, request=request, resource="queue", resource_id="cron", metadata={"deleted": count})
+        except Exception:
+            pass
 
         return JSONResponse(content={"success": True, "data": {"deleted": count}})
     except Exception as e:
@@ -298,6 +316,10 @@ async def clear_dlq(request: Request):
         r = _get_redis()
         count = r.llen(DLQ_KEY) or 0
         r.delete(DLQ_KEY)
+        try:
+            log_action(AuditAction.QUEUE_CLEAR, request=request, resource="queue", resource_id="dlq", metadata={"deleted": count})
+        except Exception:
+            pass
         
         return JSONResponse(content={"success": True, "data": {"deleted": count}})
     except Exception as e:

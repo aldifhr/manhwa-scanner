@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, List, Literal
 
 from app.utils.request_auth import safe_error, require_monitor_auth
 from app.cron.dispatch_mod import load_guild_settings
@@ -17,6 +19,13 @@ from app.logger import get_logger
 logger = get_logger("api:settings")
 
 _VALID_ORIGINS = {"KR", "CN", "JP"}
+
+
+class GuildSettingsPutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    originFilter: Optional[List[str] | str] = Field(default=None)
+    excludedTitles: Optional[List[str]] = Field(default=None)
+    label: Optional[str] = Field(default=None, max_length=60)
 
 
 def _clean_origins(raw) -> list[str]:
@@ -62,10 +71,23 @@ async def settings_put(request: Request, guild_id: str):
         return JSONResponse(content={"success": False, "error": "invalid JSON body"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse(content={"success": False, "error": "body must be an object"}, status_code=400)
+    # Pydantic DTO validation (extra=forbid, length limits)
+    try:
+        validated = GuildSettingsPutRequest.model_validate(body)
+    except Exception as ve:
+        from pydantic import ValidationError as _VE
+        if isinstance(ve, _VE):
+            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+        raise
+    # manual per-field length checks beyond pydantic (excludedTitles items)
+    if validated.excludedTitles is not None:
+        for t in validated.excludedTitles:
+            if len(t) > 200:
+                return JSONResponse(content={"success": False, "error": "validation_error", "details": [{"loc": ["excludedTitles"], "msg": "each title ≤200"}]}, status_code=422)
 
     update: dict = {}
     if "originFilter" in body:
-        origins = _clean_origins(body.get("originFilter"))
+        origins = _clean_origins(validated.originFilter)
         bad = set(origins) - _VALID_ORIGINS
         if bad:
             return JSONResponse(content={
@@ -74,12 +96,12 @@ async def settings_put(request: Request, guild_id: str):
             }, status_code=400)
         update["origin_filter"] = ",".join(origins)
     if "excludedTitles" in body:
-        titles = body.get("excludedTitles")
+        titles = validated.excludedTitles
         if not isinstance(titles, list) or not all(isinstance(t, str) for t in titles):
             return JSONResponse(content={"success": False, "error": "excludedTitles must be a string array"}, status_code=400)
         update["excluded_titles"] = [t.strip() for t in titles if t.strip()]
     if "label" in body:
-        update["label"] = str(body.get("label") or "")[:60]
+        update["label"] = str(validated.label or "")[:60]
 
     if not update:
         return JSONResponse(content={"success": False, "error": "nothing to update"}, status_code=400)
