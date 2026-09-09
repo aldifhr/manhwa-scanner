@@ -61,19 +61,19 @@ def _get_session_hash(request: Request) -> str:
 
 @router.get("/continue-reading")
 async def get_continue_reading(request: Request):
-    """Get continue-reading entries for current user. ponytail: delegates to bookmark (single source)."""
+    """Get continue-reading entries for current user."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     sid_hash = _get_session_hash(request)
     if not sid_hash:
         return JSONResponse(content={"success": True, "data": {}})
     try:
-        from app.services.bookmark import get_bookmarks
-        rows = get_bookmarks(sid_hash, limit=100, offset=0)
-        # Convert bookmarks → continue_reading entries map
+        from app.db import get_supabase
+        sb = get_supabase()
+        rows = sb.table("chapter_bookmarks").select("*").eq("session_hash", sid_hash).order("updated_at", desc=True).limit(100).execute().data or []
         entries = {}
         for r in rows:
-            tk = r.get("title_key") or r.get("titleKey") or ""
+            tk = r.get("title_key") or ""
             if not tk:
                 continue
             entries[tk] = {
@@ -89,13 +89,13 @@ async def get_continue_reading(request: Request):
             }
         return JSONResponse(content={"success": True, "data": entries})
     except Exception as e:
-        logger.warn("get_continue_reading (bookmark) failed", err=str(e)[:120])
+        logger.warn("get_continue_reading failed", err=str(e)[:120])
         return JSONResponse(content={"success": True, "data": {}})
 
 
 @router.put("/continue-reading")
 async def put_continue_reading(request: Request):
-    """Update continue-reading — ponytail: delegates to bookmark, keep compat."""
+    """Update continue-reading."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
@@ -141,7 +141,8 @@ async def put_continue_reading(request: Request):
         if isinstance(sample, dict) and sample.get("titleKey"):
             is_batch = True
     try:
-        from app.services.bookmark import save_bookmark
+        from app.db import get_supabase
+        sb = get_supabase()
         if is_batch:
             for k, v in body.items():
                 if not isinstance(v, dict):
@@ -157,7 +158,12 @@ async def put_continue_reading(request: Request):
                 cu = v.get("chapterUrl") or v.get("chapter_url") or ""
                 if not cu:
                     continue
-                save_bookmark(tk, cn or 1, cu, sid_hash, v.get("source", ""), 0, v.get("title", ""), v.get("cover", ""))
+                sb.table("chapter_bookmarks").upsert({
+                    "title_key": tk, "chapter_number": cn or 1, "chapter_url": cu,
+                    "session_hash": sid_hash, "source": v.get("source", ""),
+                    "title": v.get("title", ""), "cover": v.get("cover", ""),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }, on_conflict="title_key,chapter_number,session_hash").execute()
             return JSONResponse(content={"success": True, "data": body})
         title_key = body.get("titleKey") or body.get("title_key") or ""
         if not title_key:
@@ -168,10 +174,15 @@ async def put_continue_reading(request: Request):
             cn = float(cn)
         except Exception:
             cn = 0
-        save_bookmark(title_key, cn or 1, cu or f"https://x/{title_key}", sid_hash, body.get("source", ""), 0, body.get("title", ""), body.get("cover", ""))
+        sb.table("chapter_bookmarks").upsert({
+            "title_key": title_key, "chapter_number": cn or 1, "chapter_url": cu or f"https://x/{title_key}",
+            "session_hash": sid_hash, "source": body.get("source", ""),
+            "title": body.get("title", ""), "cover": body.get("cover", ""),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="title_key,chapter_number,session_hash").execute()
         return JSONResponse(content={"success": True, "data": body})
     except Exception as e:
-        logger.warn("put_continue_reading (bookmark) failed", err=str(e)[:120])
+        logger.warn("put_continue_reading failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
