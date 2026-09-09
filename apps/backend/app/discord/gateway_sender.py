@@ -61,9 +61,17 @@ def send_via_gateway(
     """Send a message via Discord gateway in a subprocess. Returns True on success."""
     import os
 
-    venv_py = os.path.join(os.path.dirname(sys.executable), "python")
+    # Resolve venv python explicitly — subprocess inherits parent env which
+    # may point to system python instead of venv (uv installs system-wide).
+    venv_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".venv", "bin")
+    venv_py = os.path.join(venv_bin, "python")
     py = venv_py if os.path.exists(venv_py) else sys.executable
-    env = {**os.environ, "DISCORD_TOKEN": settings.DISCORD_BOT_TOKEN or ""}
+    env = {
+        **os.environ,
+        "DISCORD_TOKEN": settings.DISCORD_BOT_TOKEN or "",
+        "VIRTUAL_ENV": os.path.dirname(venv_bin),
+        "PATH": venv_bin + ":" + os.environ.get("PATH", ""),
+    }
     # ponytail: retry with exponential backoff to avoid 1/sec subprocess burst on REST ban
     for attempt in range(3):
         try:

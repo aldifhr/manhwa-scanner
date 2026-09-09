@@ -70,6 +70,9 @@ def log_action(
         meta_req = _extract_request_meta(request) if request is not None else {}
         final_actor = (actor or meta_req.get("actor") or "unknown")[:100]
         final_ip = (ip if ip is not None else meta_req.get("ip", ""))[:45]
+        # inet column rejects empty string — convert to None
+        if not final_ip or final_ip.strip() == "":
+            final_ip = None
         final_ua = (user_agent if user_agent is not None else meta_req.get("user_agent", ""))[:500]
         final_metadata = metadata or {}
         # Ensure JSON serializable, truncate large values
