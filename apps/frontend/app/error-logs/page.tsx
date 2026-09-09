@@ -3,8 +3,7 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface ErrorLog {
   id: string;
@@ -17,6 +16,9 @@ interface ErrorLog {
 export default function ErrorLogsPage() {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["error-logs", page, q],
     queryFn: async () => {
@@ -28,20 +30,8 @@ export default function ErrorLogsPage() {
       }>(`/api/v1/logs/errors?${p}`);
       return res.data;
     },
+    retry: false,
   });
-
-  const router = useRouter();
-  const [feedback, setFeedback] = useState<string | null>(null);
-  
-  // Check auth on mount
-  useEffect(() => {
-    const session = document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
-    if (!session) {
-      router.push("/login?redirect=/error-logs");
-    }
-  }, [router]);
-
-  const queryClient = useQueryClient();
   const clearMutation = useMutation({
     mutationFn: async () => {
       const res = await readerFetch<{ success: boolean; deleted?: number; error?: string }>("/api/v1/logs/errors?clear_all=true", { method: "DELETE" });
