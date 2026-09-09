@@ -7,7 +7,7 @@ Auth: PUT requires admin role (require_monitor_auth {"admin"}); GET is monitor-o
 """
 from __future__ import annotations
 
-from fastapi import Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Literal
@@ -17,6 +17,7 @@ from app.cron.dispatch_mod import load_guild_settings
 from app.logger import get_logger
 
 logger = get_logger("api:settings")
+router = APIRouter()
 
 _VALID_ORIGINS = {"KR", "CN", "JP"}
 
@@ -38,6 +39,7 @@ def _clean_origins(raw) -> list[str]:
     return sorted({o.strip().upper() for o in parts if o.strip()})
 
 
+@router.get("/settings")
 async def settings_get(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
@@ -61,6 +63,7 @@ async def settings_get(request: Request):
         return JSONResponse(content=safe_error(e), status_code=500)
 
 
+@router.put("/settings/{guild_id}")
 async def settings_put(request: Request, guild_id: str):
     # Destructive-ish write (changes guild notification policy) — admin only.
     if not require_monitor_auth(request):

@@ -9,3 +9,4 @@ allowBuilds:
 
 overrides:
   postcss: ^8.5.13
+  js-yaml: ">=4.3.2"

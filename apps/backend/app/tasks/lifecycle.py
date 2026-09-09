@@ -4,7 +4,7 @@ import json
 import threading
 import time as _time
 
-from app.tasks.queue import _get_redis, QUEUE_KEY, DLQ_KEY, CRON_QUEUE_KEY, CRON_QUEUE_SET, QUEUE_PROCESSING_KEY, CRON_PROCESSING_KEY
+from app.tasks.queue import _get_redis, _cleanup_orphaned_set_entries, QUEUE_KEY, DLQ_KEY, CRON_QUEUE_KEY, CRON_QUEUE_SET, QUEUE_PROCESSING_KEY, CRON_PROCESSING_KEY
 from app.tasks.retention import _retention_loop
 from app.logger import get_logger
 
@@ -125,6 +125,8 @@ def run_cron_worker() -> None:
     """Blocking worker for the cron queue (ROLE=cron process only). Crash-safe via processing list."""
     logger.info("cron worker started")
     _recover_processing()
+    _cleanup_orphaned_set_entries()
+    _cleanup_counter = 0
     while not _stop.is_set():
         try:
             r = _get_redis()
@@ -151,10 +153,11 @@ def run_cron_worker() -> None:
             continue
         _key, raw = result if isinstance(result, (list, tuple)) else (CRON_QUEUE_KEY, result)
         # dedup set cleanup — job left queue, remove from set so future enqueue allowed
+        # ponytail: SREM failure is non-fatal — entry stays in SET, will be cleaned by periodic orphan sweep
         try:
             _get_redis().srem(CRON_QUEUE_SET, raw)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warn("srem dedup cleanup failed (will retry via orphan sweep)", err=str(e)[:120])
         try:
             item = json.loads(raw)
         except json.JSONDecodeError:
@@ -167,10 +170,15 @@ def run_cron_worker() -> None:
         try:
             run_cron_inline(item.get("action", "update"))
         finally:
+            # ponytail: lrem failure here means job stays in processing list — recovered on restart via _recover_processing
             try:
                 _get_redis().lrem(CRON_PROCESSING_KEY, 1, raw)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("lrem processing ack failed (job stays in proc, recovered on restart)", err=str(e)[:120])
+        _cleanup_counter += 1
+        if _cleanup_counter >= 100:
+            _cleanup_counter = 0
+            _cleanup_orphaned_set_entries()
 
 
 def get_cron_status() -> dict:

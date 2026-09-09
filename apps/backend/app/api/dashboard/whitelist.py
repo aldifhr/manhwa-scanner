@@ -99,6 +99,8 @@ async def dispatch_history_reader(request: Request):
 @router.get("/reader/whitelist")
 async def get_whitelist_reader(request: Request):
     """Backward-compat alias — public GET for anon dashboard, same as /whitelist."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     # ponytail: pisah per source (merge=false) default — user request
     page = request.query_params.get("page", "1")
     page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
@@ -110,6 +112,8 @@ async def get_whitelist_reader(request: Request):
 
 @router.get("/whitelist")
 async def whitelist_get(request: Request):
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     # ponytail: pisah per source (merge=false) default — user request
     try:
         source = request.query_params.get("source", "")

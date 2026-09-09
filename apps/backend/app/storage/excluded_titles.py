@@ -65,7 +65,7 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
             )
             keys: set[tuple[str, str]] = set()
             for r in (rows.data or []):
-                tk = str(r.get("title_key") or "").strip().lower()
+                tk = normalize_title_key(str(r.get("title_key") or ""))
                 src = _norm_source(str(r.get("source") or "all"))
                 if tk:
                     keys.add((tk, src))

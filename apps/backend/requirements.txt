@@ -11,7 +11,7 @@ cssselect==1.4.0
 curl-cffi==0.15.0
 deprecation==2.1.0
 discord-interactions==0.4.0
-fastapi==0.139.0
+fastapi>=0.136.3
 greenlet==3.5.3
 h11==0.16.0
 h2==4.3.0

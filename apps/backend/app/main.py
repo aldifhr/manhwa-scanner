@@ -83,8 +83,10 @@ app.add_middleware(
 # Extracted middlewares (was inline 150L in god-file)
 from app.middleware.correlation import correlation_middleware  # noqa: E402
 from app.middleware.security import security_headers_middleware  # noqa: E402
+from app.middleware.rate_limit import rate_limit_middleware  # noqa: E402
 app.middleware("http")(correlation_middleware)
 app.middleware("http")(security_headers_middleware)
+app.middleware("http")(rate_limit_middleware)
 
 
 from app.utils.request_auth import safe_error, require_monitor_auth

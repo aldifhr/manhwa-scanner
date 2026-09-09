@@ -6,10 +6,11 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from app.logger import get_logger
+from app.utils.auth import check_monitor_auth
 
 logger = get_logger("api:websocket")
 router = APIRouter()
@@ -83,7 +84,7 @@ manager = ConnectionManager()
 # ── WebSocket Endpoint ──
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)):
     """WebSocket endpoint for real-time updates.
     
     Client subscribes to topics via JSON message:
@@ -95,6 +96,12 @@ async def websocket_endpoint(websocket: WebSocket):
     - queue: queue depth updates
     - audit: audit log entries
     """
+    # Auth: require valid token query param or session cookie
+    cookie = websocket.cookies.get("ikiru_dashboard_session", "")
+    if not check_monitor_auth(authorization="", token_param=token or "", cookie=cookie):
+        await websocket.close(code=4001, reason="unauthorized")
+        return
+    
     # Wait for subscription message
     try:
         data = await websocket.receive_text()

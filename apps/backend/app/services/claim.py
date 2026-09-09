@@ -232,7 +232,8 @@ def claim_recent_chapters_for_dispatch(
             from app.storage.recent_chapters import get_recent_chapters as _fallback
 
             return _fallback(hours=hours)
-        except Exception:
+        except Exception as e:
+            logger.error("claim fallback get_recent_chapters failed", exc=e)
             return []
     finally:
         if conn:
