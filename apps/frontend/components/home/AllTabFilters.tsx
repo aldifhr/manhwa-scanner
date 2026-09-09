@@ -117,6 +117,7 @@ export default function AllTabFilters({
         {[
           { id: "manhwa", label: "Manhwa" },
           { id: "manhua", label: "Manhua" },
+          { id: "manga", label: "Manga" },
           { id: "no_type", label: "No Type" },
         ].map(({ id, label }) => {
           const n = typeCounts[id] ?? 0;
