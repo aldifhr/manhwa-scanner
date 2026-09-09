@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import html
 
+from app.config import settings
 from app.logger import get_logger
 from app.storage import whitelist as wl_store
 from app.utils.text import normalize_title_key, normalize_shinigami_url, slugify_title_key
