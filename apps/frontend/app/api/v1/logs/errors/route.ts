@@ -24,3 +24,23 @@ export async function GET(request: NextRequest) {
     return catchError(err);
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const target = `${backendUrl()}/api/v1/logs/errors`;
+    const res = await fetch(target, {
+      method: "DELETE",
+      headers: authHeaders(request),
+      signal: AbortSignal.timeout(TIMEOUT.DEFAULT),
+    });
+    const body = await res
+      .json()
+      .catch(() => ({ success: res.ok, error: res.ok ? null : `Upstream ${res.status}` }));
+    return NextResponse.json(body, {
+      status: res.ok ? 200 : res.status,
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (err) {
+    return catchError(err);
+  }
+}
