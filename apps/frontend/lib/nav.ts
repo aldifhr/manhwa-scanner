@@ -4,7 +4,6 @@ import {
   Books,
   EyeSlash,
   Clock,
-  BookBookmark,
   ChartBar,
 } from "@phosphor-icons/react";
 
@@ -15,7 +14,6 @@ export const NAV = [
   { href: "/whitelist", label: "Whitelist", icon: Books } as const,
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash } as const,
   { href: "/dispatch-history", label: "History", icon: Clock } as const,
-  { href: "/bookmarks", label: "Bookmarks", icon: BookBookmark },
 ] as const;
 
 /** Sidebar / nav active-state helper (single source of truth).

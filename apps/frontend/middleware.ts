@@ -6,7 +6,6 @@ import { getSecurityHeaders } from "@/lib/security/headers";
 const PUBLIC_EXACT = new Set<string>([
   "/",
   "/recent",
-  "/bookmarks",
   "/about",
   "/login",
   "/sw.js",
