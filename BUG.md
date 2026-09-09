@@ -1,3 +1,87 @@
+# BUG — Katalog
+
+## BUG-2 — 🔴 Critical — Hardcoded default `DASHBOARD_PASSWORD` & boot guard bolong
+
+### 1. Deskripsi
+`apps/backend/app/config.py:58` punya fallback `DASHBOARD_PASSWORD: str = "manhwascan"` yang ke-commit di repo public. Password ini adalah **single credential full admin** ( `POST /api/auth?action=login` → `ikiru_dashboard_session` JWT → bisa `whitelist`/`exclude`/`dispatch`/`settings`/`dispatch_history`/`admin` ). Kalau deploy lupa set env, produksi **silent wide open** dengan password yang bisa ditebak dari GitHub.
+
+### 2. Reproduksi
+1. `ENVIRONMENT=production` (default `config.py:96`) + `.env` tanpa `DASHBOARD_PASSWORD` → `Settings()` `config.py:58` pakai `"manhwascan"`.
+2. `from app.config import _validate_settings, settings; _validate_settings(settings)` `config.py:138` tidak throw — cek `config.py:152-161`:
+   ```python
+   missing=[]
+   if not s.CRON_SECRET: missing.append("CRON_SECRET") #152
+   if not s.MONITOR_AUTH_TOKEN: ... #154
+   if not s.AUTH_SECRET: ... #156
+   if not s.DATABASE_URL: ... #158
+   if not s.DISCORD_BOT_TOKEN: ... #160
+   # DASHBOARD_PASSWORD tidak pernah dicek
+   if missing: raise RuntimeError(...)
+   ```
+3. `curl -X POST https://scanner.aldifhr.fun/api/auth?action=login -H 'Content-Type: application/json' -d '{"password":"manhwascan"}'` → `200` + `set-cookie: ikiru_dashboard_session` `apps/backend/app/api/auth.py:95,117` (`_password_ok()` `auth.py:90` `candidates=[DASHBOARD_PASSWORD, MONITOR_AUTH_TOKEN]` `hmac.compare_digest`).
+
+### 3. Root Cause
+| Komponen | Kode | Perilaku |
+|---|---|---|
+| **Default insecure** | `config.py:58` | Hanya `DASHBOARD_PASSWORD` yang default non-kosong (`"manhwascan"`), 5 secret lain default `""` (`CRON_SECRET:53`, `MONITOR_AUTH_TOKEN:56`, `AUTH_SECRET:62`, `DATABASE_URL:22`, `DISCORD_BOT_TOKEN:10`). |
+| **Boot guard bolong** | `config.py:138` `_validate_settings()` | Cek 5 secret di atas, tapi tidak cek `DASHBOARD_PASSWORD`. Karena default `truthy`, `if not s.DASHBOARD_PASSWORD` tidak pernah trigger walau password masih bawaan repo. |
+| **Auth fallback** | `auth.py:90` `candidates = [DASHBOARD_PASSWORD, MONITOR_AUTH_TOKEN]` + `apps/backend/app/utils/auth.py:14` `_dashboard_passwords()` | Kalau `DASHBOARD_PASSWORD` default, `MONITOR_AUTH_TOKEN` yang sudah di-guard tetap bisa jadi alias, tapi `"manhwascan"` tetap valid sebagai password pertama. |
+| **Docs** | `apps/backend/.env.example:1` | Tidak mendokumentasikan `DASHBOARD_PASSWORD` sama sekali, makin mudah ke-skip. |
+| **Test** | `apps/backend/tests/test_utils_auth.py:25,33...` | Test mock `DASHBOARD_PASSWORD="manhwascan"` — kalau default diubah ke `""`, test perlu update. |
+
+### 4. Dampak
+* **Confidentiality/Integrity full admin** — siapa pun yang baca repo bisa login `admin` di `https://scanner.aldifhr.fun` / `komik.aldifhr.fun` kalau env lupa set.
+* **Silent failure** — boot guard yang dimaksudkan untuk cegah `auth disabled because .env not loaded` `config.py:142` justru tidak menangkap kasus ini.
+
+### 5. Solusi (tanpa patch sekarang — sesuai instruksi)
+
+**Opsi A — ubah default ke kosong + guard (paling aman, sama seperti 5 secret lain):**
+```python
+# config.py:58
+DASHBOARD_PASSWORD: str = ""  # was "manhwascan"
+# config.py:152 (di _validate_settings, sebelum if missing:)
+if not s.DASHBOARD_PASSWORD:
+    missing.append("DASHBOARD_PASSWORD")
+```
+
+**Opsi B — guard cek nilai default (kompatibel dev, tetap aman di prod):**
+```python
+if not s.DASHBOARD_PASSWORD or s.DASHBOARD_PASSWORD == "manhwascan":
+    missing.append("DASHBOARD_PASSWORD")
+```
+Untuk dev, set `ENVIRONMENT=development` (guard bypass `config.py:149`) atau set `DASHBOARD_PASSWORD=devpass` di `.env`.
+
+Tambahan:
+* Tambah `DASHBOARD_PASSWORD=change-me` ke `apps/backend/.env.example` dengan komentar `MUST be set in production`.
+* Update `tests/test_utils_auth.py` mock tetap `"manhwascan"` untuk test, tapi boot guard test baru untuk `DASHBOARD_PASSWORD` missing.
+
+### 6. Verifikasi (rencana)
+```bash
+ENVIRONMENT=production DASHBOARD_PASSWORD="" python -c "from app.config import settings, _validate_settings; _validate_settings(settings)"
+# → RuntimeError: BOOT GUARD: ... DASHBOARD_PASSWORD
+
+ENVIRONMENT=production DASHBOARD_PASSWORD="manhwascan" python -c "..."
+# → RuntimeError (opsi B)
+
+ENVIRONMENT=production DASHBOARD_PASSWORD="s3cr3t-32-chars" CRON_SECRET=x MONITOR_AUTH_TOKEN=x AUTH_SECRET=x DATABASE_URL=postgres://... DISCORD_BOT_TOKEN=x python -c "..."
+# → OK
+
+curl -X POST http://localhost:8000/api/auth?action=login -d '{"password":"manhwascan"}'
+# → 401 setelah fix (sebelum fix 200)
+```
+
+### 7. File terkait
+* `apps/backend/app/config.py:58,96,138,152,170`
+* `apps/backend/app/api/auth.py:3,90,95`
+* `apps/backend/app/utils/auth.py:14`
+* `apps/backend/.env.example:1`
+* `apps/backend/tests/test_utils_auth.py:25`
+
+### 8. Status
+* Dicatat 2026-09-09 — **tidak di-patch** sesuai instruksi, hanya dokumentasi. Patch menunggu approval untuk ubah `config.py:58,152`.
+
+---
+
 # BUG — Cron Jobs FIFO tidak pernah berkurang (358 jobs)
 
 ## 1. Deskripsi
