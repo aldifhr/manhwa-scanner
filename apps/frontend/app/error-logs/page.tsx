@@ -3,7 +3,8 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface ErrorLog {
   id: string;
@@ -29,13 +30,35 @@ export default function ErrorLogsPage() {
     },
   });
 
+  const router = useRouter();
+  const [feedback, setFeedback] = useState<string | null>(null);
+  
+  // Check auth on mount
+  useEffect(() => {
+    const session = document.cookie.match(/(?:^|;\s*)ikiru_dashboard_session=/);
+    if (!session) {
+      router.push("/login?redirect=/error-logs");
+    }
+  }, [router]);
+
   const queryClient = useQueryClient();
   const clearMutation = useMutation({
     mutationFn: async () => {
-      await readerFetch("/api/v1/logs/errors?clear_all=true", { method: "DELETE" });
+      const res = await readerFetch<{ success: boolean; deleted?: number; error?: string }>("/api/v1/logs/errors?clear_all=true", { method: "DELETE" });
+      return res;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["error-logs"] });
+    onSuccess: (data) => {
+      if (data?.success) {
+        setFeedback(`Cleared ${data.deleted ?? 0} errors`);
+        queryClient.invalidateQueries({ queryKey: ["error-logs"] });
+      } else {
+        setFeedback(data?.error || "Failed to clear");
+      }
+      setTimeout(() => setFeedback(null), 3000);
+    },
+    onError: (err) => {
+      setFeedback((err as Error).message.slice(0, 200));
+      setTimeout(() => setFeedback(null), 3000);
     },
   });
 
