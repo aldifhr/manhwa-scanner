@@ -54,14 +54,16 @@ export default function NavbarStatus({
       Reader.getDashboardSnapshot() as Promise<{
         sourceHealth?: Record<string, { status: string }>;
         cronStatus?: { timestamp: string } | null;
-      }>,
+      } | null>,
     refetchInterval: 30_000,
     staleTime: 15_000,
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  const agg = aggregate(data?.sourceHealth, data?.cronStatus);
+  // getDashboardSnapshot returns null on 401/403 (not logged in) — jangan tampil Idle
+  // kalau belum login / masih loading, anggap Live biar tidak misleading merah
+  const agg = !data ? "operational" : aggregate(data.sourceHealth, data.cronStatus);
 
   const dot = (
     <span

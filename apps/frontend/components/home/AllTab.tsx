@@ -160,10 +160,46 @@ function AllTabInner() {
     return s;
   }, [dispatchHistory]);
 
+  const isExcludedFlat = useCallback(
+    (c: FlatChapter) => {
+      const src = (c.source || "all").toLowerCase();
+      const key = `${c.titleKey}:${src}`;
+      return (
+        optimisticExcluded.has(key) ||
+        optimisticExcluded.has(`${c.titleKey}:all`) ||
+        optimisticExcluded.has(c.titleKey)
+      );
+    },
+    [optimisticExcluded]
+  );
+  const isExcludedSeries = useCallback(
+    (s: GroupedSeries) => {
+      const keys = [
+        ...new Set(
+          s.chapters.map(
+            (ch) =>
+              `${ch.titleKey || s.titleKey}:${(ch.source || "").toLowerCase()}`
+          )
+        ),
+      ];
+      if (keys.length === 0) {
+        const fk = `${s.titleKey}:all`;
+        return optimisticExcluded.has(fk) || optimisticExcluded.has(s.titleKey);
+      }
+      return keys.every(
+        (k) =>
+          optimisticExcluded.has(k) ||
+          optimisticExcluded.has(`${k.split(":")[0]}:all`) ||
+          optimisticExcluded.has(k.split(":")[0])
+      );
+    },
+    [optimisticExcluded]
+  );
+
   const filtered = useMemo(() => {
     let f = all;
     if (optimisticExcluded.size > 0)
-      f = f.filter((c) => !optimisticExcluded.has(c.titleKey));
+      f = f.filter((c) => !isExcludedFlat(c));
     if (sourceFilter) f = f.filter((c) => (c.source || "") === sourceFilter);
     if (typeFilter) {
       f = f.filter((c) => {
@@ -226,6 +262,7 @@ function AllTabInner() {
   }, [
     all,
     optimisticExcluded,
+    isExcludedFlat,
     sourceFilter,
     typeFilter,
     genreFilter,
@@ -540,7 +577,7 @@ function AllTabInner() {
                   onTogglePin={() => togglePin(s.titleKey)}
                   onMarkRead={() => markAllRead(s.chapters.map((c) => c.url))}
                   onExclude={() => handleExcludeSeries(s)}
-                  isExcluded={optimisticExcluded.has(s.titleKey)}
+                  isExcluded={isExcludedSeries(s)}
                   excluding={excludingKey === s.titleKey}
                   onAdd={() => handleAddGroup(s)}
                   isSentToDiscord={s.chapters.some(
@@ -580,7 +617,7 @@ function AllTabInner() {
                   adding={addingKey === item.titleKey}
                   onToggleRead={() => toggleRead(item.url)}
                   onAdd={() => handleAdd(item)}
-                  isExcluded={optimisticExcluded.has(item.titleKey)}
+                  isExcluded={isExcludedFlat(item)}
                   excluding={excludingKey === item.titleKey}
                   isPinned={pinnedSet.has(item.titleKey)}
                   onTogglePin={() => togglePin(item.titleKey)}
