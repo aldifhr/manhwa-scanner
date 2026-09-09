@@ -51,9 +51,9 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         recent_chapters.prune_older_than(24)
     except Exception as e:
         logger.warn("collect: recent_chapters prune failed", err=str(e)[:160])
-    # Prune dispatch_history to 24h window as well (user: "jangan 2 hari")
+    # Prune dispatch_history to 2d window (was 24h — BUG-3: 1d too short for dedup, fix 2d)
     try:
-        recent_chapters.prune_dispatch_history_older_than(24)
+        recent_chapters.prune_dispatch_history_older_than(48)
     except Exception as e:
         logger.warn("collect: dispatch_history prune failed", err=str(e)[:160])
 

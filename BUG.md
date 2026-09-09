@@ -82,6 +82,55 @@ curl -X POST http://localhost:8000/api/auth?action=login -d '{"password":"manhwa
 
 ---
 
+## BUG-3 — 🟡 Medium — Dispatch dedup ledger retention `1` hari terlalu pendek
+
+### 1. Deskripsi
+`apps/backend/app/tasks/retention.py:7` `_DISPATCH_HISTORY_RETENTION_DAYS = 1` (dan `apps/backend/app/cron/pipeline.py:56` `prune_dispatch_history_older_than(24)` tiap cron) mem-prune `dispatch_history` tiap jam. `dispatch_history` adalah ledger dedup **permanen** sebelum kirim Discord (`dispatch_mod.py:42` FCFS `fcfs_key`, `app/storage/dispatch.py:49` `_claimed_titles`), jadi kalau `scraping/collection` telat >1 hari (VPS down, source outage), `gap_detector.py:67` akan re-proses chapter yang record-nya sudah ter-prune → duplikat notifikasi. Audit `be-ag-py` lalu sudah flag `2 hari vs docstring 90 hari`, sekarang makin ketat `1 hari`.
+
+### 2. Reproduksi
+1. `retention.py:7` + `pipeline.py:56` → `DELETE FROM dispatch_history WHERE sent_at < now()-1d` (`retention.py:23`, `recent_chapters.py:55`).
+2. `dispatch_history` dicek di `dispatch_mod.py:125,142,153,169`, `rss_service.py:82,135` (`NOT EXISTS dispatch_history`, `dh_sent gte cutoff`), `claim.py:117,122`, `queue_dashboard.py:263`.
+3. Downtime 36 jam → `recent_chapters` masih ada (retain `7d` `retention.py:10`), tapi `dispatch_history` untuk `chapter X` sudah hilang → `_claimed_titles([])` kosong → `dispatch()` kirim ulang.
+
+### 3. Root Cause
+| Komponen | Kode | Perilaku |
+|---|---|---|
+| **Prune harian** | `retention.py:7,23`, `pipeline.py:54-56` | `cutoff = now-1d` tiap jam + tiap cron start (`user: "jangan 2 hari"`). |
+| **Ekspektasi arsitektur** | `ARCHITECTURE.md:356` `dispatch_history 90 days, 922 rows` | Seharusnya ledger 90 hari, bukan 1 hari. |
+| **Feed vs ledger campur** | `recent_chapters.py:15` `prune_older_than 24h` benar untuk feed window, tapi `dispatch_history` ikut 24h padahal ledger harus panjang. |
+
+### 4. Dampak
+* Duplikat Discord kalau `gap >1d` (prior bug class sama, sekarang `1d` < `2d` lalu).
+* `ARCHITECTURE.md` vs kode tidak sinkron.
+
+### 5. Solusi — `2` hari (sesuai instruksi)
+```python
+# retention.py:7
+_DISPATCH_HISTORY_RETENTION_DAYS = 2  # was 1
+# pipeline.py:56
+recent_chapters.prune_dispatch_history_older_than(48)  # was 24 — sync dengan retensi 2d
+```
+Alternatif deliberate `7`/`30`/`90` hari untuk ledger (jaga `500` per-series `retention.py:11` + index `sent_at` `migrations/034:28`), `recent_chapters` tetap `24h` untuk RSS. Untuk sekarang pakai `2` hari sebagai kompromi user.
+
+### 6. Verifikasi (rencana)
+```bash
+grep _DISPATCH_HISTORY_RETENTION_DAYS apps/backend/app/tasks/retention.py # → 2
+grep prune_dispatch_history_older_than apps/backend/app/cron/pipeline.py # → 48
+# Simulasi: insert dispatch_history sent_at=now-36h, tunggu hourly prune → row tetap ada (sebelum fix terhapus), gap resync tidak duplikat.
+```
+
+### 7. File terkait
+* `apps/backend/app/tasks/retention.py:7,23`
+* `apps/backend/app/cron/pipeline.py:54,56`
+* `apps/backend/app/storage/recent_chapters.py:46,55`
+* `apps/backend/app/cron/dispatch_mod.py:42,120`, `apps/backend/app/services/rss_service.py:82,135`, `apps/backend/app/cron/gap_detector.py:67`
+* `ARCHITECTURE.md:356`
+
+### 8. Status
+* Dicatat 2026-09-09 — solusi `2` hari, patch menunggu eksekusi `retention.py:7` + `pipeline.py:56`.
+
+---
+
 # BUG — Cron Jobs FIFO tidak pernah berkurang (358 jobs)
 
 ## 1. Deskripsi
