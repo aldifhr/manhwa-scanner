@@ -52,6 +52,9 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
             _type = "manhua"
         elif origin == "KR":
             _type = "manhwa"
+        # Fallback: use type from series meta if country_id missing/empty
+        if not _type and isinstance(_meta, dict):
+            _type = (_meta.get("type") or "").lower()
         items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"https://11.shinigami.asia/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
     return items
 
@@ -94,10 +97,17 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         _tax = m.get("taxonomy") or {}
         if isinstance(_tax, dict):
             genres = [g.get("name") for g in (_tax.get("Genre") or []) if g.get("name")]
+            # Extract type from Format taxonomy (manhwa/manhua/manga)
+            _format_items = _tax.get("Format") or []
+            _type_from_tax = ""
+            if _format_items and isinstance(_format_items, list):
+                _type_from_tax = (_format_items[0].get("slug") or _format_items[0].get("name") or "").lower()
         elif isinstance(_tax, list):
             genres = [t for t in _tax if isinstance(t, str)]
+            _type_from_tax = ""
         else:
             genres = []
+            _type_from_tax = ""
         series_url = f"https://11.shinigami.asia/series/{manga_id}"
         chaps = m.get("chapters") or []
         for ch in chaps:
@@ -125,5 +135,15 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                 _type2 = "manhua"
             elif origin == "KR":
                 _type2 = "manhwa"
+            # Fallback: use type from taxonomy or fetch series meta
+            if not _type2:
+                if _type_from_tax:
+                    _type2 = _type_from_tax
+                else:
+                    try:
+                        _meta_item = _cached_series_meta("shinigami", manga_id)
+                        _type2 = (_meta_item.get("type") or "").lower() if isinstance(_meta_item, dict) else ""
+                    except Exception:
+                        pass
             items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_at", ""), "rating": rating, "genres": genres, "description": description, "type": _type2})
     return items
