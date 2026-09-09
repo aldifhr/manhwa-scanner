@@ -422,4 +422,73 @@ export const Reader = {
       hasMore: typeof d?.hasMore === "boolean" ? d.hasMore : fallbackHasMore,
     };
   },
+
+  // ── Additional orphaned BE routes now exposed to FE ──
+
+  getActivityHeatmap: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/activity/heatmap");
+    return (data.data ?? null) as unknown;
+  },
+
+  getAnalyticsRetention: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/analytics/retention");
+    return (data.data ?? null) as unknown;
+  },
+
+  searchCatalog: async (query: string) => {
+    const p = new URLSearchParams({ q: query });
+    const data = await readerFetch<{ success: boolean; data: unknown }>(`/api/v1/catalog/search?${p}`);
+    return (data.data ?? null) as unknown;
+  },
+
+  getCatalogStats: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/catalog/stats");
+    return (data.data ?? null) as unknown;
+  },
+
+  getContinueReadingUnreadCount: async () => {
+    const data = await readerFetch<{ success: boolean; data: { unread_count?: number } }>("/api/v1/continue-reading/unread-count");
+    return data.data?.unread_count ?? 0;
+  },
+
+  getContinueReadingHistory: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/continue-reading/history");
+    return (data.data ?? null) as unknown;
+  },
+
+  markContinueReadingRead: async (data: { title_key: string; chapter_number?: number }) => {
+    await readerFetch("/api/v1/continue-reading/mark-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  },
+
+  getFailedDispatchesQueue: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/failed-dispatches/queue");
+    return (data.data ?? null) as unknown;
+  },
+
+  getSourcesHealth: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/sources/health");
+    return data.data as unknown;
+  },
+
+  getReaderBadgeCounts: async () => {
+    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/reader/badge-counts");
+    return data.data as unknown;
+  },
+
+  addWhitelistBE: async (data: Record<string, unknown>) => {
+    return readerFetch("/api/v1/whitelist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  },
+
+  updateWhitelistBE: async (data: Record<string, unknown>) => {
+    return readerFetch("/api/v1/whitelist", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  },
+
+  refreshVoratoonHealth: async () => {
+    await readerFetch("/api/v1/health/refresh-voratoon", { method: "POST" });
+  },
+
+  testErrorLog: async () => {
+    await readerFetch("/api/v1/logs/errors/test", { method: "POST" });
+  },
+
 };
