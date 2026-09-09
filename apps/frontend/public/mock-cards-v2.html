@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock V2 — Many variants from base</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{background:#070707;font-family:Inter,system-ui} .gold{border-color:rgba(212,175,55,0.15);background:#121212}</style>
+</head>
+<body class="p-6 text-white">
+<h1 class="text-xl font-bold mb-1">Base → 6 Variants (dari contoh lu)</h1>
+<p class="text-xs text-white/40 mb-6">Copy struktur <code>group flex gap-4 p-3.5 rounded-2xl</code>. Bedanya: flag, rating, pill, verified, spacing.</p>
+
+<section class="space-y-8 max-w-[820px]">
+
+<!-- BASE (contoh lu persis) -->
+<div>
+<p class="text-[11px] tracking-widest text-amber-400 mb-2">V0 — BASE (contoh lu)</p>
+<div class="group relative flex gap-4 p-3.5 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#121212] hover:border-[rgba(212,175,55,0.25)] transition">
+<a class="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"><img alt="A Hero..." class="w-full h-full object-cover group-hover:scale-[1.03] transition duration-500" src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"></div><span class="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md capitalize shadow-sm bg-emerald-500 text-black">ikiru</span></a>
+<div class="flex-1 min-w-0 flex flex-col py-1 gap-0">
+<div class="flex items-start gap-2"><img alt="korean" class="w-4 h-4" src="/kr.png"><h3 class="text-[14px] sm:text-[15px] font-semibold text-white">A Hero Who Does Everything Well</h3></div>
+<div class="flex items-center gap-2 mt-1.5"><span class="inline-flex items-center gap-1 text-[11px] font-semibold text-white/80">★ 7.50</span><span class="text-[10px] text-white/50 truncate">Action · Fantasy · Drama</span></div>
+<p class="text-[11px] leading-[1.4] text-white/55 line-clamp-2 mt-1.5">Na Kang In membuka matanya di tengah Korea Selatan, tahun 2024...</p>
+<div class="flex flex-wrap gap-1 mt-2"><span class="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-md bg-green-500/15 text-green-400 border-green-500/20">Ch. 88</span></div>
+<div class="mt-auto pt-2"><span class="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/20">✓ Verified</span></div>
+</div>
+</div>
+</div>
+
+<!-- V1 — COMPACT flag inline tengah -->
+<div>
+<p class="text-[11px] tracking-widest text-white/60 mb-2">V1 — Flag + Judul rata tengah vertikal (items-center)</p>
+<div class="group relative flex gap-4 p-3.5 rounded-2xl border border-white/10 bg-[#141414]">
+<a class="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"><img src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div><span class="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md bg-emerald-500 text-black">ikiru</span></a>
+<div class="flex-1 min-w-0 flex flex-col py-1">
+<div class="flex items-center gap-2 min-w-0"><img src="/kr.png" class="w-5 h-3.5 rounded-sm object-cover shrink-0"><h3 class="text-[14px] font-semibold truncate">A Hero Who Does Everything Well</h3></div>
+<div class="flex items-center gap-2 mt-1.5"><span class="text-[11px] font-semibold text-white/80">★ 7.50</span><span class="text-[10px] text-white/45">Action · Fantasy</span></div>
+<p class="text-[11px] text-white/55 line-clamp-2 mt-1.5">Na Kang In membuka matanya...</p>
+<div class="flex gap-1 mt-2"><span class="px-2 py-1 rounded-md text-[11px] bg-emerald-500/15 text-emerald-400">Ch. 88</span><span class="px-2 py-1 rounded-md text-[11px] bg-white/5 text-white/50">Ch. 87</span></div>
+<div class="mt-auto pt-2"><span class="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/60">+ Add WL</span></div>
+</div>
+</div>
+</div>
+
+<!-- V2 — FLAG DI ATAS JUDUL (kayak screenshot Rose Mansion) -->
+<div>
+<p class="text-[11px] tracking-widest text-white/60 mb-2">V2 — Flag di bawah judul (kayak screenshot Rose)</p>
+<div class="group flex gap-4 p-3.5 rounded-2xl border border-white/10 bg-[#141414]">
+<a class="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"><img src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div><span class="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md bg-emerald-500 text-black">ikiru</span></a>
+<div class="flex-1 min-w-0 flex flex-col py-1">
+<h3 class="text-[14px] font-semibold truncate">A Hero Who Does Everything Well</h3>
+<img src="/kr.png" class="w-4 h-3 rounded-sm mt-1 self-start">
+<div class="flex items-center gap-2 mt-1.5"><span class="text-[11px] font-semibold">★ 7.50</span><span class="text-[10px] text-white/40">Action · Fantasy · Drama</span></div>
+<p class="text-[11px] text-white/45 line-clamp-2 mt-1.5">Na Kang In...</p>
+<div class="flex gap-1 mt-2"><span class="px-2 py-1 rounded-md text-[11px] bg-emerald-500/15 text-emerald-400">Ch. 88</span></div>
+<div class="mt-auto pt-2 flex gap-2"><span class="text-[11px] px-2.5 py-1 rounded-full bg-amber-400 text-black font-semibold">+ Add WL</span><span class="text-[11px] px-2.5 py-1 rounded-full bg-sky-500/15 text-sky-300">✓ Verified</span></div>
+</div>
+</div>
+</div>
+
+<!-- V3 — NO DESCRIPTION, PILLS BESAR -->
+<div>
+<p class="text-[11px] tracking-widest text-white/60 mb-2">V3 — Tanpa description, pill besar kotak</p>
+<div class="group flex gap-4 p-3.5 rounded-2xl border border-white/10 bg-[#141414]">
+<a class="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"><img src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div><span class="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md bg-emerald-500 text-black">ikiru</span></a>
+<div class="flex-1 min-w-0 flex flex-col py-1">
+<div class="flex items-center gap-2"><img src="/kr.png" class="w-5 h-3.5 rounded-sm"><h3 class="text-[14px] font-semibold truncate">A Hero Who Does Everything Well</h3></div>
+<div class="flex items-center gap-2 mt-1"><span class="text-[11px]">★ 7.50</span><span class="text-[10px] text-white/40">Action · Fantasy</span></div>
+<div class="grid grid-cols-3 gap-1.5 mt-3"><span class="text-center py-1.5 rounded-md bg-emerald-500/15 text-emerald-400 text-xs font-semibold">Ch. 88</span><span class="text-center py-1.5 rounded-md bg-white/5 text-white/60 text-xs">Ch. 87</span><span class="text-center py-1.5 rounded-md bg-white/5 text-white/60 text-xs">Ch. 86</span></div>
+<div class="mt-auto pt-3"><span class="w-full block text-center py-1.5 rounded-full bg-amber-400 text-black text-xs font-bold">+ Add to Whitelist</span></div>
+</div>
+</div>
+</div>
+
+<!-- V4 — COVER FULL BLEED NO GRADIENT HEAVY -->
+<div>
+<p class="text-[11px] tracking-widest text-white/60 mb-2">V4 — Cover clean, rating chip di bawah pill</p>
+<div class="group flex gap-4 p-3 rounded-2xl border border-amber-400/20 bg-[#1a1300]">
+<a class="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"><img src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg" class="w-full h-full object-cover group-hover:scale-105 transition"><div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div><span class="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-full bg-black/70 backdrop-blur text-white border border-white/20">ikiru</span></a>
+<div class="flex-1 min-w-0 flex flex-col">
+<div class="flex items-center gap-2"><img src="/kr.png" class="w-5 h-3.5 rounded-sm"><h3 class="text-[14px] font-semibold truncate">A Hero Who Does Everything Well</h3></div>
+<p class="text-[11px] text-white/50 line-clamp-2 mt-1.5">Na Kang In membuka matanya...</p>
+<div class="flex flex-wrap gap-1 mt-2"><span class="px-2 py-1 rounded-md text-[11px] bg-emerald-500/15 text-emerald-400">Ch. 88</span><span class="px-2 py-1 rounded-md text-[11px] bg-white/5 text-white/40">Ch. 87 · ikiru</span></div>
+<div class="flex items-center gap-2 mt-2"><span class="text-[11px]">★ 7.50</span><span class="text-[10px] text-white/40">Action · Fantasy · Drama</span></div>
+<div class="mt-auto pt-2"><span class="text-[11px] px-3 py-1 rounded-full bg-amber-400 text-black font-semibold">+ Add WL</span></div>
+</div>
+</div>
+</div>
+
+<!-- V5 — MINIMALISME EKSTREM -->
+<div>
+<p class="text-[11px] tracking-widest text-white/60 mb-2">V5 — Minimal, title doang + 1 pill + verified mini</p>
+<div class="group flex gap-3 p-3 rounded-xl border border-white/5 bg-[#0f0f0f] hover:bg-[#161616]">
+<a class="shrink-0 relative w-20 h-28 rounded-lg overflow-hidden bg-black block"><img src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg" class="w-full h-full object-cover"><span class="absolute top-1.5 left-1.5 text-[8px] font-bold px-1 py-0.5 rounded bg-emerald-500 text-black">IKIRU</span></a>
+<div class="flex-1 min-w-0 flex flex-col justify-center">
+<div class="flex items-center gap-1.5"><img src="/kr.png" class="w-4 h-3 rounded-sm"><h3 class="text-[13px] font-semibold truncate">A Hero Who Does Everything Well</h3></div>
+<p class="text-[10px] text-white/30 mt-0.5">Action · 7.5 ★</p>
+<div class="flex gap-1 mt-2"><span class="px-2 py-1 rounded text-[10px] bg-white/10 text-white/80 border border-white/10">Ch. 88</span></div>
+</div>
+<div class="self-center shrink-0"><span class="text-[10px] px-2 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20">✓</span></div>
+</div>
+</div>
+
+<!-- V6 — DARK GOLD PREMIUM -->
+<div>
+<p class="text-[11px] tracking-widest text-amber-300 mb-2">V6 — Premium gold border + flag bulat</p>
+<div class="group flex gap-4 p-3.5 rounded-2xl border border-amber-400/30 bg-gradient-to-br from-[#1a1608] to-[#0f0f0f] hover:from-[#1f1a0a] hover:to-[#121212]">
+<a class="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block ring-1 ring-amber-400/20"><img src="https://assets.shngm.id/thumbnail/image/c439f599-7280-4669-a8d2-35b93950a579.jpg" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div><span class="absolute top-2 left-2 text-[8px] font-bold px-2 py-1 rounded-full bg-amber-400 text-black">IKIRU</span></a>
+<div class="flex-1 min-w-0 flex flex-col py-1">
+<div class="flex items-center gap-2"><span class="w-5 h-5 rounded-full overflow-hidden shrink-0 ring-1 ring-white/20"><img src="/kr.png" class="w-full h-full object-cover"></span><h3 class="text-[14px] font-semibold truncate">A Hero Who Does Everything Well</h3></div>
+<div class="flex items-center gap-2 mt-1.5"><span class="text-amber-400 text-[11px]">★ 7.50</span><span class="text-[10px] text-white/40">Action · Fantasy · Drama</span><span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10">KR</span></div>
+<p class="text-[11px] text-white/45 line-clamp-2 mt-1.5 border-l-2 border-amber-400/20 pl-2">Na Kang In membuka matanya...</p>
+<div class="flex gap-1 mt-2"><span class="flex-1 text-center py-1.5 rounded-md bg-amber-400 text-black text-xs font-bold">Ch. 88</span><span class="px-2 py-1 rounded-md bg-white/5 text-white/40 text-[11px]">87</span></div>
+<div class="mt-auto pt-2 flex gap-2"><span class="flex-1 text-center py-1 rounded-full bg-white/5 border border-white/10 text-white/60 text-[11px]">+ Add WL</span><span class="px-2 py-1 rounded-full bg-sky-500/15 text-sky-400 text-[11px]">✓ Verified</span></div>
+</div>
+</div>
+</div>
+
+</section>
+
+<footer class="text-[11px] text-white/25 mt-10">Buka <code>http://localhost:3000/mock-cards-v2.html</code> — pilih V0-V6, gue langsung apply ke <code>HomeGroupedCard</code> + <code>recent</code> biar 1:1.</footer>
+</body>
+</html>

@@ -32,7 +32,7 @@ export default function AllTabFilters({
   const hasActive =
     countryFilter !== null || sourceFilter !== null || typeFilter !== null;
   return (
-    <div className="sticky top-[57px] z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 flex flex-col gap-2.5 bg-[var(--gold-bg)]/80 backdrop-blur-xl border-y border-[var(--gold-border)] supports-[backdrop-filter]:bg-black/40">
+    <div className="sticky top-[57px] z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 flex flex-col gap-2.5 bg-black/80 backdrop-blur-xl border-y border-white/8 supports-[backdrop-filter]:bg-black/40">
       {/* Row 1: Country + Source — single horizontal scroll */}
       <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6">
         <div

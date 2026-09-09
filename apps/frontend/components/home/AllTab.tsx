@@ -478,7 +478,7 @@ function AllTabInner() {
                 feed !== "all") ? (
                 <button
                   onClick={resetFilters}
-                  className="inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-full bg-[var(--gold-accent)] text-black font-semibold hover:bg-[var(--gold-accent-hover)] transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-full bg-white text-black font-semibold hover:bg-white/90 transition-colors"
                 >
                   Reset filters
                 </button>
@@ -517,7 +517,7 @@ function AllTabInner() {
                 }
                 className={cn(
                   isDeepMatch &&
-                    "ring-2 ring-[var(--gold-accent)] ring-offset-2 ring-offset-black rounded-xl"
+                    "ring-2 ring-white ring-offset-2 ring-offset-black rounded-xl"
                 )}
               >
                 <GroupedSeriesCard

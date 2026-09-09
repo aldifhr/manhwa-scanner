@@ -20,7 +20,7 @@ export function filterButtonClass(
   return cn(
     "px-3 py-1.5 text-xs font-medium rounded-full transition-colors cursor-pointer border shrink-0 whitespace-nowrap min-h-0 min-w-0",
     active
-      ? "bg-[var(--gold-accent)] text-black border-transparent shadow-[0_2px_10px_var(--gold-accent-soft)]"
+      ? "bg-white text-black border-transparent shadow-[0_2px_10px_rgba(255,255,255,0.08)]"
       : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:border-white/20 hover:bg-white/10"
   );
 }
