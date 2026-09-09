@@ -28,6 +28,7 @@ import { groupChapters, type GroupedSeries } from "@/lib/groupChapters";
 import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
 import { queryKeys, staleTimes } from "@/lib/queryKeys";
 import type { FlatChapter } from "@/components/home/AllTab";
+import { RatingRow } from "@/components/home/seriesShared";
 import { useFeedActions } from "@/components/home/hooks/useFeedActions";
 
 interface FeedResponse {
@@ -147,8 +148,6 @@ function HomeGroupedCard({
   const { readItems, toggleRead } = useReadItems();
   const firstCh = series.chapters[0];
   const firstSource = firstCh?.source ?? null;
-  const firstLbl = firstCh ? getChapterLabel(firstCh as any) : "?";
-  const overlayLabel = firstLbl !== "?" ? `Ch. ${firstLbl}` : null;
   const sLower = (firstSource || "").toLowerCase();
   const pillCls =
     sLower === "shinigami"
@@ -160,20 +159,20 @@ function HomeGroupedCard({
           : "bg-white/90 text-black";
 
   return (
-    <div className="group relative flex gap-4 p-3.5 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] transition-all hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]">
-      {/* Cover — B visual-first */}
+    <div className="group relative flex gap-4 rounded-2xl border border-white/10 bg-[#111111] p-3 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] sm:gap-5 sm:p-4">
+      {/* Cover — visual anchor */}
       <a
         href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"
+        className="relative block h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-black focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-32"
       >
         {coverSrc && !imgErrorFinal ? (
           <>
             <img
               src={coverSrc}
               alt={decodeHtml(series.title)}
-              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
               loading="lazy"
               onError={() => {
                 if (!hasRetried && series.titleKey) {
@@ -186,21 +185,16 @@ function HomeGroupedCard({
                 }
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
             {firstSource && (
-              <span className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md capitalize shadow-sm ${pillCls}`}>
+              <span className={`absolute left-2 top-2 rounded-md px-1.5 py-1 text-[9px] font-bold capitalize shadow-sm ${pillCls}`}>
                 {firstSource}
-              </span>
-            )}
-            {overlayLabel && (
-              <span className="absolute bottom-2 left-2 right-2 text-[11px] font-bold text-white truncate drop-shadow">
-                {overlayLabel}
               </span>
             )}
           </>
         ) : (
           <div
-            className="w-full h-full rounded-xl bg-white/5 flex items-center justify-center"
+            className="flex h-full w-full items-center justify-center rounded-xl bg-white/5"
             title={
               hasRetried ? "Cover expired — fallback also failed" : undefined
             }
@@ -211,18 +205,18 @@ function HomeGroupedCard({
       </a>
 
       {/* Body */}
-      <div className="">
+      <div className="flex min-w-0 flex-1 flex-col py-0.5 sm:py-1">
         <div className="flex items-start gap-2">
           {flag && (
-            <img src={flag} alt={origin} className="w-4 h-4" loading="lazy" />
+            <img src={flag} alt={origin} className="mt-0.5 h-4 w-4 shrink-0" loading="lazy" />
           )}
           <a
             href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="block min-w-0"
+            className="block min-h-0 min-w-0 rounded focus-visible:ring-2 focus-visible:ring-white"
           >
-            <h3 className="text-[14px] sm:text-[15px] font-semibold  text-white group-hover:text-white/80 transition-colors">
+            <h3 className="line-clamp-2 text-[15px] font-semibold leading-tight text-white transition-colors group-hover:text-white/80 sm:text-base">
               {decodeHtml(series.title)}
             </h3>
           </a>
@@ -231,8 +225,15 @@ function HomeGroupedCard({
 
 
 
+        <RatingRow rating={(series as any).rating} genres={(series as any).genres} />
+
+        {/* Description — di bawah judul */}
+        <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-white/55 sm:max-w-2xl">
+          {series.description ? decodeHtml(series.description) : "-"}
+        </p>
+
         {/* Chapter pills — kotak rounded dikit */}
-        <div className="flex flex-wrap gap-1 mt-2">
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
           {series.chapters.slice(0, 4).map((ch) => {
             const label = getChapterLabel(
               ch as unknown as {
@@ -253,7 +254,7 @@ function HomeGroupedCard({
                   ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
                   : src === "voratoon"
                     ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
-                    : "bg-white/10 text-white/80 hover:bg-white/20 border-[var(--gold-border)]";
+                    : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
             return (
               <a
                 key={ch.key}
@@ -276,9 +277,9 @@ function HomeGroupedCard({
                     origin: series.origin,
                   })
                 }
-                className={`inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-md transition-colors ${chipColor}`}
+                className={`inline-flex min-h-0 min-w-0 items-center justify-center rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${chipColor}`}
               >
-                Ch. {label} · {ch.source}
+                Ch. {label}
               </a>
             );
           })}
@@ -298,24 +299,16 @@ function HomeGroupedCard({
                 href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-md bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                className="inline-flex min-h-0 min-w-0 items-center justify-center rounded-md bg-white/10 px-2 py-1 text-[11px] leading-none text-white/80 transition-colors hover:bg-white/20"
               >
                 View Series
               </a>
             )}
         </div>
 
-        {/* Description */}
-        {series.description && (
-          <p className="text-[11px] leading-[1.4] text-white/55 line-clamp-2 mt-1.5">
-            {decodeHtml(series.description)}
-          </p>
-        )}
-
-        {/* Actions — Add WL */}
-        <div className="mt-auto pt-2">
+        <div className="flex items-center justify-between gap-3 pt-3">
           {isWhitelisted ? (
-            <span className="inline-flex items-center text-[11px] px-2.5 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/20">
+            <span className="inline-flex items-center rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-300">
               ✓ Verified
             </span>
           ) : (
@@ -326,7 +319,7 @@ function HomeGroupedCard({
                 onAdd?.();
               }}
               disabled={adding}
-              className="text-[11px] px-3 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] font-semibold transition-colors disabled:opacity-50 min-h-0 min-w-0 shadow-[0_2px_10px_var(--gold-accent-soft)]"
+              className="min-h-0 min-w-0 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-black shadow-[0_2px_10px_rgba(255,255,255,0.08)] transition-colors hover:bg-white/90 disabled:opacity-50"
             >
               {adding ? "..." : "+ Add WL"}
             </button>
@@ -503,7 +496,7 @@ export default function HomePage() {
         ].map(({ icon: Icon, label, value }) => (
           <div
             key={label}
-            className="bg-[var(--gold-surface)] border border-[var(--gold-border)] rounded-xl p-3 sm:p-4 flex items-center gap-3 hover:border-[var(--gold-border-hover)] transition-colors"
+            className="bg-white/5 border border-white/8 rounded-xl p-3 sm:p-4 flex items-center gap-3 hover:border-white/15 transition-colors"
           >
             {isLoading || snapshotLoading ? (
               <>
@@ -515,10 +508,10 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <div className="p-2 rounded-lg bg-[var(--gold-accent-soft)] border border-[var(--gold-border)]">
+                <div className="p-2 rounded-lg bg-white/10 border border-white/8">
                   <Icon
                     size={18}
-                    className="text-[var(--gold-accent)]"
+                    className="text-white"
                     weight="fill"
                   />
                 </div>

@@ -2,19 +2,13 @@
 
 import { useState, memo } from "react";
 import { safeUrl, getChapterLabel } from "@/lib/utils";
+import { decodeHtml } from "@/lib/utils";
 import { ContextMenu } from "@/components/ui/ContextMenu";
 import { useLongPress } from "@/lib/hooks/useLongPress";
 import { useContinueReading } from "@/lib/continueReading";
 import { useReadItems } from "./useReadItems";
-import {
-  SeriesShell,
-  SeriesTitle,
-  GroupedBadgeRow,
-  RatingRow,
-  Synopsis,
-  CardActions,
-  ChapterChips,
-} from "./seriesShared";
+import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
+import { SeriesShell, Synopsis, CardActions, RatingRow } from "./seriesShared";
 
 interface GroupedSeries {
   title: string;
@@ -36,6 +30,7 @@ interface GroupedSeries {
   genres?: string[];
   description?: string | null;
   isWhitelisted: boolean;
+  type?: string | null;
 }
 
 function GroupedSeriesCard({
@@ -51,12 +46,6 @@ function GroupedSeriesCard({
   isPinned,
   onTogglePin,
   isDeepMatch,
-  readCount,
-  totalChapters,
-  isNew,
-  unreadCount,
-  onMarkRead,
-  isSentToDiscord,
 }: {
   series: GroupedSeries;
   isRead: boolean;
@@ -70,24 +59,23 @@ function GroupedSeriesCard({
   isPinned?: boolean;
   onTogglePin?: () => void;
   isDeepMatch?: boolean;
-  readCount: number;
-  totalChapters: number;
+  readCount?: number;
+  totalChapters?: number;
   isNew?: boolean;
   unreadCount?: number;
   onMarkRead?: () => void;
   isSentToDiscord?: boolean;
 }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress((pos) =>
-    setMenu(pos)
-  );
+  const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress((pos) => setMenu(pos));
   const seriesHref = safeUrl(series.seriesUrl) || "#";
   const { trackChapter } = useContinueReading();
-  const { readItems, toggleRead } = useReadItems();
+  const { readItems } = useReadItems();
+  const origin = normalizeOrigin(series.origin);
+  const t = (series.type || "").toLowerCase().trim();
+  const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
 
   const first = series.chapters[0];
-  const lbl = first ? getChapterLabel(first as any) : "?";
-  const overlayLabel = lbl !== "?" ? `Ch. ${lbl}` : `${series.chapters.length} ch`;
   return (
     <>
       <SeriesShell
@@ -97,38 +85,79 @@ function GroupedSeriesCard({
         seriesUrl={seriesHref}
         isRead={isRead}
         overlaySource={first?.source ?? null}
-        overlayLabel={overlayLabel}
+        overlayLabel={null}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onTouchMove={onTouchMove}
-        className={
-          isDeepMatch
-            ? "ring-2 ring-[var(--gold-accent)] ring-offset-2 ring-offset-black"
-            : undefined
-        }
+        className={isDeepMatch ? "ring-2 ring-white ring-offset-2 ring-offset-black" : undefined}
       >
-        <SeriesTitle title={series.title} seriesUrl={seriesHref} />
-        <GroupedBadgeRow
-          source={series.chapters[0]?.source}
-          origin={series.origin}
-          type={(series as unknown as { type?: string | null }).type}
-          count={series.chapters.length}
-          isNew={isNew}
-          isSent={isSentToDiscord}
-        />
+        {/* Title + flag — same as HomeGroupedCard */}
+        <div className="flex min-w-0 items-start gap-2">
+          {flag && <img src={flag} alt={origin} className="mt-0.5 h-4 w-4 shrink-0" loading="lazy" />}
+          <a href={seriesHref} target="_blank" rel="noopener noreferrer" className="block min-h-0 min-w-0 flex-1 rounded focus-visible:ring-2 focus-visible:ring-white">
+            <h3 className="line-clamp-2 text-[15px] font-semibold leading-tight text-white transition-colors group-hover:text-white/80 sm:text-base">
+              {decodeHtml(series.title)}
+            </h3>
+          </a>
+        </div>
+
         <RatingRow rating={series.rating} genres={series.genres} />
-        <ChapterChips
-          chapters={series.chapters}
-          seriesTitle={series.title}
-          seriesTitleKey={series.titleKey}
-          seriesCover={series.cover}
-          seriesUrl={series.seriesUrl}
-          origin={series.origin}
-          trackChapter={trackChapter}
-          readUrls={readItems}
-          onToggleRead={toggleRead}
-        />
+
         <Synopsis text={series.description} />
+
+        {/* Pills — same as HomeGroupedCard: slice 0-4, rounded-md, Ch. only */}
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
+          {series.chapters.slice(0, 4).map((ch) => {
+            const label = getChapterLabel(ch as any);
+            if (label === "?") return null;
+            const href = ch.chapterUrl || ch.url || series.seriesUrl || "#";
+            const src = ch.source?.toLowerCase();
+            const chipColor =
+              src === "shinigami"
+                ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
+                : src === "ikiru"
+                  ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
+                  : src === "voratoon"
+                    ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
+                    : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
+            return (
+              <a
+                key={ch.key}
+                href={safeUrl(href) || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() =>
+                  trackChapter({
+                    title: series.title,
+                    titleKey: series.titleKey,
+                    cover: series.cover,
+                    source: ch.source,
+                    chapter: ch.chapter,
+                    chapterLabel: ch.chapterLabel,
+                    chapterNumber: ch.chapterNumber,
+                    chapterUrl: href !== "#" ? href : ch.chapterUrl || ch.url,
+                    seriesUrl: series.seriesUrl,
+                    origin: series.origin,
+                  })
+                }
+                className={`inline-flex min-h-0 min-w-0 items-center justify-center rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${chipColor}`}
+              >
+                Ch. {label}
+              </a>
+            );
+          })}
+          {series.chapters.every((c) => getChapterLabel(c as any) === "?") && (
+            <a
+              href={seriesHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-0 min-w-0 items-center justify-center rounded-md border border-white/8 bg-white/10 px-2 py-1 text-[11px] leading-none text-white/80 transition-colors hover:bg-white/20"
+            >
+              View Series
+            </a>
+          )}
+        </div>
+
         <CardActions
           isWhitelisted={isWhitelisted}
           isExcluded={isExcluded}
@@ -148,14 +177,8 @@ function GroupedSeriesCard({
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            {
-              label: isRead ? "Mark as unread" : "Mark as read",
-              onClick: onToggleRead,
-            },
-            {
-              label: isPinned ? "Unpin" : "Pin to top",
-              onClick: () => onTogglePin?.(),
-            },
+            { label: isRead ? "Mark as unread" : "Mark as read", onClick: onToggleRead },
+            { label: isPinned ? "Unpin" : "Pin to top", onClick: () => onTogglePin?.() },
           ]}
         />
       )}

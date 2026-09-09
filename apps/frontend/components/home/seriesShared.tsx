@@ -74,9 +74,9 @@ export function SeriesShell({
       aria-label={ariaLabel}
       title={titleAttr}
       className={cn(
-        "group relative rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] transition-all hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]",
+        "group relative rounded-2xl border border-white/10 bg-[#111111] transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)]",
         isRead && "opacity-50",
-        "flex flex-row! gap-4 p-3.5",
+        "flex flex-row! gap-4 p-3 sm:gap-5 sm:p-4",
         className
       )}
     >
@@ -84,7 +84,7 @@ export function SeriesShell({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block focus-visible:ring-2 focus-visible:ring-[var(--gold-accent)]"
+        className="relative block h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-black focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-32"
         title="Open series"
         onClick={(e) => onClick && e.stopPropagation()}
       >
@@ -94,7 +94,7 @@ export function SeriesShell({
           titleKey={titleKey}
           size="lg"
           withRetry
-          className="!w-full !h-full !rounded-none !aspect-auto object-cover group-hover:scale-[1.03] transition-transform duration-500"
+          className="!h-full !w-full !rounded-none !aspect-auto object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
         {overlaySource && (
@@ -102,13 +102,8 @@ export function SeriesShell({
             {overlaySource}
           </span>
         )}
-        {overlayLabel && (
-          <span className="absolute bottom-2 left-2 right-2 text-[11px] font-bold text-white truncate drop-shadow">
-            {overlayLabel}
-          </span>
-        )}
       </a>
-      <div className="flex-1 min-w-0 flex flex-col py-1">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col py-0.5 sm:py-1">{children}</div>
     </Card>
   );
 }
@@ -126,7 +121,7 @@ export function SeriesTitle({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="block focus-visible:ring-2 focus-visible:ring-[var(--gold-accent)] rounded"
+      className="block focus-visible:ring-2 focus-visible:ring-white rounded"
       title="Open series"
     >
       <h3
@@ -163,18 +158,18 @@ export function FlatBadgeRow({
       {chapterLabel !== "?" ? (
         <Badge
           variant="secondary"
-          className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-[var(--gold-border)]"
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/8"
         >
           Ch. {chapterLabel}
         </Badge>
       ) : null}
       {isNew && (
-        <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold-accent-soft)] text-[var(--gold-accent)] border border-[var(--gold-accent-soft)]">
+        <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/10">
           NEW
         </span>
       )}
       {isSent && (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-white/70 border border-[var(--gold-border)]">
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-white/70 border border-white/8">
           <Check size={10} weight="bold" /> Sent
         </span>
       )}
@@ -208,17 +203,17 @@ export function GroupedBadgeRow({
       <OriginFlag origin={origin} type={type} />
       <Badge
         variant="secondary"
-        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-[var(--gold-border)]"
+        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/8"
       >
         {count} ch
       </Badge>
       {isNew && (
-        <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold-accent-soft)] text-[var(--gold-accent)] border border-[var(--gold-accent-soft)]">
+        <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/10">
           NEW
         </span>
       )}
       {isSent && (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-white/70 border border-[var(--gold-border)]">
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-white/70 border border-white/8">
           <Check size={10} weight="bold" /> Sent
         </span>
       )}
@@ -242,10 +237,9 @@ export function RatingRow({
 }
 
 export function Synopsis({ text }: { text?: string | null }) {
-  if (!text) return null;
   return (
     <p className="text-[11px] leading-[1.45] text-white/55 line-clamp-2 mt-1.5">
-      {decodeHtml(text)}
+      {text ? decodeHtml(text) : "-"}
     </p>
   );
 }
@@ -285,7 +279,7 @@ export function CardActions({
             onToggleRead();
           }}
           aria-pressed={isRead}
-          className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/70 hover:text-white hover:bg-white/10 transition-colors min-h-0 min-w-0"
+          className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/8 text-white/70 hover:text-white hover:bg-white/10 transition-colors min-h-0 min-w-0"
         >
           {isRead ? <Check size={13} weight="bold" /> : null}
           {isRead ? "Read" : "Mark read"}
@@ -300,7 +294,7 @@ export function CardActions({
             }}
             disabled={excluding}
             title="Remove from excluded"
-            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 min-h-0 min-w-0"
+            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/8 text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 min-h-0 min-w-0"
           >
             <Eye size={13} weight="bold" /> {excluding ? "..." : "Show"}
           </button>
@@ -312,7 +306,7 @@ export function CardActions({
             }}
             disabled={excluding}
             title="Exclude this title"
-            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 min-h-0 min-w-0"
+            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/8 text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 min-h-0 min-w-0"
           >
             <EyeSlash size={13} weight="bold" /> {excluding ? "..." : "Exclude"}
           </button>
@@ -329,7 +323,7 @@ export function CardActions({
               onAdd();
             }}
             disabled={adding}
-            className="inline-flex items-center gap-1 text-[11px] px-3 py-1 rounded-full bg-[var(--gold-accent)] text-black hover:bg-[var(--gold-accent-hover)] font-semibold transition-colors disabled:opacity-50 ml-auto min-h-0 min-w-0 shadow-[0_2px_10px_var(--gold-accent-soft)]"
+            className="inline-flex items-center gap-1 text-[11px] px-3 py-1 rounded-full bg-white text-black hover:bg-white/90 font-semibold transition-colors disabled:opacity-50 ml-auto min-h-0 min-w-0 shadow-[0_2px_10px_rgba(255,255,255,0.08)]"
           >
             <Plus size={13} weight="bold" /> {adding ? "..." : "Add WL"}
           </button>
@@ -409,7 +403,7 @@ export function ChapterChips({
                 ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
                 : src === "voratoon"
                   ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
-                  : "bg-white/10 text-white/80 hover:bg-white/20 border-[var(--gold-border)]";
+                  : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
           return (
             <span key={ch.key} className="inline-flex items-center gap-1 min-w-0">
               <a
@@ -445,7 +439,7 @@ export function ChapterChips({
                     );
                   }}
                   title={isRead ? "Mark unread" : "Mark read"}
-                  className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full border text-[10px] ${isRead ? "bg-white/10 border-white/20 text-white/60 hover:bg-white/15" : "bg-white/5 border-[var(--gold-border)] text-white/40 hover:text-white hover:bg-white/10"}`}
+                  className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full border text-[10px] ${isRead ? "bg-white/10 border-white/20 text-white/60 hover:bg-white/15" : "bg-white/5 border-white/8 text-white/40 hover:text-white hover:bg-white/10"}`}
                 >
                   {isRead ? <EyeSlash size={12} /> : <Eye size={12} />}
                 </button>
@@ -457,7 +451,7 @@ export function ChapterChips({
       {hiddenCount > 0 && (
         <button
           onClick={() => setExpanded(true)}
-          className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-white/8 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
         >
           +{hiddenCount} more
         </button>
@@ -465,7 +459,7 @@ export function ChapterChips({
       {expanded && chapters.length > 12 && (
         <button
           onClick={() => setExpanded(false)}
-          className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-[var(--gold-border)] text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-white/8 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
         >
           Show less
         </button>
