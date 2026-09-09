@@ -220,3 +220,180 @@ if qlen > 50:
 ## 7. Status
 * BUG dicatat 2026-09-09
 * Solusi 5.1–5.3 siap di-push; 5.5 butuh persetujuan untuk ubah `queue.py` + `queue_dashboard.py` + `cron/page.tsx`.
+
+---
+
+## BUG-4 — 🔴 High — CSRF bypass `SameSite=None` + whitelist `csrf.py:5`
+
+### 1. Deskripsi
+`_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/cron", "/api/v1/reader/whitelist", "/api/v1/whitelist"}` `apps/backend/app/middleware/csrf.py:5` membebaskan `POST /api/v1/whitelist` (`WhitelistCreate` `dashboard/whitelist.py:22`) dan `POST /api/v1/cron` (`enqueue_cron` `app/api/system.py:210` `system.py:181` `cron_trigger`). Kedua route mutasi state (whitelist/dispatch queue) dan cek auth via `ikiru_dashboard_session` cookie `utils/request_auth.py:11` + `auth.py:66` (`_get_session_cookie` cookie/Bearer). Cookie di-set `SameSite=None; Secure; domain=.aldifhr.fun` `app/api/auth.py:68,79`, jadi browser **akan kirim cookie cross-site**. Tanpa `x-csrf-token` (whitelist), `fetch` cross-site dengan `credentials:include` sukses → whitelist poisoning / cron spam.
+
+### 2. Reproduksi
+1. Login `POST /api/auth?action=login {"password": DASHBOARD_PASSWORD}` → `set-cookie: ikiru_dashboard_session=JWT; SameSite=None`.
+2. Dari `https://evil.com`:
+   ```html
+   <form action="https://scanner.aldifhr.fun/api/v1/whitelist" method="POST">
+     <input name='{"title":"pwn","source":"ikiru"}'>
+   </form><script>fetch("https://scanner.aldifhr.fun/api/v1/whitelist",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:"pwn",source:"ikiru"})})</script>
+   ```
+   Request lewat `csrf_middleware` `csrf.py:13` `if _path in _CSRF_WHITELIST: return call_next` → `200` tanpa `x-csrf-token`, padahal route lain butuh `cookie_token==header_token` `csrf.py:17`.
+3. Sama untuk `POST https://scanner.aldifhr.fun/api/cron?action=update` (hanya butuh cookie `monitor` via `require_monitor_auth`, tapi CSRF di-bypass).
+
+### 3. Root Cause
+* `SameSite=None` `auth.py:68,79` memang dibutuhkan untuk cross-subdomain `scanner↔komik` `.aldifhr.fun`, tapi tanpa CSRF jadi CSRF-prone.
+* Whitelist seharusnya hanya untuk `auth`/`interactive` (login tidak butuh CSRF), tapi ditambah `whitelist`/`cron` yang state-changing. `Bearer` bypass `csrf.py:10` benar, tapi cookie path tetap lolos.
+
+### 4. Dampak
+* Cross-site whitelist injection → RSS/dispatch kirim chapter attacker-chosen. Cron `update` spam → `beag:cron` 358 → DoS (sudah terlihat).
+
+### 5. Solusi (tanpa patch sekarang)
+```python
+# csrf.py:5
+_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive"}  # hapus /api/v1/cron, /api/v1/whitelist, /api/v1/reader/whitelist
+```
+* FE sudah kirim `x-csrf-token` via `withCsrf()` `apps/frontend/lib/csrf.ts` + `reader/transport.ts`, jadi tidak break.
+* Alternatif: ubah `SameSite=None` → `Lax` untuk `ikiru_dashboard_session` + tambah `Origin` check di `security_headers_middleware`.
+
+### 6. File terkait
+* `apps/backend/app/middleware/csrf.py:5,13,17`
+* `apps/backend/app/api/auth.py:66,68`
+* `apps/backend/app/api/system.py:181,210`
+* `apps/backend/app/api/dashboard/whitelist.py:22`
+* `apps/backend/app/utils/request_auth.py:11`
+
+### 7. Status
+* Dicatat 2026-09-09 — valid, solusi hapus dari whitelist, patch menunggu approval.
+
+---
+
+## BUG-5 — 🔴 High — Duplicate `DASHBOARD_PASSWORD` (sudah BUG-2)
+Sama dengan `BUG-2` `config.py:58` `DASHBOARD_PASSWORD="manhwascan"` + guard `config.py:152` tidak cek. Lihat `BUG-2` untuk detail & solusi `if not s.DASHBOARD_PASSWORD or s.DASHBOARD_PASSWORD=="manhwascan"`. Tidak ditambah duplikat.
+
+---
+
+## BUG-6 — 🔴 High — `autocommit=True` pecah transaksi `FOR UPDATE SKIP LOCKED` dispatch claims
+
+### 1. Deskripsi
+`apps/backend/app/db_adapter.py:125` `conn.autocommit = True` di `get_conn()` `db_adapter.py:91` agar `READ COMMITTED` tidak stale (`comment 118-123` “frozen snapshot … The Villain Of Destiny”). Tapi `claim_recent_chapters_for_dispatch()` `apps/backend/app/services/claim.py:82` `SELECT ... FOR UPDATE SKIP LOCKED` + `INSERT dispatch_claims` `claim.py:202` (dan `app/storage/dispatch.py:193` `claim_and_record` `get_conn` + `SELECT dispatch_history/claim` + `INSERT`) mengandalkan **satu transaksi**: lock harus di-hold sampai claim tertulis. Dengan `autocommit=True` tiap `cur.execute` langsung `commit`, lock `FOR UPDATE` dilepas segera → dua worker concurrent bisa `claim` chapter sama → double Discord.
+
+### 2. Reproduksi
+1. `psycopg2` default `autocommit=False` → `BEGIN` implisit sampai `commit()`. `db_adapter:get_conn` paksa `True` → tiap `cur.execute(...)` auto-commit.
+2. `claim.py:82` `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 500` → lock rows, tapi `autocommit` → `commit` langsung → lock release.
+3. Worker A & B `blpop` `beag:cron` hampir bersamaan (cron `update` tiap `120s`), keduanya `SELECT ... FOR UPDATE SKIP LOCKED` dapat row sama sebelum `INSERT dispatch_claims` `claim.py:202`, keduanya `INSERT ON CONFLICT fcfs_key DO UPDATE` sukses → `dispatch()` kirim duplikat.
+4. Log `dispatch_claims insert failed` `claim.py:210` + `dispatch_history_uq` race `dispatch.py:397` adalah symptom, bukan guard.
+
+### 3. Root Cause
+* Fix stale snapshot `db_adapter.py:119` pakai `autocommit=True` global, tapi claim butuh `autocommit=False` transaksi.
+* `put_conn` `db_adapter.py:159` tidak `commit/rollback` eksplisit karena `autocommit`, jadi transaksi tidak pernah di-hold.
+
+### 4. Dampak
+* Duplikat notifikasi Discord untuk `shinigami/ikiru` rotate URL (yang di-dedup via `fcfs_key`).
+
+### 5. Solusi (tanpa patch sekarang)
+```python
+# claim.py:79 — setelah get_conn(), matikan autocommit untuk transaksi claim
+conn = get_conn()
+conn.autocommit = False
+cur = conn.cursor()
+try:
+    cur.execute("SELECT ... FOR UPDATE SKIP LOCKED", ...)
+    # ... dedup checks ...
+    cur.execute("INSERT INTO dispatch_claims ...", ...)
+    conn.commit()
+except Exception:
+    conn.rollback(); raise
+finally:
+    conn.autocommit = True; put_conn(conn)
+```
+Sama untuk `app/storage/dispatch.py:197` `claim_and_record`. Alternatif: pakai `with conn:` + `conn.autocommit=False` atau `SELECT ... FOR UPDATE` di `SERIALIZABLE` + `ON CONFLICT DO NOTHING` sebagai guard (sudah ada).
+
+### 6. File terkait
+* `apps/backend/app/db_adapter.py:91,125,118`
+* `apps/backend/app/services/claim.py:82,202,84`
+* `apps/backend/app/storage/dispatch.py:193,269`
+* `apps/backend/app/tasks/lifecycle.py:105` (cron worker concurrency)
+
+### 7. Status
+* Dicatat 2026-09-09 — valid, solusi transaksi, patch menunggu approval.
+
+---
+
+## BUG-7 — 🟡 Medium — Voratoon aktif padahal kontrak `2 source` (ikiru+shinigami)
+
+### 1. Deskripsi
+`config.py:44` `SOURCE_KEYS: list[str] = ["ikiru", "shinigami", "voratoon"]` + comment `config.py:43` `# Only ikiru + shinigami are active sources (user: "cukup 2 sumber aja")`. `collect_recent_chapters()` `apps/backend/app/cron/collect.py:109` loop `for _src in ("ikiru","shinigami","voratoon")` tanpa cek `DISABLED_SOURCES` default `""` `config.py:47`, jadi voratoon tetap di-scrape (`rss-fetch:voratoon` terlihat di `/cron`  `voratoon 2` ), `sourceHealth` `voratoon` `pipeline.py:277`, `enrich_whitelist.py:306` `cover voratoon`.
+
+### 2. Dampak
+* 3 source load padahal user minta 2 → `rss-fetch:voratoon` overhead + `cvr.voratoon.id` presigned expire handling.
+
+### 3. Solusi
+* Opsi A — update kontrak: `config.py:43` comment → `3 sources (ikiru, shinigami, voratoon)` (kalau voratoon memang mau aktif).
+* Opsi B — hormati kontrak 2: `SOURCE_KEYS = ["ikiru","shinigami"]` atau default `DISABLED_SOURCES="voratoon"` `config.py:47`.
+
+### 4. File terkait
+* `apps/backend/app/config.py:43,44`
+* `apps/backend/app/cron/collect.py:109,118`
+* `apps/backend/app/cron/enrich_whitelist.py:306`
+
+### 5. Status
+* Dicatat 2026-09-09 — valid, solusi ubah `SOURCE_KEYS` atau `DISABLED_SOURCES`, patch menunggu approval.
+
+---
+
+## BUG-8 — 🟡 Medium — Whitelist API tolak `JP` padahal backend support `JP`
+
+### 1. Deskripsi
+`WhitelistCreate` `apps/backend/app/api/dashboard/whitelist.py:30` `origin: Optional[Literal["KR","CN"]]`, `WhitelistPatch` `whitelist.py:50` sama — hanya `KR`/`CN`. BE `normalize_origin` support `JP` (manga), `rss_service.py:118` `origin`, `recent_chapters` `origin JP`. Valid entry Jepang → `422 validation_error`.
+
+### 2. Reproduksi
+```bash
+curl -X POST /api/v1/whitelist -H "Authorization: Bearer $TOKEN" -d '{"title":"One Piece","source":"ikiru","origin":"JP"}'
+# → 422 {"error":"validation_error","details":[{"loc":["body","origin"],"msg":"Input should be 'KR' or 'CN'"}]}
+```
+
+### 3. Solusi
+```python
+# dashboard/whitelist.py:30,50
+origin: Optional[Literal["KR","CN","JP"]] = None
+```
+* Migas: `whitelist` `origin` column sudah `TEXT` tanpa check, tidak butuh migrasi.
+
+### 4. File terkait
+* `apps/backend/app/api/dashboard/whitelist.py:30,50`
+
+### 5. Status
+* Dicatat 2026-09-09 — valid, patch `Literal` menunggu approval.
+
+---
+
+## BUG-9 — 🟡 Medium — Default RSS filter buang `NULL` origin (bertentangan Python)
+
+### 1. Deskripsi
+`apps/backend/app/api/rss.py:111` default `if not origin_f and not exclude_origin: exclude_origin="JP"` (maksudnya sembunyikan JP). SQL `apps/backend/app/services/rss_service.py:70,84` (`exclude_notified` path) + Python fallback `rss.py` → `SELECT ... WHERE origin <> 'JP'` / `origin != 'JP'` `rss_service.py:72` `WHERE rc.origin != %s` dan `recent_chapters` `origin IS NULL` rows → di SQL `NULL <> 'JP'` = `UNKNOWN` → baris ter-filter (hilang). Python `build_filter` `apps/backend/app/services/rss_query.py:109` `if exclude_origin and o in [...]` dengan `o=(it.get("origin") or "").upper()` → `""` `not in ["JP"]` → **ditampilkan**. Jadi `NULL` origin (unknown) muncul di Python path tapi hilang di SQL path → `/rss` dan `/rss/custom` tidak konsisten.
+
+### 2. Reproduksi
+Insert `recent_chapters` dengan `origin=NULL` → `GET /api/v1/rss` (default `exclude_origin=JP`, SQL path `exclude_notified=false` → `rss_service.py:50` `neq`) → row hilang. `GET /api/v1/rss?exclude_notified=true` (SQL `rss_service.py:72`) juga hilang. Bandingkan `build_filter` langsung → row kept.
+
+### 3. Root Cause
+* Komentar `rss.py:110` `ponytail: NULL/unknown origin not excluded — "" not in ["JP"]` benar untuk Python, tapi SQL `<>` tidak handle `NULL`.
+* `rss_service.py:72` comment juga `was mis-labeling CN manhua as KR` tapi tidak fix `NULL`.
+
+### 4. Solusi
+```sql
+-- rss_service.py:72 (dan rss.py via builder neq)
+WHERE (rc.origin <> %s OR rc.origin IS NULL)
+-- atau
+WHERE COALESCE(rc.origin,'') <> %s
+-- atau SQL standard
+WHERE rc.origin IS DISTINCT FROM %s  -- NULL-safe <>
+```
+Untuk builder `db_adapter.py:210` `neq` bisa tambah `OR IS NULL` atau `COALESCE`. Python sudah benar.
+
+### 5. File terkait
+* `apps/backend/app/api/rss.py:108,110`
+* `apps/backend/app/services/rss_service.py:51,70,72`
+* `apps/backend/app/services/rss_query.py:109`
+* `apps/backend/app/db_adapter.py:210` `neq`
+
+### 6. Status
+* Dicatat 2026-09-09 — valid, solusi `IS DISTINCT FROM`/`OR IS NULL`, patch menunggu approval.
