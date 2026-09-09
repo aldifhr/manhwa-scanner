@@ -11,7 +11,7 @@ Next.js Frontend + FastAPI Backend — `openapi.json` synced, `komik.aldifhr.fun
 | Role   | Login                                                                               | Bisa                                                                                                                                                          |
 | ------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `anon` | —                                                                                   | Lihat `Home` `/`, `Recent` `/recent`, `Bookmarks` (localStorage), `Operational` dot di nav                                                                    |
-| `admin`| `POST /api/v1/auth?action=login` `{password: DASHBOARD_PASSWORD}` → `ikiru_dashboard_session` (JWT) | `anon` + `bookmark`/`continueReading` sync DB `chapter_bookmarks` per `session_hash` + `add/remove whitelist`, `exclude`, `dispatch`/`send notif`, `GET /admin`, `/whitelist`, `/exclude-list`, `/dispatch-history` |
+| `admin`| `POST /api/v1/auth?action=login` `{password: DASHBOARD_PASSWORD}` → `ikiru_dashboard_session` (JWT) | `anon` + `bookmark`/`continueReading` sync DB `chapter_bookmarks` per `session_hash` + `add/remove whitelist` (per-source `title_key:source`), `exclude` per-source (`useFeedActions.ts` + `AllTab.tsx` `9bf130d`), `dispatch`/`send notif`, `GET /admin`, `/whitelist`, `/exclude-list` (group `ikiru`/`shinigami`/`voratoon`/`all` legacy), `/dispatch-history` |
 
 Semua endpoint mutasi (`POST/DELETE /whitelist`, `POST /excluded-titles`, `POST /api/cron`) butuh `ikiru_dashboard_session` (admin). Tanpa login → `401` / `302 /login`.
 
@@ -19,7 +19,8 @@ Semua endpoint mutasi (`POST/DELETE /whitelist`, `POST /excluded-titles`, `POST 
 
 - Public `GET`: `/`, `/recent`, `/bookmarks` (anon local), `GET /api/v1/reader/rss`, `/api/v1/dashboard/snapshot` (`Operational` dot), `GET /whitelist` (Home badge)
 - Protected `GET`: `/whitelist`, `/exclude-list`, `/dispatch-history`, `/admin`, `/status` → butuh login (`302 /login`)
-- Mutating: `POST /whitelist`, `POST /excluded-titles` → butuh login (`401` kalau anon)
+- Mutating: `POST /whitelist` (per-source), `POST /excluded-titles` (per-source `ikiru`/`shinigami`/`voratoon`, legacy `all` = block semua source) + `POST /excluded-titles/bulk` (bulk per source) → butuh login (`401` kalau anon)
+- **Exclude per-source** (`9bf130d`): tombol Exclude di Home/AllTab kirim `source=item.source` (bukan `all`); `optimisticExcluded` key `titleKey:source` (`useFeedActions.ts:26`) + filter `AllTab.tsx:163` per-source; `/exclude-list` group by `source` (`ikiru` sky / `shinigami` violet / `voratoon` gray / `all` amber legacy); `is_excluded` cek `(tk,source)` or `(tk,all)` `app/storage/excluded_titles.py:87` — legacy `all` tetap hide semua source sampai di-migrasi
 
 ## Dev
 
