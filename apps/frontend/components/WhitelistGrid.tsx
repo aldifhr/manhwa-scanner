@@ -33,6 +33,21 @@ export function WhitelistGrid() {
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [sort, setSort] = useState<"title" | "rating" | "recent">("recent");
 
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const debouncedCatalogSearch = useDebounced(catalogSearch, 400);
+  const { data: catalogResults } = useQuery({
+    queryKey: ["catalog-search", debouncedCatalogSearch],
+    queryFn: () => Reader.searchCatalog(debouncedCatalogSearch),
+    enabled: debouncedCatalogSearch.length > 0,
+    staleTime: 30_000,
+  });
+
+  const { data: badgeCounts } = useQuery({
+    queryKey: ["reader-badge-counts"],
+    queryFn: Reader.getReaderBadgeCounts,
+    staleTime: 60_000,
+  });
+
   const items = data ?? [];
   const filtered = useWhitelistFilters(items, {
     sourceFilter,
@@ -98,8 +113,45 @@ export function WhitelistGrid() {
     );
   }
 
+  const badges = (badgeCounts ?? {}) as Record<string, number>;
+  const catalogItems = Array.isArray(catalogResults) ? catalogResults : [];
+  const isCatalogSearching = debouncedCatalogSearch.length > 0;
+
   return (
     <div className="space-y-4">
+      {/* Catalog search */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <MagnifyingGlass
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+          />
+          <input
+            type="text"
+            placeholder="Search catalog..."
+            value={catalogSearch}
+            onChange={(e) => setCatalogSearch(e.target.value)}
+            data-search-input="catalog"
+            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
+          />
+        </div>
+
+        {/* Badge counts */}
+        {Object.keys(badges).length > 0 && (
+          <div className="flex items-center gap-2">
+            {Object.entries(badges).map(([key, count]) => (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-accent/10 text-accent border border-accent/20"
+              >
+                <span className="capitalize">{key.replaceAll("_", " ")}</span>
+                <span className="font-mono font-semibold">{count}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <CompactSearchInput value={searchTerm} onChange={setSearchTerm} />
       </div>
@@ -180,6 +232,52 @@ export function WhitelistGrid() {
           {filtered.length} / {items.length}
         </span>
       </div>
+
+      {/* Catalog results */}
+      {isCatalogSearching && catalogItems.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wide">
+            Catalog results ({catalogItems.length})
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {catalogItems.map((item, i) => {
+              const c = item as Record<string, unknown>;
+              return (
+                <div
+                  key={`catalog-${i}-${String(c.id ?? c.title ?? i)}`}
+                  className="rounded-lg border border-border bg-surface p-2 hover:ring-1 hover:ring-accent transition-colors"
+                >
+                  {c.coverImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={String(c.coverUrl ?? c.cover_image_url ?? c.coverImageUrl)}
+                      alt={String(c.title ?? "")}
+                      className="w-full aspect-[3/4] object-cover rounded mb-2"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[3/4] rounded bg-white/5 mb-2 flex items-center justify-center">
+                      <MagnifyingGlass size={20} className="text-white/20" />
+                    </div>
+                  )}
+                  <p className="text-xs text-text truncate">
+                    {String(c.title ?? "Untitled")}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {isCatalogSearching && catalogItems.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <EmptyState
+            icon={<MagnifyingGlass />}
+            message="No catalog results"
+            subMessage={`Nothing found for "${debouncedCatalogSearch}"`}
+          />
+        </div>
+      )}
 
       {/* Grid */}
       {filtered.length === 0 ? (

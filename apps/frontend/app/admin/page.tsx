@@ -2,6 +2,7 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
+import { Reader } from "@/lib/reader";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -57,6 +58,17 @@ export default function AdminDashboard() {
     mutationFn: async () => readerFetch<{ success: boolean }>("/api/v1/logs/errors", { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-errors"] }); setMsg("Logs cleared"); setTimeout(() => setMsg(null), 2000); },
     onError: (e) => setMsg((e as Error).message.slice(0, 120)),
+  });
+
+  const { data: failedQueue } = useQuery({
+    queryKey: ["admin-failed-queue"],
+    queryFn: Reader.getFailedDispatchesQueue,
+    refetchInterval: 30000,
+  });
+  const { data: sourcesHealth } = useQuery({
+    queryKey: ["admin-sources-health"],
+    queryFn: Reader.getSourcesHealth,
+    refetchInterval: 30000,
   });
 
   const cronRun = useMutation({
@@ -259,6 +271,54 @@ export default function AdminDashboard() {
               </div>
             )) ?? <p className="text-sm text-white/40">No sources</p>}
           </div>
+        </div>
+
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Sources Health</h3>
+          {(() => {
+            const sh = sourcesHealth as any;
+            if (!sh || (Array.isArray(sh) && sh.length === 0) || (!Array.isArray(sh) && Object.keys(sh).length === 0)) {
+              return <p className="text-xs text-white/40">No data</p>;
+            }
+            const items = Array.isArray(sh) ? sh : sh.sources ?? Object.entries(sh).map(([name, v]: [string, any]) => ({ name, ...v }));
+            return (
+              <div className="space-y-2">
+                {items.map((s: any) => (
+                  <div key={s.name} className="flex items-center justify-between gap-3 bg-black/20 rounded-lg p-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === "healthy" ? "bg-emerald-500" : s.status === "degraded" ? "bg-amber-400" : "bg-red-500"}`} />
+                      <span className="text-sm font-medium capitalize truncate">{s.name}</span>
+                    </div>
+                    <span className="text-xs text-white/50">
+                      {s.errorRate24h?.toFixed?.(1) ?? 0}% err • {s.consecutiveFailures ?? 0} fail
+                    </span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Failed Dispatches Queue</h3>
+          {(() => {
+            const fq = failedQueue as any;
+            if (!fq || (Array.isArray(fq) && fq.length === 0) || (!Array.isArray(fq) && !fq.items?.length && !fq.length)) {
+              return <p className="text-xs text-white/40">No pending failures</p>;
+            }
+            const items = Array.isArray(fq) ? fq : fq.items ?? [];
+            return (
+              <div className="space-y-2 max-h-64 overflow-auto">
+                {items.map((r: any) => (
+                  <div key={r.id} className="flex items-center gap-2 text-xs bg-black/20 rounded-lg p-2">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/60 uppercase">{r.source}</span>
+                    <span className="truncate flex-1">{r.title} — {r.chapter}</span>
+                    <span className="text-white/40 hidden sm:inline truncate max-w-[160px]">{r.error?.slice(0, 80)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="space-y-2">
