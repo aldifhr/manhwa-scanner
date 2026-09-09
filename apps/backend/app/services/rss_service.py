@@ -69,7 +69,7 @@ async def fetch_rss_data(
                 _params.append(origin_f.upper())
             if exclude_origin:
                 for _o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
-                    _where.append("rc.origin != %s")  # ponytail: NULL origin not excluded — upgrade to `(rc.origin != %s OR rc.origin IS NULL)` if DB strips NULLs (build_filter uses "" so shown)
+                    _where.append("(rc.origin != %s OR rc.origin IS NULL)")  # ponytail: NULL origin not excluded — upgrade to `(rc.origin != %s OR rc.origin IS NULL)` if DB strips NULLs (build_filter uses "" so shown)
                     _params.append(_o)
             if type_f:
                 _where.append("rc.type = %s")

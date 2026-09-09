@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
     VORATOON_API_URL: str = "https://api.voratoon.com"
     SHINIGAMI_PUBLIC_URL: str = ""
-    # Only ikiru + shinigami are active sources (user: "cukup 2 sumber aja").
+    # 3 sources (ikiru, shinigami, voratoon) are active
     SOURCE_KEYS: list[str] = ["ikiru", "shinigami", "voratoon"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     # e.g. DISABLED_SOURCES=ikiru focuses collection on shinigami only.

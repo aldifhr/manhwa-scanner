@@ -28,7 +28,7 @@ class WhitelistCreate(BaseModel):
     titleKey: Optional[str] = Field(default=None, max_length=200)
     cover: Optional[str] = Field(default=None, max_length=2000)
     rating: Optional[float | str] = None
-    origin: Optional[Literal["KR", "CN"]] = None
+    origin: Optional[Literal["KR", "CN", "JP"]] = None
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
@@ -48,7 +48,7 @@ class WhitelistPatch(BaseModel):
     series_url: Optional[str] = Field(default=None, max_length=500)
     rating: Optional[float | str] = None
     cover: Optional[str] = Field(default=None, max_length=2000)
-    origin: Optional[Literal["KR", "CN"]] = None
+    origin: Optional[Literal["KR", "CN", "JP"]] = None
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
