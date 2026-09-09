@@ -77,6 +77,13 @@ def query_errors(
         return {"results": [], "total": 0, "page": 1, "pageSize": page_size, "totalPages": 1, "hasMore": False}
 
 
+def clear_all() -> int:
+    try:
+        res = get_supabase().table("error_logs").delete().neq("id", 0).execute()
+        return len(res.data or [])
+    except Exception as e:
+        logger.warn("clear_all failed", err=str(e)[:200])
+        return 0
 def delete_older_than(days: int = 30) -> int:
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()

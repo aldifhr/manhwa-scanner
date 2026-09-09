@@ -39,16 +39,20 @@ async def clear_errors(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
-        from app.storage.error_logs import delete_older_than
+        from app.storage.error_logs import delete_older_than, clear_all
 
-        days_raw = request.query_params.get("days", "30")
-        try:
-            days = int(days_raw)
-        except Exception:
-            days = 30
-        days = max(1, min(365, days))
-        deleted = delete_older_than(days=days)
-        return JSONResponse(content={"success": True, "data": {"deleted": deleted, "days": days}})
+        clear_all_flag = (request.query_params.get("clear_all") or "").lower() == "true"
+        if clear_all_flag:
+            deleted = clear_all()
+        else:
+            days_raw = request.query_params.get("days", "30")
+            try:
+                days = int(days_raw)
+            except Exception:
+                days = 30
+            days = max(1, min(365, days))
+            deleted = delete_older_than(days=days)
+        return JSONResponse(content={"success": True, "deleted": deleted})
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
 

@@ -32,7 +32,7 @@ export default function ErrorLogsPage() {
   const queryClient = useQueryClient();
   const clearMutation = useMutation({
     mutationFn: async () => {
-      await readerFetch("/api/v1/logs/errors", { method: "DELETE" });
+      await readerFetch("/api/v1/logs/errors?clear_all=true", { method: "DELETE" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["error-logs"] });

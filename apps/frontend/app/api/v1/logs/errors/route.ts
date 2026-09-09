@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const target = `${backendUrl()}/api/v1/logs/errors`;
+    const url = new URL(request.url);
+    const qs = url.searchParams.toString();
+    const target = `${backendUrl()}/api/v1/logs/errors${qs ? `?${qs}` : ""}`;
     const res = await fetch(target, {
       method: "DELETE",
       headers: authHeaders(request),
