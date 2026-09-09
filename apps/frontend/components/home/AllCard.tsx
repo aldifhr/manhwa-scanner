@@ -110,6 +110,8 @@ function AllCard({
         titleKey={item.titleKey}
         seriesUrl={seriesHref}
         isRead={isRead}
+        overlaySource={item.source}
+        overlayLabel={lbl !== "?" ? `Ch. ${lbl}` : null}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onTouchMove={onTouchMove}

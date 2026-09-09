@@ -89,8 +89,8 @@ function ContinueReadingCard({
     string,
     infer V
   >
-    ? V
-    : never;
+  ? V
+  : never;
 }) {
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
@@ -108,7 +108,7 @@ function ContinueReadingCard({
           </div>
           <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black via-black/70 to-transparent pt-6 p-2.5">
             <p className="text-[11px] font-bold tracking-wide text-white">
-              Ch. {entry.lastChapter}
+              Ch. {getChapterLabel({ chapterLabel: entry.lastChapter }) !== "?" ? getChapterLabel({ chapterLabel: entry.lastChapter }) : entry.lastChapter}
             </p>
           </div>
         </div>
@@ -145,36 +145,62 @@ function HomeGroupedCard({
   const [imgErrorFinal, setImgErrorFinal] = useState(false);
   const { trackChapter } = useContinueReading();
   const { readItems, toggleRead } = useReadItems();
+  const firstCh = series.chapters[0];
+  const firstSource = firstCh?.source ?? null;
+  const firstLbl = firstCh ? getChapterLabel(firstCh as any) : "?";
+  const overlayLabel = firstLbl !== "?" ? `Ch. ${firstLbl}` : null;
+  const sLower = (firstSource || "").toLowerCase();
+  const pillCls =
+    sLower === "shinigami"
+      ? "bg-red-500 text-white"
+      : sLower === "ikiru"
+        ? "bg-emerald-500 text-black"
+        : sLower === "voratoon"
+          ? "bg-orange-500 text-white"
+          : "bg-white/90 text-black";
 
   return (
-    <div className="group relative flex gap-4 p-4 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] transition-all hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]">
-      {/* Cover */}
+    <div className="group relative flex gap-4 p-3.5 rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] transition-all hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]">
+      {/* Cover — B visual-first */}
       <a
         href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0"
+        className="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block"
       >
         {coverSrc && !imgErrorFinal ? (
-          <img
-            src={coverSrc}
-            alt={decodeHtml(series.title)}
-            className="w-16 sm:w-20 h-24 sm:h-28 object-cover rounded-lg bg-white/5 ring-1 ring-white/10"
-            loading="lazy"
-            onError={() => {
-              if (!hasRetried && series.titleKey) {
-                setCoverSrc(
-                  `/api/v1/reader/cover?series=${encodeURIComponent(series.titleKey)}`
-                );
-                setHasRetried(true);
-              } else {
-                setImgErrorFinal(true);
-              }
-            }}
-          />
+          <>
+            <img
+              src={coverSrc}
+              alt={decodeHtml(series.title)}
+              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+              loading="lazy"
+              onError={() => {
+                if (!hasRetried && series.titleKey) {
+                  setCoverSrc(
+                    `/api/v1/reader/cover?series=${encodeURIComponent(series.titleKey)}`
+                  );
+                  setHasRetried(true);
+                } else {
+                  setImgErrorFinal(true);
+                }
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
+            {firstSource && (
+              <span className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md capitalize shadow-sm ${pillCls}`}>
+                {firstSource}
+              </span>
+            )}
+            {overlayLabel && (
+              <span className="absolute bottom-2 left-2 right-2 text-[11px] font-bold text-white truncate drop-shadow">
+                {overlayLabel}
+              </span>
+            )}
+          </>
         ) : (
           <div
-            className="w-16 sm:w-20 h-24 sm:h-28 rounded-lg bg-white/5 ring-1 ring-white/10 flex items-center justify-center"
+            className="w-full h-full rounded-xl bg-white/5 flex items-center justify-center"
             title={
               hasRetried ? "Cover expired — fallback also failed" : undefined
             }
@@ -185,19 +211,27 @@ function HomeGroupedCard({
       </a>
 
       {/* Body */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <a
-          href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block"
-        >
-          <h3 className="text-[14px] sm:text-[15px] font-semibold leading-snug truncate text-white group-hover:text-white/80 transition-colors">
-            {decodeHtml(series.title)}
-          </h3>
-        </a>
+      <div className="">
+        <div className="flex items-start gap-2">
+          {flag && (
+            <img src={flag} alt={origin} className="w-4 h-4" loading="lazy" />
+          )}
+          <a
+            href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block min-w-0"
+          >
+            <h3 className="text-[14px] sm:text-[15px] font-semibold  text-white group-hover:text-white/80 transition-colors">
+              {decodeHtml(series.title)}
+            </h3>
+          </a>
+        </div>
 
-        {/* Chapter pills — rounded-full, Ch. X · source */}
+
+
+
+        {/* Chapter pills — kotak rounded dikit */}
         <div className="flex flex-wrap gap-1 mt-2">
           {series.chapters.slice(0, 4).map((ch) => {
             const label = getChapterLabel(
@@ -242,7 +276,7 @@ function HomeGroupedCard({
                     origin: series.origin,
                   })
                 }
-                className={`inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-full transition-colors ${chipColor}`}
+                className={`inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-md transition-colors ${chipColor}`}
               >
                 Ch. {label} · {ch.source}
               </a>
@@ -260,15 +294,15 @@ function HomeGroupedCard({
                 }
               ) === "?"
           ) && (
-            <a
-              href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
-            >
-              View Series
-            </a>
-          )}
+              <a
+                href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center text-[11px] leading-none px-2 py-1 rounded-md bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+              >
+                View Series
+              </a>
+            )}
         </div>
 
         {/* Description */}
@@ -277,83 +311,6 @@ function HomeGroupedCard({
             {decodeHtml(series.description)}
           </p>
         )}
-
-        {/* Chapter chips — per source */}
-        <div className="flex gap-1.5 flex-wrap mt-1.5">
-          {series.chapters.map((ch) => {
-            const label = getChapterLabel(
-              ch as unknown as {
-                chapterLabel?: string | null;
-                chapterNumber?: number | string | null;
-                chapter?: string | null;
-                url?: string | null;
-                chapterUrl?: string | null;
-              }
-            );
-            if (label === "?") return null;
-            const href = ch.chapterUrl || ch.url || series.seriesUrl || "#";
-            const src = ch.source?.toLowerCase();
-            const chipColor =
-              src === "shinigami"
-                ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
-                : src === "ikiru"
-                  ? "bg-green-500/15 text-green-400 hover:bg-green-500/25"
-                  : src === "voratoon"
-                    ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
-                    : "bg-white/10 text-white/80 hover:bg-white/20";
-            return (
-              <span key={ch.key} className="inline-flex items-center gap-1">
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() =>
-                    trackChapter({
-                      title: series.title,
-                      titleKey: series.titleKey,
-                      cover: series.cover,
-                      source: ch.source,
-                      chapter:
-                        (ch as unknown as { chapter?: string }).chapter ??
-                        ch.chapterLabel,
-                      chapterLabel: ch.chapterLabel,
-                      chapterNumber: ch.chapterNumber,
-                      chapterUrl: href !== "#" ? href : ch.chapterUrl || ch.url,
-                      seriesUrl: series.seriesUrl,
-                      origin: series.origin,
-                    })
-                  }
-                  title={`${ch.source} · Ch. ${label}`}
-                  className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md transition-colors whitespace-nowrap ${chipColor}`}
-                >
-                  <span className="capitalize">{ch.source}</span>
-                  Ch. {label}
-                </a>
-              </span>
-            );
-          })}
-          {series.chapters.every(
-            (c) =>
-              getChapterLabel(
-                c as unknown as {
-                  chapterLabel?: string | null;
-                  chapterNumber?: number | string | null;
-                  chapter?: string | null;
-                  url?: string | null;
-                  chapterUrl?: string | null;
-                }
-              ) === "?"
-          ) && (
-            <a
-              href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md bg-white/10 text-white/80 hover:bg-white/20 transition-colors whitespace-nowrap"
-            >
-              View Series
-            </a>
-          )}
-        </div>
 
         {/* Actions — Add WL */}
         <div className="mt-auto pt-2">
@@ -464,7 +421,7 @@ export default function HomePage() {
     if (deferredResults.length === 0) return [];
     const isGrouped =
       typeof (deferredResults[0] as Record<string, unknown>)?.chapters !==
-        "undefined" &&
+      "undefined" &&
       Array.isArray((deferredResults[0] as { chapters?: unknown[] })?.chapters);
     if (isGrouped) return deferredResults as unknown as GroupedSeries[];
     return groupChapters(deferredResults as unknown as FlatChapter[]);
@@ -504,7 +461,7 @@ export default function HomePage() {
               Clear all
             </button>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory justify-start">
             {sortedContinueReading.map((entry, i) => (
               <motion.div
                 key={entry.titleKey}
@@ -538,9 +495,9 @@ export default function HomePage() {
             label: "Last Update",
             value: latestTimestamp
               ? new Date(latestTimestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "Manual",
           },
         ].map(({ icon: Icon, label, value }) => (
@@ -646,7 +603,7 @@ export default function HomePage() {
                 isWhitelisted={isWL}
                 adding={adding}
                 onAdd={() => handleAddGroup(s)}
-                />
+              />
             );
           }}
         />
@@ -675,7 +632,7 @@ export default function HomePage() {
                   isWhitelisted={isWL}
                   adding={adding}
                   onAdd={() => handleAddGroup(series)}
-                    />
+                />
               </motion.div>
             );
           })}

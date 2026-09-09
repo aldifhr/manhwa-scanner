@@ -8,7 +8,7 @@ interface CoverProps {
   src: string | null | undefined;
   alt: string;
   titleKey?: string | null;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
   withRetry?: boolean; // shinigami fallback via /api/reader/cover?series=
 }
@@ -17,6 +17,8 @@ const sizeClass: Record<NonNullable<CoverProps["size"]>, string> = {
   sm: "w-16 sm:w-20 h-24 sm:h-28",
   md: "w-20 h-28",
   lg: "w-full aspect-3/4",
+  // B visual-first
+  xl: "w-24 sm:w-28 h-36 sm:h-40",
 };
 
 export function Cover({

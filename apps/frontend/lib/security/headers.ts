@@ -8,13 +8,15 @@ export function getCsp(isDev: boolean): string {
   const scriptSrc = isDev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
     : "script-src 'self' 'unsafe-inline'";
+  const connectExtra = isDev ? " ws://localhost:* wss://localhost:* http://localhost:*" : "";
   return [
     "default-src 'self'",
     scriptSrc, // Next.js App Router needs inline RSC hydration; dev needs unsafe-eval for HMR
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: https:",
+    "img-src 'self' data: https: blob:",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://scanner.aldifhr.fun https://manhwa.aldifhr.fun",
+    // connect-src: 'self' + scanner + image CDNs (sw.js fetch() counts as connect-src, not img-src)
+    `connect-src 'self' https://scanner.aldifhr.fun https://manhwa.aldifhr.fun https://fe.aldifhr.fun https://assets.shngm.id https://*.shngm.id https://*.shinigami.asia https://shinigami.asia https://*.ikiru.wtf https://ikiru.wtf https://*.voratoon.id https://voratoon.com https://imgkc1.my.id https://minio.imgkc1.my.id https://cvr.voratoon.id https:${connectExtra} wss: ws: blob:`,
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",

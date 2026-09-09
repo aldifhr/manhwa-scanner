@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "minio.imgkc1.my.id" },
       { protocol: "https", hostname: "cvr.voratoon.id" },
       { protocol: "https", hostname: "voratoon.com" },
+      { protocol: "https", hostname: "assets.shngm.id" },
+      { protocol: "https", hostname: "*.shngm.id" },
+      { protocol: "https", hostname: "shinigami.asia" },
+      { protocol: "https", hostname: "*.shinigami.asia" },
     ],
   },
 
@@ -34,6 +38,9 @@ const nextConfig: NextConfig = {
       { source: "/api/v1/health/refresh-voratoon", destination: "https://scanner.aldifhr.fun/api/v1/health/refresh-voratoon" },
       { source: "/api/v1/auth/:path*", destination: "https://scanner.aldifhr.fun/api/v1/auth/:path*" },
       { source: "/api/v1/auth", destination: "https://scanner.aldifhr.fun/api/v1/auth" },
+      { source: "/api/v1/continue-reading/:path*", destination: "https://scanner.aldifhr.fun/api/v1/continue-reading/:path*" },
+      { source: "/api/v1/reader/badge-counts", destination: "https://scanner.aldifhr.fun/api/v1/reader/badge-counts" },
+      { source: "/api/v1/catalog/badge-counts", destination: "https://scanner.aldifhr.fun/api/v1/catalog/badge-counts" },
       // Legacy compat — deleted duplicate route files now served via rewrites (no duplicate handler)
       { source: "/api/auth/:path*", destination: "/api/v1/auth/:path*" },
       {

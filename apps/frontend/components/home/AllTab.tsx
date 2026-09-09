@@ -437,15 +437,6 @@ function AllTabInner() {
         groupMode={groupMode}
         toggleGroupMode={toggleGroupMode}
       />
-      <div className="flex justify-end -mt-1">
-        <button
-          onClick={() => setFilterOpen(true)}
-          className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white min-h-0 min-w-0"
-        >
-          Filters{" "}
-          {genreFilter || minRating || whitelistOnly ? "•" : ""}
-        </button>
-      </div>
       <FilterDrawer open={filterOpen} onClose={() => setFilterOpen(false)} />
       <AllTabFilters
         sources={sources}

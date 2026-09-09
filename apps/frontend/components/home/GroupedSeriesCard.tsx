@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
-import { safeUrl } from "@/lib/utils";
+import { safeUrl, getChapterLabel } from "@/lib/utils";
 import { ContextMenu } from "@/components/ui/ContextMenu";
 import { useLongPress } from "@/lib/hooks/useLongPress";
 import { useContinueReading } from "@/lib/continueReading";
@@ -85,6 +85,9 @@ function GroupedSeriesCard({
   const { trackChapter } = useContinueReading();
   const { readItems, toggleRead } = useReadItems();
 
+  const first = series.chapters[0];
+  const lbl = first ? getChapterLabel(first as any) : "?";
+  const overlayLabel = lbl !== "?" ? `Ch. ${lbl}` : `${series.chapters.length} ch`;
   return (
     <>
       <SeriesShell
@@ -93,6 +96,8 @@ function GroupedSeriesCard({
         titleKey={series.titleKey}
         seriesUrl={seriesHref}
         isRead={isRead}
+        overlaySource={first?.source ?? null}
+        overlayLabel={overlayLabel}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         onTouchMove={onTouchMove}

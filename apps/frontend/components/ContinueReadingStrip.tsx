@@ -4,54 +4,80 @@ import { BookOpen } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { useContinueReading } from "@/lib/continueReading";
-import { decodeHtml } from "@/lib/utils";
+import type { ContinueReadingEntry } from "@/lib/continueReading";
+import { decodeHtml, getChapterLabel, rewriteCoverUrl } from "@/lib/utils";
+import { motion } from "framer-motion";
 
-interface ContinueReadingEntry {
-  titleKey: string;
-  title: string;
-  cover: string | null;
-  source: string;
-  lastChapter: string;
-  chapterUrl: string;
-  updatedAt: string;
+function CoverImage({ src, alt }: { src: string | null; alt: string }) {
+  if (!src) {
+    return (
+      <div className="w-full aspect-3/4 rounded-xl cover-placeholder flex items-center justify-center bg-surface border border-white/6">
+        <BookOpen size={24} className="text-white/30" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={rewriteCoverUrl(src) || src}
+      alt={alt}
+      className="w-full aspect-3/4 object-cover bg-surface group-hover:scale-[1.03] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+      loading="lazy"
+    />
+  );
+}
+
+function SourcePill({ source }: { source: string }) {
+  const s = source?.toLowerCase();
+  const cls =
+    s === "shinigami"
+      ? "bg-red-500/15 text-red-400 border-red-500/20"
+      : s === "ikiru"
+        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
+        : s === "voratoon"
+          ? "bg-orange-500/15 text-orange-400 border border-orange-500/20"
+          : "bg-white/10 text-white/80 border-white/10";
+  return (
+    <span
+      className={`text-[10px] font-semibold px-2.5 py-1 rounded-full capitalize backdrop-blur-md border shadow-sm ${cls}`}
+    >
+      {source}
+    </span>
+  );
 }
 
 function ContinueReadingCard({ entry }: { entry: ContinueReadingEntry }) {
+  const label = getChapterLabel({ chapterLabel: entry.lastChapter });
+  const displayLabel = label === "?" ? entry.lastChapter : label;
   return (
-    <a
-      href={entry.chapterUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group shrink-0 w-36 sm:w-44 relative"
-    >
-      <div className="relative overflow-hidden rounded-xl border border-white/8 hover:border-white/15 bg-surface">
-        {entry.cover ? (
-          <img
-            src={entry.cover}
-            alt={decodeHtml(entry.title)}
-            className="w-full aspect-3/4 object-cover bg-surface group-hover:scale-[1.03] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full aspect-3/4 rounded-xl cover-placeholder flex items-center justify-center bg-surface border border-white/6">
-            <BookOpen size={24} className="text-white/30" />
+    <div className="group shrink-0 w-36 sm:w-44 relative">
+      <a
+        href={entry.chapterUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block"
+      >
+        <div className="relative overflow-hidden rounded-xl card-hover border border-white/8 hover:border-white/15 bg-surface">
+          <CoverImage src={entry.cover} alt={decodeHtml(entry.title)} />
+          <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+          <div className="absolute top-2.5 left-2.5">
+            <SourcePill source={entry.source} />
           </div>
-        )}
-        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black via-black/70 to-transparent pt-6 p-2.5">
-          <p className="text-[11px] font-bold tracking-wide text-white">
-            Ch. {entry.lastChapter}
-          </p>
+          <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black via-black/70 to-transparent pt-6 p-2.5">
+            <p className="text-[11px] font-bold tracking-wide text-white">
+              Ch. {displayLabel}
+            </p>
+          </div>
         </div>
-      </div>
+      </a>
       <div className="mt-2.5 px-1">
         <h3 className="text-xs sm:text-[13px] font-semibold leading-snug text-white line-clamp-2 min-h-[2.2rem] group-hover:text-white/80 transition-colors">
           {decodeHtml(entry.title)}
         </h3>
         <p className="text-[10px] text-white/45 mt-1 tracking-wide">
-          {entry.source}
+          {entry.origin ? `${entry.origin} • ${entry.source}` : entry.source}
         </p>
       </div>
-    </a>
+    </div>
   );
 }
 
@@ -87,9 +113,16 @@ export default function ContinueReadingStrip() {
           Clear all
         </button>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-        {sortedEntries.map((entry) => (
-          <ContinueReadingCard key={entry.titleKey} entry={entry} />
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory justify-start">
+        {sortedEntries.map((entry, i) => (
+          <motion.div
+            key={entry.titleKey}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.04, duration: 0.25 }}
+          >
+            <ContinueReadingCard entry={entry} />
+          </motion.div>
         ))}
       </div>
     </div>

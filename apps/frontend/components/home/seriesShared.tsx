@@ -30,6 +30,8 @@ export function SeriesShell({
   ariaLabel,
   titleAttr,
   className,
+  overlaySource,
+  overlayLabel,
 }: {
   cover: string;
   title: string;
@@ -47,8 +49,19 @@ export function SeriesShell({
   ariaLabel?: string;
   titleAttr?: string;
   className?: string;
+  overlaySource?: string | null;
+  overlayLabel?: string | null;
 }) {
   const href = safeUrl(seriesUrl) || "#";
+  const s = (overlaySource || "").toLowerCase();
+  const pillCls =
+    s === "shinigami"
+      ? "bg-red-500 text-white"
+      : s === "ikiru"
+        ? "bg-emerald-500 text-black"
+        : s === "voratoon"
+          ? "bg-orange-500 text-white"
+          : "bg-white/90 text-black";
   return (
     <Card
       onTouchStart={onTouchStart}
@@ -63,7 +76,7 @@ export function SeriesShell({
       className={cn(
         "group relative rounded-2xl border border-[var(--gold-border)] bg-[var(--gold-surface)] transition-all hover:border-[var(--gold-border-hover)] hover:bg-[var(--gold-surface-hover)] hover:-translate-y-[1px] hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)]",
         isRead && "opacity-50",
-        "flex flex-row! gap-3 sm:gap-4 p-3 sm:p-4",
+        "flex flex-row! gap-4 p-3.5",
         className
       )}
     >
@@ -71,7 +84,7 @@ export function SeriesShell({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--gold-accent)] rounded-lg"
+        className="shrink-0 relative w-24 sm:w-28 h-36 sm:h-40 rounded-xl overflow-hidden bg-black block focus-visible:ring-2 focus-visible:ring-[var(--gold-accent)]"
         title="Open series"
         onClick={(e) => onClick && e.stopPropagation()}
       >
@@ -79,11 +92,23 @@ export function SeriesShell({
           src={cover}
           alt={title}
           titleKey={titleKey}
-          size="md"
+          size="lg"
           withRetry
+          className="!w-full !h-full !rounded-none !aspect-auto object-cover group-hover:scale-[1.03] transition-transform duration-500"
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none" />
+        {overlaySource && (
+          <span className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-1 rounded-md capitalize shadow-sm ${pillCls}`}>
+            {overlaySource}
+          </span>
+        )}
+        {overlayLabel && (
+          <span className="absolute bottom-2 left-2 right-2 text-[11px] font-bold text-white truncate drop-shadow">
+            {overlayLabel}
+          </span>
+        )}
       </a>
-      <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      <div className="flex-1 min-w-0 flex flex-col py-1">{children}</div>
     </Card>
   );
 }
