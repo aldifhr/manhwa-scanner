@@ -1,7 +1,7 @@
 "use client";
 
 import { PageShell } from "@/components/PageShell";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
 import { useState } from "react";
 
@@ -29,6 +29,16 @@ export default function ErrorLogsPage() {
     },
   });
 
+  const queryClient = useQueryClient();
+  const clearMutation = useMutation({
+    mutationFn: async () => {
+      await readerFetch("/api/v1/logs/errors", { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["error-logs"] });
+    },
+  });
+
   return (
     <PageShell>
       <div className="space-y-4">
@@ -46,6 +56,13 @@ export default function ErrorLogsPage() {
               className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white"
             >
               Refresh
+            </button>
+            <button
+              onClick={() => clearMutation.mutate()}
+              disabled={clearMutation.isPending}
+              className="text-sm px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 disabled:opacity-50"
+            >
+              {clearMutation.isPending ? "Clearing…" : "Clear All"}
             </button>
           </div>
         </div>
