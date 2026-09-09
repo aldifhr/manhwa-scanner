@@ -266,6 +266,27 @@ async def clear_pending(request: Request):
     except Exception as e:
         logger.warn("clear_pending failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+
+
+@router.delete("/api/v1/queue/cron")
+async def clear_cron_queue(request: Request):
+    """Clear all jobs from the cron queue."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+
+    try:
+        from app.tasks import _get_redis, CRON_QUEUE_KEY
+
+        r = _get_redis()
+        count = r.llen(CRON_QUEUE_KEY) or 0
+        r.delete(CRON_QUEUE_KEY)
+
+        return JSONResponse(content={"success": True, "data": {"deleted": count}})
+    except Exception as e:
+        logger.warn("clear_cron_queue failed", err=str(e)[:120])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+
+
 async def clear_dlq(request: Request):
     """Clear all jobs from dead letter queue."""
     if not require_monitor_auth(request):

@@ -29,14 +29,21 @@ def _get_redis():
 
 
 def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
-    """Push a cron pipeline job onto the Redis cron queue."""
+    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload."""
     payload: dict = {"action": action}
     if source:
         payload["source"] = source
     if title:
         payload["title"] = title
+    payload_json = json.dumps(payload)
     try:
-        _get_redis().rpush(CRON_QUEUE_KEY, json.dumps(payload))
+        r = _get_redis()
+        # ponytail: O(n) scan of cron queue for dedup, use Redis SET if n > 1000
+        existing = r.lrange(CRON_QUEUE_KEY, 0, -1) or []
+        if payload_json in existing:
+            logger.info("cron job already in queue, skipping", action=action, source=source)
+            return
+        r.rpush(CRON_QUEUE_KEY, payload_json)
         logger.info("enqueued cron job", action=action, source=source)
     except Exception as e:
         _role = (os.environ.get("ROLE") or "api").lower()

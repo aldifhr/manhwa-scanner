@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     FASTCRON_API_KEY: str = ""  # Legacy — either secret works
     MONITOR_AUTH_TOKEN: str = ""
     # Single shared password — replaces admin/member model (ponytail: one env, no roles)
-    DASHBOARD_PASSWORD: str = "manhwascan"
+    DASHBOARD_PASSWORD: str = ""
     # JWT session-cookie secret for /api/auth login.
     # MUST be set explicitly — never defaults to MONITOR_AUTH_TOKEN (which is
     # exposed in query strings). Boot guard in _validate_settings enforces this.
@@ -159,6 +159,8 @@ def _validate_settings(s: "Settings") -> None:
         missing.append("DATABASE_URL")
     if not s.DISCORD_BOT_TOKEN:
         missing.append("DISCORD_BOT_TOKEN")
+    if not s.DASHBOARD_PASSWORD:
+        missing.append("DASHBOARD_PASSWORD")
     if missing:
         raise RuntimeError(
             "BOOT GUARD: production environment missing required secrets: "

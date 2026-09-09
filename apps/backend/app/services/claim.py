@@ -77,6 +77,11 @@ def claim_recent_chapters_for_dispatch(
     conn = None
     try:
         conn = get_conn()
+        # BUG-6: autocommit=True (set in db_adapter.get_conn) releases the
+        # FOR UPDATE SKIP LOCKED row lock immediately after SELECT, so two
+        # concurrent workers can claim the same chapter → duplicate Discord.
+        # Disable autocommit so the lock holds until conn.commit().
+        conn.autocommit = False
         cur = conn.cursor()
         cur.execute(
             "SELECT * FROM recent_chapters WHERE updated_time >= %s ORDER BY id DESC LIMIT %s FOR UPDATE SKIP LOCKED",
