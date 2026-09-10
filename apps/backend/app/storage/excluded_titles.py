@@ -133,6 +133,33 @@ def add_excluded_title(
             pass
         return {"status": "ok", "title_key": tk, "source": src}
     except Exception as e:
+        # Fallback if migration 065 not yet applied live (column missing) — retry without new cols
+        if "reason" in str(e) or "is_completed" in str(e):
+            try:
+                payload2 = {"title_key": tk, "source": src}
+                if title is not None:
+                    payload2["title"] = title
+                if cover is not None:
+                    payload2["cover"] = cover
+                if series_url is not None:
+                    payload2["series_url"] = series_url
+                # encode completed as title prefix fallback until migration lands
+                if is_completed and title is not None:
+                    payload2["title"] = f"[COMPLETED] {title}"
+                get_supabase().table("excluded_titles").upsert(
+                    payload2, on_conflict="title_key,source"
+                ).execute()
+                _CACHE_TS = 0.0
+                try:
+                    from app.api import rss as _rss_mod
+                    _rss_mod.invalidate_rss_cache()
+                except Exception:
+                    pass
+                logger.warn("add_excluded_title fallback without reason/is_completed (migration pending)", err=str(e)[:120])
+                return {"status": "ok", "title_key": tk, "source": src, "fallback": True}
+            except Exception as e2:
+                logger.error("add_excluded_title fallback failed", exc=e2)
+                return {"status": "error", "error": "internal error"}
         logger.error("add_excluded_title failed", exc=e)
         return {"status": "error", "error": "internal error"}
 

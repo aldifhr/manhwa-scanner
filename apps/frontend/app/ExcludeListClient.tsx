@@ -31,7 +31,8 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 function StatusBadge({ it }: { it: ExcludedTitleItem }) {
-  const isCompleted = it.isCompleted || it.reason === "completed" || (it as unknown as { is_completed?: boolean }).is_completed;
+  const raw = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
+  const isCompleted = raw.isCompleted || raw.reason === "completed" || raw.is_completed || (raw.title || "").startsWith("[COMPLETED]");
   if (isCompleted) {
     return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">Completed</span>;
   }
@@ -65,7 +66,8 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
       }
       if (sourceFilter !== "All" && (it.source || "all") !== sourceFilter)
         return false;
-      const isCompleted = it.isCompleted || it.reason === "completed" || (it as unknown as { is_completed?: boolean }).is_completed;
+      const raw = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
+      const isCompleted = raw.isCompleted || raw.reason === "completed" || raw.is_completed || (raw.title || "").startsWith("[COMPLETED]");
       if (statusFilter === "Completed" && !isCompleted) return false;
       if (statusFilter === "Excluded" && isCompleted) return false;
       return true;
@@ -234,11 +236,17 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
     }
   };
 
-  // counts for tabs
+  // counts for tabs — also handle fallback [COMPLETED] title prefix before migration
   const counts = {
     all: items.length,
-    excluded: items.filter((it) => !((it as unknown as { reason?: string; isCompleted?: boolean }).reason === "completed" || (it as unknown as { isCompleted?: boolean }).isCompleted)).length,
-    completed: items.filter((it) => (it as unknown as { reason?: string; isCompleted?: boolean }).reason === "completed" || (it as unknown as { isCompleted?: boolean }).isCompleted).length,
+    excluded: items.filter((it) => {
+      const r = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
+      return !(r.reason === "completed" || r.isCompleted || r.is_completed || (r.title || "").startsWith("[COMPLETED]"));
+    }).length,
+    completed: items.filter((it) => {
+      const r = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
+      return r.reason === "completed" || r.isCompleted || r.is_completed || (r.title || "").startsWith("[COMPLETED]");
+    }).length,
   };
 
   return (
