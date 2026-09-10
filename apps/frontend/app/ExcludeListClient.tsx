@@ -264,18 +264,7 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
         )}
       </div>
 
-      {/* Status tabs — All / Excluded / Completed (completed = also excluded from RSS) */}
-      <div className="flex gap-1.5">
-        {(["All", "Excluded", "Completed"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${statusFilter === s ? "bg-white text-black border-white" : "bg-surface border-border text-text-muted hover:text-text hover:border-white/15"}`}
-          >
-            {s} {s === "All" ? `(${counts.all})` : s === "Completed" ? `(${counts.completed})` : `(${counts.excluded})`}
-          </button>
-        ))}
-      </div>
+
 
       {/* Search + bulk-exclude */}
       <div className="flex flex-wrap items-center gap-2">
