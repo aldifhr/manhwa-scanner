@@ -117,7 +117,7 @@ export const Reader = {
   },
   getRssFlat: (
     page = 1,
-    limit = 1000,
+    limit = 100,
     opts: {
       exclude?: string;
       whitelist?: boolean;
@@ -389,7 +389,7 @@ export const Reader = {
   // Page-wise seam for AllTab infinite scroll — hides snake→camel + hasMore logic
   async getRssFlatPage(
     page: number,
-    limit = 1000,
+    limit = 100,
     opts: {
       exclude?: string;
       whitelist?: boolean;

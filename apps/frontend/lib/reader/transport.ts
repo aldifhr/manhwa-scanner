@@ -31,10 +31,10 @@ export async function paginatedGet<T>(
   fetchImpl: FetchImpl = fetch
 ): Promise<T[]> {
   const pageSize = Number(
-    params.get("page_size") ?? params.get("limit") ?? 1000
+    params.get("page_size") ?? params.get("limit") ?? 100
   );
-  if (pageSize > 1000) {
-    params.set(params.has("page_size") ? "page_size" : "limit", "1000");
+  if (pageSize > 100) {
+    params.set(params.has("page_size") ? "page_size" : "limit", "100");
     const first = await readerFetch<{
       success: boolean;
       data: { results: unknown[]; totalPages?: number; total_pages?: number };
@@ -48,7 +48,7 @@ export async function paginatedGet<T>(
     const fetchers = Array.from({ length: totalPages - 1 }, (_, i) => () => {
       const p = new URLSearchParams(params);
       p.set("page", String(i + 2));
-      p.set(params.has("page_size") ? "page_size" : "limit", "1000");
+      p.set(params.has("page_size") ? "page_size" : "limit", "100");
       return readerFetch<{ success: boolean; data: { results: unknown[] } }>(
         `${basePath}?${p}`,
         signal ? { signal } : undefined,

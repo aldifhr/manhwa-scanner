@@ -16,7 +16,7 @@ export const queryKeys = {
     [
       "rss-feed-flat",
       exclude ?? "",
-      limit ?? 1000,
+      limit ?? 100,
       source ?? "all",
       whitelist,
       type ?? "all",

@@ -12,14 +12,9 @@ import { useToast } from "@/lib/useToast";
 import type { FlatChapter } from "@/lib/feed";
 import { compareFlatByNewest, chapterKey } from "@/lib/feed";
 
-// Initial load fetches the whole 24h window in one shot (backend caps the
-// SQL fetch at 1000 rows, our volume is ~327 chapters / ~250 series, so a
-// single page-1 request returns everything). This avoids the old behaviour
-// where only page 1 (limit 60) rendered and the header count fell back to
-// that truncated slice — making the UI report "26 series / 31 chapters"
-// instead of the real ~250. Infinite-scroll loadMore stays as a safety valve
-// for the rare case total exceeds 1000.
-const PAGE_SIZE = 1000;
+// ponytail: public /rss hard cap 100 (was 1000) — so first page is 100, rest via infinite scroll
+// 24h volume ~327 chapters still fits in 4 pages; was single 1000 fetch before P1 hardening.
+const PAGE_SIZE = 100;
 
 export function useInfiniteFeed(opts: {
   sourceFilter: string | null;

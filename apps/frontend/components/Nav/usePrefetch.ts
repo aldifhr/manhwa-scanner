@@ -16,8 +16,8 @@ export function usePrefetch() {
         break;
       case "/recent":
         qc.prefetchQuery({
-          queryKey: queryKeys.rssFeedFlat(undefined, 1000, null, false),
-          queryFn: () => Reader.getRssFlatPage(1, 1000, {}),
+          queryKey: queryKeys.rssFeedFlat(undefined, 100, null, false),
+          queryFn: () => Reader.getRssFlatPage(1, 100, {}),
           staleTime: staleTimes.rss,
         });
         break;

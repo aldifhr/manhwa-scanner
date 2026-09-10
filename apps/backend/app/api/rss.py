@@ -80,7 +80,7 @@ async def rss_reader(request: Request):
 
 # ponytail: public endpoint hardening — whitelist query params + limit cap 100 to prevent Python-side group/filter blowup on varied q=?
 _ALLOWED_RSS_PARAMS = {
-    "page", "limit", "group",
+    "page", "limit", "group", "format",
     "source", "sources", "origin", "origins",
     "exclude", "exclude_origin",
     "q", "type", "genres", "min_rating", "max_rating",
