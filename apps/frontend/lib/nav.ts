@@ -5,7 +5,6 @@ import {
   EyeSlash,
   Clock,
   ChartBar,
-  CheckCircle,
 } from "@phosphor-icons/react";
 
 /** Central nav definition — single source for Navbar + mobile bottom nav */
@@ -14,7 +13,6 @@ export const NAV = [
   { href: "/recent", label: "Recent", icon: Compass },
   { href: "/whitelist", label: "Whitelist", icon: Books } as const,
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash } as const,
-  { href: "/completed", label: "Completed", icon: CheckCircle } as const,
   { href: "/dispatch-history", label: "History", icon: Clock } as const,
 ] as const;
 
