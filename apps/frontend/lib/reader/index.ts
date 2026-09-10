@@ -95,7 +95,7 @@ export const Reader = {
         pageSize: number;
         totalPages: number;
       };
-    }>(`/api/v1/dispatch-history?${p}`);
+    }>(`/api/v1/reader/dispatch-history?${p}`);
     const d = data.data as {
       results: unknown[];
       total: number;
@@ -415,7 +415,7 @@ export const Reader = {
         totalPages: number;
         hasMore: boolean;
       };
-    }>(`/api/v1/rss?${p}`);
+    }>(`/api/v1/reader/rss?${p}`);
     const d = data.data;
     const results = (d?.results ?? []).map(mapRss) as Record<string, unknown>[];
     const totalPages =

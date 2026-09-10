@@ -43,7 +43,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
             except (ValueError, TypeError):
                 pass
         _chn = _parse_chapter_num(ch_str)
-        _ceil = latest_sent.get((str(title or ""), "shinigami"), latest_sent.get((slugify_title_key(title or ""), "shinigami"), 0))
+        _ceil = latest_sent.get((slugify_title_key(title or ""), "shinigami"), 0)
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
         # ponytail: origin CN=manhua KR=manhwa — enforce sync (was CN/manhwa mismatch)

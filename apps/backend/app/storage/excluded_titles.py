@@ -20,7 +20,7 @@ from typing import Optional
 
 from app.db import get_supabase
 from app.logger import get_logger
-from app.utils.text import normalize_title_key
+from app.utils.text import slugify_title_key
 
 logger = get_logger("storage:excluded-titles")
 
@@ -65,7 +65,7 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
             )
             keys: set[tuple[str, str]] = set()
             for r in (rows.data or []):
-                tk = normalize_title_key(str(r.get("title_key") or ""))
+                tk = slugify_title_key(str(r.get("title_key") or ""))
                 src = _norm_source(str(r.get("source") or "all"))
                 if tk:
                     keys.add((tk, src))
@@ -80,7 +80,7 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
 
 def is_excluded(title_key: str, source: str) -> bool:
     """True if title_key is excluded for `source` OR for 'all'."""
-    tk = normalize_title_key(title_key)
+    tk = slugify_title_key(title_key)
     if not tk:
         return False
     keys = load_excluded_keys()
@@ -101,7 +101,7 @@ def add_excluded_title(
     reason: 'excluded' (manual hide) vs 'completed' (tamat). Both filtered dari RSS.
     is_completed: true = TAMAT badge di /recent. ponytail: 2 kolom tapi 1 semantics, keep both for idx + legacy.
     """
-    tk = normalize_title_key(title_key)
+    tk = slugify_title_key(title_key)
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
@@ -166,7 +166,7 @@ def add_excluded_title(
 
 def remove_excluded_title(title_key: str, source: str = "all") -> dict:
     """Delete an excluded-title row."""
-    tk = normalize_title_key(title_key)
+    tk = slugify_title_key(title_key)
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
@@ -251,7 +251,7 @@ def exclude_all_by_source(source: str) -> dict:
         )
         seen: dict[str, dict] = {}
         for r in (rows.data or []):
-            tk = normalize_title_key(str(r.get("title_key") or ""))
+            tk = slugify_title_key(str(r.get("title_key") or ""))
             if tk and tk not in seen:
                 seen[tk] = {
                     "title": str(r.get("title") or "").strip(),
@@ -271,7 +271,7 @@ def exclude_all_by_source(source: str) -> dict:
                     .execute()
                 )
                 for m in (meta.data or []):
-                    tk = normalize_title_key(str(m.get("title_key") or ""))
+                    tk = slugify_title_key(str(m.get("title_key") or ""))
                     if tk in seen and not seen[tk]["title"]:
                         t = str(m.get("title") or "").strip()
                         if t:

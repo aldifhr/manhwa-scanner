@@ -295,6 +295,9 @@ export function useFeedActions() {
         bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
       }
       const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
+      // ponytail: sync guard — prevent concurrent duplicate exclude for same series
+      for (const k of distinctKeys) if (pendingKeys.current.has(k)) throw new Error("Duplicate request");
+      for (const k of distinctKeys) pendingKeys.current.add(k);
       const excl = excludedRef.current;
       const isExcl = distinctKeys.length > 0 && distinctKeys.every((k) => excl.has(k) || excl.has(`${k.split(":")[0]}:all`));
       if (isExcl) {
@@ -343,7 +346,19 @@ export function useFeedActions() {
     },
     onError: (err) =>
       toast(err instanceof Error ? err.message : "Failed to exclude", "error"),
-    onSettled: () => setExcludingKey(null),
+    onSettled: (_data, _err, vars) => {
+      setExcludingKey(null);
+      if (vars) {
+        const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
+        for (const c of vars.chapters as unknown as { titleKey: string; source: string; seriesUrl: string }[]) {
+          if (!c.source) continue;
+          const s = c.source.toLowerCase();
+          if (!bySource.has(s)) bySource.set(s, { titleKey: c.titleKey || vars.titleKey, seriesUrl: c.seriesUrl || vars.seriesUrl });
+        }
+        if (bySource.size === 0 && vars.titleKey) bySource.set("all", { titleKey: vars.titleKey, seriesUrl: vars.seriesUrl });
+        for (const [s, v] of bySource) pendingKeys.current.delete(`${v.titleKey}:${s}`);
+      }
+    },
   });
 
   // Completed = tamat + exclude from RSS — ponytail: reuse excluded_titles with reason=completed
@@ -400,6 +415,9 @@ export function useFeedActions() {
       }
       if (bySource.size === 0 && series.titleKey) bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
       const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
+      // ponytail: sync guard — prevent concurrent duplicate complete for same series
+      for (const k of distinctKeys) if (pendingKeys.current.has(`c:${k}`)) throw new Error("Duplicate request");
+      for (const k of distinctKeys) pendingKeys.current.add(`c:${k}`);
       const comp = completedRef.current;
       const isComp = distinctKeys.length > 0 && distinctKeys.every((k) => comp.has(k) || comp.has(`${k.split(":")[0]}:all`) || comp.has(k.split(":")[0]));
       if (isComp) {
@@ -430,7 +448,19 @@ export function useFeedActions() {
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
     },
     onError: (err) => toast(err instanceof Error ? err.message : "Failed to mark as completed", "error"),
-    onSettled: () => setCompletingKey(null),
+    onSettled: (_data, _err, vars) => {
+      setCompletingKey(null);
+      if (vars) {
+        const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
+        for (const c of vars.chapters as unknown as { titleKey: string; source: string; seriesUrl: string }[]) {
+          if (!c.source) continue;
+          const s = c.source.toLowerCase();
+          if (!bySource.has(s)) bySource.set(s, { titleKey: c.titleKey || vars.titleKey, seriesUrl: c.seriesUrl || vars.seriesUrl });
+        }
+        if (bySource.size === 0 && vars.titleKey) bySource.set("all", { titleKey: vars.titleKey, seriesUrl: vars.seriesUrl });
+        for (const [s, v] of bySource) pendingKeys.current.delete(`c:${v.titleKey}:${s}`);
+      }
+    },
   });
 
   const addCb = useCallback((item: FlatChapter) => addMutation.mutate(item), [addMutation]);

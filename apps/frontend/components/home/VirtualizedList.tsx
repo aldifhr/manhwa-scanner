@@ -163,11 +163,17 @@ export default function VirtualizedList<T>({
     >
       {virtualItems.map((vi) => {
         const rowItems = rows[vi.index] ?? [];
-        // ponytail: stable row key from first item's titleKey when available, else virtualizer index
+        // ponytail: stable row key — prefer chapter key (c.key/chapterKey) for flat mode, fallback to titleKey for grouped — no index
+        const first = rowItems[0] as unknown as Record<string, unknown> | undefined;
+        const chapterRowKey =
+          (first?.key as string) ||
+          (first?.chapterKey as string) ||
+          (first?.titleKey && first?.source && (first?.chapterUrl || first?.url || first?.chapter)
+            ? `${first.titleKey}:${first.source}:${(first.chapterUrl as string) || (first.url as string) || (first.chapter as string)}`
+            : "");
         const rowKey =
-          titleKeyOf && rowItems[0]
-            ? `${titleKeyOf(rowItems[0] as T)}-${vi.index}`
-            : String(vi.key);
+          chapterRowKey ||
+          (titleKeyOf && rowItems[0] ? titleKeyOf(rowItems[0] as T) : String(vi.key));
         return (
           <div
             key={rowKey}
@@ -182,7 +188,14 @@ export default function VirtualizedList<T>({
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {rowItems.map((it, k) => {
                   const realIndex = vi.index * effectiveChunk + k;
-                  const itemKey = titleKeyOf ? titleKeyOf(it) || String(realIndex) : String(realIndex);
+                  const c = it as unknown as Record<string, unknown>;
+                  const chapterKey =
+                    (c.key as string) ||
+                    (c.chapterKey as string) ||
+                    (c.titleKey && c.source
+                      ? `${c.titleKey}:${c.source}:${(c.chapterUrl as string) || (c.url as string) || (c.chapter as string) || ""}`
+                      : "");
+                  const itemKey = chapterKey || (titleKeyOf ? titleKeyOf(it) : "") || String(realIndex);
                   return <div key={itemKey}>{renderItem(it, realIndex)}</div>;
                 })}
               </div>

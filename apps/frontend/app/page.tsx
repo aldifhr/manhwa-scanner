@@ -40,9 +40,9 @@ interface FeedResponse {
   };
 }
 
-async function fetchFeed(): Promise<FeedResponse> {
+async function fetchFeed(opts?: { signal?: AbortSignal }): Promise<FeedResponse> {
   // Flat + client groupChapters — server grouped (?group=true) missing chapter numbers for ikiru (Ch. ?), so force flat
-  const res = await fetch("/api/v1/reader/rss?limit=36&group=false", { credentials: "include" });
+  const res = await fetch("/api/v1/reader/rss?limit=36&group=false", { credentials: "include", signal: opts?.signal });
   if (!res.ok) throw new Error(`Feed fetch failed: ${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -358,10 +358,11 @@ export default function HomePage() {
   const [isPending, startTransition] = useTransition();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.homeFeed,
-    queryFn: fetchFeed,
+    queryFn: ({ signal }) => fetchFeed({ signal }),
     staleTime: staleTimes.rss,
     gcTime: 300_000,
     placeholderData: keepPreviousData,
+    retry: false,
   });
 
   const { optimisticWhitelist, optimisticExcluded, addingKey, handleAddGroup } = useFeedActions();

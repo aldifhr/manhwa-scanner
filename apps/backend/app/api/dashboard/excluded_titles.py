@@ -15,6 +15,7 @@ from typing import Optional
 
 from app.logger import get_logger
 from app.storage import excluded_titles as excl_store
+from app.utils.text import slugify_title_key
 from app.utils.request_auth import require_monitor_auth, safe_error, int_safe
 from app.config import VALID_SOURCES
 from app.services.audit import log_action, AuditAction
@@ -189,7 +190,7 @@ async def post_excluded(request: Request):
             if isinstance(ve, _VE):
                 return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
             raise
-        title_key = data.title_key.strip()
+        title_key = slugify_title_key(data.title_key.strip())
         title = data.title
         source = data.source or "all"
         cover = data.cover
@@ -240,7 +241,7 @@ async def delete_excluded(request: Request):
             if isinstance(ve, _VE):
                 return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
             raise
-        title_key = data.title_key.strip()
+        title_key = slugify_title_key(data.title_key.strip())
         source = data.source or "all"
         res = excl_store.remove_excluded_title(title_key=title_key, source=source)
         if res.get("status") == "error":

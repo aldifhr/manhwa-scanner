@@ -57,13 +57,14 @@ def collect_recent_chapters(
         from app.db import get_supabase as _gsb_ls
         _wl_ls = _gsb_ls().table("whitelist").select("title_key, source, latest_sent_chapter").execute()
         for _w in (_wl_ls.data or []):
-            _tk = _w.get("title_key") or ""
+            _tk = slugify_title_key(_w.get("title_key") or "")
             _src = _w.get("source") or ""
             try:
                 _ls = float(_w.get("latest_sent_chapter") or 0)
             except (ValueError, TypeError):
                 _ls = 0
-            _latest_sent[(_tk, _src)] = max(_latest_sent.get((_tk, _src), 0), _ls)
+            if _tk:
+                _latest_sent[(_tk, _src)] = max(_latest_sent.get((_tk, _src), 0), _ls)
     except Exception as _e:
         logger.warn("collect: load latest_sent_chapter failed", err=str(_e)[:160])
 
@@ -96,7 +97,7 @@ def collect_recent_chapters(
                 for _it in items:
                     _tk = _it.get("title_key", "") or _it.get("title", "")
                     if _tk:
-                        _exclude_keys.add(normalize_title_key(_tk))
+                        _exclude_keys.add(slugify_title_key(_tk))
                 _src_items = _collect_ikiru_source(_latest_sent, _disabled, fetch_meta, exclude_keys=_exclude_keys)
             elif src == "shinigami":
                 _src_items = _collect_shinigami_source(_latest_sent, _disabled, fetch_meta)
@@ -166,7 +167,7 @@ def collect_recent_chapters(
 
     try:
         from app.storage import excluded_titles as excl_store
-        from app.utils.text import normalize_title_key, slugify_title_key as _ntk_c
+        from app.utils.text import slugify_title_key as _ntk_c
         _excl = excl_store.load_excluded_keys()
         if _excl:
             _before = len(items)

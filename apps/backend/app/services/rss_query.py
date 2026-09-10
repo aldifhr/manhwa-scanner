@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import re
 
-from app.utils.text import normalize_title_key
+from app.utils.text import normalize_title_key, slugify_title_key
 from app.utils.origin import normalize_origin
 from app.utils.cover_scrub import scrub_cover
 from app.config import settings
@@ -109,10 +109,8 @@ def build_filter(
         if exclude_origin and o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
             return False
         if excl_keys and tk:
-            ntk = normalize_title_key(tk)
-            if (tk, src) in excl_keys or (ntk, src) in excl_keys:
-                return False
-            if (tk, "all") in excl_keys or (ntk, "all") in excl_keys:
+            ntk = slugify_title_key(tk)
+            if (ntk, src) in excl_keys or (ntk, "all") in excl_keys:
                 return False
         if type_f and (it.get("type") or "").lower() != type_f.lower():
             return False
