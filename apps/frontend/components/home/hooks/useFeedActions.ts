@@ -232,11 +232,11 @@ export function useFeedActions() {
           source: srcToDelete,
         } as Record<string, unknown>);
         // If both keys exist (edge: duplicate all+specific), clean up the other as well
-        if (excl.has(key) && excl.has(legacyKey) && srcToDelete !== "all") {
+        if (excl.has(key) && excl.has(legacyKey)) {
           try {
             await Reader.removeExcludedTitle({
               title_key: item.titleKey,
-              source: "all",
+              source: srcToDelete === "all" ? src : "all",
             } as Record<string, unknown>);
           } catch {}
         }
@@ -301,13 +301,14 @@ export function useFeedActions() {
       const excl = excludedRef.current;
       const isExcl = distinctKeys.length > 0 && distinctKeys.every((k) => excl.has(k) || excl.has(`${k.split(":")[0]}:all`));
       if (isExcl) {
-        await Promise.all(
-          [...bySource.entries()].map(([s, v]) => {
-            const k = `${v.titleKey}:${s}`;
-            const srcToDelete = excl.has(k) && !excl.has(`${v.titleKey}:all`) ? s : excl.has(`${v.titleKey}:all`) ? "all" : s;
-            return Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
-          })
-        );
+        for (const [s, v] of bySource) {
+          const k = `${v.titleKey}:${s}`;
+          const srcToDelete = excl.has(k) && !excl.has(`${v.titleKey}:all`) ? s : excl.has(`${v.titleKey}:all`) ? "all" : s;
+          await Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
+          if (excl.has(k) && excl.has(`${v.titleKey}:all`)) {
+            try { await Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete === "all" ? s : "all" } as Record<string, unknown>); } catch {}
+          }
+        }
         return { isExcl: true, keys: distinctKeys };
       } else {
         await Promise.all(
@@ -374,8 +375,8 @@ export function useFeedActions() {
       if (isComp) {
         const srcToDelete = comp.has(key) && !comp.has(legacyKey) ? src : comp.has(legacyKey) ? "all" : src;
         await Reader.removeExcludedTitle({ title_key: item.titleKey, source: srcToDelete } as Record<string, unknown>);
-        if (comp.has(key) && comp.has(legacyKey) && srcToDelete !== "all") {
-          try { await Reader.removeExcludedTitle({ title_key: item.titleKey, source: "all" } as Record<string, unknown>); } catch {}
+        if (comp.has(key) && comp.has(legacyKey)) {
+          try { await Reader.removeExcludedTitle({ title_key: item.titleKey, source: srcToDelete === "all" ? src : "all" } as Record<string, unknown>); } catch {}
         }
         return { isComp: true, key, legacyKey };
       } else {
@@ -421,11 +422,14 @@ export function useFeedActions() {
       const comp = completedRef.current;
       const isComp = distinctKeys.length > 0 && distinctKeys.every((k) => comp.has(k) || comp.has(`${k.split(":")[0]}:all`) || comp.has(k.split(":")[0]));
       if (isComp) {
-        await Promise.all([...bySource.entries()].map(([s, v]) => {
+        for (const [s, v] of bySource) {
           const k = `${v.titleKey}:${s}`;
           const srcToDelete = comp.has(k) && !comp.has(`${v.titleKey}:all`) ? s : comp.has(`${v.titleKey}:all`) ? "all" : s;
-          return Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
-        }));
+          await Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
+          if (comp.has(k) && comp.has(`${v.titleKey}:all`)) {
+            try { await Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete === "all" ? s : "all" } as Record<string, unknown>); } catch {}
+          }
+        }
         return { isComp: true, keys: distinctKeys };
       } else {
         await Promise.all([...bySource.entries()].map(([s, v]) => Reader.markTamat({ title_key: v.titleKey, title: series.title, source: s, cover: series.cover ?? null, series_url: v.seriesUrl ?? null } as Record<string, unknown>)));

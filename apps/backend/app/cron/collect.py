@@ -404,5 +404,5 @@ def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
                     break
             except (ValueError, TypeError):
                 continue
-            items.append({"title": title, "title_key": (ch_url.rstrip("/").split("/")[-2] if ch_url else "").lower() or slugify_title_key(title), "chapter": str(num), "chapter_num": _num_f, "url": ch_url, "source": "ikiru", "cover": cover, "series_url": series_url, "chapter_url": ch_url, "origin": origin, "updated_time": _ut})
+            items.append({"title": title, "title_key": slugify_title_key(ch_url.rstrip("/").split("/")[-2]) if ch_url else slugify_title_key(title), "chapter": str(num), "chapter_num": _num_f, "url": ch_url, "source": "ikiru", "cover": cover, "series_url": series_url, "chapter_url": ch_url, "origin": origin, "updated_time": _ut})
     return items

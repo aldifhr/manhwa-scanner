@@ -54,7 +54,7 @@ export function useInfiniteFeed(opts: {
         type: typeFilter && typeFilter !== "no_type" ? typeFilter : null,
       }),
     placeholderData: keepPreviousData,
-    refetchInterval: 30_000,
+    refetchInterval: false, // ponytail: refetch wipes loadMore pages; user pull-to-refresh instead
   });
 
   useEffect(() => {
