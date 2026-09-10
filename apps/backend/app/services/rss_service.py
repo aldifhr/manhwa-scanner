@@ -1,6 +1,8 @@
 """RSS service — extracted from app/api/rss.py for testability."""
 from __future__ import annotations
 
+import asyncio
+
 from app.logger import get_logger
 from app.utils.text import normalize_title_key
 from app.services.rss_query import build_filter, map_result
@@ -8,7 +10,7 @@ from app.services.rss_query import build_filter, map_result
 logger = get_logger("services:rss_service")
 
 
-async def fetch_rss_data(
+def _fetch_rss_data_sync(
     *,
     cutoff: str,
     source_f: str = "",
@@ -28,7 +30,7 @@ async def fetch_rss_data(
     exclude_notified: bool = False,
     fetch_limit: int = 1000,
 ):
-    """Fetch recent_chapters + lookups and return mapped results."""
+    """Sync core — all psycopg2 calls block; run via to_thread from async wrapper."""
     # ponytail: 5 scans → now 4 scoped queries (rc filtered in DB, wl/sm/dh IN rc_tks ≤300); full scan kept as fallback until IN coverage proven. Next step: single SQL JOIN via v_series view + NOT EXISTS excluded when rows grow.
     from app.db import get_supabase
 
@@ -198,3 +200,12 @@ async def fetch_rss_data(
         except Exception:
             pass
     return results, wl_map, sm_map, dh_sent
+
+
+async def fetch_rss_data(*args, **kwargs):
+    """Async wrapper — offloads sync psycopg2 to thread pool so event loop not blocked.
+
+    ponytail: Option A (to_thread) minimal change; Option B asyncpg migration later when scraper-heavy load grows.
+    Keeps same signature as sync core for drop-in await compatibility (rss.py await fetch_rss_data).
+    """
+    return await asyncio.to_thread(lambda: _fetch_rss_data_sync(*args, **kwargs))
