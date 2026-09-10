@@ -33,6 +33,12 @@ fe-cookies.txt
 *.pyc
 __pycache__/
 
+# coverage + test artifacts (CI-only)
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
 # clerk configuration (can include secrets)
 /.clerk/
 .vercel
