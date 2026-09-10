@@ -1,9 +1,9 @@
 """RSS feed — simplified architecture.
 
-Data flow: recent_chapters → whitelist (1 join) → response
+Data flow: recent_chapters (DB-filtered) → whitelist/series_meta/dispatch_history scoped to rc_tks (≤300) → Python map
 
-Before: 6 queries, ~450ms
-After:  2 queries, ~100ms
+Before: 6 full-table scans → 450ms + Python filter
+After:  4 scoped queries (rc + wl IN rc_tks + sm IN rc_tks + dh IN rc_tks, ≤300 rows each), ~100ms. Next: single JOIN via v_series + NOT EXISTS excluded.
 """
 import time as _time
 from datetime import datetime, timezone

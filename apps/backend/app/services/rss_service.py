@@ -29,7 +29,7 @@ async def fetch_rss_data(
     fetch_limit: int = 1000,
 ):
     """Fetch recent_chapters + lookups and return mapped results."""
-    # ponytail: series_meta canonical via v_series VIEW (053_v_series_view.sql) — sm_map now could be JOIN v_series (LEFT JOIN v_series v ON v.title_key=rc.title_key AND v.source=rc.source) to replace 2nd query; kept sm_map dict for now (minimal, no SQL change), switch to DB JOIN when extra round-trip matters
+    # ponytail: 5 scans → now 4 scoped queries (rc filtered in DB, wl/sm/dh IN rc_tks ≤300); full scan kept as fallback until IN coverage proven. Next step: single SQL JOIN via v_series view + NOT EXISTS excluded when rows grow.
     from app.db import get_supabase
 
     sb = get_supabase()
@@ -96,19 +96,28 @@ async def fetch_rss_data(
         except Exception as _e:
             logger.warn("exclude_notified SQL failed, falling back to unfiltered", err=str(_e)[:160])
 
-    # ponytail: 2 queries max (rc + sm via v_series VIEW 053), no executor fan-out, no per-slug N+1; wl minimal, sm canonical — sm query could be JOIN v_series in rc query to drop to 1 query when needed
+    # ponytail: was 5 full-table scans (wl+sm+dh+excluded) → Python filter; now scoped to rc title_keys (≤fetch_limit=300) to bound DB→Python rows
+    _rc_tks = list({str(r.get("title_key") or "") for r in rc_rows if r.get("title_key")})
+    wl_rows = []
     try:
-        wl_rows = sb.table("whitelist").select(
-            "title_key, source, series_url, latest_sent_chapter"
-        ).execute().data or []
+        if _rc_tks:
+            for i in range(0, len(_rc_tks), 100):
+                chunk = _rc_tks[i:i+100]
+                wl_rows.extend(sb.table("whitelist").select(
+                    "title_key, source, series_url, latest_sent_chapter"
+                ).in_("title_key", chunk).execute().data or [])
     except Exception:
-        wl_rows = []
+        wl_rows = wl_rows or []
+    sm_rows = []
     try:
-        sm_rows = sb.table("series_meta").select(
-            "title_key, source, rating, genres, description, cover, type"
-        ).execute().data or []
+        if _rc_tks:
+            for i in range(0, len(_rc_tks), 100):
+                chunk = _rc_tks[i:i+100]
+                sm_rows.extend(sb.table("series_meta").select(
+                    "title_key, source, rating, genres, description, cover, type"
+                ).in_("title_key", chunk).execute().data or [])
     except Exception:
-        sm_rows = []
+        sm_rows = sm_rows or []
 
     wl_map: dict[tuple[str, str], dict] = {}
     wl_title_set: set[str] = set()
@@ -132,7 +141,14 @@ async def fetch_rss_data(
 
     dh_sent: set[tuple[str, float]] = set()
     try:
-        dh_rows = sb.table("dispatch_history").select("title_key, source, chapter_title").gte("sent_at", cutoff).limit(2000).execute().data or []
+        # scope dh to rc titles + cutoff (was full 2000 scan then Python filter)
+        if _rc_tks:
+            dh_rows = []
+            for i in range(0, len(_rc_tks), 100):
+                chunk = _rc_tks[i:i+100]
+                dh_rows.extend(sb.table("dispatch_history").select("title_key, source, chapter_title").gte("sent_at", cutoff).in_("title_key", chunk).limit(500).execute().data or [])
+        else:
+            dh_rows = sb.table("dispatch_history").select("title_key, source, chapter_title").gte("sent_at", cutoff).limit(500).execute().data or []
         for dh in dh_rows:
             tk = str(dh.get("title_key") or "")
             ct = dh.get("chapter_title")
