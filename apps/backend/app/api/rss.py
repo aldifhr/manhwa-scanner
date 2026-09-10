@@ -78,7 +78,20 @@ async def rss_reader(request: Request):
     return await _rss_impl(request)
 
 
+# ponytail: public endpoint hardening — whitelist query params + limit cap 100 to prevent Python-side group/filter blowup on varied q=?
+_ALLOWED_RSS_PARAMS = {
+    "page", "limit", "group",
+    "source", "sources", "origin", "origins",
+    "exclude", "exclude_origin",
+    "q", "type", "genres", "min_rating", "max_rating",
+    "subscribed_only", "sort", "whitelist", "exclude_notified", "unread_only",
+}
+
 async def _rss_impl(request: Request):
+    # Reject unknown query params (prevents cache-key variation / workload amplification)
+    unknown = [k for k in request.query_params.keys() if k not in _ALLOWED_RSS_PARAMS]
+    if unknown:
+        return JSONResponse(content={"success": False, "error": f"unknown query param: {unknown[0]}"}, status_code=400)
     cache_key = request.url.query
     cached = _rss_cache_get(cache_key)
     if cached is not None:
@@ -92,12 +105,14 @@ async def _rss_impl(request: Request):
             return JSONResponse(content=cached)
 
     page = int_safe(request.query_params.get("page", "1"), 1)
+    if page < 1 or page > 100:
+        return JSONResponse(content={"success": False, "error": "page must be between 1 and 100"}, status_code=400)
     try:
-        limit = int_safe(request.query_params.get("limit", "500"), 500, max_val=1000)
+        limit = int_safe(request.query_params.get("limit", "50"), 50, max_val=100)
     except (ValueError, TypeError):
-        limit = 500
-    if limit > 1000 or limit < 1:
-        return JSONResponse(content={"success": False, "error": "limit must be between 1 and 1000"}, status_code=400)
+        limit = 50
+    if limit > 100 or limit < 1:
+        return JSONResponse(content={"success": False, "error": "limit must be between 1 and 100"}, status_code=400)
     group = (request.query_params.get("group", "true") or "true").lower() != "false"
     source_f = request.query_params.get("source", "")
     origin_f = request.query_params.get("origin", "")
@@ -137,7 +152,8 @@ async def _rss_impl(request: Request):
         hours = 24
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        _fetch_limit = min(1000, max(200, limit * page * 3 + 20)) if limit <= 100 else 1000
+        # ponytail: fetch_limit capped 300 (not 1000) — Python group_results + filtering was O(fetch_limit) per varied q=
+        _fetch_limit = min(300, max(100, limit * page * 2 + 20))
         results, wl_map, sm_map, dh_sent = await fetch_rss_data(
             cutoff=cutoff,
             source_f=source_f,

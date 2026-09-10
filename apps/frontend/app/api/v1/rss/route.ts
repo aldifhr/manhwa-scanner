@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     .trim()
     .toLowerCase()
     .slice(0, 20);
-  const clampedLimit = Math.min(Math.max(Number(limit) || 500, 1), 1000);
+  const clampedLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
 
   // Cek cache dulu — hash session biar JWT tidak bocor di memory
   const key = cacheKey(
