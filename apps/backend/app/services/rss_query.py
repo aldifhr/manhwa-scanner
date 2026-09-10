@@ -109,9 +109,10 @@ def build_filter(
         if exclude_origin and o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
             return False
         if excl_keys and tk:
-            if (tk, src) in excl_keys:
+            ntk = normalize_title_key(tk)
+            if (tk, src) in excl_keys or (ntk, src) in excl_keys:
                 return False
-            if (tk, "all") in excl_keys:
+            if (tk, "all") in excl_keys or (ntk, "all") in excl_keys:
                 return False
         if type_f and (it.get("type") or "").lower() != type_f.lower():
             return False
