@@ -6,7 +6,7 @@ import {
   errorResponse,
   catchError,
 } from "@/lib/server-api";
-import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { hasValidToken, COOKIE_NAME } from "@/lib/auth";
 import { timingSafeEqual, createHash } from "node:crypto";
 
 /**
@@ -68,7 +68,7 @@ function authorized(request: Request): boolean {
   const token = request.headers
     .get("cookie")
     ?.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`))?.[1];
-  return !!token && verifyToken(token);
+  return !!token && hasValidToken(token);
 }
 
 const ALLOWED_ACTIONS = new Set(["update", "dispatch", "rss-fetch", "health"]);

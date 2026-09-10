@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { COOKIE_NAME, verifyToken } from "@/lib/auth";
+import { COOKIE_NAME, hasValidToken } from "@/lib/auth";
 import { getSecurityHeaders } from "@/lib/security/headers";
 
 const PUBLIC_EXACT = new Set<string>([
@@ -84,7 +84,7 @@ export function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!token || !verifyToken(token)) {
+  if (!token || !hasValidToken(token)) {
     if (pathname.startsWith("/api/")) {
       return applySecurityHeaders(
         NextResponse.json(

@@ -32,7 +32,7 @@ function decodeJwtPayload<T>(token: string): T | null {
   }
 }
 
-export function verifyToken(token: string): boolean {
+export function hasValidToken(token: string): boolean {
   const parts = token.split(".");
   if (parts.length !== 3 || parts.some((p) => !p)) return false;
   const payload = decodeJwtPayload<{ exp?: number }>(token);
