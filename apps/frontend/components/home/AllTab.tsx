@@ -332,10 +332,10 @@ function AllTabInner() {
 
   const deepLinkRef = useRef<HTMLDivElement | null>(null);
   const scrollKey = "alltab_scroll";
-  const initialScrollOffset =
-    typeof window !== "undefined"
-      ? Number(localStorage.getItem(scrollKey) || "0")
-      : undefined;
+  const [initialScrollOffset, setInitialScrollOffset] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    setInitialScrollOffset(Number(localStorage.getItem(scrollKey) || "0"));
+  }, []);
 
   const { grouped, flatDisplay, newSeriesKeys } = useFeedGrouping(filtered, {
     pinnedSet,

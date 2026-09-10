@@ -3,7 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "@/lib/utils";
+import { decodeHtml, rewriteCoverUrl, getChapterLabel, safeUrl } from "@/lib/utils";
 import { Reader } from "@/lib/reader";
 import {
   Clock,
@@ -97,7 +97,7 @@ function ContinueReadingCard({
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
       <a
-        href={entry.chapterUrl}
+        href={safeUrl(entry.chapterUrl) || "#"}
         target="_blank"
         rel="noopener noreferrer"
         className="block"
@@ -145,6 +145,11 @@ function HomeGroupedCard({
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
   const [hasRetried, setHasRetried] = useState(false);
   const [imgErrorFinal, setImgErrorFinal] = useState(false);
+  useEffect(() => {
+    setCoverSrc(rewriteCoverUrl(series.cover));
+    setHasRetried(false);
+    setImgErrorFinal(false);
+  }, [series.cover]);
   const { trackChapter } = useContinueReading();
   const { readItems, toggleRead } = useReadItems();
   const firstCh = series.chapters[0];
@@ -163,7 +168,7 @@ function HomeGroupedCard({
     <div className="group relative flex gap-4 rounded-2xl border border-white/10 bg-[#111111] p-3 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] sm:gap-5 sm:p-4">
       {/* Cover — visual anchor */}
       <a
-        href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
+        href={safeUrl(series.seriesUrl || series.chapters[0]?.seriesUrl) || "#"}
         target="_blank"
         rel="noopener noreferrer"
         className="relative block h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-black focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-32"
@@ -212,7 +217,7 @@ function HomeGroupedCard({
             <img src={flag} alt={origin} className="mt-0.5 h-4 w-4 shrink-0" loading="lazy" />
           )}
           <a
-            href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
+            href={safeUrl(series.seriesUrl || series.chapters[0]?.seriesUrl) || "#"}
             target="_blank"
             rel="noopener noreferrer"
             className="block min-h-0 min-w-0 rounded focus-visible:ring-2 focus-visible:ring-white"
@@ -246,7 +251,7 @@ function HomeGroupedCard({
               }
             );
             if (label === "?") return null;
-            const href = ch.chapterUrl || ch.url || series.seriesUrl || "#";
+            const href = safeUrl(ch.chapterUrl || ch.url || series.seriesUrl) || "#";
             const src = ch.source?.toLowerCase();
             const chipColor =
               src === "shinigami"
@@ -297,7 +302,7 @@ function HomeGroupedCard({
               ) === "?"
           ) && (
               <a
-                href={series.seriesUrl || series.chapters[0]?.seriesUrl || "#"}
+                href={safeUrl(series.seriesUrl || series.chapters[0]?.seriesUrl) || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex min-h-0 min-w-0 items-center justify-center rounded-md bg-white/10 px-2 py-1 text-[11px] leading-none text-white/80 transition-colors hover:bg-white/20"
@@ -409,6 +414,17 @@ export default function HomePage() {
       .map((t: string) => new Date(t).getTime());
     return times.length > 0 ? Math.max(...times) : null;
   }, [deferredResults]);
+  const [lastUpdateLabel, setLastUpdateLabel] = useState("Manual");
+  const [lastUpdateLong, setLastUpdateLong] = useState<string | null>(null);
+  useEffect(() => {
+    if (latestTimestamp) {
+      setLastUpdateLabel(new Date(latestTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      setLastUpdateLong(new Date(latestTimestamp).toLocaleString());
+    } else {
+      setLastUpdateLabel("Manual");
+      setLastUpdateLong(null);
+    }
+  }, [latestTimestamp]);
 
   // grouped by titleKey — same seam as /recent AllTab (deferred + transition biar gak block main thread pas 1k row)
   const grouped = useMemo(() => {
@@ -501,12 +517,7 @@ export default function HomePage() {
           {
             icon: ArrowClockwise,
             label: "Last Update",
-            value: latestTimestamp
-              ? new Date(latestTimestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-              : "Manual",
+            value: lastUpdateLabel,
           },
         ].map(({ icon: Icon, label, value }) => (
           <div
@@ -531,7 +542,7 @@ export default function HomePage() {
                   />
                 </div>
                 <div>
-                  <p className="text-base sm:text-lg font-bold tracking-[-0.02em] text-white tabular-nums">
+                  <p suppressHydrationWarning className="text-base sm:text-lg font-bold tracking-[-0.02em] text-white tabular-nums">
                     {value}
                   </p>
                   <p className="text-[10px] sm:text-xs text-white/45 tracking-wide">
@@ -574,8 +585,8 @@ export default function HomePage() {
           icon={<MagnifyingGlass />}
           message="No updates today"
           subMessage={
-            latestTimestamp
-              ? `Last update: ${new Date(latestTimestamp).toLocaleString()}`
+            lastUpdateLong
+              ? `Last update: ${lastUpdateLong}`
               : "Check again later or view all in Recent"
           }
           action={
