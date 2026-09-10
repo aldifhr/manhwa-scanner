@@ -1,7 +1,7 @@
 """Shinigami per-series collector — extracted from collect.py:279."""
 from app.logger import get_logger
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key, slugify_title_key
+from app.utils.text import slugify_title_key
 from app.scrapers.shinigami import _country_to_type as _country_to_type_fn
 from app.cron.collectors.common import _cached_chapter_list, _cached_series_meta, MAX_CHAPTERS_PER_SERIES
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
@@ -64,7 +64,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     from app.services.rating_utils import normalize_rating as _nr
     from app.scrapers.shinigami import _country_to_type as _ctt
-    from app.utils.text import normalize_title_key, slugify_title_key as _ntk
+    from app.utils.text import slugify_title_key as _ntk
     items: list[dict] = []
     _series: list[dict] = []
     try:
@@ -76,7 +76,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     if fetch_meta and _series:
         try:
             from app.cron.collectors.common import preload_series_meta_bulk
-            _keys = [(normalize_title_key(m.get("title") or m.get("manga_name") or ""), "shinigami") for m in _series]
+            _keys = [(_ntk(m.get("title") or m.get("manga_name") or ""), "shinigami") for m in _series]
             preload_series_meta_bulk(_keys)
         except Exception:
             pass
