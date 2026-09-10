@@ -16,8 +16,10 @@ from app.storage import whitelist as wl_store
 from app.utils.request_auth import int_safe, safe_error, require_monitor_auth
 from app.utils.cover_scrub import scrub_cover, cover_ref, batch_cover_ref
 
-# Cache for catalog/chapters keyed by title_key (60s TTL).
-_CAT_CH_CACHE: list = [0.0, None, None]  # [ts, title_key, payload]
+# Cache for catalog/chapters keyed by title_key (60s TTL, max 100 titles).
+# ponytail: was single-slot [ts,title_key,payload] — thrashing on sequential users (A→B→C→A miss every time)
+_CAT_CH_CACHE: "OrderedDict[str, tuple[float, dict]]" = OrderedDict()
+_CAT_CH_MAX = 100
 _CAT_CH_TTL = 60.0
 
 logger = get_logger("api:catalog")
@@ -223,11 +225,13 @@ async def catalog_chapters(title_key: str, request: Request):
     tk = deslugify_title_key(tk)  # FE encodes spaces as dashes in URL path
     norm_tk = normalize_title_key(tk)
 
-    # 60s cache: chapter lists don't change every second; avoids the
+    # 60s LRU cache (100 titles): chapter lists don't change every second; avoids
     # transaction-pooler round-trip cost on every detail-page open.
     _now = _qtime.monotonic()
-    if _CAT_CH_CACHE[0] is not None and _CAT_CH_CACHE[1] == norm_tk and (_now - _CAT_CH_CACHE[0]) < _CAT_CH_TTL:
-        return JSONResponse(content=_CAT_CH_CACHE[2])
+    _cached = _CAT_CH_CACHE.get(norm_tk)
+    if _cached is not None and (_now - _cached[0]) < _CAT_CH_TTL:
+        _CAT_CH_CACHE.move_to_end(norm_tk)
+        return JSONResponse(content=_cached[1])
 
     try:
         res = (
@@ -292,9 +296,10 @@ async def catalog_chapters(title_key: str, request: Request):
                 "titleKey": norm_tk,
             },
         }
-        _CAT_CH_CACHE[0] = _qtime.monotonic()
-        _CAT_CH_CACHE[1] = norm_tk
-        _CAT_CH_CACHE[2] = payload
+        _CAT_CH_CACHE[norm_tk] = (_qtime.monotonic(), payload)
+        _CAT_CH_CACHE.move_to_end(norm_tk)
+        while len(_CAT_CH_CACHE) > _CAT_CH_MAX:
+            _CAT_CH_CACHE.popitem(last=False)
         return JSONResponse(content=payload)
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
