@@ -71,6 +71,13 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
     _dup_keys: dict[str, str] = {}
     _dup_set: set[int] = set()
 
+
+    def invalidate_dh_cache():
+        """Reset the dispatch-history cache after whitelist mutation."""
+        global _DH_CACHE
+        _DH_CACHE = [0.0, None, None]
+
+
     raw_urls = [r["chapter_url"] for r in rows if r.get("chapter_url")]
     urls = [normalize_shinigami_url(u) or u for u in raw_urls]
     rc_map = {}

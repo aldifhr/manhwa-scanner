@@ -162,7 +162,17 @@ async def whitelist_post(request: Request):
     # also ensure type is passed (previously silent drop)
     res = post_whitelist(title=title, url=url, source=source, body=body_dict)
     try:
+        from app.api.rss import invalidate_rss_cache
+        invalidate_rss_cache()
+    except Exception:
+        pass
+    try:
         log_action(AuditAction.WHITELIST_ADD, request=request, resource="whitelist", resource_id=title or data.title_key or "", metadata={"source": source, "status": res.get("status")})
+    except Exception:
+        pass
+    try:
+        from app.services.dispatch_history import invalidate_dh_cache
+        invalidate_dh_cache()
     except Exception:
         pass
     return JSONResponse(content=res)
@@ -207,6 +217,16 @@ async def whitelist_delete(request: Request):
             title=title,
             url=url,
         )
+        try:
+            from app.api.rss import invalidate_rss_cache
+            invalidate_rss_cache()
+        except Exception:
+            pass
+        try:
+            from app.services.dispatch_history import invalidate_dh_cache
+            invalidate_dh_cache()
+        except Exception:
+            pass
         try:
             log_action(AuditAction.WHITELIST_DELETE, request=request, resource="whitelist", resource_id=title_key or title or entry_id, metadata={"source": source, "status": result.get("status")})
         except Exception:
