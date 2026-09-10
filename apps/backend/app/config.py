@@ -29,18 +29,30 @@ class Settings(BaseSettings):
     API_PORT: int = 3000
     CRON_PORT: int = 3001
 
-    # Sources — support both old (IKIRU_BASE_URL etc.) and new (.env) names.
-    # New .env uses IKIRU_PUBLIC_URL / SHINIGAMI_API_URL / SHINIGAMI_PUBLIC_URL.
-    # Old code uses IKIRU_BASE_URL / SECONDARY_SOURCE_URL / SECONDARY_PUBLIC_BASE.
-    # Validator below syncs them so either name works.
+    # ══════════════════════════════════════════════════════════════════════════════
+    # SOURCE DOMAINS — single source of truth. Change here + DB REPLACE once.
+    # ══════════════════════════════════════════════════════════════════════════════
     IKIRU_BASE_URL: str = "https://07.ikiru.wtf/"
     IKIRU_PUBLIC_URL: str = ""
-    SECONDARY_SOURCE_URL: str = "https://api.shngm.io"
+    IKIRU_SERIES_PATH: str = "/manga/"  # ponytail: ikiru path prefix
+    IKIRU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}.{id}/"
+
     SHINIGAMI_API_URL: str = ""
-    SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
-    VORATOON_API_URL: str = "https://api.voratoon.com"
-    VORATOON_DOMAIN: str = "v2.voratoon.com"  # ponytail: change here + REPLACE DB once
+    SHINIGAMI_API_BASE: str = "https://api.shngm.io"
+    SHINIGAMI_PUBLIC_BASE: str = "https://11.shinigami.asia"
     SHINIGAMI_PUBLIC_URL: str = ""
+    SHINIGAMI_SERIES_PATH: str = "/series/"  # ponytail: shinigami path prefix
+    SHINIGAMI_CHAPTER_PATH: str = "/chapter/"
+
+    VORATOON_API_URL: str = "https://api.voratoon.com"
+    VORATOON_DOMAIN: str = "v2.voratoon.com"
+    VORATOON_SERIES_PATH: str = "/series/"  # ponytail: voratoon path prefix
+    VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
+
+    # Aliases (deprecated — see _sync_aliases)
+    SECONDARY_SOURCE_URL: str = "https://api.shngm.io"
+    SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
+
     # 3 sources (ikiru, shinigami, voratoon) are active
     SOURCE_KEYS: list[str] = ["ikiru", "shinigami", "voratoon"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).

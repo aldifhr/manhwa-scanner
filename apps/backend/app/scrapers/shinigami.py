@@ -178,7 +178,7 @@ def get_shinigami_series_meta(manga_id: str) -> dict | None:
         "released": str(d.get("release_year") or ""),
         "origin": d.get("country_id"),
         "source": "shinigami",
-        "series_url": f"https://11.shinigami.asia/series/{manga_id}",
+        "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_SERIES_PATH}{manga_id}",
     }
 
 
