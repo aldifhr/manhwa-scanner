@@ -9,6 +9,7 @@ HTML scrape fallback is kept for resilience when the API is unavailable.
 """
 import random
 import time as _t
+from urllib.parse import quote_plus
 
 from app.services.rating_utils import normalize_rating
 from app.config import settings
@@ -112,7 +113,7 @@ def _fetch_json(path: str, retries: int = 4):
 
 def search_ikiru_api(query: str, per_page: int = 20):
     """Search series via API."""
-    q = query.replace("/", " ")
+    q = quote_plus(query.replace("/", " "))
     data = _fetch_json(f"/search/series?q={q}&per_page={per_page}")
     return data.get("items", []) if data else []
 
