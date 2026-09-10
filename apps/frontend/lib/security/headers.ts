@@ -9,15 +9,16 @@
  * matching nonce will be blocked by the browser (correct behavior).
  */
 
-export function getCsp(nonce: string, isDev: boolean): string {
+export function getCsp(isDev: boolean): string {
+  // 'unsafe-inline' required for Next.js 16 RSC hydration scripts.
   const scriptSrc = isDev
-    ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`
-    : `script-src 'self' 'nonce-${nonce}'`;
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
+    : `script-src 'self' 'unsafe-inline'`;
   const connectExtra = isDev ? " ws://localhost:* wss://localhost:* http://localhost:*" : "";
   return [
     "default-src 'self'",
     scriptSrc,
-    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     "img-src 'self' data: https: blob:",
     "font-src 'self' https://fonts.gstatic.com",
     // connect-src: 'self' + scanner + image CDNs (sw.js fetch() counts as connect-src, not img-src)
@@ -30,9 +31,9 @@ export function getCsp(nonce: string, isDev: boolean): string {
   ].join("; ");
 }
 
-export function getSecurityHeaders(nonce: string, isDev: boolean): Record<string, string> {
+export function getSecurityHeaders(isDev: boolean): Record<string, string> {
   return {
-    "Content-Security-Policy": getCsp(nonce, isDev),
+    "Content-Security-Policy": getCsp(isDev),
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
