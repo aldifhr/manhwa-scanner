@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from app.logger import get_logger
@@ -84,21 +84,34 @@ manager = ConnectionManager()
 # ── WebSocket Endpoint ──
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)):
+async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates.
-    
+
+    Auth: Cookie (browser) or Authorization header (non-browser). ?token= is deprecated
+    (leaks to proxy/access logs, browser history, analytics) — kept for compat with warning.
+
     Client subscribes to topics via JSON message:
     {"action": "subscribe", "topics": ["dispatch", "health", "queue"]}
-    
+
     Available topics:
     - dispatch: new dispatch events
     - health: source health changes
     - queue: queue depth updates
     - audit: audit log entries
     """
-    # Auth: require valid token query param or session cookie
+    # ponytail: P0 fix — ?token= leaks to logs/history/analytics; prefer Cookie / Authorization header
+    # Browser WebSocket cannot set custom headers, so session cookie is primary. Non-browser clients
+    # should use `Authorization: Bearer <token>` handshake header or `Sec-WebSocket-Protocol` fallback.
     cookie = websocket.cookies.get("ikiru_dashboard_session", "")
-    if not check_monitor_auth(authorization="", token_param=token or "", cookie=cookie):
+    auth_header = websocket.headers.get("authorization", "") or websocket.headers.get("sec-websocket-protocol", "") or ""
+    # Support Bearer via subprotocol: "bearer, <token>" → extract token
+    if auth_header.lower().startswith("bearer,"):
+        auth_header = "Bearer " + auth_header.split(",", 1)[1].strip()
+    token_param = websocket.query_params.get("token", "") or ""
+    if token_param:
+        # DEPRECATED path — keep for compat but warn (check_monitor_auth also warns); value never logged
+        logger.warn("websocket: deprecated ?token= auth used — migrate to session cookie or Authorization header")
+    if not check_monitor_auth(authorization=auth_header, token_param=token_param, cookie=cookie):
         await websocket.close(code=4001, reason="unauthorized")
         return
     
