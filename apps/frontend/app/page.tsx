@@ -364,7 +364,7 @@ export default function HomePage() {
     placeholderData: keepPreviousData,
   });
 
-  const { optimisticWhitelist, addingKey, handleAddGroup } = useFeedActions();
+  const { optimisticWhitelist, optimisticExcluded, addingKey, handleAddGroup } = useFeedActions();
 
   const [isLoggedInForSnapshot, setIsLoggedInForSnapshot] = useState(false);
   useEffect(() => {
@@ -411,14 +411,28 @@ export default function HomePage() {
 
   // grouped by titleKey — same seam as /recent AllTab (deferred + transition biar gak block main thread pas 1k row)
   const grouped = useMemo(() => {
+    let g: GroupedSeries[];
     if (deferredResults.length === 0) return [];
     const isGrouped =
       typeof (deferredResults[0] as Record<string, unknown>)?.chapters !==
       "undefined" &&
       Array.isArray((deferredResults[0] as { chapters?: unknown[] })?.chapters);
-    if (isGrouped) return deferredResults as unknown as GroupedSeries[];
-    return groupChapters(deferredResults as unknown as FlatChapter[]);
-  }, [deferredResults]);
+    if (isGrouped) g = deferredResults as unknown as GroupedSeries[];
+    else g = groupChapters(deferredResults as unknown as FlatChapter[]);
+    if (optimisticExcluded.size > 0) {
+      const isEx = (s: GroupedSeries) => {
+        const nk = s.titleKey.toLowerCase();
+        for (const c of s.chapters as unknown as { titleKey: string; source: string }[]) {
+          const k = `${c.titleKey || s.titleKey}:${(c.source || "all").toLowerCase()}`;
+          const nk2 = (c.titleKey || s.titleKey).toLowerCase();
+          if (optimisticExcluded.has(k) || optimisticExcluded.has(nk2) || optimisticExcluded.has(`${k.split(":")[0]}:all`) || optimisticExcluded.has(s.titleKey) || optimisticExcluded.has(nk)) return true;
+        }
+        return optimisticExcluded.has(s.titleKey) || optimisticExcluded.has(nk);
+      };
+      g = g.filter((s) => !isEx(s));
+    }
+    return g;
+  }, [deferredResults, optimisticExcluded]);
 
   const totalSent = snapshot?.overview?.totalChaptersSent ?? 0;
   const totalTracked = snapshot?.overview?.totalMangaTracked ?? 0;
