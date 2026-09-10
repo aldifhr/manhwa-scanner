@@ -32,7 +32,7 @@ export async function readerFetch<T>(
     const msg = parseErrorMessage(res.status, text);
     if (res.status === 401) {
       void handle401();
-      throw new Error(`UNAUTHORIZED: ${msg}`);
+      throw new Error(`401 Unauthorized: ${msg}`);
     }
     throw new Error(msg);
   }
@@ -49,12 +49,13 @@ export async function paginatedGet<T>(
   const pageSize = Number(
     params.get("page_size") ?? params.get("limit") ?? 100
   );
+  const q = new URLSearchParams(params); // clone to avoid mutating caller
   if (pageSize > 100) {
-    params.set(params.has("page_size") ? "page_size" : "limit", "100");
+    q.set(q.has("page_size") ? "page_size" : "limit", "100");
     const first = await readerFetch<{
       success: boolean;
       data: { results: unknown[]; totalPages?: number; total_pages?: number };
-    }>(`${basePath}?${params}`, signal ? { signal } : undefined, fetchImpl);
+    }>(`${basePath}?${q}`, signal ? { signal } : undefined, fetchImpl);
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const totalPages = (first.data?.totalPages ??
       (first.data as { total_pages?: number })?.total_pages ??
@@ -62,9 +63,9 @@ export async function paginatedGet<T>(
     const firstRows = (first.data?.results ?? []).map(map);
     if (totalPages <= 1) return firstRows;
     const fetchers = Array.from({ length: totalPages - 1 }, (_, i) => () => {
-      const p = new URLSearchParams(params);
+      const p = new URLSearchParams(q);
       p.set("page", String(i + 2));
-      p.set(params.has("page_size") ? "page_size" : "limit", "100");
+      p.set(q.has("page_size") ? "page_size" : "limit", "100");
       return readerFetch<{ success: boolean; data: { results: unknown[] } }>(
         `${basePath}?${p}`,
         signal ? { signal } : undefined,
@@ -88,6 +89,6 @@ export async function paginatedGet<T>(
   const data = await readerFetch<{
     success: boolean;
     data: { results: unknown[] };
-  }>(`${basePath}?${params}`, signal ? { signal } : undefined, fetchImpl);
+  }>(`${basePath}?${q}`, signal ? { signal } : undefined, fetchImpl);
   return (data.data?.results ?? []).map(map);
 }

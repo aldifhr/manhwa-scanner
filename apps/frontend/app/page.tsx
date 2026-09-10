@@ -5,6 +5,7 @@ import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { decodeHtml, rewriteCoverUrl, getChapterLabel, safeUrl } from "@/lib/utils";
 import { Reader } from "@/lib/reader";
+import { readerFetch } from "@/lib/reader/transport";
 import {
   Clock,
   TrendUp,
@@ -41,10 +42,7 @@ interface FeedResponse {
 }
 
 async function fetchFeed(opts?: { signal?: AbortSignal }): Promise<FeedResponse> {
-  // Flat + client groupChapters — server grouped (?group=true) missing chapter numbers for ikiru (Ch. ?), so force flat
-  const res = await fetch("/api/v1/reader/rss?limit=36&group=false", { credentials: "include", signal: opts?.signal });
-  if (!res.ok) throw new Error(`Feed fetch failed: ${res.status} ${res.statusText}`);
-  return res.json();
+  return readerFetch<FeedResponse>("/api/v1/reader/rss?limit=36&group=false", { signal: opts?.signal });
 }
 
 function CoverImage({ src, alt }: { src: string | null; alt: string }) {
@@ -511,7 +509,7 @@ export default function HomePage() {
           {
             icon: TrendUp,
             label: "Total Series",
-            value: totalTracked || (data?.data?.total ?? 0),
+            value: totalTracked ?? (data?.data?.total ?? 0),
           },
           { icon: Star, label: "Total Sent", value: totalSent },
           {
