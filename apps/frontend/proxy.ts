@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 import { COOKIE_NAME, hasValidToken } from "@/lib/auth";
 import { getSecurityHeaders } from "@/lib/security/headers";
 
+function generateNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Buffer.from(array).toString("base64");
+}
+
 const PUBLIC_EXACT = new Set<string>([
   "/",
   "/recent",
@@ -69,7 +75,8 @@ function isPublicPath(pathname: string, method: string): boolean {
 }
 
 function applySecurityHeaders(res: NextResponse): NextResponse {
-  const headers = getSecurityHeaders(process.env.NODE_ENV === "development");
+  const nonce = generateNonce();
+  const headers = getSecurityHeaders(nonce, process.env.NODE_ENV === "development");
   for (const [k, v] of Object.entries(headers)) {
     res.headers.set(k, v);
   }

@@ -16,6 +16,7 @@ Connection: DATABASE_URL env (transaction pooler, sslmode=require).
 from __future__ import annotations
 
 import os
+import re
 import threading
 import psycopg2
 import psycopg2.pool
@@ -200,42 +201,53 @@ class _Query:
         self._want_count = False
 
     # ---- WHERE builders ----
+    _ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+
+    @staticmethod
+    def _ident(col: str) -> str:
+        """Validate a column identifier before it reaches the SQL string.
+        Writes already had an allowlist (_compile_write); reads had none.
+        One guard, every WHERE/ORDER BY/SELECT path covered."""
+        if not isinstance(col, str) or not _Query._ID_RE.match(col):
+            raise ValueError(f"invalid column name (rejected): {col!r}")
+        return col
+
     def _w(self, frag, params):
         self._where.append((frag, params))
 
     def eq(self, col, val):
-        self._w(f"{col} = %s", [val]); return self
+        self._w(f"{self._ident(col)} = %s", [val]); return self
 
     def neq(self, col, val):
-        self._w(f"{col} <> %s", [val]); return self
+        self._w(f"{self._ident(col)} <> %s", [val]); return self
 
     def gt(self, col, val):
-        self._w(f"{col} > %s", [val]); return self
+        self._w(f"{self._ident(col)} > %s", [val]); return self
 
     def lt(self, col, val):
-        self._w(f"{col} < %s", [val]); return self
+        self._w(f"{self._ident(col)} < %s", [val]); return self
 
     def gte(self, col, val):
-        self._w(f"{col} >= %s", [val]); return self
+        self._w(f"{self._ident(col)} >= %s", [val]); return self
 
     def lte(self, col, val):
-        self._w(f"{col} <= %s", [val]); return self
+        self._w(f"{self._ident(col)} <= %s", [val]); return self
 
     def like(self, col, pat):
-        self._w(f"{col} LIKE %s", [pat]); return self
+        self._w(f"{self._ident(col)} LIKE %s", [pat]); return self
 
     def ilike(self, col, pat):
-        self._w(f"{col} ILIKE %s", [pat]); return self
+        self._w(f"{self._ident(col)} ILIKE %s", [pat]); return self
 
     def is_(self, col, val):
-        self._w(f"{col} IS {val}", []); return self
+        self._w(f"{self._ident(col)} IS {val}", []); return self
 
     def in_(self, col, vals):
         if not vals:
             # PostgREST .in_([ ]) => no rows
             self._w("1 = 0", []); return self
         ph = ",".join(["%s"] * len(vals))
-        self._w(f"{col} IN ({ph})", list(vals)); return self
+        self._w(f"{self._ident(col)} IN ({ph})", list(vals)); return self
 
     # Known JSONB columns (so .contains()/@> compiles correctly). Anything
     # not in this set is treated as TEXT (substring match via LIKE) — the old
@@ -253,6 +265,7 @@ class _Query:
 
     def contains(self, col, val):
         import json
+        col = self._ident(col)
         full = f"{self.table}.{col}"
         if full in self._JSONB_COLS:
             import json as _json
@@ -277,6 +290,7 @@ class _Query:
 
     def filter(self, col, op, val):
         # generic: op in eq,neq,gt,lt,gte,lte,like,ilike,cs(contains),cd
+        col = self._ident(col)
         full = f"{self.table}.{col}"
         if op in ("cs", "cd") and full not in self._JSONB_COLS:
             # TEXT column: PostgREST maps cs/cd on text to substring match
@@ -316,7 +330,7 @@ class _Query:
     def order(self, col, desc=False, ascending=None):
         if ascending is not None:
             desc = not ascending
-        self._order.append((col, desc)); return self
+        self._order.append((self._ident(col), desc)); return self
 
     def limit(self, n):
         self._limit = n; return self
@@ -435,7 +449,8 @@ class _Query:
     def _col_list(self):
         if self._cols in ("*", None):
             return "*"
-        return ", ".join(c.strip() for c in self._cols.split(","))
+        # Validate each column identifier
+        return ", ".join(self._ident(c.strip()) for c in self._cols.split(","))
 
     def compile(self):
         w, p = self._build_where()
@@ -455,11 +470,12 @@ class _Query:
             sets = []
             params = []
             for c, v in self._values.items():
+                _ident_c = self._ident(c)
                 if isinstance(v, (list, dict)):
-                    sets.append(f"{c} = %s::jsonb")
+                    sets.append(f"{_ident_c} = %s::jsonb")
                     params.append(_json.dumps(v))
                 else:
-                    sets.append(f"{c} = %s")
+                    sets.append(f"{_ident_c} = %s")
                     params.append(v)
             # FAIL-CLOSED: an UPDATE without a WHERE predicate would
             # mutate the ENTIRE table (full-table wipe). Supabase's

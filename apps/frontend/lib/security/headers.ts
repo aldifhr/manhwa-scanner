@@ -1,18 +1,23 @@
 /**
  * Single source of truth for security headers / CSP.
- * Imported by `middleware.ts` (edge) and `next.config.ts` (routing layer).
+ * Imported by middleware (edge) and next.config (routing layer).
  * Keeps style-src / font-src / script-src in sync across both layers.
+ *
+ * Nonce-based: 'unsafe-inline' is dropped entirely. Next.js 16 auto-applies
+ * the nonce to inline RSC hydration scripts and all <style> blocks generated
+ * by styled-jsx/Tailwind. Any inline <script> or style attribute lacking the
+ * matching nonce will be blocked by the browser (correct behavior).
  */
 
-export function getCsp(isDev: boolean): string {
+export function getCsp(nonce: string, isDev: boolean): string {
   const scriptSrc = isDev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    : "script-src 'self' 'unsafe-inline'";
+    ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`
+    : `script-src 'self' 'nonce-${nonce}'`;
   const connectExtra = isDev ? " ws://localhost:* wss://localhost:* http://localhost:*" : "";
   return [
     "default-src 'self'",
-    scriptSrc, // Next.js App Router needs inline RSC hydration; dev needs unsafe-eval for HMR
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    scriptSrc,
+    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "img-src 'self' data: https: blob:",
     "font-src 'self' https://fonts.gstatic.com",
     // connect-src: 'self' + scanner + image CDNs (sw.js fetch() counts as connect-src, not img-src)
@@ -25,9 +30,9 @@ export function getCsp(isDev: boolean): string {
   ].join("; ");
 }
 
-export function getSecurityHeaders(isDev: boolean): Record<string, string> {
+export function getSecurityHeaders(nonce: string, isDev: boolean): Record<string, string> {
   return {
-    "Content-Security-Policy": getCsp(isDev),
+    "Content-Security-Policy": getCsp(nonce, isDev),
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -35,8 +40,3 @@ export function getSecurityHeaders(isDev: boolean): Record<string, string> {
       "camera=(), microphone=(), geolocation=(), payment=()",
   };
 }
-
-// Static export for middleware / next.config that don't need dynamic isDev at import time.
-// Middleware will call getSecurityHeaders(process.env.NODE_ENV === 'development') at runtime.
-export const SECURITY_HEADERS: Record<string, string> =
-  getSecurityHeaders(false);

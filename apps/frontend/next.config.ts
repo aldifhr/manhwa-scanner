@@ -1,8 +1,5 @@
 import path from "path";
 import type { NextConfig } from "next";
-import { getCsp } from "./lib/security/headers";
-
-const csp = getCsp(process.env.NODE_ENV === "development");
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../../"),
@@ -124,10 +121,10 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-store" },
         ],
       },
+      // CSP is set by middleware (proxy.ts) with per-request nonce; other headers kept here for static/non-matched routes
       {
         source: "/(.*)",
         headers: [
-          { key: "Content-Security-Policy", value: csp },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
