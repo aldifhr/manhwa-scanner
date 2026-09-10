@@ -27,6 +27,8 @@ class ExcludedAddRequest(BaseModel):
     source: Optional[str] = Field(default="all", max_length=50)
     cover: Optional[str] = Field(default=None, max_length=2000)
     series_url: Optional[str] = Field(default=None, max_length=500)
+    reason: Optional[str] = Field(default=None, max_length=20)
+    is_completed: Optional[bool] = None
 
 
 class ExcludedDeleteRequest(BaseModel):
@@ -155,6 +157,8 @@ async def get_excluded(request: Request):
                 "createdAt": r.get("created_at"),
                 "cover": row_cover or cover_map.get(tk) or None,
                 "seriesUrl": series_url,
+                "reason": r.get("reason") or ("completed" if r.get("is_completed") else "excluded"),
+                "isCompleted": bool(r.get("is_completed")) or (r.get("reason") == "completed"),
             }
             results.append(item)
 
@@ -190,9 +194,13 @@ async def post_excluded(request: Request):
         source = data.source or "all"
         cover = data.cover
         series_url = data.series_url
+        reason = (data.reason or "excluded").strip().lower() if data.reason else "excluded"
+        is_completed = bool(data.is_completed) or reason == "completed"
+        if reason not in ("excluded", "completed"):
+            reason = "completed" if is_completed else "excluded"
         res = excl_store.add_excluded_title(
             title_key=title_key, title=title, source=source,
-            cover=cover, series_url=series_url
+            cover=cover, series_url=series_url, reason=reason, is_completed=is_completed
         )
         if res.get("status") == "error":
             return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)

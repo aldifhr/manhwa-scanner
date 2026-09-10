@@ -356,6 +356,18 @@ export const Reader = {
     );
     return { status: "ok" as const };
   },
+  // Tamat = completed exclude dari /recent — same table, reason=completed + is_completed=true
+  markTamat: async (data: Record<string, unknown>) => {
+    const res = await readerFetch<{ success?: boolean; data?: unknown }>(
+      "/api/v1/excluded-titles",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, reason: "completed", is_completed: true }),
+      }
+    );
+    return { status: "ok" as const };
+  },
   removeExcludedTitle: async (data: Record<string, unknown>) => {
     await readerFetch("/api/v1/excluded-titles", {
       method: "DELETE",

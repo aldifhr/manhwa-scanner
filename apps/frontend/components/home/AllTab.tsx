@@ -128,12 +128,16 @@ function AllTabInner() {
   const {
     optimisticWhitelist,
     optimisticExcluded,
+    optimisticCompleted,
     excludingKey,
+    completingKey,
     addingKey,
     handleAdd,
     handleAddGroup,
     handleExclude,
     handleExcludeSeries,
+    handleComplete,
+    handleCompleteSeries,
   } = useFeedActions();
 
   const all = allItems;
@@ -172,6 +176,18 @@ function AllTabInner() {
     },
     [optimisticExcluded]
   );
+  const isCompletedFlat = useCallback(
+    (c: FlatChapter) => {
+      const src = (c.source || "all").toLowerCase();
+      const key = `${c.titleKey}:${src}`;
+      return (
+        optimisticCompleted.has(key) ||
+        optimisticCompleted.has(`${c.titleKey}:all`) ||
+        optimisticCompleted.has(c.titleKey)
+      );
+    },
+    [optimisticCompleted]
+  );
   const isExcludedSeries = useCallback(
     (s: GroupedSeries) => {
       const keys = [
@@ -194,6 +210,28 @@ function AllTabInner() {
       );
     },
     [optimisticExcluded]
+  );
+  const isCompletedSeries = useCallback(
+    (s: GroupedSeries) => {
+      const keys = [
+        ...new Set(
+          s.chapters.map(
+            (ch) => `${ch.titleKey || s.titleKey}:${(ch.source || "").toLowerCase()}`
+          )
+        ),
+      ];
+      if (keys.length === 0) {
+        const fk = `${s.titleKey}:all`;
+        return optimisticCompleted.has(fk) || optimisticCompleted.has(s.titleKey);
+      }
+      return keys.every(
+        (k) =>
+          optimisticCompleted.has(k) ||
+          optimisticCompleted.has(`${k.split(":")[0]}:all`) ||
+          optimisticCompleted.has(k.split(":")[0])
+      );
+    },
+    [optimisticCompleted]
   );
 
   const filtered = useMemo(() => {
@@ -579,6 +617,9 @@ function AllTabInner() {
                   onExclude={() => handleExcludeSeries(s)}
                   isExcluded={isExcludedSeries(s)}
                   excluding={excludingKey === s.titleKey}
+                  isCompleted={isCompletedSeries(s)}
+                  completing={completingKey === s.titleKey}
+                  onComplete={() => handleCompleteSeries(s)}
                   onAdd={() => handleAddGroup(s)}
                   isSentToDiscord={s.chapters.some(
                     (c) => c.isSent === true || sentKeys.has(c.key)
@@ -619,6 +660,9 @@ function AllTabInner() {
                   onAdd={() => handleAdd(item)}
                   isExcluded={isExcludedFlat(item)}
                   excluding={excludingKey === item.titleKey}
+                  isCompleted={isCompletedFlat(item)}
+                  completing={completingKey === item.titleKey}
+                  onComplete={() => handleComplete(item)}
                   isPinned={pinnedSet.has(item.titleKey)}
                   onTogglePin={() => togglePin(item.titleKey)}
                   onExclude={() => handleExclude(item)}

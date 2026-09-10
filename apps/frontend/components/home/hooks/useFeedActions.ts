@@ -17,7 +17,11 @@ export function useFeedActions() {
   const [optimisticExcluded, setOptimisticExcluded] = useState<Set<string>>(
     new Set()
   );
+  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(
+    new Set()
+  );
   const [excludingKey, setExcludingKey] = useState<string | null>(null);
+  const [completingKey, setCompletingKey] = useState<string | null>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
 
   const isLoggedIn =
@@ -27,14 +31,14 @@ export function useFeedActions() {
     queryKey: queryKeys.excludedTitles,
     queryFn: () =>
       Reader.getExcludedTitles() as Promise<
-        { titleKey: string; source?: string }[]
+        { titleKey: string; source?: string; reason?: string; isCompleted?: boolean }[]
       >,
     enabled: isLoggedIn,
     retry: false,
     refetchOnWindowFocus: false,
   });
   useEffect(() => {
-    if (excludedData)
+    if (excludedData) {
       setOptimisticExcluded(
         new Set(
           excludedData.map(
@@ -42,6 +46,14 @@ export function useFeedActions() {
           )
         )
       );
+      setOptimisticCompleted(
+        new Set(
+          excludedData
+            .filter((e) => e.reason === "completed" || (e as any).isCompleted || (e as any).is_completed)
+            .map((e) => `${e.titleKey}:${(e.source || "all").toLowerCase()}`)
+        )
+      );
+    }
   }, [excludedData]);
 
   const addMutation = useMutation({
@@ -309,6 +321,86 @@ export function useFeedActions() {
     onSettled: () => setExcludingKey(null),
   });
 
+  // Completed = tamat + exclude from RSS — ponytail: reuse excluded_titles with reason=completed
+  const completeMutation = useMutation({
+    mutationFn: async (item: FlatChapter) => {
+      const src = (item.source || "all").toLowerCase();
+      const key = `${item.titleKey}:${src}`;
+      const legacyKey = `${item.titleKey}:all`;
+      const isComp = optimisticCompleted.has(key) || optimisticCompleted.has(legacyKey) || optimisticCompleted.has(item.titleKey);
+      if (isComp) {
+        const srcToDelete = optimisticCompleted.has(key) && !optimisticCompleted.has(legacyKey) ? src : optimisticCompleted.has(legacyKey) ? "all" : src;
+        await Reader.removeExcludedTitle({ title_key: item.titleKey, source: srcToDelete } as Record<string, unknown>);
+        if (optimisticCompleted.has(key) && optimisticCompleted.has(legacyKey) && srcToDelete !== "all") {
+          try { await Reader.removeExcludedTitle({ title_key: item.titleKey, source: "all" } as Record<string, unknown>); } catch {}
+        }
+        return { isComp: true, key, legacyKey };
+      } else {
+        await Reader.markTamat({ title_key: item.titleKey, title: item.title, source: src, cover: item.cover ?? null, series_url: item.seriesUrl ?? null } as Record<string, unknown>);
+        return { isComp: false, key };
+      }
+    },
+    onMutate: (item) => setCompletingKey(item.titleKey),
+    onSuccess: ({ isComp, key, legacyKey }) => {
+      if (isComp) {
+        setOptimisticCompleted((prev) => { const n = new Set(prev); n.delete(key); if (legacyKey) n.delete(legacyKey); return n; });
+        setOptimisticExcluded((prev) => { const n = new Set(prev); n.delete(key); if (legacyKey) n.delete(legacyKey); return n; });
+        toast("Completed undone", "success");
+      } else {
+        setOptimisticCompleted((prev) => new Set(prev).add(key));
+        setOptimisticExcluded((prev) => new Set(prev).add(key));
+        toast("Marked as completed & excluded from RSS", "success");
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : "Failed to mark as completed", "error"),
+    onSettled: () => setCompletingKey(null),
+  });
+
+  const completeSeriesMutation = useMutation({
+    mutationFn: async (series: GroupedSeries) => {
+      const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
+      for (const c of series.chapters as unknown as { titleKey: string; source: string; seriesUrl: string }[]) {
+        if (!c.source) continue;
+        const s = c.source.toLowerCase();
+        if (!bySource.has(s)) bySource.set(s, { titleKey: c.titleKey || series.titleKey, seriesUrl: c.seriesUrl || series.seriesUrl });
+      }
+      if (bySource.size === 0 && series.titleKey) bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
+      const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
+      const isComp = distinctKeys.length > 0 && distinctKeys.every((k) => optimisticCompleted.has(k) || optimisticCompleted.has(`${k.split(":")[0]}:all`) || optimisticCompleted.has(k.split(":")[0]));
+      if (isComp) {
+        await Promise.all([...bySource.entries()].map(([s, v]) => {
+          const k = `${v.titleKey}:${s}`;
+          const srcToDelete = optimisticCompleted.has(k) && !optimisticCompleted.has(`${v.titleKey}:all`) ? s : optimisticCompleted.has(`${v.titleKey}:all`) ? "all" : s;
+          return Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
+        }));
+        return { isComp: true, keys: distinctKeys };
+      } else {
+        await Promise.all([...bySource.entries()].map(([s, v]) => Reader.markTamat({ title_key: v.titleKey, title: series.title, source: s, cover: series.cover ?? null, series_url: v.seriesUrl ?? null } as Record<string, unknown>)));
+        return { isComp: false, keys: distinctKeys };
+      }
+    },
+    onMutate: (series) => setCompletingKey(series.titleKey),
+    onSuccess: ({ isComp, keys }) => {
+      if (isComp) {
+        setOptimisticCompleted((prev) => { const n = new Set(prev); for (const k of keys) { n.delete(k); n.delete(`${k.split(":")[0]}:all`); n.delete(k.split(":")[0]); } return n; });
+        setOptimisticExcluded((prev) => { const n = new Set(prev); for (const k of keys) { n.delete(k); n.delete(`${k.split(":")[0]}:all`); } return n; });
+        toast("Completed undone", "success");
+      } else {
+        setOptimisticCompleted((prev) => new Set([...prev, ...keys]));
+        setOptimisticExcluded((prev) => new Set([...prev, ...keys]));
+        toast("Marked as completed & excluded from RSS", "success");
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : "Failed to mark as completed", "error"),
+    onSettled: () => setCompletingKey(null),
+  });
+
   const rateLimitedAdd = usePacerRateLimitedWL((item: FlatChapter) =>
     addMutation.mutate(item)
   );
@@ -331,15 +423,27 @@ export function useFeedActions() {
     (series: GroupedSeries) => excludeSeriesMutation.mutate(series),
     [excludeSeriesMutation]
   );
+  const handleComplete = useCallback(
+    (item: FlatChapter) => completeMutation.mutate(item),
+    [completeMutation]
+  );
+  const handleCompleteSeries = useCallback(
+    (series: GroupedSeries) => completeSeriesMutation.mutate(series),
+    [completeSeriesMutation]
+  );
 
   return {
     optimisticWhitelist,
     optimisticExcluded,
+    optimisticCompleted,
     excludingKey,
+    completingKey,
     addingKey,
     handleAdd,
     handleAddGroup,
     handleExclude,
     handleExcludeSeries,
+    handleComplete,
+    handleCompleteSeries,
   } as const;
 }

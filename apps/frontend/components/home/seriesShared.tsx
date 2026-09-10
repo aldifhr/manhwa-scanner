@@ -255,6 +255,9 @@ export function CardActions({
   onToggleRead,
   showRead = true,
   showAdd = true,
+  isCompleted,
+  completing,
+  onComplete,
 }: {
   isWhitelisted: boolean;
   isExcluded: boolean;
@@ -266,10 +269,15 @@ export function CardActions({
   onToggleRead?: () => void;
   showRead?: boolean;
   showAdd?: boolean;
+  isCompleted?: boolean;
+  completing?: boolean;
+  onComplete?: () => void;
 }) {
   // ponytail: single password — no role gate, any authed user can Add WL/Exclude
   const showAddEff = showAdd;
   const showExcludeEff = !isWhitelisted;
+  // Completed = tamat + exclude from RSS — from /recent, not whitelist
+  const showCompleted = !!onComplete;
   return (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-auto pt-3">
       {showRead && onToggleRead && (
@@ -283,6 +291,19 @@ export function CardActions({
         >
           {isRead ? <Check size={13} weight="bold" /> : null}
           {isRead ? "Read" : "Mark read"}
+        </button>
+      )}
+      {showCompleted && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onComplete?.();
+          }}
+          disabled={!!completing}
+          title={isCompleted ? "Undo completed" : "Mark as completed & exclude from RSS"}
+          className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors disabled:opacity-50 min-h-0 min-w-0 ${isCompleted ? "bg-amber-500/15 text-amber-300 border-amber-500/20 hover:bg-amber-500/25" : "bg-white/5 border-white/8 text-white/60 hover:text-white hover:bg-white/10"}`}
+        >
+          <CheckCircle size={13} weight={isCompleted ? "fill" : "bold"} /> {completing ? "..." : isCompleted ? "Completed ✓" : "Completed"}
         </button>
       )}
       {showExcludeEff &&

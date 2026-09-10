@@ -39,6 +39,9 @@ function AllCard({
   isExcluded,
   excluding,
   onExclude,
+  isCompleted,
+  completing,
+  onComplete,
   isPinned = false,
   onTogglePin,
   showReadButton = true,
@@ -55,6 +58,9 @@ function AllCard({
   isExcluded: boolean;
   excluding: boolean;
   onExclude: () => void;
+  isCompleted?: boolean;
+  completing?: boolean;
+  onComplete?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
   showReadButton?: boolean;
@@ -165,6 +171,9 @@ function AllCard({
           isExcluded={isExcluded}
           excluding={excluding}
           onExclude={onExclude}
+          isCompleted={isCompleted}
+          completing={completing}
+          onComplete={onComplete}
           adding={adding}
           onAdd={onAdd}
           isRead={isRead}

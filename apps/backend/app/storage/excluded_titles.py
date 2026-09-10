@@ -93,14 +93,26 @@ def add_excluded_title(
     source: str = "all",
     cover: Optional[str] = None,
     series_url: Optional[str] = None,
+    reason: str = "excluded",
+    is_completed: bool = False,
 ) -> dict:
-    """Upsert an excluded-title row (idempotent via unique (title_key,source))."""
+    """Upsert an excluded-title row (idempotent via unique (title_key,source)).
+
+    reason: 'excluded' (manual hide) vs 'completed' (tamat). Both filtered dari RSS.
+    is_completed: true = TAMAT badge di /recent. ponytail: 2 kolom tapi 1 semantics, keep both for idx + legacy.
+    """
     tk = normalize_title_key(title_key)
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
+    # normalize reason
+    reason = (reason or "excluded").strip().lower()
+    if reason not in ("excluded", "completed"):
+        reason = "excluded"
+    if reason == "completed":
+        is_completed = True
     try:
-        payload = {"title_key": tk, "source": src}
+        payload = {"title_key": tk, "source": src, "reason": reason, "is_completed": is_completed}
         if title is not None:
             payload["title"] = title
         if cover is not None:
@@ -154,25 +166,35 @@ def list_excluded_titles() -> list[dict]:
         rows = (
             get_supabase()
             .table("excluded_titles")
-            .select("id, title_key, title, source, created_at, cover, series_url")
+            .select("id, title_key, title, source, created_at, cover, series_url, reason, is_completed")
             .order("created_at", desc=True)
             .execute()
         )
         return list(rows.data or [])
     except Exception as e:
-        # Fallback for DBs where cover/series_url not yet migrated (fresh local DB)
-        if "cover" in str(e) or "series_url" in str(e):
+        # Fallback for DBs where cover/series_url/reason not yet migrated (fresh local DB)
+        if any(k in str(e) for k in ("cover", "series_url", "reason", "is_completed")):
             try:
                 rows = (
                     get_supabase()
                     .table("excluded_titles")
-                    .select("id, title_key, title, source, created_at")
+                    .select("id, title_key, title, source, created_at, cover, series_url")
                     .order("created_at", desc=True)
                     .execute()
                 )
                 return list(rows.data or [])
             except Exception:
-                pass
+                try:
+                    rows = (
+                        get_supabase()
+                        .table("excluded_titles")
+                        .select("id, title_key, title, source, created_at")
+                        .order("created_at", desc=True)
+                        .execute()
+                    )
+                    return list(rows.data or [])
+                except Exception:
+                    pass
         logger.error("list_excluded_titles failed", exc=e)
         return []
 

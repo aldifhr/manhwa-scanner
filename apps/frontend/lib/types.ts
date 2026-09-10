@@ -106,7 +106,7 @@ export interface DispatchHistoryItem {
   isDuplicate?: boolean;
 }
 
-// Excluded titles types
+// Excluded titles types — tamat = completed (filtered dari RSS + badge TAMAT)
 export interface ExcludedTitleItem {
   id?: string;
   titleKey: string;
@@ -115,6 +115,8 @@ export interface ExcludedTitleItem {
   createdAt?: string | null;
   cover?: string | null;
   seriesUrl?: string | null;
+  reason?: "excluded" | "completed";
+  isCompleted?: boolean;
 }
 
 import type { FlatChapter } from "@/lib/feed";
