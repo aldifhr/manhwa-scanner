@@ -633,7 +633,7 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
         elif tk and s == "ikiru":
             _wl_series = f"https://07.ikiru.wtf/manga/{tk}/"
         elif tk and s == "voratoon":
-            _wl_series = f"https://v2.voratoon.com/series/{tk}"
+            _wl_series = f"https://{settings.VORATOON_DOMAIN}/series/{tk}"
         elif tk and s == "shinigami":
             if rc.get("series_url"):
                 _wl_series = rc.get("series_url") or ""
@@ -653,7 +653,7 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
             _slug = _re2.sub(r"[^a-z0-9-]", "-", _slug_raw.lower().replace(" ", "-").replace("_", "-"))
             _slug = _re2.sub(r"-+", "-", _slug).strip("-")
             if _slug:
-                _wl_series = f"https://v2.voratoon.com/series/{_slug}"
+                _wl_series = f"https://{settings.VORATOON_DOMAIN}/series/{_slug}"
         except Exception:
             pass
     # cover must be a real http(s) URL; scrapers/FE sometimes store 'x' or

@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     SHINIGAMI_API_URL: str = ""
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
     VORATOON_API_URL: str = "https://api.voratoon.com"
+    VORATOON_DOMAIN: str = "v2.voratoon.com"  # ponytail: change here + REPLACE DB once
     SHINIGAMI_PUBLIC_URL: str = ""
     # 3 sources (ikiru, shinigami, voratoon) are active
     SOURCE_KEYS: list[str] = ["ikiru", "shinigami", "voratoon"]
