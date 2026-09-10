@@ -8,7 +8,7 @@ from app.config import settings
 from app.logger import get_logger
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 from app.services.rating_utils import normalize_rating
-from app.utils.text import normalize_title_key, slugify_title_key
+from app.utils.text import slugify_title_key
 from app.storage import health, whitelist as wl_store
 from app.cron.collectors.common import _SOURCE_TIMEOUT, _parse_types
 from app.cron.collectors.ikiru import _collect_ikiru_source
@@ -218,7 +218,7 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
     from app.scrapers import shinigami
     _sb = _get_sb()
     for w in whitelist:
-        wk = normalize_title_key(w.get("title_key", ""))
+        wk = slugify_title_key(w.get("title_key", ""))
         src = w.get("source")
         if src != "shinigami":
             continue
@@ -347,7 +347,7 @@ def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
     try:
         from app.db import get_supabase as _gsb3
         _sb3 = _gsb3()
-        _tk_list = [normalize_title_key(s.replace("-", " ")) for s in slugs]
+        _tk_list = [slugify_title_key(s) for s in slugs]
         if _tk_list:
             _dh = (_sb3.table("dispatch_history").select("title_key, source, chapter_title").in_("title_key", _tk_list).execute())
             for _row in (_dh.data or []):
@@ -361,7 +361,7 @@ def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
     except Exception as _e:
         logger.warn("ikiru notified-history load failed", err=str(_e)[:120])
     for slug in slugs:
-        _tk = normalize_title_key(slug.replace("-", " "))
+        _tk = slugify_title_key(slug)
         _sent = _slug_notified.get(f"{_tk}:ikiru") or set()
         from app.cron.collectors.common import _cached_chapter_list, _ikiru_re_touch_anchor, _is_ikiru_re_touch, MAX_CHAPTERS_PER_SERIES
         from app.scrapers import ikiru
@@ -404,5 +404,5 @@ def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
                     break
             except (ValueError, TypeError):
                 continue
-            items.append({"title": title, "title_key": (ch_url.rstrip("/").split("/")[-2] if ch_url else "").lower() or normalize_title_key(title), "chapter": str(num), "chapter_num": _num_f, "url": ch_url, "source": "ikiru", "cover": cover, "series_url": series_url, "chapter_url": ch_url, "origin": origin, "updated_time": _ut})
+            items.append({"title": title, "title_key": (ch_url.rstrip("/").split("/")[-2] if ch_url else "").lower() or slugify_title_key(title), "chapter": str(num), "chapter_num": _num_f, "url": ch_url, "source": "ikiru", "cover": cover, "series_url": series_url, "chapter_url": ch_url, "origin": origin, "updated_time": _ut})
     return items
