@@ -1,4 +1,4 @@
-"""Voratoon scraper — https://v1.voratoon.com"""
+"""Voratoon scraper — https://v2.voratoon.com"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -305,8 +305,8 @@ def _emit_series(results: list[dict], s: dict) -> None:
             "chapter_num": _parse_chapter_number(ch_index),
             "source": "voratoon",
             "cover": cover,
-            "series_url": f"https://v1.voratoon.com/series/{slug}",
-            "chapter_url": f"https://v1.voratoon.com/series/{slug}/chapter/{ch_index}",
+            "series_url": f"https://v2.voratoon.com/series/{slug}",
+            "chapter_url": f"https://v2.voratoon.com/series/{slug}/chapter/{ch_index}",
             "description": synopsis[:500] if synopsis else "",
             "rating": float(rating) if rating else 0.0,
             "genres": genres,

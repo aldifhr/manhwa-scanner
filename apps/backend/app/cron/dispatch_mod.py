@@ -181,7 +181,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _legacy_pairs = set()
 
     # Reject junk URLs that don't match known source patterns
-    _VALID_URL_PREFIXES = ("https://11.shinigami.asia/chapter/", "https://v1.voratoon.com/series/", "https://07.ikiru.wtf/manga/")
+    _VALID_URL_PREFIXES = ("https://11.shinigami.asia/chapter/", "https://v2.voratoon.com/series/", "https://07.ikiru.wtf/manga/")
     _junk_urls = {u for u in _all_urls if not any(u.startswith(p) for p in _VALID_URL_PREFIXES)}
     if _junk_urls:
         logger.warn("dispatch: filtering junk urls", count=len(_junk_urls), examples=list(_junk_urls)[:3])

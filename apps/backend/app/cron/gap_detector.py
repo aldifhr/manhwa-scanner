@@ -210,7 +210,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                             continue
                         ch_index = c.get("chapter") or c.get("chapter_number")
                         if num > 0 and ch_index:
-                            url = f"https://v1.voratoon.com/series/{slug}/chapter/{ch_index}"
+                            url = f"https://v2.voratoon.com/series/{slug}/chapter/{ch_index}"
                             chapters.append((num, url, str(c.get("title") or ""), c.get("updated_time")))
 
                 if not chapters:

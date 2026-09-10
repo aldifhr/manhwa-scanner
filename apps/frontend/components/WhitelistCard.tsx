@@ -32,7 +32,7 @@ function resolveDetailUrl(item: WhitelistRouteItem): string | undefined {
   const slug = slugFromTitle(title);
   if (!slug) return undefined;
   if (sources.includes("voratoon"))
-    return `https://v1.voratoon.com/series/${slug}`;
+    return `https://v2.voratoon.com/series/${slug}`;
   if (sources.includes("ikiru")) return `https://07.ikiru.wtf/manga/${slug}/`;
   if (sources.includes("shinigami")) {
     const raw =
