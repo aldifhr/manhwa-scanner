@@ -11,7 +11,8 @@ export const queryKeys = {
     limit?: number,
     source?: string | null,
     whitelist = false,
-    type?: string | null
+    type?: string | null,
+    page?: number
   ) =>
     [
       "rss-feed-flat",
@@ -20,6 +21,7 @@ export const queryKeys = {
       source ?? "all",
       whitelist,
       type ?? "all",
+      page ?? 1,
     ] as const,
   dispatchHistory: (search?: string) =>
     ["dispatch-history", search ?? ""] as const,

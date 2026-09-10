@@ -45,13 +45,7 @@ import { useUiUrlSync } from "@/lib/useUiUrlSync";
 import { useDebounced } from "@/lib/useDebounced";
 import { usePacerThrottledScroll } from "@/lib/usePacerThrottles";
 import { PageShell } from "@/components/PageShell";
-function normalizeTitleKey(k: string) {
-  return (k || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+import { normalizeTitleKey } from "@/lib/groupChapters";
 import { usePinnedSet } from "./hooks/usePinnedSet";
 import { useInfiniteFeed } from "./hooks/useInfiniteFeed";
 import { useFeedActions } from "./hooks/useFeedActions";
@@ -607,7 +601,7 @@ function AllTabInner() {
             const isDeepMatch = i === groupedDeepLinkIndex;
             return (
               <div
-                key={`${s.titleKey}-${i}`}
+                key={s.titleKey}
                 data-title-key={s.titleKey}
                 ref={
                   isDeepMatch

@@ -107,7 +107,7 @@ export async function refreshSession(): Promise<boolean> {
   try {
     const res = await fetch(
       `/api/reader/auth-refresh`,
-      withCsrf({ method: "POST" })
+      withCsrf({ method: "POST", credentials: "include" as RequestCredentials })
     );
     return res.ok;
   } catch {

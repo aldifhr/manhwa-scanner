@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const LS_KEY = "home_read_items";
-
 export function useReadItems() {
   const [readItems, setReadItems] = useState<Set<string>>(new Set());
-
+  const hasHydrated = useRef(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -12,9 +11,11 @@ export function useReadItems() {
     } catch {
       /* ignore */
     }
+    hasHydrated.current = true;
   }, []);
 
   useEffect(() => {
+    if (!hasHydrated.current) return;
     try {
       localStorage.setItem(LS_KEY, JSON.stringify([...readItems]));
     } catch {

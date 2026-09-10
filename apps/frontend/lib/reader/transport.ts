@@ -2,6 +2,19 @@
 import { withCsrf } from "@/lib/csrf";
 import { parseErrorMessage } from "@/lib/fetchError";
 
+// global 401 handler — triggers refreshSession then redirect to /login
+let _handling401 = false;
+async function handle401() {
+  if (typeof window === "undefined" || _handling401) return;
+  _handling401 = true;
+  try {
+    // trigger refreshSession (dynamic import avoids circular static dep)
+    const { refreshSession } = await import("@/lib/server-api");
+    await refreshSession();
+  } catch {}
+  window.location.href = "/login";
+}
+
 export type FetchImpl = typeof fetch;
 
 export async function readerFetch<T>(
@@ -17,7 +30,10 @@ export async function readerFetch<T>(
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     const msg = parseErrorMessage(res.status, text);
-    if (res.status === 401) throw new Error(`UNAUTHORIZED: ${msg}`);
+    if (res.status === 401) {
+      void handle401();
+      throw new Error(`UNAUTHORIZED: ${msg}`);
+    }
     throw new Error(msg);
   }
   return res.json() as Promise<T>;

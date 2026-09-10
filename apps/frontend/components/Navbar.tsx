@@ -40,7 +40,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-black/95 backdrop-blur-md border-b border-white/10 safe-area-top">
+      <nav inert={open ? (true as unknown as boolean) : undefined} className="sticky top-0 z-50 bg-black/95 backdrop-blur-md border-b border-white/10 safe-area-top">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-14 sm:h-16 gap-4 sm:gap-8">
             <Link
@@ -95,6 +95,7 @@ export default function Navbar() {
               className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors"
               aria-label="Open menu"
               aria-expanded={open}
+              aria-controls="mobile-drawer"
             >
               <svg
                 width="20"
@@ -128,6 +129,10 @@ export default function Navbar() {
               aria-hidden
             />
             <motion.div
+              id="mobile-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation menu"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}

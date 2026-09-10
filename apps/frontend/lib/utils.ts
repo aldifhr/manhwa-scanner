@@ -73,7 +73,9 @@ export function getChapterLabel(item: {
 }
 
 /** Decode HTML entities (numeric &#8217; and named &amp;) in API responses */
-export function decodeHtml(text: string): string {
+export function decodeHtml(text: string | null | undefined): string {
+  if (text == null) return "";
+  if (typeof text !== "string") text = String(text);
   const named: Record<string, string> = {
     "&amp;": "&",
     "&lt;": "<",

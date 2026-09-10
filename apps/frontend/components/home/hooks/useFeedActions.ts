@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { queryKeys } from "@/lib/queryKeys";
@@ -24,9 +24,24 @@ export function useFeedActions() {
   const [completingKey, setCompletingKey] = useState<string | null>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
 
-  const isLoggedIn =
-    typeof document !== "undefined" &&
-    !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
+  // refs to avoid stale closure race in mutationFn
+  const excludedRef = useRef(optimisticExcluded);
+  const completedRef = useRef(optimisticCompleted);
+  useEffect(() => { excludedRef.current = optimisticExcluded; }, [optimisticExcluded]);
+  useEffect(() => { completedRef.current = optimisticCompleted; }, [optimisticCompleted]);
+
+  // per-key lock via Set (prevents concurrent toggle race on same title)
+  const pendingKeys = useRef<Set<string>>(new Set());
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => {
+    const check = () => setIsLoggedIn(typeof document !== "undefined" && !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/));
+    check();
+    const id = setInterval(check, 2000);
+    const onFocus = () => check();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(id); window.removeEventListener("focus", onFocus); };
+  }, []);
   const { data: excludedData } = useQuery({
     queryKey: queryKeys.excludedTitles,
     queryFn: () =>
@@ -205,16 +220,19 @@ export function useFeedActions() {
       const src = (item.source || "all").toLowerCase();
       const key = `${item.titleKey}:${src}`;
       const legacyKey = `${item.titleKey}:all`;
-      const isExcl = optimisticExcluded.has(key) || optimisticExcluded.has(legacyKey);
+      const excl = excludedRef.current;
+      if (pendingKeys.current.has(key)) throw new Error("Duplicate request");
+      pendingKeys.current.add(key);
+      const isExcl = excl.has(key) || excl.has(legacyKey);
       if (isExcl) {
         // Prefer deleting the specific source if present, else legacy "all"
-        const srcToDelete = optimisticExcluded.has(key) && !optimisticExcluded.has(legacyKey) ? src : optimisticExcluded.has(legacyKey) ? "all" : src;
+        const srcToDelete = excl.has(key) && !excl.has(legacyKey) ? src : excl.has(legacyKey) ? "all" : src;
         await Reader.removeExcludedTitle({
           title_key: item.titleKey,
           source: srcToDelete,
         } as Record<string, unknown>);
         // If both keys exist (edge: duplicate all+specific), clean up the other as well
-        if (optimisticExcluded.has(key) && optimisticExcluded.has(legacyKey) && srcToDelete !== "all") {
+        if (excl.has(key) && excl.has(legacyKey) && srcToDelete !== "all") {
           try {
             await Reader.removeExcludedTitle({
               title_key: item.titleKey,
@@ -254,7 +272,13 @@ export function useFeedActions() {
     },
     onError: (err) =>
       toast(err instanceof Error ? err.message : "Failed to exclude", "error"),
-    onSettled: () => setExcludingKey(null),
+    onSettled: (_data, _err, vars) => {
+      setExcludingKey(null);
+      if (vars) {
+        const k = `${vars.titleKey}:${(vars.source || "all").toLowerCase()}`;
+        pendingKeys.current.delete(k);
+      }
+    },
   });
 
   const excludeSeriesMutation = useMutation({
@@ -271,12 +295,13 @@ export function useFeedActions() {
         bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
       }
       const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
-      const isExcl = distinctKeys.length > 0 && distinctKeys.every((k) => optimisticExcluded.has(k) || optimisticExcluded.has(`${k.split(":")[0]}:all`));
+      const excl = excludedRef.current;
+      const isExcl = distinctKeys.length > 0 && distinctKeys.every((k) => excl.has(k) || excl.has(`${k.split(":")[0]}:all`));
       if (isExcl) {
         await Promise.all(
           [...bySource.entries()].map(([s, v]) => {
             const k = `${v.titleKey}:${s}`;
-            const srcToDelete = optimisticExcluded.has(k) && !optimisticExcluded.has(`${v.titleKey}:all`) ? s : optimisticExcluded.has(`${v.titleKey}:all`) ? "all" : s;
+            const srcToDelete = excl.has(k) && !excl.has(`${v.titleKey}:all`) ? s : excl.has(`${v.titleKey}:all`) ? "all" : s;
             return Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
           })
         );
@@ -327,11 +352,14 @@ export function useFeedActions() {
       const src = (item.source || "all").toLowerCase();
       const key = `${item.titleKey}:${src}`;
       const legacyKey = `${item.titleKey}:all`;
-      const isComp = optimisticCompleted.has(key) || optimisticCompleted.has(legacyKey) || optimisticCompleted.has(item.titleKey);
+      const comp = completedRef.current;
+      const isComp = comp.has(key) || comp.has(legacyKey) || comp.has(item.titleKey);
+      if (pendingKeys.current.has(`c:${key}`)) throw new Error("Duplicate request");
+      pendingKeys.current.add(`c:${key}`);
       if (isComp) {
-        const srcToDelete = optimisticCompleted.has(key) && !optimisticCompleted.has(legacyKey) ? src : optimisticCompleted.has(legacyKey) ? "all" : src;
+        const srcToDelete = comp.has(key) && !comp.has(legacyKey) ? src : comp.has(legacyKey) ? "all" : src;
         await Reader.removeExcludedTitle({ title_key: item.titleKey, source: srcToDelete } as Record<string, unknown>);
-        if (optimisticCompleted.has(key) && optimisticCompleted.has(legacyKey) && srcToDelete !== "all") {
+        if (comp.has(key) && comp.has(legacyKey) && srcToDelete !== "all") {
           try { await Reader.removeExcludedTitle({ title_key: item.titleKey, source: "all" } as Record<string, unknown>); } catch {}
         }
         return { isComp: true, key, legacyKey };
@@ -356,7 +384,10 @@ export function useFeedActions() {
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
     },
     onError: (err) => toast(err instanceof Error ? err.message : "Failed to mark as completed", "error"),
-    onSettled: () => setCompletingKey(null),
+    onSettled: (_d, _e, vars) => {
+      setCompletingKey(null);
+      if (vars) pendingKeys.current.delete(`c:${vars.titleKey}:${(vars.source || "all").toLowerCase()}`);
+    },
   });
 
   const completeSeriesMutation = useMutation({
@@ -369,11 +400,12 @@ export function useFeedActions() {
       }
       if (bySource.size === 0 && series.titleKey) bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
       const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
-      const isComp = distinctKeys.length > 0 && distinctKeys.every((k) => optimisticCompleted.has(k) || optimisticCompleted.has(`${k.split(":")[0]}:all`) || optimisticCompleted.has(k.split(":")[0]));
+      const comp = completedRef.current;
+      const isComp = distinctKeys.length > 0 && distinctKeys.every((k) => comp.has(k) || comp.has(`${k.split(":")[0]}:all`) || comp.has(k.split(":")[0]));
       if (isComp) {
         await Promise.all([...bySource.entries()].map(([s, v]) => {
           const k = `${v.titleKey}:${s}`;
-          const srcToDelete = optimisticCompleted.has(k) && !optimisticCompleted.has(`${v.titleKey}:all`) ? s : optimisticCompleted.has(`${v.titleKey}:all`) ? "all" : s;
+          const srcToDelete = comp.has(k) && !comp.has(`${v.titleKey}:all`) ? s : comp.has(`${v.titleKey}:all`) ? "all" : s;
           return Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
         }));
         return { isComp: true, keys: distinctKeys };
@@ -401,12 +433,10 @@ export function useFeedActions() {
     onSettled: () => setCompletingKey(null),
   });
 
-  const rateLimitedAdd = usePacerRateLimitedWL((item: FlatChapter) =>
-    addMutation.mutate(item)
-  );
-  const rateLimitedAddGroup = usePacerRateLimitedWL((series: GroupedSeries) =>
-    addGroupMutation.mutate(series)
-  );
+  const addCb = useCallback((item: FlatChapter) => addMutation.mutate(item), [addMutation]);
+  const addGroupCb = useCallback((series: GroupedSeries) => addGroupMutation.mutate(series), [addGroupMutation]);
+  const rateLimitedAdd = usePacerRateLimitedWL(addCb);
+  const rateLimitedAddGroup = usePacerRateLimitedWL(addGroupCb);
   const handleAdd = useCallback(
     (item: FlatChapter) => rateLimitedAdd(item),
     [rateLimitedAdd]

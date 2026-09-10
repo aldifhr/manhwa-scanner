@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { decodeHtml, rewriteCoverUrl, getChapterLabel } from "@/lib/utils";
@@ -42,7 +42,8 @@ interface FeedResponse {
 
 async function fetchFeed(): Promise<FeedResponse> {
   // Flat + client groupChapters — server grouped (?group=true) missing chapter numbers for ikiru (Ch. ?), so force flat
-  const res = await fetch("/api/v1/reader/rss?limit=36&group=false");
+  const res = await fetch("/api/v1/reader/rss?limit=36&group=false", { credentials: "include" });
+  if (!res.ok) throw new Error(`Feed fetch failed: ${res.status} ${res.statusText}`);
   return res.json();
 }
 
@@ -365,11 +366,10 @@ export default function HomePage() {
 
   const { optimisticWhitelist, addingKey, handleAddGroup } = useFeedActions();
 
-
-
-  const isLoggedInForSnapshot =
-    typeof document !== "undefined" &&
-    !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
+  const [isLoggedInForSnapshot, setIsLoggedInForSnapshot] = useState(false);
+  useEffect(() => {
+    setIsLoggedInForSnapshot(!!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/));
+  }, []);
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: queryKeys.dashboardSnapshot,
     queryFn: () =>
@@ -615,7 +615,7 @@ export default function HomePage() {
             const isBM = false;
             return (
               <motion.div
-                key={series.titleKey + String(i)}
+                key={series.titleKey}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i, 12) * 0.04, duration: 0.3 }}

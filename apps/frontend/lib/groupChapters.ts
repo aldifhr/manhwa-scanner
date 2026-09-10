@@ -1,8 +1,8 @@
 import type { FlatChapter } from "@/lib/feed";
 
-function normalizeTitleKey(k: string): string {
+export function normalizeTitleKey(k: string | null | undefined): string {
   if (!k) return "";
-  return k
+  return String(k)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
@@ -79,9 +79,16 @@ export interface GroupedSeries {
 export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
   const map = new Map<string, GroupedSeries>();
   const coverSource = new Map<string, string>();
+  // dedup: normalized group key + source + chapter (chapter may be undefined, fall back to chapterLabel/number)
+  const seenChapters = new Map<string, Set<string>>();
   for (const it of items) {
-    const tk = it.titleKey;
+    const tk = (it.titleKey ?? "") as string;
     const gk = normalizeTitleKey(tk); // dedup across dash/space/case/uuid
+    if (!gk) continue;
+    // chapter dedup key uses normalized group key so "Solo-Leveling" vs "solo leveling" doesn't duplicate
+    const chapId = `${(it.source || "").toLowerCase()}:${String(it.chapter ?? it.chapterLabel ?? it.chapterNumber ?? it.url ?? "")}`;
+    const seen = seenChapters.get(gk);
+    if (seen?.has(chapId)) continue;
     let g = map.get(gk);
     if (!g) {
       g = {
@@ -104,7 +111,7 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
       if (!g!.type && it.type) g!.type = it.type;
     }
     g!.chapters.push({
-      key: `${tk}:${it.source}:${it.chapter}`,
+      key: `${gk}:${it.source}:${it.chapter}`,
       titleKey: tk,
       chapter: it.chapter,
       chapterLabel: it.chapterLabel,
@@ -118,6 +125,9 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
       isSent: it.isSent,
       isWhitelisted: it.isWhitelisted,
     });
+    // track dedup
+    if (!seenChapters.has(gk)) seenChapters.set(gk, new Set());
+    seenChapters.get(gk)!.add(chapId);
     // keep series-level whitelist flag if any chapter is whitelisted
     if (it.isWhitelisted) g!.isWhitelisted = true;
     // prefer first non-empty description/rating/genres (RSS may have empty desc on one source)

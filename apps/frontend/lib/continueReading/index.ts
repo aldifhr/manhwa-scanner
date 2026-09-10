@@ -89,7 +89,7 @@ const SYNC_ENDPOINT = "/api/v1/continue-reading";
 export async function fetchRemote(): Promise<
   Record<string, ContinueReadingEntry>
 > {
-  const res = await fetch(SYNC_ENDPOINT, { cache: "no-store" });
+  const res = await fetch(SYNC_ENDPOINT, { cache: "no-store", credentials: "include" });
   if (!res.ok) return {};
   const body = await res.json().catch(() => null);
   const remote: Record<string, ContinueReadingEntry> = body?.data ?? body ?? {};
@@ -103,6 +103,7 @@ export async function pushRemote(
     SYNC_ENDPOINT,
     withCsrf({
       method: "PUT",
+      credentials: "include" as RequestCredentials,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(clean),
     })
@@ -195,6 +196,7 @@ export function useContinueReading(
     }
     globalHasFetchedRemote = true;
     let cancelled = false;
+    let didFinish = false;
     (async () => {
       try {
         if (!globalFetchPromise) globalFetchPromise = doFetch();
@@ -221,11 +223,17 @@ export function useContinueReading(
           globalHasFetchedRemote = false;
         }, 60000);
       } finally {
+        didFinish = true;
         if (!cancelled) hasHydrated.current = true;
       }
     })();
     return () => {
       cancelled = true;
+      // StrictMode: first mount unmounted before fetch finished — reset globals so second mount fetches
+      if (!didFinish) {
+        globalHasFetchedRemote = false;
+        globalFetchPromise = null;
+      }
     };
   }, [store, doFetch]);
   useEffect(() => {

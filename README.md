@@ -1,48 +1,39 @@
-# manhwa-scanner — Monorepo
+# manhwa-scanner
 
-Next.js Frontend + FastAPI Backend — `openapi.json` synced, `komik.aldifhr.fun` (FE) → `scanner.aldifhr.fun` (BE).
+Monorepo: **Next.js frontend** (`apps/frontend`) + **FastAPI backend** (`apps/backend`). Scrapes chapter releases from ikiru, shinigami, and voratoon sources into a 24h rolling feed, filters against a whitelist, and dispatches new chapters to Discord. `komik.aldifhr.fun` (FE) → `scanner.aldifhr.fun` (BE).
 
-- **FE** `apps/frontend` — Next 16 App Router, `pnpm --filter manhwa-reader dev` (`http://localhost:3000`)
-- **BE** `apps/backend` — FastAPI, `uv run uvicorn app.main:app --reload` (`http://localhost:8000`)
-- **Live:** `https://komik.aldifhr.fun` → `https://scanner.aldifhr.fun`
+## Architecture
 
-## Roles — Full Admin Only (single password `DASHBOARD_PASSWORD`)
+Two-pass cron pipeline: **rss-fetch** (scrape + persist to PostgreSQL) → **dispatch** (whitelist filter → Discord). Storage via psycopg2 connection pool, Redis-backed task queue for cron jobs. See [docs/architecture.md](docs/architecture.md) for the full data flow, table catalog (12 tables), and index map.
 
-| Role   | Login                                                                               | Bisa                                                                                                                                                          |
-| ------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `anon` | —                                                                                   | Lihat `Home` `/`, `Recent` `/recent`, `Bookmarks` (localStorage), `Operational` dot di nav                                                                    |
-| `admin`| `POST /api/v1/auth?action=login` `{password: DASHBOARD_PASSWORD}` → `ikiru_dashboard_session` (JWT) | `anon` + `bookmark`/`continueReading` sync DB `chapter_bookmarks` per `session_hash` + `add/remove whitelist` (per-source `title_key:source`), `exclude` per-source (`useFeedActions.ts` + `AllTab.tsx` `9bf130d`), `dispatch`/`send notif`, `GET /admin`, `/whitelist`, `/exclude-list` (group `ikiru`/`shinigami`/`voratoon`/`all` legacy), `/dispatch-history` |
-
-Semua endpoint mutasi (`POST/DELETE /whitelist`, `POST /excluded-titles`, `POST /api/cron`) butuh `ikiru_dashboard_session` (admin). Tanpa login → `401` / `302 /login`.
-
-## Routes
-
-- Public `GET`: `/`, `/recent`, `/bookmarks` (anon local), `GET /api/v1/reader/rss`, `/api/v1/dashboard/snapshot` (`Operational` dot), `GET /whitelist` (Home badge)
-- Protected `GET`: `/whitelist`, `/exclude-list`, `/dispatch-history`, `/admin`, `/status` → butuh login (`302 /login`)
-- Mutating: `POST /whitelist` (per-source), `POST /excluded-titles` (per-source `ikiru`/`shinigami`/`voratoon`, legacy `all` = block semua source) + `POST /excluded-titles/bulk` (bulk per source) → butuh login (`401` kalau anon)
-- **Exclude per-source** (`9bf130d`): tombol Exclude di Home/AllTab kirim `source=item.source` (bukan `all`); `optimisticExcluded` key `titleKey:source` (`useFeedActions.ts:26`) + filter `AllTab.tsx:163` per-source; `/exclude-list` group by `source` (`ikiru` sky / `shinigami` violet / `voratoon` gray / `all` amber legacy); `is_excluded` cek `(tk,source)` or `(tk,all)` `app/storage/excluded_titles.py:87` — legacy `all` tetap hide semua source sampai di-migrasi
-
-## Dev
+## Quick start
 
 ```bash
+# Clone
+git clone <repo-url> manhwa-scanner && cd manhwa-scanner
+
+# Frontend
 pnpm install
-pnpm --filter manhwa-reader dev        # FE
-cd apps/backend && uv run uvicorn app.main:app --reload  # BE
-pnpm --filter manhwa-reader typecheck && pnpm --filter manhwa-reader test
+pnpm --filter manhwa-reader dev        # http://localhost:3000
+
+# Backend
+cd apps/backend
+uv sync
+cp .env.example .env                   # set DASHBOARD_PASSWORD, DATABASE_URL, etc.
+ENVIRONMENT=development uv run uvicorn app.main:app --reload  # http://localhost:8000
 ```
-
-## Env
-
-| Variable                               | Contoh          | Ket                                           |
-| -------------------------------------- | --------------- | --------------------------------------------- |
-| `DASHBOARD_PASSWORD` / `MONITOR_AUTH_TOKEN` | `BE .env`       | admin password (single, `DASHBOARD_PASSWORD` utama) |
-| `AUTH_SECRET`                          | `BE .env`       | HS256 JWT `ikiru_dashboard_session`                 |
-| `DATABASE_URL`                         | Supabase pooler | `chapter_bookmarks`, `whitelist`, `recent_chapters` |
-
-`app_users` di-drop `050` — full admin only, tidak pakai `pbkdf2`/`role` lagi.
 
 ## Docs
 
-- `CONTEXT.md` — domain & deep modules (`Reader`, `Cover`, `Cache`)
-- `AGENTS.md` — 14 skills `obra/superpowers` (ponytail full)
-- `apps/backend/openapi.json` — contract
+- [docs/architecture.md](docs/architecture.md) — data flow, tables, indexes, retention
+- [docs/local-development.md](docs/local-development.md) — env vars, local run, lint, test
+- [docs/deployment.md](docs/deployment.md) — PM2, Caddy, deploy.sh, Vercel
+- [docs/api.md](docs/api.md) — endpoint overview (full schema: `apps/backend/openapi.json`)
+- [docs/sources.md](docs/sources.md) — ikiru/shinigami/voratoon, fallback chains, type mapping
+- [docs/security.md](docs/security.md) — auth, CSRF, JWT, P0 findings
+
+## References
+
+- [apps/backend/README.md](apps/backend/README.md) — backend-specific setup, config, cron
+- [CONTEXT.md](CONTEXT.md) — domain glossary, roles, routes, deep modules
+- [BUG.md](BUG.md) — known issues and security findings

@@ -25,12 +25,13 @@ function getCsrfToken(): string {
  * Only adds the header for mutating methods — safe methods are left untouched.
  */
 export function withCsrf(init: RequestInit = {}): RequestInit {
-  const method = (init.method ?? "GET").toUpperCase();
-  if (["GET", "HEAD", "OPTIONS"].includes(method)) return init;
+  const base: RequestInit = { ...init, credentials: "include" as RequestCredentials };
+  const method = (base.method ?? "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return base;
 
   const token = getCsrfToken();
   // merge headers handling Headers instance / array
-  const headers = new Headers(init.headers as HeadersInit | undefined);
+  const headers = new Headers(base.headers as HeadersInit | undefined);
   if (token) headers.set(CSRF_HEADER, token);
-  return { ...init, headers };
+  return { ...base, headers };
 }

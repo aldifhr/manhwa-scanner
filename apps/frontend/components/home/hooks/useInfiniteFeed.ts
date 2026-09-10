@@ -31,13 +31,20 @@ export function useInfiniteFeed(opts: {
   const [backendHasMore, setBackendHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // refs to avoid stale closure race
+  const pageRef = useRef(page);
+  const loadingRef2 = useRef(loadingMore);
+  useEffect(() => { pageRef.current = page; }, [page]);
+  useEffect(() => { loadingRef2.current = loadingMore; }, [loadingMore]);
+
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: queryKeys.rssFeedFlat(
       exclude,
       PAGE_SIZE,
       sourceFilter || null,
       whitelistParam,
-      typeFilter && typeFilter !== "no_type" ? typeFilter : null
+      typeFilter && typeFilter !== "no_type" ? typeFilter : null,
+      1
     ),
     queryFn: () =>
       Reader.getRssFlatPage(1, PAGE_SIZE, {
@@ -51,20 +58,20 @@ export function useInfiniteFeed(opts: {
   });
 
   useEffect(() => {
-    if (data && page === 1) {
+    if (data && pageRef.current === 1) {
       const sorted = [...(data.results as unknown as FlatChapter[])].sort(
         compareFlatByNewest
       );
       setAllItems(sorted);
       setBackendHasMore(data.hasMore);
     }
-  }, [data, page]);
+  }, [data]);
 
   const hasMore = backendHasMore;
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || isLoading) return;
-    const next = page + 1;
+    if (loadingRef2.current || !hasMore || isLoading) return;
+    const next = pageRef.current + 1;
     setLoadingMore(true);
     try {
       const res = await Reader.getRssFlatPage(next, PAGE_SIZE, {
@@ -81,7 +88,7 @@ export function useInfiniteFeed(opts: {
         return [...prev, ...incoming].sort(compareFlatByNewest);
       });
       setBackendHasMore(res.hasMore);
-      setPage((p) => p + 1);
+      setPage(next);
     } catch (e) {
       if ((e as Error)?.name === "AbortError") return;
       toast("Failed to load more — check connection", "error");
@@ -89,10 +96,8 @@ export function useInfiniteFeed(opts: {
       setLoadingMore(false);
     }
   }, [
-    loadingMore,
     hasMore,
     isLoading,
-    page,
     sourceFilter,
     whitelistParam,
     typeFilter,
@@ -102,10 +107,12 @@ export function useInfiniteFeed(opts: {
   // reset on server-filter change only (whitelistParam, source, type)
   // feed=nowl vs all share same whitelistParam=false → client-only filter, no clear needed
   // Keep allItems populated (keepPreviousData) so filter buttons don't vanish mid-refetch
+  // ponytail: reset allItems only after refetch — don't clear here, data effect replaces when page 1
   useEffect(() => {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
     setBackendHasMore(true);
     setPage(1);
+    pageRef.current = 1;
     setLoadingMore(false);
   }, [sourceFilter, typeFilter, whitelistParam]);
 
@@ -138,20 +145,31 @@ export function useInfiniteFeed(opts: {
     [hasMore]
   );
 
+  // cleanup observer on unmount (leak fix)
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, []);
+
   // prefetch next page when scrolled past 80% — THROTTLE (may drop intermediate scrolls)
   const throttledPrefetch = usePacerThrottledScroll(() => {
-    if (!hasMore || loadingMore) return;
+    if (!hasMore || loadingRef2.current) return;
     const scrolled = window.scrollY + window.innerHeight;
     const threshold = document.documentElement.scrollHeight * 0.8;
     if (scrolled >= threshold) {
-      const next = page + 1;
+      const next = pageRef.current + 1;
       queryClient.prefetchQuery({
         queryKey: queryKeys.rssFeedFlat(
           exclude,
           PAGE_SIZE,
           sourceFilter || null,
           whitelistParam,
-          typeFilter && typeFilter !== "no_type" ? typeFilter : null
+          typeFilter && typeFilter !== "no_type" ? typeFilter : null,
+          next
         ),
         queryFn: () =>
           Reader.getRssFlatPage(next, PAGE_SIZE, {

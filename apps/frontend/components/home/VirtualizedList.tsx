@@ -163,9 +163,14 @@ export default function VirtualizedList<T>({
     >
       {virtualItems.map((vi) => {
         const rowItems = rows[vi.index] ?? [];
+        // ponytail: stable row key from first item's titleKey when available, else virtualizer index
+        const rowKey =
+          titleKeyOf && rowItems[0]
+            ? `${titleKeyOf(rowItems[0] as T)}-${vi.index}`
+            : String(vi.key);
         return (
           <div
-            key={vi.key}
+            key={rowKey}
             data-index={vi.index}
             ref={measureRef}
             className="absolute top-0 left-0 w-full"
@@ -177,7 +182,8 @@ export default function VirtualizedList<T>({
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {rowItems.map((it, k) => {
                   const realIndex = vi.index * effectiveChunk + k;
-                  return <div key={realIndex}>{renderItem(it, realIndex)}</div>;
+                  const itemKey = titleKeyOf ? titleKeyOf(it) || String(realIndex) : String(realIndex);
+                  return <div key={itemKey}>{renderItem(it, realIndex)}</div>;
                 })}
               </div>
             )}
