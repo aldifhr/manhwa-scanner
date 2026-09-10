@@ -26,7 +26,7 @@ logger = get_logger("storage:excluded-titles")
 
 # ponytail: single source from config, hardcode drifts when new source added
 from app.config import settings as _cfg
-_VALID_SOURCES = tuple(_cfg.VALID_SOURCES_WITH_ALL)  # type: ignore
+_VALID_SOURCES = ("all", "ikiru", "shinigami", "voratoon")
 
 
 def _norm_source(src: str) -> str:
