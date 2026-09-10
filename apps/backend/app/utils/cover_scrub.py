@@ -123,3 +123,47 @@ def cover_ref(title_key: str | None) -> str:
         pass
     _cover_ref_cache[tk] = (_t.monotonic(), "")
     return ""
+
+
+def batch_cover_ref(title_keys: list[str]) -> dict[str, str]:
+    """Batch cover lookup — WHERE title_key IN (...) once, not N queries."""
+    import time as _t
+    result: dict[str, str] = {}
+    pending: list[str] = []
+    for tk in title_keys:
+        if not tk:
+            continue
+        cached = _cover_ref_cache.get(tk)
+        if cached and (_t.monotonic() - cached[0]) < _cover_ref_ttl:
+            result[tk] = cached[1]
+        else:
+            pending.append(tk)
+    if not pending:
+        return result
+    try:
+        from app.db import get_supabase
+        sb = get_supabase()
+        for table in ("whitelist", "recent_chapters"):
+            try:
+                res = (
+                    sb.table(table)
+                    .select("title_key,cover")
+                    .in_("title_key", pending)
+                    .limit(len(pending) * 2)
+                    .execute()
+                )
+                for r in (res.data or []):
+                    tk = r.get("title_key", "")
+                    if tk not in result:
+                        raw = r.get("cover")
+                        c = raw.strip() if isinstance(raw, str) else ""
+                        if c:
+                            result[tk] = c
+            except Exception:
+                continue
+    except Exception:
+        pass
+    for tk in pending:
+        if tk not in result:
+            _cover_ref_cache[tk] = (_t.monotonic(), "")
+    return result

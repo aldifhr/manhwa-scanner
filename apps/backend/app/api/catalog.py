@@ -14,7 +14,7 @@ from app.utils.text import slugify_title_key, deslugify_title_key, normalize_tit
 from app.logger import get_logger
 from app.storage import whitelist as wl_store
 from app.utils.request_auth import int_safe, safe_error, require_monitor_auth
-from app.utils.cover_scrub import scrub_cover, cover_ref
+from app.utils.cover_scrub import scrub_cover, cover_ref, batch_cover_ref
 
 # Cache for catalog/chapters keyed by title_key (60s TTL).
 _CAT_CH_CACHE: list = [0.0, None, None]  # [ts, title_key, payload]
@@ -152,6 +152,9 @@ async def catalog_list(request: Request):
             except Exception:
                 pass
 
+    # Batch cover lookup — 1 query instead of N
+    covers = batch_cover_ref(tks) if paged else {}
+
     results = []
     for r in paged:
         tk = r.get("title_key", "")
@@ -177,7 +180,7 @@ async def catalog_list(request: Request):
             {
                 "titleKey": tk,
                 "title": r.get("title", "") or cached.get("title", ""),
-                "cover": cover_ref(tk),
+                "cover": covers.get(tk, ""),
                 "status": status,
                 "source": src,
                 "rating": rating,
