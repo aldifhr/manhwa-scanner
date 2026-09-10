@@ -31,7 +31,7 @@ export function WhitelistGrid() {
   const [originFilter, setOriginFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounced(searchTerm, 300);
-  const [sort, setSort] = useState<"title" | "rating" | "recent">("recent");
+  const [sort, setSort] = useState<"title" | "rating" | "recent">("title");
 
   const [catalogSearch, setCatalogSearch] = useState("");
   const debouncedCatalogSearch = useDebounced(catalogSearch, 400);
