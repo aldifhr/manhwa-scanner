@@ -24,7 +24,9 @@ from app.utils.text import slugify_title_key
 
 logger = get_logger("storage:excluded-titles")
 
-_VALID_SOURCES = ("all", "ikiru", "shinigami", "voratoon")
+# ponytail: single source from config, hardcode drifts when new source added
+from app.config import settings as _cfg
+_VALID_SOURCES = tuple(_cfg.VALID_SOURCES_WITH_ALL)  # type: ignore
 
 
 def _norm_source(src: str) -> str:
@@ -246,7 +248,7 @@ def exclude_all_by_source(source: str) -> dict:
             .table("recent_chapters")
             .select("title_key, title, series_url, cover")
             .eq("source", src)
-            .limit(2000)
+            .limit(5000)
             .execute()
         )
         seen: dict[str, dict] = {}
