@@ -1,4 +1,4 @@
-const CACHE_NAME = "manhwa-images-v3";
+const CACHE_NAME = "manhwa-images-v4";
 const MAX_AGE_MS = 6 * 60 * 60 * 1000; // SWR window: serve cache instantly while this fresh, else network-first
 const MAX_ENTRIES = 800;
 
