@@ -212,7 +212,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
         for _r in rows:
             _r["metadata_enriched_at"] = None
 
-     from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
     refresh_cutoff = (now - timedelta(days=refresh_days)).isoformat()
     voratoon_cutoff = (now - timedelta(days=5)).isoformat()
@@ -273,6 +273,9 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
 
         # kalau voratoon expiring soon, jangan skip — paksa refresh
         if is_expiring:
+            refreshed += 1
+        elif force:
+            # ponytail: admin force refresh — bypass all skip logic
             refreshed += 1
         elif all_present:
             # Complete — only refresh if older than the refresh window.
