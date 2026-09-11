@@ -64,6 +64,12 @@ def run_cron_inline(action: str) -> None:
         logger.info("cron voratoon-cover done", **stats)
         return
 
+    if action == "failed-retry":
+        from app.services.dispatch_retry import retry_failed_dispatches
+        result = retry_failed_dispatches()
+        logger.info("cron failed-retry done", **result)
+        return
+
     if action == "vseries-refresh":
         from app.db import q as _q
         try:

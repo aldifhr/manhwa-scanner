@@ -166,7 +166,7 @@ VALID_SOURCES_WITH_ALL = ("ikiru", "shinigami", "voratoon", "all")
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon",
-    "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover",
+    "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover", "failed-retry",
 )
 
 
