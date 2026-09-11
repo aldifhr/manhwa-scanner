@@ -181,9 +181,13 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _legacy_pairs = set()
 
     # Reject junk URLs that don't match known source patterns
+    # ponytail: voratoon migrated v1 -> v2, allow both for retry of old failed_dispatches rows (v1 URLs)
     _VALID_URL_PREFIXES = (
         f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_CHAPTER_PATH}",
         f"https://{settings.VORATOON_DOMAIN}{settings.VORATOON_SERIES_PATH}",
+        "https://v1.voratoon.com/series/",
+        "https://v2.voratoon.com/series/",
+        "https://voratoon.com/series/",
         f"{settings.IKIRU_BASE_URL.rstrip('/')}{settings.IKIRU_SERIES_PATH}",
     )
     _junk_urls = {u for u in _all_urls if not any(u.startswith(p) for p in _VALID_URL_PREFIXES)}
