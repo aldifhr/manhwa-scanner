@@ -79,6 +79,18 @@ function isPublicPath(pathname: string, method: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ponytail: already authed -> /login bounces to redirect or /
+  if (pathname === "/login") {
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+    if (token && hasValidToken(token)) {
+      const raw = request.nextUrl.searchParams.get("redirect");
+      const redirect =
+        raw && raw.startsWith("/") && !raw.startsWith("//") && !/^(?:javascript|data|vbscript):/i.test(raw) ? raw : "/";
+      return applySecurityHeaders(NextResponse.redirect(new URL(redirect, request.url)));
+    }
+    return applySecurityHeaders(NextResponse.next());
+  }
+
   if (isPublicPath(pathname, request.method)) {
     return applySecurityHeaders(NextResponse.next());
   }
