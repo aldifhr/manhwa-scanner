@@ -79,7 +79,14 @@ async def failed_dispatches(request: Request):
             tk = r.get("title_key") or rc.get("title_key") or ""
             wl = wl_by_key.get(tk, {})
             title = wl.get("title") or rc.get("title") or tk
-            cover = wl.get("cover") or rc.get("cover") or ""
+            cover = rc.get("cover") or ""
+            # Fallback: whitelist cover missing, rc pruned → series_meta
+            if not cover:
+                try:
+                    sm = get_supabase().table("series_meta").select("cover").eq("title_key", tk).eq("source", r.get("source", "")).limit(1).execute()
+                    cover = (sm.data or [{}])[0].get("cover", "") or ""
+                except Exception:
+                    pass
             results.append({
                 "id": r.get("chapter_url"),
                 "chapterUrl": r.get("chapter_url"),
