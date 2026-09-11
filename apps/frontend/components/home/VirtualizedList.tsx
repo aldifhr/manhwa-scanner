@@ -115,16 +115,27 @@ export default function VirtualizedList<T>({
 
   // When items prepend (new chapters stream at top), restore anchor instead of jumping
   const prevLenRef = useRef(items.length);
+  const prevScrollYRef = useRef(window.scrollY);
   useEffect(() => {
-    if (items.length > prevLenRef.current && anchorIndexRef.current !== null) {
-      const delta = items.length - prevLenRef.current;
-      const anchor = anchorIndexRef.current + delta;
+    const lenDiff = items.length - prevLenRef.current;
+    if (lenDiff > 0 && anchorIndexRef.current !== null) {
+      const anchor = anchorIndexRef.current + lenDiff;
       virtualizer.scrollToIndex(anchor, { align: "start" });
+    } else if (lenDiff === 0) {
+      // Same length (e.g. whitelist toggle) — preserve scroll position
+      requestAnimationFrame(() => window.scrollTo({ top: prevScrollYRef.current }));
     }
     prevLenRef.current = items.length;
   }, [items.length, virtualizer]);
 
-  // Deep-link & snapshot restore: scroll matching row into view (virtual rows not in DOM)
+  // Save scroll position before items change (next render)
+  useEffect(() => {
+    prevScrollYRef.current = window.scrollY;
+  });
+
+  const scrollRestoredRef = useRef(false);
+
+  // Deep-link & snapshot restore — guard initial restore with ref (runs once)
   useEffect(() => {
     if (scrollToTitleKey && titleKeyOf) {
       const idx = items.findIndex(
@@ -140,7 +151,8 @@ export default function VirtualizedList<T>({
         return () => clearTimeout(t);
       }
     }
-    if (initialScrollOffset !== undefined && initialScrollOffset > 0) {
+    if (!scrollRestoredRef.current && initialScrollOffset !== undefined && initialScrollOffset > 0) {
+      scrollRestoredRef.current = true;
       virtualizer.scrollToOffset(initialScrollOffset);
     }
   }, [
