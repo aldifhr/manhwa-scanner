@@ -7,10 +7,15 @@ import { useState } from "react";
 import Link from "next/link";
 
 async function getHealthDetailed() {
-  const r = await readerFetch<{ success: boolean; data: unknown }>(
-    "/api/v1/health/detailed"
-  );
-  return (r as unknown as { data: unknown }).data as unknown;
+  try {
+    const r = await readerFetch<{ success: boolean; data: unknown }>(
+      "/api/v1/health/detailed"
+    );
+    return (r as unknown as { data: unknown }).data as unknown;
+  } catch (e) {
+    if ((e as Error)?.message?.includes("401")) return null;
+    throw e;
+  }
 }
 
 export default function AdminDashboard() {

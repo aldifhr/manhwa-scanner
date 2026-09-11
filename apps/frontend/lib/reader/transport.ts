@@ -8,11 +8,14 @@ async function handle401() {
   if (typeof window === "undefined" || _handling401) return;
   _handling401 = true;
   try {
-    // trigger refreshSession (dynamic import avoids circular static dep)
     const { refreshSession } = await import("@/lib/server-api");
-    await refreshSession();
-  } catch {}
-  window.location.href = "/login";
+    const ok = await refreshSession();
+    if (!ok) window.location.href = "/login";
+  } catch {
+    window.location.href = "/login";
+  } finally {
+    _handling401 = false;
+  }
 }
 
 export type FetchImpl = typeof fetch;
