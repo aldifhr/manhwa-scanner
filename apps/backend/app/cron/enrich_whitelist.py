@@ -212,10 +212,22 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
         for _r in rows:
             _r["metadata_enriched_at"] = None
 
-    from datetime import datetime, timedelta, timezone
+     from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
     refresh_cutoff = (now - timedelta(days=refresh_days)).isoformat()
     voratoon_cutoff = (now - timedelta(days=5)).isoformat()
+
+    # ponytail: cover canonical is series_meta since 052 — whitelist select no cover, need series_meta map for expiry check
+    _sm_cover_map: dict[tuple[str, str], str] = {}
+    try:
+        _vor_tks = [(r["title_key"], r.get("source", "")) for r in rows if r.get("source") == "voratoon"]
+        if _vor_tks:
+            _tks_only = [tk for tk, _ in _vor_tks]
+            _sm_rows = sb.table("series_meta").select("title_key, source, cover").in_("title_key", _tks_only).eq("source", "voratoon").execute().data or []
+            for _sm in _sm_rows:
+                _sm_cover_map[(_sm.get("title_key"), _sm.get("source"))] = _sm.get("cover") or ""
+    except Exception:
+        pass
 
     updated = 0
     skipped = 0
@@ -228,7 +240,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
         # voratoon presigned cover expiry — force refresh kalau sisa <24h atau cover mismatched slug
         is_expiring = False
         if src == "voratoon":
-            _cover_raw = r.get("cover") or ""
+            _cover_raw = r.get("cover") or _sm_cover_map.get((tk, src), "") or ""
             is_expiring = _is_voratoon_expiring_soon(_cover_raw, hours=24)
             if not is_expiring and _cover_raw and "cvr.voratoon.id" in _cover_raw:
                 import re as _re3
