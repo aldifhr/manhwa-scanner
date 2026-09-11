@@ -25,20 +25,20 @@ export async function POST(request: Request) {
     const csrfTokenValue = csrfCookie ? csrfCookie.split("=").slice(1).join("=") : "";
     const response = NextResponse.json({ success: true });
     if (backendJwtValue) {
+      // ponytail: lax host-only = first-party, not blocked as 3rd-party cookie (none+domain was causing loop on Brave/Incognito)
+      // Domain .aldifhr.fun sharing handled server-side via authHeaders forwarding, no need for client cross-site
       response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        domain: ".aldifhr.fun",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         path: "/",
         maxAge: 7 * 24 * 60 * 60,
       });
       if (csrfTokenValue) {
         response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
           httpOnly: false,
-          secure: true,
-          sameSite: "none",
-          domain: ".aldifhr.fun",
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
           path: "/",
           maxAge: 7 * 24 * 60 * 60,
         });

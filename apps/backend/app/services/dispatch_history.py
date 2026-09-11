@@ -188,7 +188,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             or r.get("chapter_title")
             or "Untitled"
         )
-        chapter = rc.get("chapter") or (r.get("chapter_title") or "")
+        # ponytail: dispatch row chapter_title is source of truth — rc is series-level (limit 1) so rc.get(chapter) would clone latest chapter to all rows (e.g. Dungeon Architect 52 x17)
+        chapter = (r.get("chapter_title") or rc.get("chapter") or "")
         title = html.unescape(title).replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
         _desc = (_desc or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
         # BUG5: scrub cover (voratoon presigned -> proxy-in)
@@ -197,7 +198,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             "title": title,
             "titleKey": r.get("title_key") or "",
             "chapter": chapter,
-            "chapterLabel": rc.get("chapter") or "",
+            "chapterLabel": (r.get("chapter_title") or rc.get("chapter") or ""),
             "url": _norm or _raw or "",
             "source": r.get("source") or rc.get("source") or "",
             "cover": _cover,

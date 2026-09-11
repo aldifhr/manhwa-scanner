@@ -23,10 +23,13 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: 0,
   };
+  // clear host-only (current) + legacy domain cookie from previous none+domain fix
   response.cookies.set(COOKIE_NAME, "", { ...clearOpts, httpOnly: true });
-  response.cookies.set("ikiru_csrf_token", "", {
-    ...clearOpts,
-    httpOnly: false,
-  });
+  response.cookies.set(COOKIE_NAME, "", { ...clearOpts, httpOnly: true, domain: ".aldifhr.fun" });
+  response.cookies.set("ikiru_csrf_token", "", { ...clearOpts, httpOnly: false });
+  response.cookies.set("ikiru_csrf_token", "", { ...clearOpts, httpOnly: false, domain: ".aldifhr.fun" });
+  // also clear none variant if still present
+  response.cookies.set(COOKIE_NAME, "", { ...clearOpts, httpOnly: true, sameSite: "none" as const, secure: true, domain: ".aldifhr.fun" });
+  response.cookies.set("ikiru_csrf_token", "", { ...clearOpts, httpOnly: false, sameSite: "none" as const, secure: true, domain: ".aldifhr.fun" });
   return response;
 }
