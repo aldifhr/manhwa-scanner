@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { backendUrl, authHeaders, TIMEOUT } from "@/lib/server-api";
 import { rewriteCoverUrl } from "@/lib/utils";

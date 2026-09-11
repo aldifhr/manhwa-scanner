@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { authHeaders, backendUrl, TIMEOUT, catchError } from "@/lib/server-api";
 import {
