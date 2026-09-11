@@ -59,10 +59,17 @@ export function useInfiniteFeed(opts: {
 
   useEffect(() => {
     if (data && pageRef.current === 1) {
-      const sorted = [...(data.results as unknown as FlatChapter[])].sort(
-        compareFlatByNewest
-      );
-      setAllItems(sorted);
+      setAllItems((prev) => {
+        const newData = data.results as unknown as FlatChapter[];
+        if (prev.length === 0) {
+          return [...newData].sort(compareFlatByNewest);
+        }
+        // ponytail: append-only refetch — keep existing scroll position
+        const existingKeys = new Set(prev.map((c) => chapterKey(c)));
+        const trulyNew = newData.filter((c) => !existingKeys.has(chapterKey(c)));
+        if (trulyNew.length === 0) return prev;
+        return [...trulyNew, ...prev];
+      });
       setBackendHasMore(data.hasMore);
     }
   }, [data]);
