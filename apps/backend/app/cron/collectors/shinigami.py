@@ -66,6 +66,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     from app.services.rating_utils import normalize_rating as _nr
     from app.scrapers.shinigami import _country_to_type as _ctt
     from app.utils.text import slugify_title_key as _ntk
+    from app.services.scanner_confidence import attach_confidence
     items: list[dict] = []
     _series: list[dict] = []
     try:
@@ -147,4 +148,4 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                     except Exception:
                         pass
             items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_at", ""), "rating": rating, "genres": genres, "description": description, "type": _type2})
-    return items
+    return attach_confidence(items, "shinigami")

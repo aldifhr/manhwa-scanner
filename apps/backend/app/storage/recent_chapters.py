@@ -273,10 +273,16 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             touch_rows: list[dict] = []
             for r in to_upsert:
                 if r["chapter_url"] in existing_urls:
+                    r["scan_status"] = "updated"
+                    r["scan_reason"] = "metadata refreshed"
+                    r["confidence_score"] = 100
                     touch_rows.append(r)
                 elif _composite_key(r) in existing_ch:
                     continue
                 else:
+                    r["scan_status"] = "new"
+                    r["scan_reason"] = "new chapter"
+                    r["confidence_score"] = 100
                     new_rows.append(r)
             # Chunk upserts: Supabase/PostgREST returns HTTP 400
             # ("JSON could not be generated") on a single large .insert() call
@@ -311,7 +317,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             if touch_rows:
                 _touch_rows = []
                 for r in touch_rows:
-                    _t = {"chapter_url": r["chapter_url"]}
+                    _t = {
+                        "chapter_url": r["chapter_url"],
+                        "scan_status": "updated",
+                        "scan_reason": "metadata refreshed",
+                        "confidence_score": 100,
+                    }
                     for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type"):
                         v = r.get(k)
                         if v not in (None, "", []):

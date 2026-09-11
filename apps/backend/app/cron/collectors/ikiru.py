@@ -65,6 +65,7 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
     from concurrent.futures import ThreadPoolExecutor
     from app.cron.collectors.common import _COLLECT_WORKERS, preload_series_meta_bulk
     from app.utils.text import slugify_title_key as _ntk
+    from app.services.scanner_confidence import attach_confidence
     items: list[dict] = []
     _series = list(_ikiru_scraper.get_ikiru_latest_updates())
     if not _series:
@@ -87,4 +88,4 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
                 items.extend(_f.result() or [])
             except Exception as _fe:
                 logger.warn("ikiru series worker failed", err=str(_fe)[:120])
-    return items
+    return attach_confidence(items, "ikiru")
