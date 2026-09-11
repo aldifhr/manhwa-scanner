@@ -70,6 +70,26 @@ export default function AdminDashboard() {
     queryFn: Reader.getFailedDispatchesQueue,
     refetchInterval: 30000,
   });
+  const { data: scanStatus } = useQuery({
+    queryKey: ["admin-scan-status"],
+    queryFn: async () => {
+      const r = await readerFetch<{ success: boolean; data: { results: any[] } }>(
+        "/api/v1/scan-status?hours=24&limit=10"
+      );
+      return r.data?.results ?? [];
+    },
+    refetchInterval: 30000,
+  });
+  const { data: confidence } = useQuery({
+    queryKey: ["admin-confidence"],
+    queryFn: async () => {
+      const r = await readerFetch<{ success: boolean; data: any }>(
+        "/api/v1/confidence"
+      );
+      return r.data;
+    },
+    refetchInterval: 60000,
+  });
   const { data: sourcesHealth } = useQuery({
     queryKey: ["admin-sources-health"],
     queryFn: Reader.getSourcesHealth,
@@ -245,6 +265,76 @@ export default function AdminDashboard() {
                     <span className="text-xs text-white/50 w-8 text-right">{count as number}</span>
                   </div>
                 ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Scan Status (24h)</h3>
+          {(() => {
+            const items = scanStatus as any[];
+            if (!items || items.length === 0) {
+              return <p className="text-xs text-white/40">No recent changes</p>;
+            }
+            const newCount = items.filter((i: any) => i.scan_status === "new").length;
+            const updatedCount = items.filter((i: any) => i.scan_status === "updated").length;
+            return (
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+                    {newCount} new
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                    {updatedCount} updated
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-48 overflow-auto">
+                  {items.slice(0, 10).map((item: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs bg-black/20 rounded p-2">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        item.scan_status === "new" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+                      }`}>
+                        {item.scan_status}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/60 uppercase">{item.source}</span>
+                      <span className="truncate flex-1 text-white/70">{item.title_key}</span>
+                      {item.confidence_score != null && (
+                        <span className={`text-[10px] ${item.confidence_score >= 90 ? "text-emerald-400" : item.confidence_score >= 70 ? "text-amber-400" : "text-red-400"}`}>
+                          {item.confidence_score}%
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Scanner Confidence</h3>
+          {(() => {
+            const conf = confidence as any;
+            if (!conf || !conf.sources) {
+              return <p className="text-xs text-white/40">No data</p>;
+            }
+            return (
+              <div className="space-y-2">
+                {conf.sources.map((s: any) => {
+                  const pct = s.avg_confidence ?? 0;
+                  const color = pct >= 90 ? "bg-emerald-500" : pct >= 70 ? "bg-amber-500" : "bg-red-500";
+                  return (
+                    <div key={s.source} className="flex items-center gap-2">
+                      <span className="text-xs text-white/60 w-20 capitalize">{s.source}</span>
+                      <div className="flex-1 h-5 bg-black/30 rounded overflow-hidden">
+                        <div className={`h-full ${color} rounded`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs text-white/50 w-12 text-right">{pct.toFixed(0)}%</span>
+                      <span className="text-[10px] text-white/40 w-16 text-right">{s.count} items</span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}
