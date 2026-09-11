@@ -76,10 +76,6 @@ const nextConfig: NextConfig = {
         source: "/api/reader/activity/heatmap",
         destination: "/api/v1/analytics/engagement",
       },
-      {
-        source: "/api/reader/auth-refresh",
-        destination: "/api/v1/auth/login",
-      },
       { source: "/api/reader/cover-img", destination: "/api/v1/reader/cover" },
       // Catch-all for remaining /api/reader/* -> /api/v1/reader/*
       { source: "/api/reader/:path*", destination: "/api/v1/reader/:path*" },
