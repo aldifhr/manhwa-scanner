@@ -174,9 +174,11 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
 _ENRICH_LAST_RUN: float = 0
 _ENRICH_THROTTLE_S = 300  # 5m — faster metadata for new series
 
-def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
+def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: bool = False) -> int:
     """Enrich whitelist entries with upstream metadata (cover, rating, genres,
     description, status, type, origin).
+
+    force=True — bypass throttle + force refresh ALL voratoon covers (admin button).
 
     PERF-01 fix: previously the SELECT omitted rating/status/cover/origin, so the
     "all_present" completeness check could never be True (those fields read as
@@ -194,7 +196,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7) -> int:
     import time as _t
     global _ENRICH_LAST_RUN
     # ponytail: throttle 1h — if last run was <1h ago and all were skipped, skip DB entirely
-    if _t.time() - _ENRICH_LAST_RUN < _ENRICH_THROTTLE_S:
+    if not force and _t.time() - _ENRICH_LAST_RUN < _ENRICH_THROTTLE_S:
         # quick check via cache? still need SELECT to know, so just skip if within throttle and previous was all-skip
         # we keep simple: if throttled, return 0 immediately (next 5m tick will still check)
         return 0

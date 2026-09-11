@@ -110,7 +110,7 @@ async def refresh_voratoon(request: Request):
     try:
         from app.cron.enrich_whitelist import enrich_all_whitelist
         # force refresh voratoon expiring soon (5d window) — reuse same logic
-        count = enrich_all_whitelist(refresh_days=5)
+        count = enrich_all_whitelist(refresh_days=5, force=True)
         return JSONResponse(content={"success": True, "data": {"refreshed": count}})
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
