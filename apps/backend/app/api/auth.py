@@ -92,9 +92,8 @@ def _set_session_cookies(resp: JSONResponse, token: str) -> None:
 
 
 def _password_ok(pw: str) -> bool:
-    # ponytail: single password check — DASHBOARD_PASSWORD env else "manhwascan", MONITOR_AUTH_TOKEN as fallback alias
-    candidates = [settings.DASHBOARD_PASSWORD, settings.MONITOR_AUTH_TOKEN]
-    return any(pw and c and hmac.compare_digest(pw, str(c)) for c in candidates if c)
+    # ponytail: single password check — DASHBOARD_PASSWORD only (MONITOR_AUTH_TOKEN removed as fallback — P1 fix)
+    return bool(pw and settings.DASHBOARD_PASSWORD and hmac.compare_digest(pw, str(settings.DASHBOARD_PASSWORD)))
 
 
 @router.post("/auth")

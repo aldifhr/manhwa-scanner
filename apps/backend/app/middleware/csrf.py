@@ -2,7 +2,8 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/cron", "/api/v1/failed-dispatches", "/api/v1/health/refresh-voratoon"}
+# P0 fix: /api/v1/cron removed from whitelist — must use Bearer OR CSRF (not blanket bypass)
+_CSRF_WHITELIST = {"/api/v1/auth", "/api/v1/interactive", "/api/v1/failed-dispatches", "/api/v1/health/refresh-voratoon"}
 
 
 async def csrf_middleware(request: Request, call_next):

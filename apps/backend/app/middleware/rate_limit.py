@@ -12,10 +12,10 @@ _counts: dict[tuple[str, int], int] = {}
 async def rate_limit_middleware(request: Request, call_next):
     ip = request.client.host if request.client else "?"
     minute = int(time.time()) // 60
-    # Auth endpoints (login/refresh) get stricter limit
+    # Auth endpoints (login/refresh) get stricter limit — P1 fix: 5/min (was 100/min)
     path = request.url.path
     is_auth = path.endswith("/auth") or "/auth/" in path
-    limit = 100 if is_auth else 1000
+    limit = 5 if is_auth else 1000
 
     key = (ip, minute)
     count = _counts.get(key, 0) + 1

@@ -66,14 +66,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: explicit allowlist for frontend origins (nginx also sets headers; this is defense-in-depth
-# so a misconfigured reverse proxy cannot accidentally expose APIs to any origin).
+# CORS: explicit allowlist — P1 fix: no wildcard regex
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://fe.aldifhr.fun", "https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"],
-    allow_origin_regex=r"https://.*\.aldifhr\.fun",
     allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*", "X-CSRF-Token", "Authorization"],
     allow_credentials=True,
