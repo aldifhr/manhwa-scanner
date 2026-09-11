@@ -40,6 +40,7 @@ async def failed_dispatches(request: Request):
             get_supabase()
             .table("failed_dispatches")
             .select("*", count="exact")
+            .in_("status", ["pending", "failed"])
             .order("created_at", desc=True)
             .limit(limit)
             .offset(offset)
