@@ -6,6 +6,8 @@ import { parseErrorMessage } from "@/lib/fetchError";
 let _handling401 = false;
 async function handle401() {
   if (typeof window === "undefined" || _handling401) return;
+  // ponytail: jangan redirect kalau sudah di login page — avoid infinite refresh
+  if (typeof window !== "undefined" && window.location.pathname === "/login") return;
   _handling401 = true;
   try {
     const { refreshSession } = await import("@/lib/server-api");
