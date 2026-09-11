@@ -97,8 +97,6 @@ export function useFeedActions() {
       // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
       setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
-      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       const isExists = result.status === "already_exists";
       toast(
         isExists ? "Already in whitelist" : `Added ${item.title} to whitelist`,
@@ -178,8 +176,6 @@ export function useFeedActions() {
       // Bandel fix: already_exists also counts as added for optimistic
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
-      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       toast(`Added ${series.title} to whitelist`, {
         type: "success",
         duration: 5000,
@@ -205,7 +201,6 @@ export function useFeedActions() {
               } as Record<string, unknown>).catch(() => {});
             }
             queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
-            queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
           },
         },
       });
