@@ -27,16 +27,18 @@ export async function POST(request: Request) {
     if (backendJwtValue) {
       response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
+        domain: ".aldifhr.fun",
         path: "/",
         maxAge: 7 * 24 * 60 * 60,
       });
       if (csrfTokenValue) {
         response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
           httpOnly: false,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
+          secure: true,
+          sameSite: "none",
+          domain: ".aldifhr.fun",
           path: "/",
           maxAge: 7 * 24 * 60 * 60,
         });
