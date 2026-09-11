@@ -1,4 +1,5 @@
 """Shinigami per-series collector — extracted from collect.py:279."""
+from app.config import settings
 from app.logger import get_logger
 from app.services.rating_utils import normalize_rating
 from app.utils.text import slugify_title_key
@@ -30,7 +31,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
     for ch in ch_list[:MAX_CHAPTERS_PER_SERIES]:
         ch_str = str(ch.get("chapter_number") or "")
         ch_id = ch.get("chapter_id") or ""
-        chapter_url = f"https://11.shinigami.asia/chapter/{ch_id}" if ch_id else ""
+        chapter_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}" if ch_id else ""
         if not chapter_url:
             continue
         _rd = ch.get("release_date") or ""
@@ -55,7 +56,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
         # Fallback: use type from series meta if country_id missing/empty
         if not _type and isinstance(_meta, dict):
             _type = (_meta.get("type") or "").lower()
-        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"https://11.shinigami.asia/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
+        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
     return items
 
 
@@ -108,7 +109,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         else:
             genres = []
             _type_from_tax = ""
-        series_url = f"https://11.shinigami.asia/series/{manga_id}"
+        series_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}"
         chaps = m.get("chapters") or []
         for ch in chaps:
             ch_id = ch.get("chapter_id") or ""
@@ -125,7 +126,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                         continue
                 except (ValueError, TypeError):
                     pass
-            chapter_url = f"https://11.shinigami.asia/chapter/{ch_id}"
+            chapter_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}"
             _chn = _parse_chapter_num(ch_str)
             _ceil = latest_sent.get((tk, "shinigami"), 0)
             if _chn is not None and _ceil and _chn <= _ceil:

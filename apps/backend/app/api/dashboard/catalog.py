@@ -3,6 +3,7 @@ import asyncio
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from app.config import settings
 from app.utils.request_auth import require_monitor_auth
 from app.utils.cover_scrub import cover_ref
 from app.logger import get_logger
@@ -58,7 +59,7 @@ async def catalog_search(request: Request):
             "titleKey": slug,
             "cover": cover_ref(slug),
             "source": src,
-            "url": r.get("permalink") or r.get("url") or r.get("series_url") or (f"https://11.shinigami.asia/series/{r.get('manga_id')}" if src == "shinigami" and r.get("manga_id") else ""),
+            "url": r.get("permalink") or r.get("url") or r.get("series_url") or (f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{r.get('manga_id')}" if src == "shinigami" and r.get("manga_id") else ""),
             "origin": _origin_cc,
             "isInWhitelist": _is_wl,
         })

@@ -19,7 +19,8 @@ class TestScrubCover:
         url = "https://cvr.voratoon.id/prod/series/test/cover.webp?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Zgozh0pCiplFv4J3%252F20260828%252Fap-northeast-1%252Fs3%252Faws4_request&X-Amz-Date=20260828T031644Z&X-Amz-Expires=518400&X-Amz-Signature=abc123&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
         result = scrub_cover(url)
         assert "/api/v1/reader/proxy?url=" in result
-        assert "cvr.voratoon.id" in result
+        from app.config import settings as _cfg
+        assert _cfg.VORATOON_COVER_BUCKET in result
 
     def test_public_url_strips_aws_params(self):
         url = "https://example.com/cover.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=KEY&X-Amz-Signature=SIG&X-Amz-Expires=3600&X-Amz-Date=20260828T031644Z&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"

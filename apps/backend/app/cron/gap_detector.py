@@ -189,7 +189,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                             num = float(c.get("chapter_number") or 0)
                             ch_id = c.get("chapter_id")
                             if num > 0 and ch_id:
-                                url = f"https://11.shinigami.asia/chapter/{ch_id}"
+                                url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}"
                                 chapters.append((num, url, str(c.get("chapter_title") or ""), c.get("release_date")))
                 elif src == "ikiru":
                     slug = series_url.rstrip("/").split("/")[-1] if series_url else tk.replace(" ", "-")

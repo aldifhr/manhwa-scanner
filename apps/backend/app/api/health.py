@@ -83,7 +83,8 @@ async def api_health(request: Request):
 
 def _parse_voratoon_expiry(cover: str) -> tuple[str | None, float | None]:
     """Parse X-Amz-Date/X-Amz-Expires from presigned voratoon cover. Returns (expiry_iso, hours_remaining) or (None, None)."""
-    if not cover or "cvr.voratoon.id" not in cover:
+    from app.config import settings as _cfg
+    if not cover or _cfg.VORATOON_COVER_BUCKET not in cover:
         return None, None
     import re as _re
     import time as _time
@@ -171,7 +172,8 @@ async def health_detailed(request: Request):
             pass
         for _r in _rows:
             _cover = _r.get("cover") or ""
-            if "cvr.voratoon.id" not in _cover:
+            from app.config import settings as _cfg
+            if _cfg.VORATOON_COVER_BUCKET not in _cover:
                 continue
             expiry_iso, hours_remaining = _parse_voratoon_expiry(_cover)
             if expiry_iso is None:

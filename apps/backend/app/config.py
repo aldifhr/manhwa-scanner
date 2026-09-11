@@ -46,6 +46,7 @@ class Settings(BaseSettings):
 
     VORATOON_API_URL: str = "https://api.voratoon.com"
     VORATOON_DOMAIN: str = "v2.voratoon.com"
+    VORATOON_COVER_BUCKET: str = "cvr.voratoon.id"
     VORATOON_SERIES_PATH: str = "/series/"  # ponytail: voratoon path prefix
     VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
 
@@ -97,7 +98,7 @@ class Settings(BaseSettings):
         "g.shinigami.asia:443",
         "shinigami.asia:443",
         "assets.shngm.id:443",
-        "cvr.voratoon.id:443",
+        f"{VORATOON_COVER_BUCKET}:443",
         "cdn.voratoon.com:443",
     ]
 

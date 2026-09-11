@@ -523,8 +523,8 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
         allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
     except Exception:
         allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-            "07.ikiru.wtf:443", "ikiru.wtf:443", "g.shinigami.asia:443",
-            "shinigami.asia:443", "assets.shngm.id:443", "cvr.voratoon.id:443",
+            f"{settings.IKIRU_BASE_URL.rstrip('/')}:443", "ikiru.wtf:443", "g.shinigami.asia:443",
+            "shinigami.asia:443", "assets.shngm.id:443", f"{settings.VORATOON_COVER_BUCKET}:443",
         ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
@@ -548,7 +548,7 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
         try:
             headers_req = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"}
             if "ikiru.wtf" in url:
-                headers_req["Referer"] = "https://07.ikiru.wtf/"
+                headers_req["Referer"] = f"https://{settings.IKIRU_BASE_URL.rstrip('/')}/"
                 headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
             from urllib.parse import urljoin as _urljoin
 

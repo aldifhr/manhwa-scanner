@@ -13,7 +13,8 @@ logger = get_logger("enrich")
 
 def _is_voratoon_expiring_soon(cover: str, hours: int = 24) -> bool:
     """Check if presigned voratoon cover expires within hours."""
-    if not cover or "cvr.voratoon.id" not in cover:
+    from app.config import settings as _cfg
+    if not cover or _cfg.VORATOON_COVER_BUCKET not in cover:
         return False
     import re as _re
     from datetime import datetime as _dt, timezone as _tz
@@ -242,7 +243,8 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
         if src == "voratoon":
             _cover_raw = r.get("cover") or _sm_cover_map.get((tk, src), "") or ""
             is_expiring = _is_voratoon_expiring_soon(_cover_raw, hours=24)
-            if not is_expiring and _cover_raw and "cvr.voratoon.id" in _cover_raw:
+            from app.config import settings as _cfg
+            if not is_expiring and _cover_raw and _cfg.VORATOON_COVER_BUCKET in _cover_raw:
                 import re as _re3
                 from urllib.parse import unquote as _unq
                 # decode proxy wrapper if needed
@@ -338,7 +340,8 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
         # ponytail: minimal keep LIKE but source-filtered (source='voratoon')
         try:
             from app.db import q as _q2
-            bm_rows = _q2("SELECT DISTINCT title_key, cover FROM chapter_bookmarks WHERE source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%' LIMIT 100", [])
+            from app.config import settings as _cfg
+            bm_rows = _q2(f"SELECT DISTINCT title_key, cover FROM chapter_bookmarks WHERE source='voratoon' AND cover LIKE '%%{_cfg.VORATOON_COVER_BUCKET}%%' LIMIT 100", [])
             for br in bm_rows or []:
                 if not _is_voratoon_expiring_soon(br.get("cover") or "", hours=24):
                     continue
@@ -348,7 +351,7 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
                 upd = enrich_whitelist_entry(slug, "voratoon", None)
                 if upd and upd.get("cover"):
                     try:
-                        _q2("UPDATE chapter_bookmarks SET cover=%s, updated_at=%s WHERE title_key=%s AND source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%'", [upd["cover"], now.isoformat(), slug])
+                        _q2(f"UPDATE chapter_bookmarks SET cover=%s, updated_at=%s WHERE title_key=%s AND source='voratoon' AND cover LIKE '%%{_cfg.VORATOON_COVER_BUCKET}%%'", [upd["cover"], now.isoformat(), slug])
                         updated += 1
                     except Exception:
                         pass

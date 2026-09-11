@@ -186,7 +186,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_CHAPTER_PATH}",
         f"https://{settings.VORATOON_DOMAIN}{settings.VORATOON_SERIES_PATH}",
         "https://v1.voratoon.com/series/",
-        "https://v2.voratoon.com/series/",
+        f"https://{settings.VORATOON_DOMAIN}{settings.VORATOON_SERIES_PATH}",
         "https://voratoon.com/series/",
         f"{settings.IKIRU_BASE_URL.rstrip('/')}{settings.IKIRU_SERIES_PATH}",
     )

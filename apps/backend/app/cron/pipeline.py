@@ -283,7 +283,7 @@ def _probe_source_health(force: bool = False) -> dict:
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
-        "Referer": "https://07.ikiru.wtf/",
+        "Referer": f"https://{settings.IKIRU_BASE_URL.rstrip('/')}/",
     }
 
     try:

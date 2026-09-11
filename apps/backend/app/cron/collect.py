@@ -277,13 +277,13 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
                 logger.warn("whitelisted shinigami api scrape failed", mid=mid, err=str(e)[:120])
         if not chapters:
             continue
-        series_url = f"https://11.shinigami.asia/series/{mid}"
+        series_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{mid}"
         cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         _sent = _notified.get(f"{wk}:shinigami") or set()
         for ch in chapters:
             num = ch.get("chapter_number") or ch.get("number") or ch.get("chapter")
             ch_id = ch.get("chapter_id") or ch.get("id")
-            ch_url = f"https://11.shinigami.asia/chapter/{ch_id}" if ch_id else (ch.get("url") or "")
+            ch_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}" if ch_id else (ch.get("url") or "")
             if not ch_url or num is None:
                 continue
             rel_raw = ch.get("release_date") or ch.get("published_at") or ch.get("created_at")

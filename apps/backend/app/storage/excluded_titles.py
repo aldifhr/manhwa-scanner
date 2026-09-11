@@ -9,7 +9,7 @@ ponytail: cover/series_url here are bloat — canonical is series_meta.cover
 (title_key, source) (see 042_db_audit_fix.sql fix 6). JOIN series_meta at
 read time (rss_service sm>it>wl) instead of duplicating. Kept for
 back-compat list_excluded_titles fast path; idx_excluded_titles_source
-speeds the LIKE '%cvr.voratoon.id%X-Amz-%' scan which is always
+speeds the LIKE '%' || VORATOON_COVER_BUCKET || '%X-Amz-%' scan which is always
 source-filtered (source='voratoon').
 """
 from __future__ import annotations

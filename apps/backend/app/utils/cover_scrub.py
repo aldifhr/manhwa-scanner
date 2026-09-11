@@ -37,7 +37,7 @@ _AMZ_PARAMS = (
 def scrub_cover(url: str | None) -> str:
     """Return a safe cover URL for the client.
 
-    - voratoon covers live on a PRIVATE S3 bucket (cvr.voratoon.id). Stripping
+    - voratoon covers live on a PRIVATE S3 bucket (VORATOON_COVER_BUCKET). Stripping
       the presigned query yields a 403, so we MUST proxy the FULL original URL
       (presigned params intact) through /api/v1/reader/proxy?url=<encoded>.
     - ikiru/shinigami covers are PUBLIC, so we strip the AWS presign noise and
@@ -53,7 +53,8 @@ def scrub_cover(url: str | None) -> str:
     # Voratoon: private bucket -> serve presigned URL directly via proxy?url= (ponytail: matches frontend isDirectAllowed + X-Amz- proxy rule)
     # S3 presigned URLs are CORS-open and short-lived (6 days), so serving them
     # direct avoids an extra hop and 403 (signature mismatch when re-encoded).
-    if "cvr.voratoon.id" in url:
+    from app.config import settings as _cfg
+    if _cfg.VORATOON_COVER_BUCKET in url:
         from urllib.parse import quote
         return "/api/v1/reader/proxy?url=" + quote(url, safe="")
 

@@ -123,7 +123,8 @@ class TestPresignedCoverPassthrough:
         # Response body has /api/v1/reader/proxy?url=<encoded> — presigned params are
         # in the url= query string (encoded), NOT bare in the response body.
         assert result.startswith("/api/v1/reader/proxy?url=")
-        assert "cvr.voratoon.id" in result  # host preserved
+        from app.config import settings as _cfg
+        assert _cfg.VORATOON_COVER_BUCKET in result  # host preserved
 
     def test_public_cover_strips_noise(self):
         """Shinigami/ikiru public covers have AWS noise stripped."""

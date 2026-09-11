@@ -421,7 +421,8 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             """
             SELECT DISTINCT ON (title_key) title_key, cover, series_url
             FROM recent_chapters
-            WHERE source='voratoon' AND cover LIKE '%%cvr.voratoon.id%%X-Amz-%%'
+            from app.config import settings as _cfg
+            WHERE source='voratoon' AND cover LIKE '%%' || _cfg.VORATOON_COVER_BUCKET || '%%X-Amz-%%'
             LIMIT %s
             """,
             (limit,),

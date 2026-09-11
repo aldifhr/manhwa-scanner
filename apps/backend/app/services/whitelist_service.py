@@ -631,7 +631,7 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
         if _u.startswith(("http://", "https://")):
             _wl_series = _u
         elif tk and s == "ikiru":
-            _wl_series = f"https://07.ikiru.wtf/manga/{tk}/"
+            _wl_series = f"https://{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{tk}/"
         elif tk and s == "voratoon":
             _wl_series = f"https://{settings.VORATOON_DOMAIN}/series/{tk}"
         elif tk and s == "shinigami":
@@ -639,9 +639,9 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
                 _wl_series = rc.get("series_url") or ""
             elif len(tk) == 36 and tk.count("-") == 4:
                 # shinigami UUID directly
-                _wl_series = f"https://11.shinigami.asia/series/{tk}"
+                _wl_series = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{tk}"
             elif " " not in tk:
-                _wl_series = f"https://11.shinigami.asia/series/{tk}"
+                _wl_series = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{tk}"
     # ponytail: fix voratoon slug with spaces/%20 (e.g. a painter who draws dungeons → a-painter-who-draws-dungeons)
     if s == "voratoon" and _wl_series and (" " in _wl_series or "%20" in _wl_series):
         import re as _re2
