@@ -400,8 +400,7 @@ async def reader_cover(request: Request):
     the DB (whitelist, then recent_chapters), scrub any AWS presign query
     params, and proxy the image server-side. Short TTL cache headers.
     """
-    if not require_monitor_auth(request):
-        return FastResponse(status_code=401)
+    # ponytail: public — used in <img> tags, can't carry auth
     series = (request.query_params.get("series", "") or "").strip()
     if not series or len(series) > 80:
         return FastResponse(status_code=400)
