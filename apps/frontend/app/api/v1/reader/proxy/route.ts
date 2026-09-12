@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       const target = new URL(`${backendUrl()}/api/v1/reader/proxy`);
       target.searchParams.set("url", url);
       const res = await fetch(target.toString(), {
-        headers: authHeaders(request),
+        headers: { ...authHeaders(request), "Content-Type": "application/json" },
         signal: AbortSignal.timeout(TIMEOUT.COVER),
       });
 

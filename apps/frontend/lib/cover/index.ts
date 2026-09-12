@@ -20,8 +20,7 @@ const DIRECT_HOSTS = new Set([
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",
-  "08.ikiru.wtf",
-  "11.shinigami.asia",
+  // ponytail: ikirim + shinigami CDN lack CORS headers — must use proxy, not direct
 ]);
 export function isDirectAllowed(hostname: string): boolean {
   return DIRECT_HOSTS.has(hostname);
