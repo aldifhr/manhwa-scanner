@@ -13,7 +13,7 @@ from app.logger import get_logger
 from app.services.resilience import cb_shinigami
 
 from app.services.rating_utils import normalize_rating
-from app.scrapers.shinigami_models import ShinigamiLatestResponse
+from app.scrapers.shinigami_models import ShinigamiLatestResponse, ShinigamiDetailResponse
 logger = get_logger("shinigami:api")
 
 # Lazy BASE/API so tests can patch settings.SECONDARY_SOURCE_URL at runtime (was import-time binding)
@@ -138,7 +138,14 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
 
 def get_shinigami_series(manga_id: str):
     data = _get(f"/manga/detail/{manga_id}")
-    return data.get("data") if data else None
+    if not data:
+        return None
+    try:
+        return ShinigamiDetailResponse.model_validate(data).data
+    except Exception as exc:
+        cb_shinigami.record_failure()
+        logger.warn("Shinigami detail schema invalid", manga_id=manga_id, err=str(exc)[:200])
+        raise RuntimeError("Shinigami detail schema invalid") from exc
 
 
 def _country_to_type(country_id: str | None) -> str | None:

@@ -11,3 +11,8 @@ class ShinigamiManga(BaseModel):
 class ShinigamiLatestResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
     data: list[ShinigamiManga] = Field(default_factory=list)
+
+
+class ShinigamiDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    data: dict
