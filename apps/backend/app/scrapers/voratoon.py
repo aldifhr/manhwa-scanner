@@ -194,9 +194,6 @@ def collect_voratoon() -> list[dict]:
 
     def _fetch_combo(fmt: str, filt) -> list[dict]:
         """Paginate one format/filter combo and return its emitted chapters."""
-        # ponytail: fresh 24h only + JP filter — early-stop when page is all stale, skip JP/manga
-        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-        _cutoff = _dt.now(_tz.utc) - _td(hours=24)
         _out: list[dict] = []
         page = 1
         while True:
@@ -241,28 +238,6 @@ def collect_voratoon() -> list[dict]:
                 break
             for s in series_list:
                 _emit_series(_out, s)
-            # ponytail: early-stop — if page has zero fresh chapters (<24h), next pages are older (sort=latest)
-            _has_fresh = False
-            for s in series_list:
-                for ch in (s.get("chapters") or []):
-                    _t = ch.get("createdAt") or ch.get("updatedAt") or ""
-                    if not _t:
-                        _has_fresh = True
-                        break
-                    try:
-                        _dtp = _dt.fromisoformat(_t.replace("Z", "+00:00"))
-                        if _dtp.tzinfo is None:
-                            _dtp = _dtp.replace(tzinfo=_tz.utc)
-                        if _dtp >= _cutoff:
-                            _has_fresh = True
-                            break
-                    except (ValueError, TypeError):
-                        _has_fresh = True
-                        break
-                if _has_fresh:
-                    break
-            if not _has_fresh:
-                break
             meta = payload.get("meta") or {}
             if meta.get("lastPage") and page >= int(meta["lastPage"]):
                 break
