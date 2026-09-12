@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # ══════════════════════════════════════════════════════════════════════════════
     # SOURCE DOMAINS — single source of truth. Change here + DB REPLACE once.
     # ══════════════════════════════════════════════════════════════════════════════
-    IKIRU_BASE_URL: str = "https://07.ikiru.wtf/"
+    IKIRU_BASE_URL: str = "https://08.ikiru.wtf/"
     IKIRU_PUBLIC_URL: str = ""
     IKIRU_SERIES_PATH: str = "/manga/"  # ponytail: ikiru path prefix
     IKIRU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}.{id}/"
@@ -92,7 +92,7 @@ class Settings(BaseSettings):
     # Image proxy: only these upstream hosts may be fetched. NO wildcards,
     # NO arbitrary ports — explicit host:port pairs to prevent SSRF.
     PROXY_ALLOWED_HOSTS: list[str] = [
-        "07.ikiru.wtf:443",
+        "08.ikiru.wtf:443",
         "08.ikiru.wtf:443",
         "ikiru.wtf:443",
         "g.shinigami.asia:443",

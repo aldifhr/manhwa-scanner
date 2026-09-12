@@ -27,6 +27,7 @@ import time
 from app.db import get_supabase
 from app.logger import get_logger
 from app.storage import recent_chapters as rc_store
+from app.config import settings as _cfg
 
 logger = get_logger("cron:enrich-resync")
 
@@ -421,11 +422,10 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             """
             SELECT DISTINCT ON (title_key) title_key, cover, series_url
             FROM recent_chapters
-            from app.config import settings as _cfg
-            WHERE source='voratoon' AND cover LIKE '%%' || _cfg.VORATOON_COVER_BUCKET || '%%X-Amz-%%'
+            WHERE source='voratoon' AND cover LIKE '%%' || %s || '%%X-Amz-%%'
             LIMIT %s
             """,
-            (limit,),
+            (_cfg.VORATOON_COVER_BUCKET, limit,),
         )
         _cols2 = [d[0] for d in _cur2.description] if _cur2.description else []
         rc_rows = [dict(zip(_cols2, r)) for r in _cur2.fetchall()] if _cols2 else []

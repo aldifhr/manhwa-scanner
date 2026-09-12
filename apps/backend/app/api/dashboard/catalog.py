@@ -30,7 +30,7 @@ async def catalog_search(request: Request):
     for _r in raw:
         if not _r.get("source"):
             _perm = _r.get("permalink", "") or ""
-            _r["source"] = "ikiru" if _perm.startswith("https://07.ikiru") else "shinigami"
+            _r["source"] = "ikiru" if _perm.startswith("https://08.ikiru") else "shinigami"
     from app.storage import whitelist as _wl_store
     _wl_keys = set()
     try:

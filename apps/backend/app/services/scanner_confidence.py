@@ -28,7 +28,7 @@ _W_META = 10
 
 # Source host patterns (for reachability heuristic when health store unavailable)
 _SOURCE_HOSTS = {
-    "ikiru": ("ikiru.wtf", "07.ikiru.wtf", "08.ikiru.wtf"),
+    "ikiru": ("ikiru.wtf", "08.ikiru.wtf", "08.ikiru.wtf"),
     "shinigami": ("shinigami.asia", "shngm.io", "api.shngm.io"),
     "voratoon": ("voratoon.com", "v2.voratoon.com", "api.voratoon.com"),
 }
