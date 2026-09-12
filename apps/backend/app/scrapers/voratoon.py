@@ -60,18 +60,26 @@ def fetch_series_detail(slug: str) -> dict | None:
     """Fetch single series detail with 5 latest chapters."""
     url = f"{BASE_URL}/series/{slug}"
     params = {"includeMeta": "true", "takeChapter": 5}
+    if not cb_voratoon.allow():
+        raise RuntimeError("circuit voratoon OPEN — fast fail")
     try:
         r = httpx.get(url, params=params, timeout=TIMEOUT)
         r.raise_for_status()
-        return r.json().get("data")
+        data = r.json().get("data")
+        if not isinstance(data, dict):
+            raise RuntimeError("Voratoon detail schema invalid")
+        cb_voratoon.record_success()
+        return data
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             return None
+        cb_voratoon.record_failure()
         logger.error("voratoon detail failed", exc=e)
-        return None
+        raise RuntimeError("Voratoon detail fetch failed") from e
     except Exception as e:
+        cb_voratoon.record_failure()
         logger.error("voratoon detail failed", exc=e)
-        return None
+        raise RuntimeError("Voratoon detail fetch failed") from e
 
 
 def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
@@ -85,6 +93,8 @@ def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
     url = f"{BASE_URL}/series/{slug}/chapters"
     params = {"take": take, "page": page}
     import time as _t
+    if not cb_voratoon.allow():
+        raise RuntimeError("circuit voratoon OPEN — fast fail")
     try:
         for attempt in range(3):
             r = httpx.get(url, params=params, timeout=TIMEOUT)
@@ -92,11 +102,16 @@ def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
                 _t.sleep(2.0 * (attempt + 1))
                 continue
             r.raise_for_status()
-            return r.json().get("data", [])
-        return []
+            data = r.json().get("data")
+            if not isinstance(data, list):
+                raise RuntimeError("Voratoon chapters schema invalid")
+            cb_voratoon.record_success()
+            return data
+        raise RuntimeError("Voratoon chapters retry exhausted")
     except Exception as e:
+        cb_voratoon.record_failure()
         logger.error("voratoon chapters failed", exc=e)
-        return []
+        raise RuntimeError("Voratoon chapters fetch failed") from e
 
 
 def _build_synopsis_cache() -> dict[str, str]:
