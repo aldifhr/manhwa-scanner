@@ -14,6 +14,8 @@ from app.cron.collectors.common import _SOURCE_TIMEOUT, _parse_types
 from app.cron.collectors.ikiru import _collect_ikiru_source
 from app.cron.collectors.shinigami import _collect_shinigami_source
 from app.cron.collectors.voratoon import _collect_voratoon_source
+from app.cron.source_result import SourceResult
+import time as _time
 
 logger = get_logger("cron:collect")
 health_store = health
@@ -89,7 +91,8 @@ def collect_recent_chapters(
 
     import concurrent.futures
 
-    def _try_collect(src: str) -> tuple[str, list[dict]]:
+    def _try_collect(src: str) -> SourceResult:
+        started = _time.monotonic()
         try:
             _src_items: list[dict] = []
             if src == "ikiru":
@@ -103,10 +106,10 @@ def collect_recent_chapters(
                 _src_items = _collect_shinigami_source(_latest_sent, _disabled, fetch_meta)
             elif src == "voratoon":
                 _src_items = _collect_voratoon_source(_latest_sent)
-            return (src, _src_items)
+            return SourceResult.ok(src, _src_items, started)
         except Exception as exc:
             logger.warn("collect provider failed", source=src, err=str(exc)[:300])
-            raise RuntimeError(f"{src} provider failed") from exc
+            return SourceResult.failed(src, started, exc)
 
     _sources_to_run: list[str] = []
     for _src in ("ikiru", "shinigami", "voratoon"):
@@ -134,11 +137,14 @@ def collect_recent_chapters(
                     _src = _futures[_future]
                     _t0 = _t0_map.get(_src, _health_start(_src))
                     try:
-                        _collected_src, _src_items = _future.result(timeout=5)
-                        items.extend(_src_items)
+                        result = _future.result(timeout=5)
+                        if not result.success:
+                            _health_end(_src, _t0, False, result.error or "provider failed")
+                            logger.warn("collect failed", source=_src, err=result.error or "provider failed")
+                            continue
+                        items.extend(result.items)
                         _health_end(_src, _t0, True)
-                        rt_ms = int((_t.time() - _t0) * 1000)
-                        logger.info("collect done", source=_src, count=len(_src_items), response_time_ms=rt_ms)
+                        logger.info("collect done", source=_src, count=len(result.items), response_time_ms=result.latency_ms)
                     except concurrent.futures.TimeoutError:
                         _health_end(_src, _t0, False, f"timeout after {_SOURCE_TIMEOUT}s")
                         logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
