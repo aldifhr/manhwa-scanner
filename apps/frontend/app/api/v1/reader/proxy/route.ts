@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // 2. Request coalescing — only one concurrent fetch per URL
     let result: ResolvedResult;
     const inflight = coalesceFetch(url, async () => {
-      const target = new URL(`${backendUrl()}/api/v1/reader/proxy`);
+      const target = new URL(`${backendUrl()}/api/v1/img`);
       target.searchParams.set("url", url);
       const res = await fetch(target.toString(), {
         headers: { ...authHeaders(request), "Content-Type": "application/json" },

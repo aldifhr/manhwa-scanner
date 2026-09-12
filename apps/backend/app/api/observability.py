@@ -5,7 +5,8 @@ proxy, metrics.
 """
 import time as _time
 import re
-import asyncio as _asyncio
+import asyncio
+import concurrent.futures
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response as FastResponse
@@ -305,8 +306,8 @@ _IMAGE_CACHE_MAX = 2000
 # (07.ikiru.wtf) at once → rate-limit 403s. With it, the first
 # request fetches + writes the file; the rest await the same lock, then read
 # the cached bytes.
-_URL_FETCH_LOCKS: dict[str, "_asyncio.Lock"] = {}
-_URL_LOCKS_GUARD = _asyncio.Lock()
+_URL_FETCH_LOCKS: dict[str, asyncio.Lock] = {}
+_URL_LOCKS_GUARD = asyncio.Lock()
 # M2 FIX: Track last access time for lock eviction
 _URL_FETCH_LOCKS_LAST_USED: dict[str, float] = {}
 _URL_FETCH_LOCKS_MAX = 1000  # max concurrent URL locks before eviction
@@ -318,7 +319,7 @@ async def _url_lock(url: str):
             # M2 FIX: Evict oldest locks if we exceed max
             if len(_URL_FETCH_LOCKS) >= _URL_FETCH_LOCKS_MAX:
                 _evict_oldest_locks()
-            _URL_FETCH_LOCKS[url] = _asyncio.Lock()
+            _URL_FETCH_LOCKS[url] = asyncio.Lock()
         _URL_FETCH_LOCKS_LAST_USED[url] = _time.time()
     return _URL_FETCH_LOCKS[url]
 
@@ -526,7 +527,7 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
 
     p = urlparse(url)
     try:
-        allowed = settings.get_proxy_hosts()  # type: ignore[attr-defined]
+        allowed = settings.get_proxy_hosts()
     except Exception:
         allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
             f"{settings.IKIRU_BASE_URL.rstrip('/')}:443", "ikiru.wtf:443", "g.shinigami.asia:443",
@@ -552,23 +553,18 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                 headers["Expires"] = "Thu, 31 Dec 2026 23:59:59 GMT"
             return FastResponse(content=cached, status_code=200, media_type=_detect_ctype(cached), headers=headers)
         try:
-            headers_req = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"}
+            # ponytail: curl_cffi + Chrome TLS (httpx blocked by CF) via to_thread — sync call blocks event loop
+            from curl_cffi import requests as cffi_req
+            headers_req = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+                "Accept-Encoding": "gzip, deflate, br",
+            }
             if "ikiru.wtf" in url:
-                headers_req["Referer"] = f"https://{settings.IKIRU_BASE_URL.rstrip('/')}/"
+                headers_req["Referer"] = f"https://{settings.IKIRU_PUBLIC_URL.rstrip('/')}/"
                 headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
-            from urllib.parse import urljoin as _urljoin
-
-            async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
-                r = await client.get(url, headers=headers_req)
-                _hops = 0
-                while r.is_redirect and _hops < 3:
-                    loc = r.headers.get("location", "")
-                    _next = _urljoin(str(r.url), loc)
-                    _p_next = urlparse(_next)
-                    if _p_next.scheme not in ("http", "https") or f"{_p_next.hostname}:{_p_next.port or (443 if _p_next.scheme == 'https' else 80)}" not in allowed:
-                        return FastResponse(status_code=403)
-                    r = await client.get(_next, headers=headers_req)
-                    _hops += 1
+            r = await asyncio.to_thread(
+                lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=30, allow_redirects=False)
+            )
             if r.status_code == 200:
                 content = r.content[:_RESPONSE_SIZE_CAP]
                 _cache_put(url, content)
