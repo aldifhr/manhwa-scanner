@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import httpx
 import time
 import random
+import threading
 
 from app.config import settings
 from app.logger import get_logger
@@ -16,8 +17,19 @@ logger = get_logger("scraper:voratoon")
 
 def _base_url() -> str:
     return settings.VORATOON_API_URL.rstrip("/")
-BASE_URL = _base_url()
 TIMEOUT = 60.0
+_CLIENTS: dict[int, httpx.Client] = {}
+_CLIENTS_LOCK = threading.Lock()
+
+
+def _client() -> httpx.Client:
+    key = threading.get_ident()
+    with _CLIENTS_LOCK:
+        return _CLIENTS.setdefault(key, httpx.Client(timeout=TIMEOUT))
+
+
+def _get(url: str, **kwargs):
+    return _client().get(url, **kwargs)
 
 
 def _parse_chapter_number(index: int | None) -> float:
@@ -29,7 +41,7 @@ def _parse_chapter_number(index: int | None) -> float:
 
 def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dict]:
     """Fetch series list filtered by format (manhwa/manhua)."""
-    url = f"{BASE_URL}/series"
+    url = f"{_base_url()}/series"
     params = {
         "take": take,
         "page": page,
@@ -42,7 +54,7 @@ def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dic
     if not cb_voratoon.allow():
         raise RuntimeError("circuit voratoon OPEN — fast fail")
     try:
-        r = httpx.get(url, params=params, timeout=TIMEOUT)
+        r = _get(url, params=params, timeout=TIMEOUT)
         r.raise_for_status()
         payload = r.json()
         data = payload.get("data")
@@ -58,12 +70,12 @@ def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dic
 
 def fetch_series_detail(slug: str) -> dict | None:
     """Fetch single series detail with 5 latest chapters."""
-    url = f"{BASE_URL}/series/{slug}"
+    url = f"{_base_url()}/series/{slug}"
     params = {"includeMeta": "true", "takeChapter": 5}
     if not cb_voratoon.allow():
         raise RuntimeError("circuit voratoon OPEN — fast fail")
     try:
-        r = httpx.get(url, params=params, timeout=TIMEOUT)
+        r = _get(url, params=params, timeout=TIMEOUT)
         r.raise_for_status()
         data = r.json().get("data")
         if not isinstance(data, dict):
@@ -90,14 +102,14 @@ def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
     collect_voratoon()'s series-list-with-takeChapter path which includes
     real chapter timestamps.
     """
-    url = f"{BASE_URL}/series/{slug}/chapters"
+    url = f"{_base_url()}/series/{slug}/chapters"
     params = {"take": take, "page": page}
     import time as _t
     if not cb_voratoon.allow():
         raise RuntimeError("circuit voratoon OPEN — fast fail")
     try:
         for attempt in range(3):
-            r = httpx.get(url, params=params, timeout=TIMEOUT)
+            r = _get(url, params=params, timeout=TIMEOUT)
             if r.status_code == 429:
                 _t.sleep(2.0 * (attempt + 1))
                 continue
@@ -197,7 +209,7 @@ def collect_voratoon() -> list[dict]:
         _out: list[dict] = []
         page = 1
         while True:
-            url = f"{BASE_URL}/series"
+            url = f"{_base_url()}/series"
             params = {
                 "take": 30,
                 "page": page,
@@ -213,7 +225,7 @@ def collect_voratoon() -> list[dict]:
             payload = None
             for attempt in range(3):
                 try:
-                    r = httpx.get(
+                    r = _get(
                         url,
                         params=params,
                         timeout=TIMEOUT,
