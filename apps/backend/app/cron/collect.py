@@ -104,8 +104,9 @@ def collect_recent_chapters(
             elif src == "voratoon":
                 _src_items = _collect_voratoon_source(_latest_sent)
             return (src, _src_items)
-        except Exception:
-            return (src, [])
+        except Exception as exc:
+            logger.warn("collect provider failed", source=src, err=str(exc)[:300])
+            raise RuntimeError(f"{src} provider failed") from exc
 
     _sources_to_run: list[str] = []
     for _src in ("ikiru", "shinigami", "voratoon"):
