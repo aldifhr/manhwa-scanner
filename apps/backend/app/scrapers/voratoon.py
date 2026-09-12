@@ -10,6 +10,7 @@ import random
 from app.config import settings
 from app.logger import get_logger
 from app.utils.cover_scrub import scrub_cover
+from app.services.resilience import cb_voratoon
 
 logger = get_logger("scraper:voratoon")
 
@@ -38,6 +39,8 @@ def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dic
         "takeChapter": 0,
         "format": fmt,
     }
+    if not cb_voratoon.allow():
+        raise RuntimeError("circuit voratoon OPEN — fast fail")
     try:
         r = httpx.get(url, params=params, timeout=TIMEOUT)
         r.raise_for_status()
@@ -45,8 +48,10 @@ def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dic
         data = payload.get("data")
         if not isinstance(data, list):
             raise RuntimeError("Voratoon series schema invalid")
+        cb_voratoon.record_success()
         return data
     except Exception as e:
+        cb_voratoon.record_failure()
         logger.error("voratoon series failed", exc=e)
         raise RuntimeError("Voratoon series fetch failed") from e
 
