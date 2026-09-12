@@ -11,6 +11,7 @@ API so the filled chapters carry real release timestamps and URLs.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import urllib.request
@@ -122,7 +123,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
             tk, src = g["title_key"], g["source"]
             key = f"{tk[:30]} ({src})"
             # per-series savepoint isolation
-            sp_name = f"sp_gap_{abs(hash(key)) % 100000}"
+            sp_name = f"sp_gap_{int(hashlib.sha256(key.encode()).hexdigest()[:8], 16) % 100000}"
             import re as _re_sp
             if not _re_sp.match(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$", sp_name):
                 sp_name = "sp_gap_fallback"
