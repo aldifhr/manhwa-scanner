@@ -1,5 +1,5 @@
 """Minimal Shinigami response contracts."""
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class ShinigamiManga(BaseModel):
@@ -10,7 +10,7 @@ class ShinigamiManga(BaseModel):
 
 class ShinigamiLatestResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
-    data: list[ShinigamiManga] = Field(default_factory=list)
+    data: list[ShinigamiManga]
 
 
 class ShinigamiDetailResponse(BaseModel):
