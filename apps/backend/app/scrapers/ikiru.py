@@ -136,13 +136,22 @@ def get_ikiru_latest_updates(max_pages: int = 20, hours_cutoff: int = 24):
             logger.debug("ikiru /list/latest API failed, falling back to HTML")
             break
 
-        items = data.get("items", [])
+        items = data.get("items")
+        if not isinstance(items, list):
+            logger.warn("ikiru API schema invalid, falling back to HTML")
+            return _get_ikiru_latest_updates_html(max_pages, hours_cutoff)
         if not items:
             break
 
         added_this_page = 0
         for item in items:
+            if not isinstance(item, dict):
+                logger.warn("ikiru API item schema invalid, falling back to HTML")
+                return _get_ikiru_latest_updates_html(max_pages, hours_cutoff)
             slug = item.get("slug") or ""
+            if not slug:
+                logger.warn("ikiru API item missing slug, falling back to HTML")
+                return _get_ikiru_latest_updates_html(max_pages, hours_cutoff)
             if not slug or slug in seen_slugs:
                 continue
 
