@@ -13,6 +13,7 @@ from app.logger import get_logger
 from app.services.resilience import cb_shinigami
 
 from app.services.rating_utils import normalize_rating
+from app.scrapers.shinigami_models import ShinigamiLatestResponse
 logger = get_logger("shinigami:api")
 
 # Lazy BASE/API so tests can patch settings.SECONDARY_SOURCE_URL at runtime (was import-time binding)
@@ -100,7 +101,14 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
     for mtype in ("mirror", "project"):
         for p in range(1, max_pages + 1):
             data = _get(f"/manga/list?type={mtype}&page={p}&page_size={per_page}&is_update=true&sort=latest&sort_order=desc")
-            items = data.get("data", []) if data else []
+            if not data:
+                raise RuntimeError("Shinigami empty response")
+            try:
+                items = ShinigamiLatestResponse.model_validate(data).model_dump().get("data", [])
+            except Exception as exc:
+                cb_shinigami.record_failure()
+                logger.warn("Shinigami response schema invalid", page=p, source_type=mtype, err=str(exc)[:200])
+                raise RuntimeError("Shinigami response schema invalid") from exc
             if not items:
                 break
             # Shinigami returns newest-first; check timestamps to decide whether to stop.

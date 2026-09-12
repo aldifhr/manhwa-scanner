@@ -7,6 +7,7 @@ API endpoints used:
 
 HTML scrape fallback is kept for resilience when the API is unavailable.
 """
+import hashlib
 import random
 import time as _t
 from urllib.parse import quote_plus
@@ -159,7 +160,7 @@ def get_ikiru_latest_updates(max_pages: int = 20, hours_cutoff: int = 24):
             seen_slugs.add(slug)
             series_url = item.get("permalink") or f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
             all_items.append({
-                "id": item.get("id") or abs(hash(slug)) % (10 ** 9),
+                "id": item.get("id") or int(hashlib.sha256(slug.encode()).hexdigest()[:8], 16) % (10 ** 9),
                 "title": item.get("title") or slug.replace("-", " ").title(),
                 "slug": slug,
                 "url": series_url,
@@ -248,7 +249,7 @@ def _get_ikiru_latest_updates_html(max_pages: int = 2, hours_cutoff: int = 24):
             series_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
             title = slug.replace("-", " ").title()
             all_items.append({
-                "id": abs(hash(slug)) % (10 ** 9),
+                "id": int(hashlib.sha256(slug.encode()).hexdigest()[:8], 16) % (10 ** 9),
                 "title": title,
                 "slug": slug,
                 "url": ch_url,
