@@ -565,6 +565,20 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             r = await asyncio.to_thread(
                 lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=30, allow_redirects=False)
             )
+            # CF hotlink protection: retry without Referer or with 08 host
+            if r.status_code == 403 and "hotlink" in (r.text.lower() if hasattr(r, 'text') else ""):
+                for alt_ref in [f"https://{p.hostname}/", ""]:
+                    alt_headers = dict(headers_req)
+                    if alt_ref:
+                        alt_headers["Referer"] = alt_ref
+                    else:
+                        alt_headers.pop("Referer", None)
+                    r2 = await asyncio.to_thread(
+                        lambda h=alt_headers: cffi_req.get(url, headers=h, impersonate="chrome", timeout=30, allow_redirects=False)
+                    )
+                    if r2.status_code == 200:
+                        r = r2
+                        break
             if r.status_code == 200:
                 content = r.content[:_RESPONSE_SIZE_CAP]
                 _cache_put(url, content)
