@@ -41,10 +41,14 @@ def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dic
     try:
         r = httpx.get(url, params=params, timeout=TIMEOUT)
         r.raise_for_status()
-        return r.json().get("data", [])
+        payload = r.json()
+        data = payload.get("data")
+        if not isinstance(data, list):
+            raise RuntimeError("Voratoon series schema invalid")
+        return data
     except Exception as e:
         logger.error("voratoon series failed", exc=e)
-        return []
+        raise RuntimeError("Voratoon series fetch failed") from e
 
 
 def fetch_series_detail(slug: str) -> dict | None:
