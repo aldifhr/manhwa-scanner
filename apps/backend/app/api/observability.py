@@ -496,7 +496,14 @@ async def reader_cover(request: Request):
         if not cover_url or not cover_url.startswith("http"):
             continue
         return await _fetch_image(cover_url, cache_control="public, max-age=3600")
-    return FastResponse(status_code=404)
+    # ponytail: <img> tag URL — never 404, return placeholder SVG
+    svg = '<svg width="200" height="280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#111"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#444" font-size="12" font-family="sans-serif">No cover</text></svg>'
+    return FastResponse(
+        content=svg.encode(),
+        status_code=200,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 def _detect_ctype(data: bytes) -> str:
