@@ -6,7 +6,7 @@ import { useScrollVisibility } from "@/lib/hooks/useScrollVisibility";
 export default function BackToTop() {
   const visible = useScrollVisibility(300);
 
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "instant" });
 
   return (
     <button
