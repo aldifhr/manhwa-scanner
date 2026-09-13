@@ -11,7 +11,7 @@ const badge = (status: string) => status === "healthy" || status === "closed" ||
 export default function CronHealthPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["cron-health"],
-    queryFn: async () => (await readerFetch<{ success: boolean; data: any }>("/api/v1/cron/health")).data,
+    queryFn: async () => (await readerFetch<{ success: boolean; data: any }>("/api/cron/health")).data,
     refetchInterval: 15000,
   });
   const sources = data?.sources ?? [];
