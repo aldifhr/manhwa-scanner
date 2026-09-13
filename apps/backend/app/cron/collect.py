@@ -192,13 +192,12 @@ def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
     allowed: set[str] = set()
     for w in whitelist:
         wk = slugify_title_key(w.get("title_key", ""))
-        src = w.get("source")
-        if src:
-            allowed.add(f"{wk}:{src}")
+        if wk:
+            allowed.add(wk)
     result = []
     for it in items:
-        key = f"{slugify_title_key(it.get('title_key', ''))}:{it.get('source')}"
-        if key in allowed:
+        tk = slugify_title_key(it.get('title_key', ''))
+        if tk in allowed:
             result.append(it)
     return result
 
