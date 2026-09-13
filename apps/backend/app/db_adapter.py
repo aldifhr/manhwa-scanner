@@ -198,6 +198,7 @@ class _Query:
         self._offset = 0
         self._single = False
         self._maybe_single = False
+        self._first = False
         self._want_count = False
 
     # ---- WHERE builders ----
@@ -346,6 +347,11 @@ class _Query:
         # can never trip (silent wrong-data path). We fetch
         # ALL matched rows and the .execute() guard rejects >1.
         self._single = True
+        return self
+
+    def first(self):
+        self._first = True
+        self._limit = 1
         return self
 
     def maybe_single(self):
@@ -506,7 +512,9 @@ class _Query:
             cur.execute(sql, params)
             if self.op == "select":
                 rows = cur.fetchall()
-                if self._single:
+                if self._first:
+                    data = _row_to_jsonable(rows[0]) if rows else None
+                elif self._single:
                     if not rows:
                         raise Exception("JSON object requested, but 0 rows returned")
                     if len(rows) > 1:
