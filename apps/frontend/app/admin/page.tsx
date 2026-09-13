@@ -229,13 +229,13 @@ export default function AdminDashboard() {
             {resyncRatings.isPending ? "..." : "Resync ratings"}
           </button>
           <Link
-            href="/error-logs"
+            href="/admin/error-logs"
             className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
           >
             Error logs →
           </Link>
           <Link
-            href="/cron-health"
+            href="/admin/cron-health"
             className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-center"
           >
             Cron health →
