@@ -133,24 +133,27 @@ def collect_recent_chapters(
                     _t0_map[_src] = _health_start(_src)
                     logger.info("collect start", source=_src)
                     _futures[_executor.submit(_try_collect, _src)] = _src
-                for _future in concurrent.futures.as_completed(_futures, timeout=_SOURCE_TIMEOUT):
-                    _src = _futures[_future]
-                    _t0 = _t0_map.get(_src, _health_start(_src))
-                    try:
-                        result = _future.result(timeout=5)
-                        if not result.success:
-                            _health_end(_src, _t0, False, result.error or "provider failed")
-                            logger.warn("collect failed", source=_src, err=result.error or "provider failed")
-                            continue
-                        items.extend(result.items)
-                        _health_end(_src, _t0, True)
-                        logger.info("collect done", source=_src, count=len(result.items), response_time_ms=result.latency_ms)
-                    except concurrent.futures.TimeoutError:
-                        _health_end(_src, _t0, False, f"timeout after {_SOURCE_TIMEOUT}s")
-                        logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
-                    except Exception as e:
-                        _health_end(_src, _t0, False, str(e)[:300])
-                        logger.warn("collect failed", source=_src, err=str(e)[:200])
+                try:
+                    for _future in concurrent.futures.as_completed(_futures, timeout=_SOURCE_TIMEOUT):
+                        _src = _futures[_future]
+                        _t0 = _t0_map.get(_src, _health_start(_src))
+                        try:
+                            result = _future.result(timeout=5)
+                            if not result.success:
+                                _health_end(_src, _t0, False, result.error or "provider failed")
+                                logger.warn("collect failed", source=_src, err=result.error or "provider failed")
+                                continue
+                            items.extend(result.items)
+                            _health_end(_src, _t0, True)
+                            logger.info("collect done", source=_src, count=len(result.items), response_time_ms=result.latency_ms)
+                        except Exception as e:
+                            _health_end(_src, _t0, False, str(e)[:300])
+                            logger.warn("collect failed", source=_src, err=str(e)[:200])
+                except concurrent.futures.TimeoutError:
+                    for _future, _src in _futures.items():
+                        if not _future.done():
+                            _health_end(_src, _t0_map.get(_src, _health_start(_src)), False, f"timeout after {_SOURCE_TIMEOUT}s")
+                            logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
 
         _run_phase(_phase1)
         _run_phase(_phase2)
