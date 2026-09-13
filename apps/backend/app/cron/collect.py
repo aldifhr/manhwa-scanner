@@ -172,6 +172,22 @@ def collect_recent_chapters(
         except Exception as e:
             logger.warn("collect whitelisted shinigami failed", err=str(e))
 
+    # Cross-source dedup: same title+chapter from multiple sources → keep first
+    from app.services.fcfs import fcfs_key as _fcfs
+    _seen_fcfs: set[str] = set()
+    _deduped_items: list[dict] = []
+    _dup_count = 0
+    for it in items:
+        _fk = _fcfs(it.get("title", ""), it.get("chapter", ""))
+        if _fk in _seen_fcfs:
+            _dup_count += 1
+            continue
+        _seen_fcfs.add(_fk)
+        _deduped_items.append(it)
+    if _dup_count:
+        logger.info("collect: cross-source dedup", removed=_dup_count)
+    items = _deduped_items
+
     try:
         from app.storage import excluded_titles as excl_store
         from app.utils.text import slugify_title_key as _ntk_c

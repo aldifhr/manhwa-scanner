@@ -61,8 +61,15 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
         cached = _CHAPTER_CACHE.get(key)
         if cached and (_time_mod.monotonic() - cached[0]) < _CHAPTER_CACHE_TTL:
             return cached[1]
-    _time_mod.sleep(0.75)
-    data = fetcher() or []
+    try:
+        data = fetcher() or []
+    except Exception as e:
+        err_str = str(e).lower()
+        if "429" in err_str or "500" in err_str or "503" in err_str:
+            _time_mod.sleep(0.5)
+            data = fetcher() or []
+        else:
+            data = []
     with _CHAPTER_CACHE_LOCK:
         _CHAPTER_CACHE[key] = (_time_mod.monotonic(), data)
         if len(_CHAPTER_CACHE) > _CHAPTER_CACHE_MAX:
