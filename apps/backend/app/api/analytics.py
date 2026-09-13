@@ -1,6 +1,7 @@
 """Analytics dashboard — ponytail: 392L analytics (distinct from stats 498L), keep separate until unified dashboard query. Analytics dashboard — popular series, chapter velocity, engagement metrics."""
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -13,6 +14,21 @@ from app.utils.request_auth import require_monitor_auth
 
 logger = get_logger("api:analytics")
 router = APIRouter()
+
+# Analytics cache — 30s TTL for burst-absorb
+_ANALYTICS_CACHE: dict[str, tuple[float, dict]] = {}
+_ANALYTICS_TTL = 30.0
+
+
+def _analytics_cache_get(key: str):
+    entry = _ANALYTICS_CACHE.get(key)
+    if entry and (time.monotonic() - entry[0]) < _ANALYTICS_TTL:
+        return entry[1]
+    return None
+
+
+def _analytics_cache_put(key: str, val: dict):
+    _ANALYTICS_CACHE[key] = (time.monotonic(), val)
 
 
 class PopularSeriesItem(BaseModel):
@@ -93,13 +109,18 @@ async def analytics_overview(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
 
+    # Cache burst — 30s TTL for admin dashboard polls
+    _cached = _analytics_cache_get("overview")
+    if _cached is not None:
+        return JSONResponse(content=_cached)
+
     from app.db import q
 
     def _safe(sql: str, params=None, fallback=None):
         try:
             return q(sql, params) if params else q(sql)
         except Exception as e:
-            logger.warn("analytics_overview subquery failed", sql=sql[:80], err=str(e)[:160])
+            logger.warning("analytics_overview subquery failed", exc_info=e, extra={"sql": sql[:80]})
             return fallback if fallback is not None else []
 
     popular_series = _safe("""
@@ -154,7 +175,7 @@ async def analytics_overview(request: Request):
         LIMIT 15
     """)
 
-    return JSONResponse(content={
+    _result = {
         "success": True,
         "data": {
             "popular_series": popular_series,
@@ -164,8 +185,10 @@ async def analytics_overview(request: Request):
             "failed_dispatch_stats": failed_stats[0] if failed_stats else {},
             "top_genres": top_genres,
             "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-    })
+        },
+    }
+    _analytics_cache_put("overview", _result)
+    return JSONResponse(content=_result)
 
 
 class SeriesDetailResponse(BaseModel):
