@@ -105,9 +105,10 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
         return existing_urls, existing_ch
     # ponytail: cache 60s — same batch re-hit within cron tick wastes 1 DB round-trip; 154→131 inserted 0 still pays lookup
     _key = tuple(tks[:5] + [str(len(tks))])  # cheap sig
-    _cached = _EXISTING_RC_CACHE.get(_key)
-    if _cached and (_t.time() - _cached[2]) < _EXISTING_RC_TTL:
-        return _cached[0], _cached[1]
+    with _existing_rc_lock:
+        _cached = _EXISTING_RC_CACHE.get(_key)
+        if _cached and (_t.time() - _cached[2]) < _EXISTING_RC_TTL:
+            return _cached[0], _cached[1]
     _cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     try:
         for i in range(0, len(tks), 100):
@@ -143,6 +144,10 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
     return existing_urls, existing_ch
 
 
+import threading
+_wl_lock = threading.Lock()
+_existing_rc_lock = threading.Lock()
+
 _wl_origins: dict[tuple[str, str], str] = {}
 _WL_ORIGIN_TTL = 600.0
 _WL_ORIGIN_TS = 0.0
@@ -152,30 +157,32 @@ def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
     """Cached whitelist origin map (ponytail: 10min TTL + invalidation, not per-batch query)."""
     import time as _t
     global _wl_origins, _WL_ORIGIN_TS
-    if not force and _wl_origins and (_t.time() - _WL_ORIGIN_TS) < _WL_ORIGIN_TTL:
+    with _wl_lock:
+        if not force and _wl_origins and (_t.time() - _WL_ORIGIN_TS) < _WL_ORIGIN_TTL:
+            return _wl_origins
+        try:
+            from app.db import get_supabase as _gsb_wl
+            _sb_wl = _gsb_wl()
+            _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
+            _wl_origins = {}
+            for _wl in _wl_rows:
+                _tk_wl = str(_wl.get("title_key") or "").strip()
+                _src_wl = str(_wl.get("source") or "").strip()
+                _orig_wl = str(_wl.get("origin") or "").strip().upper()
+                if _tk_wl and _src_wl and _orig_wl:
+                    _wl_origins[(_tk_wl, _src_wl)] = _orig_wl
+            _WL_ORIGIN_TS = _t.time()
+        except Exception:
+            pass
         return _wl_origins
-    try:
-        from app.db import get_supabase as _gsb_wl
-        _sb_wl = _gsb_wl()
-        _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
-        _wl_origins = {}
-        for _wl in _wl_rows:
-            _tk_wl = str(_wl.get("title_key") or "").strip()
-            _src_wl = str(_wl.get("source") or "").strip()
-            _orig_wl = str(_wl.get("origin") or "").strip().upper()
-            if _tk_wl and _src_wl and _orig_wl:
-                _wl_origins[(_tk_wl, _src_wl)] = _orig_wl
-        _WL_ORIGIN_TS = _t.time()
-    except Exception:
-        pass
-    return _wl_origins
 
 
 def invalidate_whitelist_origin_cache() -> None:
     """Call after whitelist add/remove so next batch_insert uses fresh origins."""
     global _wl_origins, _WL_ORIGIN_TS
-    _wl_origins = {}
-    _WL_ORIGIN_TS = 0.0
+    with _wl_lock:
+        _wl_origins = {}
+        _WL_ORIGIN_TS = 0.0
 
 
 def batch_insert_recent_chapters(rows: list[dict]) -> None:

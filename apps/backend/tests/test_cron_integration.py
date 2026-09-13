@@ -130,7 +130,7 @@ class TestPipelineEndToEnd:
              patch("app.cron.pipeline.recent_chapters.prune_older_than"), \
              patch("app.cron.pipeline.recent_chapters.prune_dispatch_history_older_than"), \
              patch("app.cron.pipeline.health.write_cron_status"), \
-             patch("app.cron.pipeline.load_whitelist_cached", return_value=[]):
+             patch("app.cron.pipeline.wl_store.load_whitelist", return_value=[]):
 
             from app.cron.pipeline import run_pipeline
             stats = run_pipeline(action="rss-fetch:ikiru", do_dispatch=False)
@@ -148,7 +148,7 @@ class TestPipelineEndToEnd:
         mock_channels = ["chan_123"]
 
         with patch("app.cron.pipeline._probe_source_health", return_value={}), \
-             patch("app.cron.pipeline.load_whitelist_cached", return_value=mock_whitelist), \
+             patch("app.cron.pipeline.wl_store.load_whitelist", return_value=mock_whitelist), \
              patch("app.services.dispatch_service.dispatch_service.claim_for_dispatch", return_value=mock_items), \
              patch("app.cron.pipeline.enrich_mod.enrich", return_value=mock_items), \
              patch("app.cron.pipeline.collect.filter_whitelisted", return_value=mock_items), \
@@ -176,7 +176,7 @@ class TestPipelineEndToEnd:
         mock_whitelist = [{"title_key": "test", "title": "Test"}]
 
         with patch("app.cron.pipeline._probe_source_health", return_value={}), \
-             patch("app.cron.pipeline.load_whitelist_cached", return_value=mock_whitelist), \
+             patch("app.cron.pipeline.wl_store.load_whitelist", return_value=mock_whitelist), \
              patch("app.services.dispatch_service.dispatch_service.claim_for_dispatch", return_value=mock_items), \
              patch("app.cron.pipeline.enrich_mod.enrich", return_value=mock_items), \
              patch("app.cron.pipeline.collect.filter_whitelisted", return_value=mock_items), \

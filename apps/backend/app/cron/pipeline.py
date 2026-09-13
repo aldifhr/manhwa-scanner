@@ -77,7 +77,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             _health_map = _probe_source_health()
             _use_claimed = False
             try:
-                _wl_for_claim = load_whitelist_cached()
+                _wl_for_claim = wl_store.load_whitelist()
                 # Single seam via dispatch_service (was direct storage call)
                 from app.services.dispatch_service import dispatch_service as _ds_claim
                 _claimed = _ds_claim.claim_for_dispatch(whitelist=_wl_for_claim, hours=24, limit=500)
@@ -107,7 +107,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 _ds.unclaim_stale(cutoff)
             except Exception as e:
                 logger.warn("unclaim_stale failed", err=str(e)[:160])
-            whitelist = load_whitelist_cached()
+            whitelist = wl_store.load_whitelist()
             # dispatch ONLY whitelisted items to Discord — if deep queue already claimed+filtered, skip filter
             if _use_claimed:
                 to_dispatch = enriched_all
@@ -172,22 +172,8 @@ from app.storage import recent_chapters  # noqa: E402
 _HEALTH_PROBE_CACHE: dict = {}
 _HEALTH_PROBE_CACHE_TTL = 120.0  # seconds
 
-# Whitelist cache (PERF follow-up): load_whitelist() is a DB read run on every
-# dispatch. Cache it for a short window so consecutive cron runs don't each hit
-# Supabase. The enrich throttle (PERF-01) already stops upstream re-scrapes;
-# this stops the redundant DB re-read of the whitelist itself.
-_WHITELIST_CACHE: dict = {"data": None, "ts": 0.0}
-_WHITELIST_CACHE_TTL = 600.0  # seconds (10 min; was 60s)
-
-
-def load_whitelist_cached() -> list[dict]:
-    import time as _t
-    if _WHITELIST_CACHE["data"] is not None and (_t.time() - _WHITELIST_CACHE["ts"]) < _WHITELIST_CACHE_TTL:
-        return _WHITELIST_CACHE["data"]
-    _wl = wl_store.load_whitelist()
-    _WHITELIST_CACHE["data"] = _wl
-    _WHITELIST_CACHE["ts"] = _t.time()
-    return _wl
+# Whitelist cache: REMOVED — load_whitelist() already has @ttl_cache(ttl=600) in whitelist.py
+# This was a double-cache. Call wl_store.load_whitelist() directly.
 
 
 def _probe_source_health(force: bool = False) -> dict:
