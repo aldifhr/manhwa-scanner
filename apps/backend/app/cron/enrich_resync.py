@@ -389,11 +389,12 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
         if su and "/series/" in su:
             slug = su.split("/series/")[-1].split("/")[0].split("?")[0]
         if not slug:
-            slug = tk
+            logger.info("voratoon cover: skip row without series_url", tk=tk)
+            continue
         checked += 1
         try:
             detail = _fetch_vt(slug)
-            data = (detail or {}).get("data", {}) if isinstance(detail, dict) else {}
+            data = detail if isinstance(detail, dict) else {}
             raw_cover = data.get("coverImage") or data.get("cover") or ""
             if not raw_cover:
                 # fallback: try series list search
@@ -441,11 +442,14 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             su2 = str(r2.get("series_url") or "").strip()
             if not tk2:
                 continue
-            slug2 = su2.split("/series/")[-1].split("/")[0].split("?")[0] if su2 and "/series/" in su2 else tk2
+            if not su2 or "/series/" not in su2:
+                logger.info("voratoon cover: skip recent row without series_url", tk=tk2)
+                continue
+            slug2 = su2.split("/series/")[-1].split("/")[0].split("?")[0]
             checked += 1
             try:
                 detail2 = _fetch_vt(slug2)
-                data2 = (detail2 or {}).get("data", {}) if isinstance(detail2, dict) else {}
+                data2 = detail2 if isinstance(detail2, dict) else {}
                 raw2 = data2.get("coverImage") or data2.get("cover") or ""
                 new2 = _scrub(raw2) if raw2 else ""
                 if new2 and new2 != r2.get("cover"):
