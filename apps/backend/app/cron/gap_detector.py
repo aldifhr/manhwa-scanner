@@ -450,4 +450,10 @@ def maybe_alert_gaps() -> int:
             logger.warn("gap alert sent", count=len(gaps))
         except Exception as e:
             logger.warn("gap alert send failed", err=str(e)[:160])
+        # Telegram mirror
+        try:
+            from app.cron.telegram_notifier import notify_text
+            notify_text(summary.replace("**", "").replace("🔧", "🔧").replace("ℹ️", "ℹ️"))
+        except Exception:
+            pass
     return len(gaps)

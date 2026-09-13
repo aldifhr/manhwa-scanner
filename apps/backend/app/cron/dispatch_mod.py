@@ -325,6 +325,12 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     fire_chapter_released(it)
                 except Exception:
                     pass
+                # Telegram notification — async, never blocks
+                try:
+                    from app.cron.telegram_notifier import notify_chapter
+                    notify_chapter(it)
+                except Exception:
+                    pass
                 time.sleep(0.8)
             except Exception as derr:
                 _consec_fail += 1

@@ -48,6 +48,12 @@ def _send(content: str) -> None:
         discord_client.send_channel_message(cid, content=content)
     except Exception as e:
         logger.warn("source alert send failed", err=str(e)[:160])
+    # Telegram mirror
+    try:
+        from app.cron.telegram_notifier import notify_text
+        notify_text(content.replace("**", ""))
+    except Exception:
+        pass
 
 
 def alert_source_transitions(prev_map: dict, curr_map: dict) -> None:

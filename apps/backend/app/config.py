@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     VORATOON_SERIES_PATH: str = "/series/"  # ponytail: voratoon path prefix
     VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
 
+    # Telegram (optional — chapter release notifications)
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""
+
     # Aliases (deprecated — see _sync_aliases)
     SECONDARY_SOURCE_URL: str = "https://api.shngm.io"
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
