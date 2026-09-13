@@ -52,7 +52,7 @@ _PARSE_TYPES_CACHE: dict[str, list[str]] = {}
 _PARSE_TYPES_CACHE_MAX = 1024
 
 _COLLECT_WORKERS = 12
-_SOURCE_TIMEOUT = 180.0
+_SOURCE_TIMEOUT = 120.0
 
 
 def _cached_chapter_list(source: str, sid: str, fetcher) -> list:

@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger("tasks.scheduler")
 
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
-_SOURCE_INTERVAL_S = 600
+_SOURCE_INTERVAL_S = 900
 _DISPATCH_INTERVAL_S = 120
 _ENRICH_INTERVAL_S = 3600
 _ENRICH_MISSING_INTERVAL_S = 3600
