@@ -70,6 +70,38 @@ def run_cron_inline(action: str) -> None:
         logger.info("cron failed-retry done", **result)
         return
 
+    if action == "dispatch-alert":
+        from app.cron.dispatch_alert import check_and_alert_failed_dispatches
+        check_and_alert_failed_dispatches()
+        return
+
+    if action == "gap-detect":
+        from app.cron.gap_detector import maybe_alert_gaps
+        maybe_alert_gaps()
+        return
+
+    if action == "dashboard-snapshot":
+        from app.api.dashboard.stats import build_snapshot_sync
+        from app.storage import health
+        health.write_dashboard_snapshot(build_snapshot_sync())
+        return
+
+    if action == "whitelist-enrich":
+        from app.cron.enrich_whitelist import enrich_all_whitelist
+        enrich_all_whitelist()
+        return
+
+    if action == "retention":
+        from app.db import get_supabase
+        from app.storage import recent_chapters
+        from datetime import datetime, timezone, timedelta
+        recent_chapters.prune_older_than(24)
+        recent_chapters.prune_dispatch_history_older_than(48)
+        get_supabase().table("cron_run_status").delete().lt(
+            "created_at", (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        ).execute()
+        return
+
     if action == "vseries-refresh":
         from app.db import q as _q
         try:

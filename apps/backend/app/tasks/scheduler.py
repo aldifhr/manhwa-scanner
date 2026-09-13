@@ -15,6 +15,9 @@ _ENRICH_MISSING_INTERVAL_S = 3600
 _ENRICH_REFRESH_INTERVAL_S = 604800
 _VORATOON_COVER_INTERVAL_S = 86400
 _FAILED_RETRY_INTERVAL_S = 3600
+_DASHBOARD_INTERVAL_S = 600
+_RETENTION_INTERVAL_S = 86400
+_ALERT_INTERVAL_S = 600
 _VSERIES_REFRESH_INTERVAL_S = 3600  # ponytail: v_series MATERIALIZED REFRESH hourly (was 7d via enrich-refresh)
 
 _SCHED_THREAD: threading.Thread | None = None
@@ -32,6 +35,9 @@ def _scheduler_loop() -> None:
     last_vseries = 0.0
     last_dispatch = 0.0
     last_failed_retry = 0.0
+    last_dashboard = 0.0
+    last_retention = 0.0
+    last_alert = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
@@ -85,6 +91,7 @@ def _scheduler_loop() -> None:
             if _now - last_enrich >= _ENRICH_INTERVAL_S:
                 try:
                     enqueue_cron("enrich", title="enrichment")
+                    enqueue_cron("whitelist-enrich", title="whitelist enrichment")
                     last_enrich = _now
                 except Exception:
                     pass
@@ -116,6 +123,25 @@ def _scheduler_loop() -> None:
                 try:
                     enqueue_cron("failed-retry")
                     last_failed_retry = _now
+                except Exception:
+                    pass
+            if _now - last_alert >= _ALERT_INTERVAL_S:
+                try:
+                    enqueue_cron("dispatch-alert")
+                    enqueue_cron("gap-detect")
+                    last_alert = _now
+                except Exception:
+                    pass
+            if _now - last_dashboard >= _DASHBOARD_INTERVAL_S:
+                try:
+                    enqueue_cron("dashboard-snapshot")
+                    last_dashboard = _now
+                except Exception:
+                    pass
+            if _now - last_retention >= _RETENTION_INTERVAL_S:
+                try:
+                    enqueue_cron("retention")
+                    last_retention = _now
                 except Exception:
                     pass
             try:

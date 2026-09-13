@@ -45,18 +45,6 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
     instance_id = f"be-ag-py-{int(start)}"
     _use_claimed = False  # set True only when the deep-queue claim path is used
 
-    # Prune anything older than the 24h window before this run so backlog
-    # never accumulates in recent_chapters (user: "24 jam doang").
-    try:
-        recent_chapters.prune_older_than(24)
-    except Exception as e:
-        logger.warn("collect: recent_chapters prune failed", err=str(e)[:160])
-    # Prune dispatch_history to 2d window (was 24h — BUG-3: 1d too short for dedup, fix 2d)
-    try:
-        recent_chapters.prune_dispatch_history_older_than(48)
-    except Exception as e:
-        logger.warn("collect: dispatch_history prune failed", err=str(e)[:160])
-
     # Parse source from action string (e.g., "rss-fetch:ikiru" → source="ikiru")
     source = None
     if ":" in action:
@@ -146,18 +134,6 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                     retry_stats = _ds.retry_failed_dispatches(channels)
                 except Exception as e:
                     logger.error("pipeline retry_failed failed", exc=e)
-                # Alert admin if failures accumulated above threshold
-                try:
-                    from app.cron.dispatch_alert import check_and_alert_failed_dispatches
-                    check_and_alert_failed_dispatches()
-                except Exception as e:
-                    logger.warn("dispatch alert check failed", err=str(e)[:120])
-                # Chapter gap detection (sent vs scraped) — alert with cooldown
-                try:
-                    from app.cron.gap_detector import maybe_alert_gaps
-                    maybe_alert_gaps()
-                except Exception as e:
-                    logger.warn("gap detector failed", err=str(e)[:120])
         else:
             sent = 0
             retry_stats = {}
@@ -176,39 +152,6 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         }
         logger.info("Cron completed", **stats)
         health.write_cron_status("ok", chapters_sent=sent, matched=stats.get("matched", 0), duration=duration)
-
-        # Enrich whitelist entries with metadata from source APIs
-        # (cover, rating, genres, description). Runs every dispatch.
-        try:
-            from app.cron.enrich_whitelist import enrich_all_whitelist
-            _enriched = enrich_all_whitelist()
-            if _enriched:
-                logger.info("whitelist enrichment done", updated=_enriched)
-        except Exception as _ee:
-            logger.warn("whitelist enrichment failed", err=str(_ee)[:120])
-
-        # Materialized dashboard snapshot: compute once, persist 1 row.
-        try:
-            from app.api.dashboard.stats import build_snapshot_sync
-            _snap = build_snapshot_sync()
-            health.write_dashboard_snapshot(_snap)
-        except Exception as _se:
-            # Connection closed during deploy shutdown is expected — debug only
-            _msg = str(_se).lower()
-            if "already closed" in _msg or "pool closed" in _msg or "connection" in _msg and "closed" in _msg:
-                logger.debug("cron snapshot skipped — pool closed", err=str(_se)[:120])
-            else:
-                logger.error("cron snapshot persist failed", exc=_se)
-
-        # Retention prune: cron_run_status is an operational log — keep only 2 days
-        try:
-            from app.db import get_supabase as _gsb_ret
-            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-            _gsb_ret().table("cron_run_status").delete().lt(
-                "created_at", (_dt.now(_tz.utc) - _td(days=2)).isoformat()
-            ).execute()
-        except Exception as _re:
-            logger.warn("cron retention prune failed", err=str(_re)[:160])
 
         return stats
     except Exception as e:
