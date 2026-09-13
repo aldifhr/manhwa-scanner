@@ -45,13 +45,25 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        from app.db import close_pool as _close_pool
-        _close_pool()
+        from app.tasks import stop_worker as _stop_worker
+        _stop_worker(timeout=10.0)
+    except Exception:
+        pass
+    # Drain Redis processing lists before closing pool
+    try:
+        from app.tasks.queue import CRON_PROCESSING_KEY, QUEUE_PROCESSING_KEY, _get_redis
+        r = _get_redis()
+        for key in (CRON_PROCESSING_KEY, QUEUE_PROCESSING_KEY):
+            while True:
+                raw = r.rpop(key)
+                if raw is None:
+                    break
+                r.lpush(key.replace(":processing", ""), raw)  # type: ignore[arg-type]
     except Exception:
         pass
     try:
-        from app.tasks import stop_worker as _stop_worker
-        _stop_worker()
+        from app.db import close_pool as _close_pool
+        _close_pool()
     except Exception:
         pass
 

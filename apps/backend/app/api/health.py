@@ -11,6 +11,17 @@ router = APIRouter()
 
 @router.get("/healthz")
 async def healthz():
+    """Liveness probe: check DB + Redis are reachable."""
+    try:
+        from app.db import q as _q
+        _q("SELECT 1")
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "service": "be-ag-py", "error": f"db: {str(e)[:100]}"}, status_code=503)
+    try:
+        from app.tasks.queue import _get_redis as _gr
+        _gr().ping()
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "service": "be-ag-py", "error": f"redis: {str(e)[:100]}"}, status_code=503)
     return {"status": "ok", "service": "be-ag-py"}
 
 

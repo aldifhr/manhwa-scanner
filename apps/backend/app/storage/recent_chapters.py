@@ -131,6 +131,7 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
                     existing_ch.add((_tk, _src, _cn))  # type: ignore
     except Exception as e:
         logger.error("batchInsertRecentChapters existing lookup failed", exc=e, exc_info=True)
+        raise  # fail-closed: jangan return empty set, biar caller retry
     # cache store
     try:
         import time as _t2
