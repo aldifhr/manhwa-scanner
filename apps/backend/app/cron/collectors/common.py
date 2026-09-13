@@ -156,7 +156,6 @@ def _cached_series_meta(source: str, sid: str) -> dict:
                 return _e
     except Exception:
         pass
-    _time_mod.sleep(0.3)
     meta: dict = {}
     try:
         if source == "ikiru":
