@@ -130,7 +130,7 @@ def _norm_row(r: dict) -> dict:
     return out
 
 
-@ttl_cache(ttl=30.0, maxsize=1)
+@ttl_cache(ttl=600.0, maxsize=1)
 def load_whitelist(force: bool = False) -> list[dict]:
     try:
         res = (

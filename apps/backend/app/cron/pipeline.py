@@ -177,7 +177,7 @@ _HEALTH_PROBE_CACHE_TTL = 120.0  # seconds
 # Supabase. The enrich throttle (PERF-01) already stops upstream re-scrapes;
 # this stops the redundant DB re-read of the whitelist itself.
 _WHITELIST_CACHE: dict = {"data": None, "ts": 0.0}
-_WHITELIST_CACHE_TTL = 60.0  # seconds
+_WHITELIST_CACHE_TTL = 600.0  # seconds (10 min; was 60s)
 
 
 def load_whitelist_cached() -> list[dict]:
