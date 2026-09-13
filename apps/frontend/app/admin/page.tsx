@@ -111,27 +111,6 @@ export default function AdminDashboard() {
     },
     onError: (e) => setMsg((e as Error).message.slice(0, 120)),
   });
-  const refreshVor = useMutation({
-    mutationFn: async () => {
-      const r = await readerFetch<{ success: boolean; data: any }>(
-        "/api/v1/health/refresh-voratoon",
-        { method: "POST" }
-      );
-      return r;
-    },
-    onSuccess: (r: any) => {
-      setMsg(`Refreshed ${r.data?.refreshed ?? 0} covers`);
-      setTimeout(() => setMsg(null), 3000);
-      qc.invalidateQueries({ queryKey: ["admin-health"] });
-    },
-    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
-  });
-  const resyncRatings = useMutation({
-    mutationFn: async () => readerFetch<{ success: boolean }>("/api/cron?action=enrich", { method: "POST" }),
-    onSuccess: () => { setMsg("Resync triggered"); setTimeout(() => setMsg(null), 3000); },
-    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
-  });
-
   const { data: failed } = useQuery({
     queryKey: ["admin-failed"],
     queryFn: async () => {
@@ -213,20 +192,6 @@ export default function AdminDashboard() {
             className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50"
           >
             {cronRun.isPending ? "..." : "Trigger cron update"}
-          </button>
-          <button
-            onClick={() => refreshVor.mutate()}
-            disabled={refreshVor.isPending}
-            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
-          >
-            {refreshVor.isPending ? "..." : "Refresh Voratoon covers"}
-          </button>
-          <button
-            onClick={() => resyncRatings.mutate()}
-            disabled={resyncRatings.isPending}
-            className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
-          >
-            {resyncRatings.isPending ? "..." : "Resync ratings"}
           </button>
           <Link
             href="/admin/error-logs"
