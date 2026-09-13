@@ -8,6 +8,7 @@ logger = logging.getLogger("tasks.scheduler")
 
 _RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
 _SOURCE_INTERVAL_S = 900
+_IKIRU_INTERVAL_S = 3600
 _DISPATCH_INTERVAL_S = 120
 _ENRICH_INTERVAL_S = 3600
 _ENRICH_MISSING_INTERVAL_S = 3600
@@ -51,6 +52,7 @@ def _scheduler_loop() -> None:
     except Exception:
         pass
     last_source = _time.monotonic()
+    last_ikiru = _time.monotonic()
     while True:
         try:
             if _stop.wait(_DISPATCH_INTERVAL_S):
@@ -64,17 +66,22 @@ def _scheduler_loop() -> None:
                     logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
             if _now - last_source >= _SOURCE_INTERVAL_S:
                 if not _stop.is_set():
-                    for src in _RSS_SOURCES:
-                        if _stop.is_set():
-                            break
+                    for src in ("shinigami", "voratoon"):
                         try:
                             logger.info("scheduler enqueue rss-fetch", source=src)
                             enqueue_cron(f"rss-fetch:{src}", source=src)
                         except Exception as e:
                             logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
                         _stop.wait(20)
-                logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
+                logger.info("scheduler rss-fetch batch done", sources=("shinigami", "voratoon"))
                 last_source = _now
+            if _now - last_ikiru >= _IKIRU_INTERVAL_S:
+                try:
+                    logger.info("scheduler enqueue rss-fetch", source="ikiru")
+                    enqueue_cron("rss-fetch:ikiru", source="ikiru")
+                    last_ikiru = _now
+                except Exception as e:
+                    logger.warn("scheduler enqueue failed", src="ikiru", err=str(e)[:120])
             if _now - last_enrich >= _ENRICH_INTERVAL_S:
                 try:
                     enqueue_cron("enrich", title="enrichment")
