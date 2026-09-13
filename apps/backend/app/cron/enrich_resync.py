@@ -394,7 +394,7 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
         checked += 1
         try:
             detail = _fetch_vt(slug)
-            data = detail if isinstance(detail, dict) else {}
+            data = (detail or {}).get("data", {}) if isinstance(detail, dict) else {}
             raw_cover = data.get("coverImage") or data.get("cover") or ""
             if not raw_cover:
                 # fallback: try series list search
@@ -449,7 +449,7 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             checked += 1
             try:
                 detail2 = _fetch_vt(slug2)
-                data2 = detail2 if isinstance(detail2, dict) else {}
+                data2 = (detail2 or {}).get("data", {}) if isinstance(detail2, dict) else {}
                 raw2 = data2.get("coverImage") or data2.get("cover") or ""
                 new2 = _scrub(raw2) if raw2 else ""
                 if new2 and new2 != r2.get("cover"):
