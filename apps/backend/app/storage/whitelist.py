@@ -253,7 +253,7 @@ def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:
                     f"DELETE FROM whitelist WHERE (title_key, source) IN ({values_clause})",
                     params
                 )
-                conn.commit()
+                # autocommit=True from get_conn() — no explicit commit needed
                 load_whitelist.invalidate()
             finally:
                 if cur is not None:

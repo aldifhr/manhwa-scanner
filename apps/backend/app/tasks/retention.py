@@ -112,4 +112,7 @@ def _retention_loop(stop_event) -> None:
                 logger.warn("retention: recent_chapters cleanup failed", err=str(e)[:120])
         except Exception as e:
             logger.exception("retention prune failed")
-        stop_event.wait(3600)  # hourly
+        try:
+            stop_event.wait(3600)  # hourly
+        except (KeyboardInterrupt, SystemExit):
+            break
