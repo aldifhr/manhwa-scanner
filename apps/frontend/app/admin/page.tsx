@@ -59,12 +59,6 @@ export default function AdminDashboard() {
     },
     refetchInterval: 60000,
   });
-  const clearErrors = useMutation({
-    mutationFn: async () => readerFetch<{ success: boolean }>("/api/v1/logs/errors", { method: "DELETE" }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-errors"] }); setMsg("Logs cleared"); setTimeout(() => setMsg(null), 2000); },
-    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
-  });
-
   const { data: failedQueue } = useQuery({
     queryKey: ["admin-failed-queue"],
     queryFn: Reader.getFailedDispatchesQueue,
@@ -275,7 +269,6 @@ export default function AdminDashboard() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white/80">Latest errors (5)</h2>
-            <button onClick={() => clearErrors.mutate()} disabled={clearErrors.isPending} className="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50">{clearErrors.isPending ? "..." : "Clear"}</button>
           </div>
           {!errors || errors.length === 0 ? (
             <p className="text-sm text-white/40 border border-dashed border-white/10 rounded-lg p-4 text-center">
