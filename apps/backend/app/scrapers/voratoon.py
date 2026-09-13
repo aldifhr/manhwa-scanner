@@ -287,23 +287,7 @@ def _emit_series(results: list[dict], s: dict) -> None:
     rating = data.get("rating")
     genres = [g.get("data", {}).get("name", "") for g in data.get("genres", [])]
     fmt = data.get("format", "manhwa")
-    # Fallback to per-series detail if rating or synopsis is missing from list endpoint
-    if not rating or not synopsis:
-        try:
-            _detail = fetch_series_detail(slug)
-            if _detail:
-                _detail_data = _detail.get("data", {})
-                rating = _detail_data.get("rating") or rating
-                if not genres:
-                    genres = [g.get("data", {}).get("name", "") for g in _detail_data.get("genres", [])]
-                if not cover:
-                    cover = _detail_data.get("coverImage", "")
-                    cover = scrub_cover(cover) if cover else ""
-                if not synopsis:
-                    synopsis = _detail_data.get("synopsis", "")
-        except Exception:
-            pass
-
+    # Metadata enrichment runs separately; avoid one detail request per series here.
     for ch in (s.get("chapters") or []):
         ch_index = ch.get("chapterIndex") or ch.get("data", {}).get("index")
         if not ch_index:
