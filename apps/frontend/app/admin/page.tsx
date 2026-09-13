@@ -251,7 +251,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold mb-3">Failed Dispatches Queue</h3>
+          <h3 className="text-sm font-semibold mb-3">Retry Queue</h3>
           {(() => {
             const fq = failedQueue as any;
             if (!fq || (Array.isArray(fq) && fq.length === 0) || (!Array.isArray(fq) && !fq.items?.length && !fq.length)) {
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
 
         <div className="bg-surface border border-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Failed dispatches {(failed as any)?.total ? `(${(failed as any).total})` : ""}</h3>
+            <h3 className="text-sm font-semibold">Failure History {(failed as any)?.total ? `(${(failed as any).total})` : ""}</h3>
             <button onClick={() => retryAll.mutate()} disabled={retryAll.isPending || !(failed as any)?.results?.length} className="text-xs px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50">{retryAll.isPending ? "..." : "Retry all"}</button>
           </div>
           {!(failed as any)?.results?.length ? <p className="text-xs text-white/40">No failures</p> : <div className="space-y-2">{(failed as any).results.map((r: any) => <div key={r.id} className="flex items-center gap-2 text-xs bg-black/20 rounded-lg p-2"><span className="truncate flex-1">{r.title} — {r.chapter}</span><span className="text-white/40 hidden sm:inline truncate max-w-[160px]">{r.error?.slice(0, 80)}</span><button onClick={() => retryOne.mutate(r.id)} disabled={retryOne.isPending} className="shrink-0 px-2 py-1 rounded bg-white/10 hover:bg-white/15 border border-white/10">Retry</button></div>)}</div>}
