@@ -111,5 +111,5 @@ def _retention_loop(stop_event) -> None:
             except Exception as e:
                 logger.warn("retention: recent_chapters cleanup failed", err=str(e)[:120])
         except Exception as e:
-            logger.error("retention prune failed", exc=e)
+            logger.exception("retention prune failed")
         stop_event.wait(3600)  # hourly

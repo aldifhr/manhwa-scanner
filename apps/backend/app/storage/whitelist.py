@@ -136,8 +136,7 @@ def load_whitelist(force: bool = False) -> list[dict]:
         res = (
             get_supabase()
             .table("whitelist")
-            .select("title_key, source, series_url, latest_sent_chapter, title, created_at, id, url, latest_chapter")
-            .order("created_at", desc=True)
+            .select("title_key, source, series_url, latest_sent_chapter, title, id, url, latest_chapter")
             .limit(5000)
             .execute()
         )
