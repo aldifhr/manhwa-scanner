@@ -121,7 +121,7 @@ def search_ikiru_api(query: str, per_page: int = 20):
 
 # ── Latest updates: API primary, HTML fallback ──
 
-def get_ikiru_latest_updates(max_pages: int = 20, hours_cutoff: int = 24):
+def get_ikiru_latest_updates(max_pages: int = 3, hours_cutoff: int = 24):
     """Get latest updates. Primary: /list/latest API. Fallback: HTML scrape."""
     from datetime import datetime, timezone, timedelta
 
