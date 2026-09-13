@@ -30,11 +30,16 @@ logger = get_logger("db")
 
 DATABASE_URL = os.environ.get("DATABASE_URL") or getattr(settings, "DATABASE_URL", "") or ""
 
-_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+_pool = None
 _pool_lock = threading.Lock()
 # Bounded semaphore so we never exceed pool capacity; get_conn() blocks
 # (queues) instead of raising PoolError under burst load.
-_conn_sem: threading.Semaphore | None = None
+_conn_sem = None
+# Telemetry counters (ponytail: explicit counters beat introspection for pool
+# health; add percentiles here if you ever need P99 wait timing).
+_pool_acquires = 0
+_pool_releases = 0
+_pool_active = 0
 _POOL_MAX = 15
 
 
@@ -45,54 +50,34 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
             if _pool is None:
                 if not DATABASE_URL:
                     raise RuntimeError("DATABASE_URL not set (transaction pooler DSN required)")
+                # Append options=-c timezone=UTC so connections are born UTC (removes
+                # the per-borrow SET TIME ZONE round-trip that was in get_conn()).
+                _dsn = DATABASE_URL
+                if "options=" not in _dsn:
+                    _dsn = _dsn + ("&" if "?" in _dsn else "?") + "options=-c timezone=UTC"
                 _pool = psycopg2.pool.ThreadedConnectionPool(
                     minconn=2,
                     maxconn=_POOL_MAX,
-                    dsn=DATABASE_URL,
+                    dsn=_dsn,
                     cursor_factory=RealDictCursor,
                 )
                 _conn_sem = threading.Semaphore(_POOL_MAX)
-                logger.info("psycopg2 pool created", dsn_masked=DATABASE_URL.split("@")[0] + "@***")
+                logger.info("psycopg2 pool created", dsn_masked=("***" if "@" in DATABASE_URL else DATABASE_URL.split("?")[0]))
     return _pool
 
 
 def get_pool_stats() -> dict:
-    """Return connection pool utilization. -1 if pool not initialized."""
-    p = _pool
-    if p is None:
-        return {"active": -1, "idle": -1, "max": _POOL_MAX}
-    # Prefer public stats when available; fall back to internal dicts.
-    try:
-        # psycopg2 ThreadedConnectionPool has no public stats API; we inspect
-        # _used / _rused as best-effort but guard against future renames.
-        used = 0
-        for attr in ("_used", "_rused", "_used_connections", "_pool"):
-            v = getattr(p, attr, None)
-            if isinstance(v, dict):
-                used += len(v)
-            elif isinstance(v, (list, set, tuple)):
-                used += len(v)
-            elif v is not None and attr == "_used":
-                # _used is dict keyed by connection id in newer psycopg2
-                try:
-                    used += len(v)
-                except Exception:
-                    pass
-        # If we couldn't infer, report -1 instead of lying.
-        if used == 0:
-            # double-check: if pool is truly empty, distinguish from unknown
-            # by checking if _used exists at all
-            if not any(hasattr(p, a) for a in ("_used", "_rused")):
-                return {"active": -1, "idle": -1, "max": _POOL_MAX}
-        return {"active": used, "idle": max(0, _POOL_MAX - used), "max": _POOL_MAX}
-    except Exception:
-        return {"active": -1, "idle": -1, "max": _POOL_MAX}
+    return {
+        "active": _pool_active,
+        "idle": max(0, _POOL_MAX - _pool_active),
+        "max": _POOL_MAX,
+        "acquires": _pool_acquires,
+        "releases": _pool_releases,
+    }
 
 
 def get_conn():
-    """Borrow a connection, blocking (queued) if the pool is saturated.
-    Retries once on a stale/closed connection (transaction poolers drop
-    idle conns) instead of surfacing SSL-closed errors to the caller."""
+    global _pool_acquires, _pool_releases, _pool_active
     if not cb_db.allow():
         raise RuntimeError("circuit db OPEN — fast fail")
     sem = _get_pool() and _conn_sem
@@ -100,69 +85,43 @@ def get_conn():
         _get_pool()
         sem = _conn_sem
     sem.acquire()
+    _pool_acquires += 1
     last_err = None
     for _ in range(2):
         try:
             conn = _get_pool().getconn()
-            # Lazy validation: only run SELECT 1 if the connection is
-            # explicitly marked closed (cheap local attribute check, no
-            # network round-trip). psycopg2's ThreadedConnectionPool already
-            # keeps connections alive between borrows; the full SELECT 1 was
-            # a per-borrow network hit on every get_conn() call. If a conn is
-            # silently SSL-dropped, the real query will raise and the caller's
-            # retry / circuit breaker handles it.
             if getattr(conn, "closed", 0):
                 raise psycopg2.OperationalError("connection marked closed")
-            # autocommit=True: psycopg2 defaults to autocommit=False, so the
-            # first query on a borrowed pooled connection opens a transaction
-            # whose MVCC snapshot PERSISTS across borrows (get_conn/put_conn
-            # never commit/rollback). Long-lived API/cron connections then see
-            # a frozen snapshot from process start and silently MISS every row
-            # inserted after that (cron scrapes, whitelist adds, gap backfills)
-            # — e.g. The Villain Of Destiny shinigami never appearing in /recent.
-            # autocommit makes every statement see committed data (READ
-            # COMMITTED), eliminating the stale-snapshot bug.
             try:
                 conn.autocommit = True
             except Exception:
                 pass
-            # Force UTC on every borrowed connection. The DB default session
-            # TZ is Asia/Shanghai (+08:00), which makes tz-naive/string
-            # `updated_time >= cutoff` comparisons shift by 8h and silently
-            # drop rows from RSS/cron windows. UTC makes all comparisons
-            # unambiguous regardless of how the param is bound.
-            try:
-                with conn.cursor() as _tzcur:
-                    _tzcur.execute("SET TIME ZONE UTC")
-            except Exception:
-                pass
+            # Timezone is set at DSN level (options=-c timezone=UTC); the
+            # per-borrow SET TIME ZONE was an extra round-trip on every getconn.
             cb_db.record_success()
+            _pool_active += 1
             return conn
         except Exception as e:
             last_err = e
             cb_db.record_failure()
             try:
-                # DISCARD (close=True) — do NOT recycle a broken
-                # connection back into the pool. Recycling a stale/
-                # SSL-closed socket lets the next getconn() pull the
-                # same dead conn and fail again (retry spin). psycopg2's
-                # putconn(close=True) actually closes it.
                 _get_pool().putconn(conn, close=True)
             except Exception:
                 pass
-    # Both attempts failed: if the pool has multiple broken conns
-    # we can't easily detect them all, but recreating on repeated
-    # failure would be overkill for a single-instance bot. Log + raise.
+    # Both attempts failed.
+    _pool_releases += 1
     sem.release()
     raise last_err
 
 
 def put_conn(conn):
+    global _pool_active
     try:
         _get_pool().putconn(conn)
     except Exception:
         pass
     finally:
+        _pool_active -= 1
         if _conn_sem is not None:
             _conn_sem.release()
 
