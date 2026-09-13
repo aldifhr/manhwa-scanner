@@ -50,15 +50,12 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
             if _pool is None:
                 if not DATABASE_URL:
                     raise RuntimeError("DATABASE_URL not set (transaction pooler DSN required)")
-                # Append options=-c timezone=UTC so connections are born UTC (removes
-                # the per-borrow SET TIME ZONE round-trip that was in get_conn()).
-                _dsn = DATABASE_URL
-                if "options=" not in _dsn:
-                    _dsn = _dsn + ("&" if "?" in _dsn else "?") + "options=-c timezone=UTC"
+                # Timezone is set via SET TIME ZONE in get_conn(); don't modify DSN
+                # because some psycopg2 parsers reject options= in URI query params.
                 _pool = psycopg2.pool.ThreadedConnectionPool(
                     minconn=2,
                     maxconn=_POOL_MAX,
-                    dsn=_dsn,
+                    dsn=DATABASE_URL,
                     cursor_factory=RealDictCursor,
                 )
                 _conn_sem = threading.Semaphore(_POOL_MAX)
@@ -96,8 +93,16 @@ def get_conn():
                 conn.autocommit = True
             except Exception:
                 pass
-            # Timezone is set at DSN level (options=-c timezone=UTC); the
-            # per-borrow SET TIME ZONE was an extra round-trip on every getconn.
+            # Force UTC on every borrowed connection. The DB default session
+            # TZ is Asia/Shanghai (+08:00), which makes tz-naive/string
+            # `updated_time >= cutoff` comparisons shift by 8h and silently
+            # drop rows from RSS/cron windows. UTC makes all comparisons
+            # unambiguous regardless of how the param is bound.
+            try:
+                with conn.cursor() as _tzcur:
+                    _tzcur.execute("SET TIME ZONE UTC")
+            except Exception:
+                pass
             cb_db.record_success()
             _pool_active += 1
             return conn
