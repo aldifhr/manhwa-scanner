@@ -369,32 +369,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold mb-3">Sources Health</h3>
-          {(() => {
-            const sh = sourcesHealth as any;
-            if (!sh || (Array.isArray(sh) && sh.length === 0) || (!Array.isArray(sh) && Object.keys(sh).length === 0)) {
-              return <p className="text-xs text-white/40">No data</p>;
-            }
-            const items = Array.isArray(sh) ? sh : sh.sources ?? Object.entries(sh).map(([name, v]: [string, any]) => ({ name, ...v }));
-            return (
-              <div className="space-y-2">
-                {items.map((s: any) => (
-                  <div key={s.name} className="flex items-center justify-between gap-3 bg-black/20 rounded-lg p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === "healthy" ? "bg-emerald-500" : s.status === "degraded" ? "bg-amber-400" : "bg-red-500"}`} />
-                      <span className="text-sm font-medium capitalize truncate">{s.name}</span>
-                    </div>
-                    <span className="text-xs text-white/50">
-                      {s.errorRate24h?.toFixed?.(1) ?? 0}% err • {s.consecutiveFailures ?? 0} fail
-                    </span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className="bg-surface border border-border rounded-xl p-4">
           <h3 className="text-sm font-semibold mb-3">Failed Dispatches Queue</h3>
           {(() => {
             const fq = failedQueue as any;
