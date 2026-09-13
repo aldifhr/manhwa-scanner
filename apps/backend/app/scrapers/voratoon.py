@@ -192,6 +192,8 @@ def collect_voratoon() -> list[dict]:
     calls) with far fewer requests.
     """
     results: list[dict] = []
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
 
     # Latest releases: per format (manhwa=Korea, manhua=China), each with and
     # without the type==project filter (project-type series only appear under
@@ -248,8 +250,22 @@ def collect_voratoon() -> list[dict]:
             series_list = payload.get("data", [])
             if not series_list:
                 break
+            page_has_recent = False
             for s in series_list:
+                for ch in (s.get("chapters") or []):
+                    stamp = ch.get("createdAt") or ch.get("updatedAt") or ""
+                    try:
+                        ts = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                        if ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
+                        if ts >= cutoff:
+                            page_has_recent = True
+                            break
+                    except (ValueError, TypeError):
+                        continue
                 _emit_series(_out, s)
+            if not page_has_recent:
+                break
             meta = payload.get("meta") or {}
             if meta.get("lastPage") and page >= int(meta["lastPage"]):
                 break

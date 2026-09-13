@@ -221,11 +221,10 @@ alter table source_health add column if not exists updated_at timestamptz not nu
 alter table source_health add column if not exists created_at timestamptz not null default now();
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname = 'source_health_status_check') then
-    alter table source_health
-      add constraint source_health_status_check
-      check (status = any (array['healthy','degraded']));
-  end if;
+  alter table source_health drop constraint if exists source_health_status_check;
+  alter table source_health
+    add constraint source_health_status_check
+    check (status = any (array['HEALTHY','DEGRADED','DOWN','BLOCKED','RATE_LIMITED']));
 end $$;
 
 -- ---- cron_run_status: status jsonb + extra columns
