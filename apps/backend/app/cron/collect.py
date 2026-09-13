@@ -180,19 +180,19 @@ def collect_recent_chapters(
         for _src in ("ikiru", "shinigami", "voratoon"):
             _hm[_src] = {"status": "disabled", "response_time_ms": 0, "successes_today": 0, "failures_today": 0, "consecutive_failures": 0, "last_success_at": None, "last_checked_at": _now_iso, "last_error": "cooldown"}
 
+    _wl = None
     if with_whitelisted_ikiru and "ikiru" not in _disabled:
         try:
-            wl = wl_store.load_whitelist()
-            items.extend(collect_whitelisted_ikiru_chapters(wl))
+            _wl = wl_store.load_whitelist()
+            items.extend(collect_whitelisted_ikiru_chapters(_wl))
         except Exception as e:
-            logger.warn("collect whitelisted ikiru failed", err=str(e))
-
+            logger.warn("collect whitelisted ikiru failed", err=str(e)[:120])
     if with_whitelisted_shinigami and "shinigami" not in _disabled:
         try:
-            wl = wl_store.load_whitelist()
-            items.extend(collect_whitelisted_shinigami_chapters(wl))
+            _wl = _wl or wl_store.load_whitelist()
+            items.extend(collect_whitelisted_shinigami_chapters(_wl))
         except Exception as e:
-            logger.warn("collect whitelisted shinigami failed", err=str(e))
+            logger.warn("collect whitelisted shinigami failed", err=str(e)[:120])
 
     # Cross-source dedup: same title+chapter from multiple sources → keep first
     from app.services.fcfs import fcfs_key as _fcfs
