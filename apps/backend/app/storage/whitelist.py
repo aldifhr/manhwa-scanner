@@ -189,6 +189,8 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
         ).execute()
         # Invalidate cache so next load picks up the new rows.
         load_whitelist.invalidate()
+        from app.storage import recent_chapters as _rc
+        _rc.invalidate_whitelist_origin_cache()
         return {"status": "ok", "whitelist": payload}
     except Exception as e:
         msg = str(e)

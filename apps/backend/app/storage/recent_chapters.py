@@ -142,12 +142,44 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
     return existing_urls, existing_ch
 
 
+_wl_origins: dict[tuple[str, str], str] = {}
+_WL_ORIGIN_TTL = 600.0
+_WL_ORIGIN_TS = 0.0
+
+
+def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
+    """Cached whitelist origin map (ponytail: 10min TTL + invalidation, not per-batch query)."""
+    import time as _t
+    global _wl_origins, _WL_ORIGIN_TS
+    if not force and _wl_origins and (_t.time() - _WL_ORIGIN_TS) < _WL_ORIGIN_TTL:
+        return _wl_origins
+    try:
+        from app.db import get_supabase as _gsb_wl
+        _sb_wl = _gsb_wl()
+        _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
+        _wl_origins = {}
+        for _wl in _wl_rows:
+            _tk_wl = str(_wl.get("title_key") or "").strip()
+            _src_wl = str(_wl.get("source") or "").strip()
+            _orig_wl = str(_wl.get("origin") or "").strip().upper()
+            if _tk_wl and _src_wl and _orig_wl:
+                _wl_origins[(_tk_wl, _src_wl)] = _orig_wl
+        _WL_ORIGIN_TS = _t.time()
+    except Exception:
+        pass
+    return _wl_origins
+
+
+def invalidate_whitelist_origin_cache() -> None:
+    """Call after whitelist add/remove so next batch_insert uses fresh origins."""
+    global _wl_origins, _WL_ORIGIN_TS
+    _wl_origins = {}
+    _WL_ORIGIN_TS = 0.0
+
+
 def batch_insert_recent_chapters(rows: list[dict]) -> None:
     if not rows:
         return
-    # Keep only columns that exist in recent_chapters table
-    # (html_backlog is derived from updated_time="" at read time,
-    #  no separate column needed)
     allowed = {
         "chapter_url",
         "title_key",
@@ -164,65 +196,31 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         "genres",
         "rating",
     }
-    # ponytail: load whitelist origins so recent_chapters.origin matches
-    # whitelist.origin (collector source country_id is unreliable —
-    # shinigami hosts CN content but reports country_id=KR)
-    _wl_origins: dict[tuple[str, str], str] = {}
-    try:
-        from app.db import get_supabase as _gsb_wl
-        _sb_wl = _gsb_wl()
-        _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
-        for _wl in _wl_rows:
-            _tk_wl = str(_wl.get("title_key") or "").strip()
-            _src_wl = str(_wl.get("source") or "").strip()
-            _orig_wl = str(_wl.get("origin") or "").strip().upper()
-            if _tk_wl and _src_wl and _orig_wl:
-                _wl_origins[(_tk_wl, _src_wl)] = _orig_wl
-    except Exception:
-        pass
+    _wl_origins_local = _get_wl_origins()
     cleaned = []
     for row in rows:
-        # skip rows without chapter_url (not-null constraint)
         if not row.get("chapter_url"):
             continue
-        # Normalize origin. ikiru/shinigami are MIXED-origin scanlation sites
-        # (they host manga=JP, manhwa=KR, manhua=CN), so the source NAME is NOT
-        # a reliable country. Precedence: explicit origin -> series type
-        # (manga->JP, manhwa->KR, manhua->CN via normalize_origin) -> source
-        # name (last-resort KR only when there is genuinely no type signal).
         _raw_origin = row.get("origin") or row.get("type") or ""
         _src = row.get("source") or ""
         _norm = normalize_origin(_raw_origin)
         if not _norm and _src:
             _norm = normalize_origin(_src)
-        # ponytail: don't default ikiru/shinigami to KR when origin+type empty — leave "" so KR-only guild filters it correctly (was mis-labeling CN manhua as KR)
         if not _norm:
             _norm = ""
-        # whitelist is source-of-truth — shinigami collector country_id is unreliable (hosts CN as KR)
         _tk_override = str(row.get("title_key") or "").strip()
-        if _tk_override and (_tk_override, _src) in _wl_origins:
-            _norm = _wl_origins[(_tk_override, _src)]
-        # Derive type from origin if type is missing (shinigami often has origin but no type)
+        if _tk_override and (_tk_override, _src) in _wl_origins_local:
+            _norm = _wl_origins_local[(_tk_override, _src)]
         if not row.get("type") and _norm:
             _origin_to_type = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
             row["type"] = _origin_to_type.get(_norm, "")
-        # Ensure every allowed column is present so the upsert payload is
-        # complete. Missing keys cause Supabase (pooler/transaction mode) to
-        # reject the whole chunk with "row missing columns" — which silently
-        # drops unrelated chapters from RSS. Default empties keep rows valid.
         _r = {k: row.get(k) for k in allowed}
-        # Guard NOT-NULL columns: wrapper items may omit status/rating/etc
-        # (ikiru/shinigami don't emit status), leaving None which Postgres
-        # rejects as NULL and silently drops the whole upsert chunk.
         for _k in ("rating", "description", "type"):
             if _r.get(_k) is None:
                 _r[_k] = ""
-        # Origin: chk_rc_origin allows NULL but rejects "" — set after guard so it stays NULL
-        _r["origin"] = _norm or None  # ponytail: empty→NULL (chk_rc_origin rejects "")
+        _r["origin"] = _norm or None
         if _r.get("genres") is None:
             _r["genres"] = []
-        # Coerce nullable numeric columns to 0.0 so Postgres numeric/double
-        # doesn't reject the upsert chunk on "" or None. rating stays float (0.0 default, never "").
         for _k in ("chapter_num", "rating"):
             _v = _r.get(_k)
             if _v is None or _v == "":
@@ -234,12 +232,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     _r[_k] = 0.0
         _r["chapter_url"] = row["chapter_url"]
         cleaned.append(_r)
-    # Note: we do NOT dedupe ACROSS sources here because the design is
-    # flat-per-source — the same chapter on ikiru AND shinigami must both
-    # survive. WITHIN a source, (title_key, source, chapter_num) is unique:
-    # ikiru re-touches an old chapter by renewing its <time> AND often rotating
-    # the chapter URL (new cid) — without this composite dedup a re-touch would
-    # insert a SECOND row that floods the 24h RSS as "new".
     try:
         # Dedup within the batch itself (ikiru feed can return the same
         # chapter_url multiple times across its duplicated pages; the feed
