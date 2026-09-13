@@ -76,10 +76,20 @@ def collect_recent_chapters(
     def _health_end(src: str, t0: float, ok: bool, err: str | None = None) -> None:
         rt = int((_t.time() - t0) * 1000)
         prev = _hm.get(src) or {}
-        consec = prev.get("consecutive_failures", 0)
-        consec = 0 if ok else consec + 1
+        consec = 0 if ok else prev.get("consecutive_failures", 0) + 1
+        text = (err or "").lower()
+        if ok:
+            status = "HEALTHY"
+        elif any(x in text for x in ("429", "rate limit", "too many requests")):
+            status = "RATE_LIMITED"
+        elif any(x in text for x in ("403", "forbidden", "cloudflare", "blocked")):
+            status = "BLOCKED"
+        elif any(x in text for x in ("timeout", "timed out", "connection")):
+            status = "DOWN"
+        else:
+            status = "DEGRADED"
         _hm[src] = {
-            "status": "healthy" if ok else "degraded",
+            "status": status,
             "response_time_ms": rt,
             "successes_today": (prev.get("successes_today", 0) + 1) if ok else prev.get("successes_today", 0),
             "failures_today": (prev.get("failures_today", 0) + 1) if not ok else prev.get("failures_today", 0),

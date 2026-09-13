@@ -4,8 +4,10 @@ import { PageShell } from "@/components/PageShell";
 import { useQuery } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
 
-const badge = (status: string) => status === "healthy" || status === "closed" || status === "online"
+const badge = (status: string) => status === "healthy" || status === "HEALTHY" || status === "closed" || status === "online"
   ? "text-emerald-400 bg-emerald-500/10"
+  : status === "DEGRADED" || status === "RATE_LIMITED"
+  ? "text-amber-400 bg-amber-500/10"
   : "text-red-400 bg-red-500/10";
 
 export default function CronHealthPage() {
