@@ -82,57 +82,48 @@ def search_shinigami_api(query: str, per_page: int = 20):
 
 
 def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: int = 10, hours_cutoff: int = 24):
-    """Fetch latest-updates (is_update=true, sorted by latest) across BOTH
-    manga types (mirror + project), paginating until items are older than
-    `hours_cutoff` (or after `max_pages` as a safety cap).
-
-    Shinigami splits its catalog into `type=mirror` (scanlations) and
-    `type=project` (official/OEL). The default list only returns `mirror`,
-    so we must query both types explicitly and merge + dedupe by manga_id.
-
-    Each type returns `per_page` manga per page. We stop a type's pagination
-    when the newest item on a page is older than `hours_cutoff`.
-    """
+    """Fetch latest-updates (is_update=true, sorted by latest), paginating
+    until items are older than `hours_cutoff` (or after `max_pages` as a
+    safety cap)."""
     from datetime import datetime, timezone, timedelta
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_cutoff)
     all_items: list[dict] = []
     seen_ids: set[str] = set()
-    for mtype in ("mirror", "project"):
-        for p in range(1, max_pages + 1):
-            data = _get(f"/manga/list?type={mtype}&page={p}&page_size={per_page}&is_update=true&sort=latest&sort_order=desc")
-            if not data:
-                raise RuntimeError("Shinigami empty response")
+    for p in range(1, max_pages + 1):
+        data = _get(f"/manga/list?page={p}&page_size={per_page}&is_update=true&sort=latest&sort_order=desc")
+        if not data:
+            raise RuntimeError("Shinigami empty response")
+        try:
+            items = ShinigamiLatestResponse.model_validate(data).model_dump().get("data", [])
+        except Exception as exc:
+            cb_shinigami.record_failure()
+            logger.warn("Shinigami response schema invalid", page=p, err=str(exc)[:200])
+            raise RuntimeError("Shinigami response schema invalid") from exc
+        if not items:
+            break
+        # Shinigami returns newest-first; check timestamps to decide whether to stop.
+        stop = False
+        for it in items:
+            ts_raw = it.get("latest_chapter_time") or it.get("updated_at")
+            if not ts_raw:
+                continue
             try:
-                items = ShinigamiLatestResponse.model_validate(data).model_dump().get("data", [])
-            except Exception as exc:
-                cb_shinigami.record_failure()
-                logger.warn("Shinigami response schema invalid", page=p, source_type=mtype, err=str(exc)[:200])
-                raise RuntimeError("Shinigami response schema invalid") from exc
-            if not items:
-                break
-            # Shinigami returns newest-first; check timestamps to decide whether to stop.
-            stop = False
-            for it in items:
-                ts_raw = it.get("latest_chapter_time") or it.get("updated_at")
-                if not ts_raw:
-                    continue
-                try:
-                    ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
-                    if ts < cutoff:
-                        stop = True
-                        break
-                except (ValueError, TypeError):
-                    continue
-            for it in items:
-                mid = it.get("manga_id")
-                if mid and mid in seen_ids:
-                    continue
-                if mid:
-                    seen_ids.add(mid)
-                all_items.append(it)
-            if stop:
-                break
+                ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+                if ts < cutoff:
+                    stop = True
+                    break
+            except (ValueError, TypeError):
+                continue
+        for it in items:
+            mid = it.get("manga_id")
+            if mid and mid in seen_ids:
+                continue
+            if mid:
+                seen_ids.add(mid)
+            all_items.append(it)
+        if stop:
+            break
     return all_items
 
 
