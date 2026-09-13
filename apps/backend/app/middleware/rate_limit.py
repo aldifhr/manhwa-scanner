@@ -22,7 +22,11 @@ async def rate_limit_middleware(request: Request, call_next):
     _counts[key] = count
 
     if len(_counts) > 50000:
-        _counts.clear()
+        # Evict old buckets (previous minute) instead of clearing everything
+        prev_minute = minute - 1
+        to_remove = [k for k in _counts if k[1] < prev_minute]
+        for k in to_remove:
+            del _counts[k]
 
     if count > limit:
         return JSONResponse(
