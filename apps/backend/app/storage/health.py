@@ -44,9 +44,12 @@ def save_source_health_map(health_map: dict) -> None:
             cooldown = (now + timedelta(minutes=_COOLDOWN_MIN)).isoformat()
             if not du or du < now.isoformat():
                 du = cooldown
+        _s = h.get("status", "HEALTHY")
+        if _s not in ("HEALTHY", "DEGRADED", "DOWN", "BLOCKED", "RATE_LIMITED"):
+            _s = _s.upper() if _s in ("healthy", "degraded") else "DEGRADED"
         rows.append({
             "source": key,
-            "status": h.get("status", "HEALTHY") if h.get("status") in ("HEALTHY", "DEGRADED", "DOWN", "BLOCKED", "RATE_LIMITED", "healthy", "degraded") else "DEGRADED",
+            "status": _s,
             "consecutive_failures": consec,
             "disabled_until": du,
             "last_error": h.get("lastError") or h.get("last_error"),
