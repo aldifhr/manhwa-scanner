@@ -72,7 +72,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 with_whitelisted_ikiru=True,
                 with_whitelisted_shinigami=True,
                 source=source,
-                fetch_meta=True,  # lazy: skips series already in series_meta, bootstraps new ones
+                fetch_meta=False,  # metadata enrichment runs in scheduled enrich job
             )
             # PERF: persist per-source health (incl. voratoon) so /status shows
             # real telemetry instead of a stale row. collect_recent_chapters
