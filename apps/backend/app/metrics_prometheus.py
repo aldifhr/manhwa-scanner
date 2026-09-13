@@ -57,6 +57,12 @@ DISPATCH_ERRORS = Counter(
     ["error_type"]
 )
 
+REDIS_QUEUE_DEPTH = Gauge(
+    "redis_queue_depth",
+    "Redis cron queue depth",
+    ["queue"]  # main, processing, dlq
+)
+
 # ── System Metrics ──
 
 ACTIVE_JOBS = Gauge(

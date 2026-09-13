@@ -98,6 +98,15 @@ def collect_recent_chapters(
             "last_checked_at": _now_iso,
             "last_error": err if not ok else None,
         }
+        # Track RSS fetch metrics
+        try:
+            from app.metrics_prometheus import track_rss_fetch
+            if not ok:
+                track_rss_fetch(source=src, item_count=0, error=str(err)[:80])
+            else:
+                track_rss_fetch(source=src, item_count=len(items))
+        except Exception:
+            pass
 
     import concurrent.futures
 

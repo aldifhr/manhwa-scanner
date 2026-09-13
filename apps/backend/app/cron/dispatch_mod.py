@@ -319,6 +319,11 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 _consec_fail = 0
                 sent += 1
                 _sent_urls.add(url)
+                try:
+                    from app.metrics_prometheus import track_dispatch
+                    track_dispatch(source=it.get("source", "unknown"), status="sent", duration=0.8)
+                except Exception:
+                    pass
                 # Outbound webhook (external integrations) — async, never blocks
                 try:
                     from app.cron.outbound_webhook import fire_chapter_released
@@ -334,6 +339,11 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 time.sleep(0.8)
             except Exception as derr:
                 _consec_fail += 1
+                try:
+                    from app.metrics_prometheus import track_dispatch_error
+                    track_dispatch_error(error_type=type(derr).__name__)
+                except Exception:
+                    pass
                 dispatch_store.record_failed(
                     chapter_url=url, title_key=it.get("title_key", ""),
                     source=it.get("source", ""), chapter_title=str(it.get("chapter", "")),

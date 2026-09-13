@@ -25,7 +25,7 @@ _stop = threading.Event()
 
 
 def _scheduler_loop() -> None:
-    from app.tasks.queue import enqueue_cron, CRON_QUEUE_KEY, _get_redis
+    from app.tasks.queue import enqueue_cron, CRON_QUEUE_KEY, CRON_QUEUE_SET, CRON_PROCESSING_KEY, _get_redis
     from datetime import datetime, timezone
 
     last_enrich = 0.0
@@ -145,9 +145,25 @@ def _scheduler_loop() -> None:
                 except Exception:
                     pass
             try:
+                from app.metrics_prometheus import REDIS_QUEUE_DEPTH
                 qlen = _get_redis().llen(CRON_QUEUE_KEY)
+                REDIS_QUEUE_DEPTH.labels(queue="main").set(qlen)
+                REDIS_QUEUE_DEPTH.labels(queue="processing").set(_get_redis().llen(CRON_PROCESSING_KEY))
+                REDIS_QUEUE_DEPTH.labels(queue="dlq").set(_get_redis().llen("beag:cron:dlq"))
                 if qlen > 50:
                     logger.error("cron queue depth exceeded", queue_length=qlen, threshold=50)
+            except Exception:
+                pass
+            # Update system metrics
+            try:
+                from app.metrics_prometheus import DB_POOL_SIZE, CIRCUIT_BREAKER_STATE, REDIS_QUEUE_DEPTH
+                from app.db_adapter import get_pool_stats
+                from app.services.resilience import cb_db, cb_ikiru, cb_shinigami, cb_voratoon
+                ps = get_pool_stats()
+                DB_POOL_SIZE.labels(state="active").set(ps.get("active", 0))
+                DB_POOL_SIZE.labels(state="idle").set(ps.get("idle", 0))
+                for name, cb in [("db", cb_db), ("ikiru", cb_ikiru), ("shinigami", cb_shinigami), ("voratoon", cb_voratoon)]:
+                    CIRCUIT_BREAKER_STATE.labels(service=name).set({"closed": 0, "half_open": 1, "open": 2}.get(cb.state, 0))
             except Exception:
                 pass
         except Exception as e:
