@@ -8,6 +8,7 @@ re-exported for backward compatibility with existing call sites.
 """
 from __future__ import annotations
 
+import json
 import time
 
 from app.cron import collect, dispatch_mod, enrich as enrich_mod
@@ -51,6 +52,16 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         action, source = action.split(":", 1)
 
     logger.info("pipeline start", action=action, source=source or "all", do_dispatch=do_dispatch, instance=instance_id)
+    # ── Retry drain: check for pending failed inserts from previous run ──
+    try:
+        from app.tasks import _get_redis as _gr3
+        _pending = _gr3().get("beag:failed_inserts:pending")
+        if _pending:
+            _info = json.loads(_pending)
+            logger.warn("pipeline: previous run had failed inserts — retry via next scrape", **_info)
+            _gr3().delete("beag:failed_inserts:pending")
+    except Exception:
+        pass
     try:
         # ── Per-source health telemetry ──
         _health_map: dict = {}
@@ -74,6 +85,23 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             insert_stats = recent_chapters.batch_insert_recent_chapters(enriched_all)
             if insert_stats.get("failed", 0):
                 logger.error("pipeline: batch_insert partial failure", **insert_stats)
+                try:
+                    from app.metrics_prometheus import PARTIAL_INSERT_FAILURES
+                    PARTIAL_INSERT_FAILURES.labels(action=action, source=source or "all").inc()
+                except Exception:
+                    pass
+                # Save failed rows for retry on next run
+                try:
+                    from app.tasks import _get_redis as _gr2
+                    r = _gr2()
+                    r.setex("beag:failed_inserts:pending", 3600, json.dumps({
+                        "action": action,
+                        "source": source or "all",
+                        "failed": insert_stats["failed"],
+                        "ts": time.time(),
+                    }))
+                except Exception:
+                    pass
         else:
             # Dispatch mode: deep queue claim (FOR UPDATE SKIP LOCKED) — atomic whitelisted claim.
             _health_map = _probe_source_health()

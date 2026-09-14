@@ -63,6 +63,12 @@ COVER_BACKFILL_ERRORS = Counter(
     ["source"]
 )
 
+PARTIAL_INSERT_FAILURES = Counter(
+    "partial_insert_failures_total",
+    "Partial batch insert failures (some chunks failed)",
+    ["action", "source"]
+)
+
 REDIS_QUEUE_DEPTH = Gauge(
     "redis_queue_depth",
     "Redis cron queue depth",
