@@ -190,6 +190,7 @@ def invalidate_whitelist_origin_cache() -> None:
 def batch_insert_recent_chapters(rows: list[dict]) -> None:
     if not rows:
         return
+    inserted = failed = 0
     allowed = {
         "chapter_url",
         "title_key",
@@ -291,8 +292,9 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
             # (~150+ rows). Insert genuinely-new rows (with their real
             # updated_time).
             CHUNK = 50
-            inserted = 0
+            # inserted/failed already init at top — reuse
             # ponytail: ON CONFLICT chapter_url (stable unique), rc_composite is race guard via 057 ensure, not CONFLICT target until backfill stable
+            # ponytail: track failed chunks — was silent loss (warn+continue reported ok). Now surface partial_success so cron doesn't lie.
             for i in range(0, len(new_rows), CHUNK):
                 chunk_rows = new_rows[i : i + CHUNK]
                 try:
@@ -301,9 +303,14 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     ).execute()
                     inserted += len(chunk_rows)
                 except Exception as e:
+                    msg = str(e).lower()
+                    if "rc_composite" in msg or "idx_recent_chapters_composite_unique" in msg or "composite_unique" in msg:
+                        logger.info("batchInsert race rc_composite benign, skip", chunk=f"{i//CHUNK}")
+                        continue
+                    failed += len(chunk_rows)
                     # harden: log constraint + first row keys so pool closed / constraint errors are diagnosable without replay
-                    logger.warn(
-                        "batchInsertRecentChapters chunk failed",
+                    logger.error(
+                        "batchInsertRecentChapters chunk failed — data loss",
                         exc=e,
                         exc_info=True,
                         range=f"{i}-{i+len(chunk_rows)}",
@@ -311,6 +318,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                         first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
                         first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
                     )
+            # touch + backfill still run even on partial failure — don't lose metadata refresh
             # Existing rows: refresh NON-time metadata only — never
             # updated_time — so an ikiru re-touch (renewed <time>) can't keep
             # an old chapter pinned to the top of the 24h feed. PostgREST
@@ -350,8 +358,9 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                             chunk_rows, on_conflict="chapter_url"
                         ).execute()
                     except Exception as e:
-                        logger.warn(
-                            "batchInsertRecentChapters touch chunk failed",
+                        failed += len(chunk_rows)
+                        logger.error(
+                            "batchInsertRecentChapters touch chunk failed — data loss",
                             exc=e,
                             exc_info=True,
                             range=f"{len(chunk_rows)} rows",
@@ -418,8 +427,14 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     ).execute()
         except Exception as e:
             logger.error("batchInsertRecentChapters backfill failed", exc=e, exc_info=True)
+            failed += len(updates) if 'updates' in locals() else 0
     except Exception as e:
         logger.error("batchInsertRecentChapters failed", exc=e, exc_info=True, constraint="chapter_url", first_keys=list(cleaned[0].keys()) if cleaned else [])
+        failed = len(cleaned) if 'cleaned' in locals() else 0
+    finally:
+        # ponytail: surface partial failure — caller (pipeline) must not report ok when chunks lost
+        if failed:
+            logger.error("batchInsert partial_success", inserted=inserted, failed=failed, total=len(rows))
     # P1 cache-share: invalidate RSS cache across api/cron via Redis pub key
     try:
         from app.tasks import _get_redis as _gr
