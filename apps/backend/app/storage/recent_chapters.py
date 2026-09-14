@@ -78,16 +78,16 @@ def _norm_chapter_num(v) -> str | None:
 def _composite_key(r: dict) -> tuple[str, str, str] | None:
     """(title_key, source, chapter_num) — the WITHIN-source unique key.
 
-    ikiru re-touches an old chapter by renewing its <time> AND often rotating
-    the chapter URL (new cid). The composite key stays stable across that, so a
-    re-touch can't insert a duplicate row that floods the 24h RSS as "new".
-    Returns None for unnumbered chapters (one-shots) — those are never deduped.
+    For unnumbered chapters (one-shots), returns (title_key, source, 'oneshot')
+    so duplicates from same title+source are still deduped.
     """
     tk = r.get("title_key") or ""
     src = r.get("source") or ""
     cn = _norm_chapter_num(r.get("chapter_num"))
-    if not tk or not src or cn is None:
+    if not tk or not src:
         return None
+    if cn is None:
+        return (tk, src, "oneshot")
     return (tk, src, cn)
 
 
