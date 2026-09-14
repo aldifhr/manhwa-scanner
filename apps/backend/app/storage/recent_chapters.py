@@ -259,8 +259,14 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                             _res = _sb.table("series_meta").select("title_key,source,cover").in_("title_key", _src_tks).eq("source", src).limit(len(_src_tks)*2).execute()
                             for row in _res.data or []:
                                 _covers[(row["title_key"], src)] = row.get("cover")
-                    except Exception:
-                        pass
+                    except Exception as _e:
+                        logger.warn("cover backfill query failed — chapter inserted without cover, retry next cron", err=str(_e)[:160], srcs=list(set(s for _, s in chunk)))
+                        try:
+                            from app.metrics_prometheus import COVER_BACKFILL_ERRORS
+                            for s in set(s for _, s in chunk):
+                                COVER_BACKFILL_ERRORS.labels(source=s).inc()
+                        except Exception:
+                            pass
                 for r in cleaned:
                     if not r.get("cover"):
                         r["cover"] = _covers.get((r.get("title_key",""), r.get("source","")), "")

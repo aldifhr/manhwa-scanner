@@ -57,6 +57,12 @@ DISPATCH_ERRORS = Counter(
     ["error_type"]
 )
 
+COVER_BACKFILL_ERRORS = Counter(
+    "cover_backfill_errors_total",
+    "Cover backfill failures from series_meta",
+    ["source"]
+)
+
 REDIS_QUEUE_DEPTH = Gauge(
     "redis_queue_depth",
     "Redis cron queue depth",
