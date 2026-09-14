@@ -156,7 +156,11 @@ _WL_ORIGIN_TS = 0.0
 
 
 def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
-    """Cached whitelist origin map (ponytail: 10min TTL + invalidation, not per-batch query)."""
+    """Cached origin map keyed by (title_key, source).
+
+    Reads from series_meta (canonical for static fields including origin),
+    joined against whitelist so only whitelisted titles are returned.
+    """
     import time as _t
     global _wl_origins, _WL_ORIGIN_TS
     with _wl_lock:
@@ -165,7 +169,8 @@ def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
         try:
             from app.db import get_supabase as _gsb_wl
             _sb_wl = _gsb_wl()
-            _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
+            # Whitelist no longer has origin — read from series_meta (canonical)
+            _wl_rows = _sb_wl.table("series_meta").select("title_key,source,origin").neq("origin", "").execute().data or []
             _new_origins = {}
             for _wl in _wl_rows:
                 _tk_wl = str(_wl.get("title_key") or "").strip()
@@ -176,7 +181,7 @@ def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
             _wl_origins = _new_origins
             _WL_ORIGIN_TS = _t.time()
         except Exception as _e:
-            logger.warn("wl_origins refresh failed — using stale cache", err=str(_e)[:160])
+            logger.warn("series_meta origin refresh failed — using stale cache", err=str(_e)[:160])
         return _wl_origins
 
 
