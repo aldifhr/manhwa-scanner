@@ -3,6 +3,8 @@ Ceiling: Python pre-insert dedup (composite key + URL rotation) + chunked upsert
 Upgrade: push dedup to SQL ON CONFLICT/DISTINCT ON when composite key stabilizes + pg advisory covers rotation
 """
 from datetime import datetime, timezone, timedelta
+import hashlib
+import threading
 
 from app.db import get_supabase
 from app.logger import get_logger
@@ -10,6 +12,9 @@ from app.utils.text import normalize_shinigami_url
 from app.utils.origin import normalize_origin
 
 logger = get_logger("storage:recent-chapters")
+
+_wl_lock = threading.Lock()
+_existing_rc_lock = threading.Lock()
 
 
 def prune_older_than(hours: int = 24) -> int:
@@ -86,7 +91,7 @@ def _composite_key(r: dict) -> tuple[str, str, str] | None:
     return (tk, src, cn)
 
 
-_EXISTING_RC_CACHE: dict[tuple, tuple[set[str], set[tuple[str, str, str]], float]] = {}
+_EXISTING_RC_CACHE: dict[str, tuple[set[str], set[tuple[str, str, str]], float]] = {}
 _EXISTING_RC_TTL = 60.0
 
 def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, str]]]:
@@ -103,8 +108,8 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
     tks = sorted({(r.get("title_key") or "") for r in rows if r.get("title_key")})
     if not tks:
         return existing_urls, existing_ch
-    # ponytail: cache 60s — same batch re-hit within cron tick wastes 1 DB round-trip; 154→131 inserted 0 still pays lookup
-    _key = tuple(tks[:5] + [str(len(tks))])  # cheap sig
+    # ponytail: SHA-256 of full sorted set — old key was tks[:5]+len (collision: [A,B,C,D,E,F] vs [A,B,C,D,E,X])
+    _key = hashlib.sha256("\x00".join(tks).encode()).hexdigest()
     with _existing_rc_lock:
         _cached = _EXISTING_RC_CACHE.get(_key)
         if _cached and (_t.time() - _cached[2]) < _EXISTING_RC_TTL:
@@ -136,17 +141,14 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
     # cache store
     try:
         import time as _t2
-        _EXISTING_RC_CACHE[_key] = (existing_urls, existing_ch, _t2.time())
-        if len(_EXISTING_RC_CACHE) > 64:
-            _EXISTING_RC_CACHE.pop(next(iter(_EXISTING_RC_CACHE)))
+        with _existing_rc_lock:
+            _EXISTING_RC_CACHE[_key] = (existing_urls, existing_ch, _t2.time())
+            if len(_EXISTING_RC_CACHE) > 64:
+                _EXISTING_RC_CACHE.pop(next(iter(_EXISTING_RC_CACHE)))
     except Exception:
         pass
     return existing_urls, existing_ch
 
-
-import threading
-_wl_lock = threading.Lock()
-_existing_rc_lock = threading.Lock()
 
 _wl_origins: dict[tuple[str, str], str] = {}
 _WL_ORIGIN_TTL = 600.0

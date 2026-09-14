@@ -19,7 +19,7 @@ class TestDbAdapterFirst:
     def test_single_no_limit(self):
         from app.db_adapter import _Query
         sql, params = _Query("wc", "select").select("id").eq("k", "v").single().compile()
-        assert "LIMIT" not in sql
+        assert "LIMIT 2" in sql
 
 
 class TestRecentChaptersDedup:

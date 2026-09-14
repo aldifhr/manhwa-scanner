@@ -156,7 +156,7 @@ class _Query:
         self._values = None          # dict for insert/update/upsert
         self._on_conflict = None      # column name(s) for upsert
         self._where: list[tuple] = [] # (sql_fragment, [params])
-        self._or_groups: list[list[tuple]] = []  # list of and-groups
+        self._or_groups: list[list[list[tuple]]] = []  # list of OR-groups, each group = list of branches (AND-lists)
         self._order: list[tuple] = [] # (col, desc)
         self._limit = None
         self._offset = 0
@@ -272,17 +272,21 @@ class _Query:
         self._w(m, [val]); return self
 
     def or_(self, *chains):
-        """loosely emulate .or_(): each chain is a callable that applies
-        filters to a cloned builder; we OR the resulting AND-groups."""
-        group = []
+        """Emulate PostgREST .or_(): each chain is a callable that applies
+        filters to a cloned builder. Each chain becomes a parenthesized
+        AND-branch; branches are joined with OR.
+        e.g. .or_(lambda q: q.eq('a',1).eq('b',2), lambda q: q.eq('c',3))
+             → ((a=1) AND (b=2)) OR ((c=3))
+        """
+        branches: list[list[tuple]] = []
         for ch in chains:
             b = _Query(self.table, self.op)
             b._cols = self._cols
             ch(b)
-            for frag, params in b._where:
-                group.append((frag, params))
-        if group:
-            self._or_groups.append(group)
+            if b._where:
+                branches.append(list(b._where))
+        if branches:
+            self._or_groups.append(branches)
         return self
 
     # ---- modifiers ----
@@ -304,13 +308,12 @@ class _Query:
         self._offset = n; return self
 
     def single(self):
-        # NOTE: do NOT set self._limit = 1 here. Supabase's
-        # .single() does NOT cap the fetch — it expects the query
-        # to return exactly 1 row and 406s on multiple. If we
-        # LIMIT 1, the DB returns 1 row and our >1 guard
-        # can never trip (silent wrong-data path). We fetch
-        # ALL matched rows and the .execute() guard rejects >1.
+        # ponytail: bounded LIMIT 2 — 0=not found, 1=ok, 2=multiple.
+        # Old code fetched ALL rows (catastrophic over-fetch). LIMIT 2
+        # preserves Supabase .single() semantics while bounding cost.
         self._single = True
+        if self._limit is None or self._limit > 2:
+            self._limit = 2
         return self
 
     def first(self):
@@ -320,6 +323,8 @@ class _Query:
 
     def maybe_single(self):
         self._maybe_single = True
+        if self._limit is None or self._limit > 2:
+            self._limit = 2
         return self
 
     # ---- data setters ----
@@ -409,11 +414,16 @@ class _Query:
         for frag, p in self._where:
             clauses.append(f"({frag})")
             params.extend(p)
-        for grp in self._or_groups:
-            sub = " OR ".join(f"({frag})" for frag, _ in grp)
-            clauses.append(f"({sub})")
-            for _, p in grp:
-                params.extend(p)
+        for branches in self._or_groups:
+            # Each branch is an AND-list; branches are ORed together.
+            or_parts = []
+            for branch in branches:
+                and_sql = " AND ".join(f"({frag})" for frag, _ in branch)
+                # single-condition branch: (cond), multi: ((a) AND (b))
+                or_parts.append(f"({and_sql})" if len(branch) > 1 else and_sql)
+                for _, p in branch:
+                    params.extend(p)
+            clauses.append(f"({' OR '.join(or_parts)})")
         return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
 
     def _col_list(self):
