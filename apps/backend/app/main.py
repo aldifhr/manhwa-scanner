@@ -23,28 +23,34 @@ async def lifespan(app: FastAPI):
     """Startup: init resources. Shutdown: close connections gracefully."""
     # ponytail: auto-migrate on boot — was manual psql, now 8L idempotent
     # P1 fix: migration failure → fail startup (not silent warn)
+    # Advisory lock prevents concurrent migration across multiple instances
     from pathlib import Path
     import psycopg2
     dsn = os.getenv("DATABASE_URL") or "postgresql://be_ag:***@127.0.0.1:5432/be_ag_py"
     conn = psycopg2.connect(dsn)
     conn.autocommit = False
     cur = conn.cursor()
+    # Acquire advisory lock for migrations (only one instance migrates at a time)
+    cur.execute("SELECT pg_advisory_lock(%s)", (1234567890,))
     cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())")
     conn.commit()
     mig_dir = Path(__file__).parent / "db" / "migrations"
-    for p in sorted(mig_dir.glob("*.sql")):
-        cur.execute("SELECT 1 FROM schema_migrations WHERE filename=%s", (p.name,))
-        if cur.fetchone():
-            continue
-        try:
-            cur.execute(p.read_text())
-            cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (p.name,))
-            conn.commit()
-            logger.info("migrated", file=p.name)
-        except Exception as e:
-            conn.rollback()
-            logger.error("migrate failed — startup halted", file=p.name, err=str(e)[:200])
-            raise RuntimeError(f"migration {p.name} failed: {e}") from e
+    try:
+        for p in sorted(mig_dir.glob("*.sql")):
+            cur.execute("SELECT 1 FROM schema_migrations WHERE filename=%s", (p.name,))
+            if cur.fetchone():
+                continue
+            try:
+                cur.execute(p.read_text())
+                cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (p.name,))
+                conn.commit()
+                logger.info("migrated", file=p.name)
+            except Exception as e:
+                conn.rollback()
+                logger.error("migrate failed — startup halted", file=p.name, err=str(e)[:200])
+                raise RuntimeError(f"migration {p.name} failed: {e}") from e
+    finally:
+        cur.execute("SELECT pg_advisory_unlock(%s)", (1234567890,))
     conn.close()
     from app.tasks import start_worker
     start_worker()
