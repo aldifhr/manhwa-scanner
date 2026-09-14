@@ -19,14 +19,16 @@ async def audit_stale(request: Request):
         limit = max(1, min(limit, 100))
         from app.db import q
         rows = q("""
-            SELECT w.title_key, w.title, MAX(rc.updated_time) as last_update,
-                   EXTRACT(DAY FROM NOW() - MAX(rc.updated_time))::int as days_idle,
-                   COUNT(rc.id)::int as chapter_count
+            SELECT w.title_key, w.title,
+                   COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max) as last_update,
+                   EXTRACT(DAY FROM NOW() - COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max))::int as days_idle,
+                   COALESCE(rc2.cnt,0)::int as chapter_count
             FROM whitelist w
-            LEFT JOIN recent_chapters rc ON rc.title_key = w.title_key
-            GROUP BY w.title_key, w.title
-            HAVING MAX(rc.updated_time) IS NULL OR MAX(rc.updated_time) < NOW() - (%s || ' days')::interval
-            ORDER BY last_update ASC NULLS FIRST
+            LEFT JOIN (SELECT title_key, MAX(updated_time) as rc_max, COUNT(*) as cnt FROM recent_chapters GROUP BY title_key) rc2 ON rc2.title_key = w.title_key
+            LEFT JOIN (SELECT title_key, MAX(sent_at) as dh_max FROM dispatch_history GROUP BY title_key) dh ON dh.title_key = w.title_key
+            WHERE COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max) IS NULL
+               OR COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max) < NOW() - (%s || ' days')::interval
+            ORDER BY 3 ASC NULLS FIRST
             LIMIT %s
         """, [str(days), str(limit)])
         return JSONResponse(content={"success": True, "data": {"results": rows, "days": days, "limit": limit}})
