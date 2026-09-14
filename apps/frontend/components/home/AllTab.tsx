@@ -82,6 +82,7 @@ function AllTabInner() {
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
   const noDescription = useUiStore((s) => s.noDescription);
+  const setNoDescription = useUiStore((s) => s.setNoDescription);
   const setFeed = useUiStore((s) => s.setFeed);
   const toggleGroupMode = useUiStore((s) => s.toggleGroupMode);
   const setSortMode = useUiStore((s) => s.setSortMode);
@@ -491,12 +492,15 @@ function AllTabInner() {
         countryCounts={countryCounts}
         typeCounts={typeCounts}
         unknownCount={unknownCount}
+        noDescCount={all.filter((c) => !c.description || String(c.description).trim() === "" || String(c.description).trim() === "-").length}
         countryFilter={countryFilter}
         sourceFilter={sourceFilter}
         typeFilter={typeFilter}
+        noDescription={noDescription}
         setCountryFilter={setCountryFilter}
         setSourceFilter={setSourceFilter}
         setTypeFilter={setTypeFilter}
+        setNoDescription={setNoDescription}
       />
 
       {grouped.length === 0 ? (
