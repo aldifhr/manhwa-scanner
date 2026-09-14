@@ -20,8 +20,9 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
     _meta: dict = {}
     if fetch_meta:
         _meta = _cached_series_meta("shinigami", manga_id)
-    _meta_rating = normalize_rating(m.get("rating") or m.get("user_rate")) or normalize_rating(_meta.get("rating"))
-    _meta_genres = (m.get("genre") or m.get("genres") or _meta.get("genres") or [])
+    _meta_rating = _meta.get("rating") if _meta.get("rating") not in (None, "", 0) else (normalize_rating(m.get("rating") or m.get("user_rate")) or 0.0)
+    _meta_desc = _meta.get("description") or ""
+    _meta_genres = _meta.get("genres") or []
     try:
         from app.scrapers import shinigami as shinigami
         ch_list = _cached_chapter_list("shinigami", manga_id, lambda: shinigami.get_shinigami_chapters(manga_id, per_page=MAX_CHAPTERS_PER_SERIES))
@@ -56,7 +57,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
         # Fallback: use type from series meta if country_id missing/empty
         if not _type and isinstance(_meta, dict):
             _type = (_meta.get("type") or "").lower()
-        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "genres": _meta_genres, "type": _type})
+        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_time", ""), "rating": _meta_rating, "description": _meta_desc, "genres": _meta_genres, "type": _type})
     return items
 
 
@@ -96,6 +97,14 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         cover = m.get("cover_image_url") or m.get("cover_portrait_url") or ""
         rating = _nr(m.get("user_rate"))
         description = (m.get("description") or "").strip()
+        _meta_item: dict = {}
+        if fetch_meta:
+            _meta_item = _cached_series_meta("shinigami", manga_id)
+        if not rating and isinstance(_meta_item, dict):
+            rating = normalize_rating(_meta_item.get("rating")) or 0.0
+        if not description and isinstance(_meta_item, dict):
+            description = (_meta_item.get("description") or "").strip()
+        _meta_genres = _meta_item.get("genres") or []
         _tax = m.get("taxonomy") or {}
         if isinstance(_tax, dict):
             genres = [g.get("name") for g in (_tax.get("Genre") or []) if g.get("name")]
