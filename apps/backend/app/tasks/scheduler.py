@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
+import os
 import threading
 import time as _time
-import logging
 
 logger = logging.getLogger("tasks.scheduler")
 
@@ -61,18 +62,24 @@ def _scheduler_loop() -> None:
     last_ikiru = _time.monotonic()
     while True:
         try:
+            # Reload disabled sources from env each cycle
+            _disabled_raw = (os.getenv("DISABLED_SOURCES", "") or "").strip().lower()
+            _disabled_set = {s.strip() for s in _disabled_raw.split(",") if s.strip()}
             if _stop.wait(_DISPATCH_INTERVAL_S):
                 break
             _now = _time.monotonic()
             if _now - last_dispatch >= _DISPATCH_INTERVAL_S:
                 try:
-                    enqueue_cron("update", title="dispatch chapters")
+                    if "update" not in _disabled_set:
+                        enqueue_cron("update", title="dispatch chapters")
                     last_dispatch = _now
                 except Exception as e:
                     logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
             if _now - last_source >= _SOURCE_INTERVAL_S:
                 if not _stop.is_set():
                     for src in ("shinigami", "voratoon"):
+                        if src in _disabled_set:
+                            continue
                         try:
                             logger.info("scheduler enqueue rss-fetch", source=src)
                             enqueue_cron(f"rss-fetch:{src}", source=src)
@@ -83,8 +90,11 @@ def _scheduler_loop() -> None:
                 last_source = _now
             if _now - last_ikiru >= _IKIRU_INTERVAL_S:
                 try:
-                    logger.info("scheduler enqueue rss-fetch", source="ikiru")
-                    enqueue_cron("rss-fetch:ikiru", source="ikiru")
+                    if "ikiru" in _disabled_set:
+                        logger.debug("scheduler: ikiru disabled, skipping")
+                    else:
+                        logger.info("scheduler enqueue rss-fetch", source="ikiru")
+                        enqueue_cron("rss-fetch:ikiru", source="ikiru")
                     last_ikiru = _now
                 except Exception as e:
                     logger.warn("scheduler enqueue failed", src="ikiru", err=str(e)[:120])
