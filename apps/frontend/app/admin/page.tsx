@@ -226,7 +226,7 @@ export default function AdminDashboard() {
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${s.status === "healthy" ? "bg-emerald-500" : s.status === "degraded" ? "bg-amber-400" : "bg-red-500"}`}
+                    className={`w-2 h-2 rounded-full shrink-0 ${s.status?.toLowerCase() === "healthy" ? "bg-emerald-500" : s.status?.toLowerCase() === "degraded" ? "bg-amber-400" : "bg-red-500"}`}
                   />
                   <span className="text-sm font-medium capitalize truncate">
                     {s.name}

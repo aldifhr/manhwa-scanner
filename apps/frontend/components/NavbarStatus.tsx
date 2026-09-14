@@ -12,7 +12,10 @@ function aggregate(
   cronStatus?: { timestamp: string } | null
 ): Agg {
   const sources = Object.values(sourceHealth ?? {});
-  if (sources.some((s) => s.status === "degraded" || s.status === "down")) {
+  if (sources.some((s) => {
+    const st = s.status?.toLowerCase();
+    return st === "degraded" || st === "down";
+  })) {
     return "degraded";
   }
   if (cronStatus?.timestamp) {
