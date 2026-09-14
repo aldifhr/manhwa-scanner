@@ -193,9 +193,10 @@ def invalidate_whitelist_origin_cache() -> None:
         _WL_ORIGIN_TS = 0.0
 
 
-def batch_insert_recent_chapters(rows: list[dict]) -> None:
+def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
+    """Batch insert chapters. Returns {inserted, failed, deduped} counts."""
     if not rows:
-        return
+        return {"inserted": 0, "failed": 0, "deduped": 0}
     inserted = failed = 0
     allowed = {
         "chapter_url",
@@ -249,6 +250,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
                     _r[_k] = 0.0
         _r["chapter_url"] = row["chapter_url"]
         cleaned.append(_r)
+    to_upsert: list[dict] = []
     try:
         # Backfill missing covers from series_meta (collect_whitelisted_shinigami sets cover=None)
         _need_cover = [r for r in cleaned if not r.get("cover")]
@@ -466,6 +468,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         # ponytail: surface partial failure — caller (pipeline) must not report ok when chunks lost
         if failed:
             logger.error("batchInsert partial_success", inserted=inserted, failed=failed, total=len(rows))
+    return {"inserted": inserted, "failed": failed, "deduped": len(rows) - len(to_upsert) if 'to_upsert' in locals() else 0}
     # P1 cache-share: invalidate RSS cache across api/cron via Redis pub key
     try:
         from app.tasks import _get_redis as _gr

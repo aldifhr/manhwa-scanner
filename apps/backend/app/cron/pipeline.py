@@ -71,7 +71,9 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             except Exception as _he:
                 logger.warn("collect health persist failed", err=str(_he)[:160])
             enriched_all = enrich_mod.enrich(items, persist_cache=True, skip_api=True)
-            recent_chapters.batch_insert_recent_chapters(enriched_all)
+            insert_stats = recent_chapters.batch_insert_recent_chapters(enriched_all)
+            if insert_stats.get("failed", 0):
+                logger.error("pipeline: batch_insert partial failure", **insert_stats)
         else:
             # Dispatch mode: deep queue claim (FOR UPDATE SKIP LOCKED) — atomic whitelisted claim.
             _health_map = _probe_source_health()
