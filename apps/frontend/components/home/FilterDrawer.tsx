@@ -9,9 +9,11 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
   const genreFilter = useUiStore((s) => s.genreFilter);
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
+  const noDescription = useUiStore((s) => s.noDescription);
   const setGenreFilter = useUiStore((s) => s.setGenreFilter);
   const setMinRating = useUiStore((s) => s.setMinRating);
   const setWhitelistOnly = useUiStore((s) => s.setWhitelistOnly);
+  const setNoDescription = useUiStore((s) => s.setNoDescription);
   const resetFilters = useUiStore((s) => s.resetFilters);
 
   const { data: meta } = useQuery({
@@ -60,6 +62,10 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={whitelistOnly} onChange={(e) => setWhitelistOnly(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-white/5" />
             <span className="text-sm text-white/80">Whitelist only</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={noDescription} onChange={(e) => setNoDescription(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-white/5" />
+            <span className="text-sm text-white/80">No description only</span>
           </label>
         </div>
         <div className="p-4 border-t border-white/10 flex gap-2">

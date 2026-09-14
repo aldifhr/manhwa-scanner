@@ -17,6 +17,7 @@ interface UiState {
   genreFilter: string | null;
   minRating: string | null;
   whitelistOnly: boolean;
+  noDescription: boolean;
   setFeed: (f: Feed) => void;
   toggleGroupMode: () => void;
   setSortMode: (s: SortMode) => void;
@@ -28,6 +29,7 @@ interface UiState {
   setGenreFilter: (g: string | null) => void;
   setMinRating: (r: string | null) => void;
   setWhitelistOnly: (v: boolean) => void;
+  setNoDescription: (v: boolean) => void;
   resetFilters: () => void;
 }
 
@@ -51,6 +53,7 @@ export const useUiStore = create<UiState>()(
       genreFilter: null,
       minRating: null,
       whitelistOnly: false,
+      noDescription: false,
       setFeed: (feed) => set({ feed }),
       toggleGroupMode: () => set((s) => ({ groupMode: !s.groupMode })),
       setSortMode: (sortMode) => set({ sortMode }),
@@ -62,6 +65,7 @@ export const useUiStore = create<UiState>()(
       setGenreFilter: (genreFilter) => set({ genreFilter }),
       setMinRating: (minRating) => set({ minRating }),
       setWhitelistOnly: (whitelistOnly) => set({ whitelistOnly }),
+      setNoDescription: (noDescription) => set({ noDescription }),
       resetFilters: () =>
         set({
           sourceFilter: null,
@@ -71,6 +75,7 @@ export const useUiStore = create<UiState>()(
           genreFilter: null,
           minRating: null,
           whitelistOnly: false,
+      noDescription: false,
         }),
     }),
     {
@@ -88,6 +93,7 @@ export const useUiStore = create<UiState>()(
         genreFilter: s.genreFilter,
         minRating: s.minRating,
         whitelistOnly: s.whitelistOnly,
+        noDescription: s.noDescription,
       }),
     }
   )

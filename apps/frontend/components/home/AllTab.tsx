@@ -81,6 +81,7 @@ function AllTabInner() {
   const genreFilter = useUiStore((s) => s.genreFilter);
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
+  const noDescription = useUiStore((s) => s.noDescription);
   const setFeed = useUiStore((s) => s.setFeed);
   const toggleGroupMode = useUiStore((s) => s.toggleGroupMode);
   const setSortMode = useUiStore((s) => s.setSortMode);
@@ -264,6 +265,7 @@ function AllTabInner() {
           c.isWhitelisted ||
           optimisticWhitelist.has(`${c.titleKey}:${c.source}`)
       );
+    if (noDescription) f = f.filter((c) => !c.description || String(c.description).trim() === "" || String(c.description).trim() === "-");
     const q = searchQuery.trim().toLowerCase();
     if (q) f = f.filter((c) => (c.title || "").toLowerCase().includes(q));
     return f.map((c) => ({ ...c, seriesUrl: resolveSeriesUrl(c) }));
@@ -276,6 +278,7 @@ function AllTabInner() {
     genreFilter,
     minRating,
     whitelistOnly,
+    noDescription,
     countryFilter,
     optimisticWhitelist,
     searchQuery,
