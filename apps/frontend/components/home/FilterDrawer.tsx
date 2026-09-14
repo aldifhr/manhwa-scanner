@@ -59,14 +59,13 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
               ))}
             </div>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={whitelistOnly} onChange={(e) => setWhitelistOnly(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-white/5" />
-            <span className="text-sm text-white/80">Whitelist only</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={noDescription} onChange={(e) => setNoDescription(e.target.checked)} className="w-4 h-4 rounded border-white/20 bg-white/5" />
-            <span className="text-sm text-white/80">No description only</span>
-          </label>
+          <div>
+            <p className="text-xs font-semibold tracking-widest uppercase text-white/40 mb-2">Other</p>
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setWhitelistOnly(!whitelistOnly)} className={filterButtonClass(whitelistOnly)}>Whitelist only</button>
+              <button onClick={() => setNoDescription(!noDescription)} className={filterButtonClass(noDescription)}>No description</button>
+            </div>
+          </div>
         </div>
         <div className="p-4 border-t border-white/10 flex gap-2">
           <button onClick={() => { resetFilters(); onClose(); }} className="flex-1 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white/70 text-sm">Clear</button>
