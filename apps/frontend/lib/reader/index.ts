@@ -248,46 +248,6 @@ export const Reader = {
     );
     return (data.data ?? null) as unknown;
   },
-  // Custom RSS feed endpoints
-  getRssCustomFeed: async (params: {
-    genres?: string;
-    sources?: string;
-    origins?: string;
-    status?: string;
-    minRating?: string;
-    maxRating?: string;
-    unreadOnly?: boolean;
-    subscribedOnly?: boolean;
-    sort?: string;
-    limit?: number;
-    page?: number;
-  }) => {
-    const p = new URLSearchParams();
-    if (params.genres) p.set("genres", params.genres);
-    if (params.sources) p.set("sources", params.sources);
-    if (params.origins) p.set("origins", params.origins);
-    if (params.status) p.set("status", params.status);
-    if (params.minRating) p.set("min_rating", params.minRating);
-    if (params.maxRating) p.set("max_rating", params.maxRating);
-    if (params.unreadOnly) p.set("unread_only", "true");
-    if (params.subscribedOnly) p.set("subscribed_only", "true");
-    if (params.sort) p.set("sort", params.sort);
-    p.set("limit", String(params.limit ?? 50));
-    p.set("page", String(params.page ?? 1));
-    const data = await readerFetch<{
-      success: boolean;
-      data: {
-        results: Record<string, unknown>[];
-        total: number;
-        page: number;
-        pageSize: number;
-        totalPages: number;
-        hasMore: boolean;
-        filters: Record<string, unknown>;
-      };
-    }>(`/api/v1/rss/custom?${p}`);
-    return data.data as unknown;
-  },
   getRssFilterMetadata: async () => {
     const data = await readerFetch<{ success: boolean; data: unknown }>(
       "/api/v1/rss/filters/metadata"
