@@ -30,16 +30,7 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
-function StatusBadge({ it }: { it: ExcludedTitleItem }) {
-  const raw = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
-  const isCompleted = raw.isCompleted || raw.reason === "completed" || raw.is_completed || (raw.title || "").startsWith("[COMPLETED]");
-  if (isCompleted) {
-    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">Completed</span>;
-  }
-  return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/5 text-white/60 border border-white/10">Excluded</span>;
-}
-
-export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "All" | "Excluded" | "Completed" }) {
+export function ExcludeListClient() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
@@ -50,7 +41,6 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sourceFilter, setSourceFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState<"All" | "Excluded" | "Completed">(initialStatus);
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [bulkSource, setBulkSource] = useState("ikiru");
@@ -66,19 +56,13 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
       }
       if (sourceFilter !== "All" && (it.source || "all") !== sourceFilter)
         return false;
-      const raw = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
-      const isCompleted = raw.isCompleted || raw.reason === "completed" || raw.is_completed || (raw.title || "").startsWith("[COMPLETED]");
-      if (statusFilter === "Completed" && !isCompleted) return false;
-      if (statusFilter === "Excluded" && isCompleted) return false;
       return true;
     });
-  }, [items, debouncedSearch, sourceFilter, statusFilter]);
+  }, [items, debouncedSearch, sourceFilter]);
 
   const displayTitle = (it: ExcludedTitleItem) =>
     decodeHtml(it.title || it.titleKey || "Unknown title");
 
-  // Group the visible items by source so the user sees the distinct
-  // exclude lists (all / ikiru / shinigami) side by side.
   const grouped = useMemo(() => {
     const map: Record<string, ExcludedTitleItem[]> = {};
     for (const it of filtered) {
@@ -110,7 +94,6 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
     const prev =
       queryClient.getQueryData<ExcludedTitleItem[]>(queryKeys.excludedTitles) ??
       items;
-    // Optimistic: hide immediately
     queryClient.setQueryData<ExcludedTitleItem[]>(
       queryKeys.excludedTitles,
       (old) =>
@@ -125,19 +108,10 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
     setBusyKey(key);
     try {
       const rawKey = it.titleKey || it.id || it.title || "";
-      // Normalize curly quotes — backend stores straight quotes, FE display uses ’
       const title_key = rawKey
         .replace(/[\u2018\u2019]/g, "'")
         .replace(/[\u201C\u201D]/g, '"')
         .trim();
-      if (process.env.NODE_ENV === "development") {
-        console.log("[exclude delete] payload", {
-          title_key,
-          rawKey,
-          source: it.source,
-          it,
-        });
-      }
       if (!title_key) throw new Error("title_key missing");
       await Reader.removeExcludedTitle({
         title_key,
@@ -150,14 +124,12 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
           label: "Undo",
           onClick: async () => {
             try {
-              const isComp = (it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean }).reason === "completed" || (it as unknown as { isCompleted?: boolean }).isCompleted || (it as unknown as { is_completed?: boolean }).is_completed;
               await Reader.addExcludedTitle({
                 title_key: it.titleKey || it.id || "",
                 title: it.title ?? undefined,
                 source: it.source || "all",
                 cover: it.cover ?? null,
                 series_url: it.seriesUrl ?? null,
-                ...(isComp ? { reason: "completed", is_completed: true } : {}),
               } as Record<string, unknown>);
               queryClient.invalidateQueries({
                 queryKey: queryKeys.excludedTitles,
@@ -169,7 +141,6 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
     } catch (err) {
-      // Revert optimistic
       queryClient.setQueryData(queryKeys.excludedTitles, prev);
       toast(err instanceof Error ? err.message : "Failed to remove", {
         type: "error",
@@ -181,7 +152,6 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
 
   const handleBulk = async () => {
     if (!bulkSource) return;
-    // ponytail: confirm bulk — pernah ke-klik tanpa sengaja +2000 row (exclude_all_by_source)
     const ok = window.confirm(`Exclude ALL ${bulkSource} titles from recent (up to 2000)? This will hide them from RSS.`);
     if (!ok) return;
     const before =
@@ -191,7 +161,6 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
     try {
       const res = await Reader.bulkExcludeBySource(bulkSource);
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
-      // Fetch new list to diff for undo
       let added: ExcludedTitleItem[] = [];
       try {
         const fresh = (await Reader.getExcludedTitles()) as ExcludedTitleItem[];
@@ -236,37 +205,21 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
     }
   };
 
-  // counts for tabs — also handle fallback [COMPLETED] title prefix before migration
-  const counts = {
-    all: items.length,
-    excluded: items.filter((it) => {
-      const r = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
-      return !(r.reason === "completed" || r.isCompleted || r.is_completed || (r.title || "").startsWith("[COMPLETED]"));
-    }).length,
-    completed: items.filter((it) => {
-      const r = it as unknown as { reason?: string; isCompleted?: boolean; is_completed?: boolean; title?: string | null };
-      return r.reason === "completed" || r.isCompleted || r.is_completed || (r.title || "").startsWith("[COMPLETED]");
-    }).length,
-  };
-
   return (
     <PageShell>
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-tight text-text">
-          {initialStatus === "Completed" ? "Completed" : "Exclude List"}
+          Exclude List
         </h1>
         {isLoading ? (
           <div className="skeleton h-3 w-20 rounded" />
         ) : (
           <span className="text-xs text-text-muted">
-            {initialStatus === "Completed" ? `${counts.completed} completed` : `${items.length} excluded • ${counts.completed} completed`}
+            {items.length} excluded
           </span>
         )}
       </div>
 
-
-
-      {/* Search + bulk-exclude */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-xs">
           <MagnifyingGlass
@@ -390,8 +343,8 @@ export function ExcludeListClient({ initialStatus = "All" }: { initialStatus?: "
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-text truncate flex items-center gap-1.5">
-                            {displayTitle(it)} <StatusBadge it={it} />
+                          <p className="text-sm font-medium text-text truncate">
+                            {displayTitle(it)}
                           </p>
                           <p className="text-[11px] text-text-muted truncate">
                             {it.source || "all"}

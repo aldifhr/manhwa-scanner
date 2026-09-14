@@ -32,7 +32,5 @@ export function mapExcluded(r: unknown) {
       (x.titleKey as string) ??
       (x.id as string) ??
       "",
-    reason: (x.reason as string) ?? (x.isCompleted ? "completed" : "excluded"),
-    isCompleted: (x.isCompleted as boolean) ?? (x.is_completed as boolean) ?? (x.reason === "completed"),
   };
 }

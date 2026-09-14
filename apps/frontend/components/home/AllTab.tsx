@@ -122,16 +122,12 @@ function AllTabInner() {
   const {
     optimisticWhitelist,
     optimisticExcluded,
-    optimisticCompleted,
     excludingKey,
-    completingKey,
     addingKey,
     handleAdd,
     handleAddGroup,
     handleExclude,
     handleExcludeSeries,
-    handleComplete,
-    handleCompleteSeries,
   } = useFeedActions();
 
   const all = allItems;
@@ -175,23 +171,7 @@ function AllTabInner() {
     },
     [optimisticExcluded]
   );
-  const isCompletedFlat = useCallback(
-    (c: FlatChapter) => {
-      const src = (c.source || "all").toLowerCase();
-      const nk = normalizeTitleKey(c.titleKey);
-      const key = `${c.titleKey}:${src}`;
-      const nkey = `${nk}:${src}`;
-      return (
-        optimisticCompleted.has(key) ||
-        optimisticCompleted.has(nkey) ||
-        optimisticCompleted.has(`${c.titleKey}:all`) ||
-        optimisticCompleted.has(`${nk}:all`) ||
-        optimisticCompleted.has(c.titleKey) ||
-        optimisticCompleted.has(nk)
-      );
-    },
-    [optimisticCompleted]
-  );
+
   const isExcludedSeries = useCallback(
     (s: GroupedSeries) => {
       const keys = [
@@ -222,35 +202,7 @@ function AllTabInner() {
     },
     [optimisticExcluded]
   );
-  const isCompletedSeries = useCallback(
-    (s: GroupedSeries) => {
-      const keys = [
-        ...new Set(
-          s.chapters.map(
-            (ch) => `${ch.titleKey || s.titleKey}:${(ch.source || "").toLowerCase()}`
-          )
-        ),
-      ];
-      const nkeys = keys.map((k) => {
-        const [tk, src] = k.split(":");
-        return `${normalizeTitleKey(tk)}:${src}`;
-      });
-      const allKeys = [...keys, ...nkeys];
-      if (keys.length === 0) {
-        const fk = `${s.titleKey}:all`;
-        const nfk = `${normalizeTitleKey(s.titleKey)}:all`;
-        const nk = normalizeTitleKey(s.titleKey);
-        return optimisticCompleted.has(fk) || optimisticCompleted.has(nfk) || optimisticCompleted.has(s.titleKey) || optimisticCompleted.has(nk);
-      }
-      return allKeys.every(
-        (k) =>
-          optimisticCompleted.has(k) ||
-          optimisticCompleted.has(`${k.split(":")[0]}:all`) ||
-          optimisticCompleted.has(k.split(":")[0])
-      );
-    },
-    [optimisticCompleted]
-  );
+
 
   const filtered = useMemo(() => {
     let f = all;
@@ -635,9 +587,6 @@ function AllTabInner() {
                   onExclude={() => handleExcludeSeries(s)}
                   isExcluded={isExcludedSeries(s)}
                   excluding={excludingKey === s.titleKey}
-                  isCompleted={isCompletedSeries(s)}
-                  completing={completingKey === s.titleKey}
-                  onComplete={() => handleCompleteSeries(s)}
                   onAdd={() => handleAddGroup(s)}
                   isSentToDiscord={s.chapters.some(
                     (c) => c.isSent === true || sentKeys.has(c.key)
@@ -678,9 +627,6 @@ function AllTabInner() {
                   onAdd={() => handleAdd(item)}
                   isExcluded={isExcludedFlat(item)}
                   excluding={excludingKey === item.titleKey}
-                  isCompleted={isCompletedFlat(item)}
-                  completing={completingKey === item.titleKey}
-                  onComplete={() => handleComplete(item)}
                   isPinned={pinnedSet.has(item.titleKey)}
                   onTogglePin={() => togglePin(item.titleKey)}
                   onExclude={() => handleExclude(item)}

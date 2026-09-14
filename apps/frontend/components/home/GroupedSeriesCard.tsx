@@ -43,9 +43,6 @@ function GroupedSeriesCard({
   isExcluded,
   excluding,
   onExclude,
-  isCompleted,
-  completing,
-  onComplete,
   isPinned,
   onTogglePin,
   isDeepMatch,
@@ -59,9 +56,6 @@ function GroupedSeriesCard({
   isExcluded: boolean;
   excluding: boolean;
   onExclude: () => void;
-  isCompleted?: boolean;
-  completing?: boolean;
-  onComplete?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
   isDeepMatch?: boolean;
@@ -169,9 +163,6 @@ function GroupedSeriesCard({
           isExcluded={isExcluded}
           excluding={excluding}
           onExclude={onExclude}
-          isCompleted={isCompleted}
-          completing={completing}
-          onComplete={onComplete}
           adding={adding}
           onAdd={onAdd}
           isRead={isRead}
