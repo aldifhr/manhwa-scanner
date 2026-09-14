@@ -19,28 +19,30 @@ from fastapi.openapi.utils import get_openapi  # kept for custom_openapi delegat
 async def lifespan(app: FastAPI):
     """Startup: init resources. Shutdown: close connections gracefully."""
     # ponytail: auto-migrate on boot — was manual psql, now 8L idempotent
-    try:
-        from pathlib import Path
-        import psycopg2
-        dsn = os.getenv("DATABASE_URL") or "postgresql://be_ag:1337@127.0.0.1:5432/be_ag_py"
-        conn = psycopg2.connect(dsn)
-        conn.autocommit = True
-        cur = conn.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())")
-        mig_dir = Path(__file__).parent / "db" / "migrations"
-        for p in sorted(mig_dir.glob("*.sql")):
-            cur.execute("SELECT 1 FROM schema_migrations WHERE filename=%s", (p.name,))
-            if cur.fetchone():
-                continue
-            try:
-                cur.execute(p.read_text())
-                cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (p.name,))
-                logger.info("migrated", file=p.name)
-            except Exception as e:
-                logger.warn("migrate failed", file=p.name, err=str(e)[:120])
-        conn.close()
-    except Exception as e:
-        logger.warn("auto-migrate skipped", err=str(e)[:120])
+    # P1 fix: migration failure → fail startup (not silent warn)
+    from pathlib import Path
+    import psycopg2
+    dsn = os.getenv("DATABASE_URL") or "postgresql://be_ag:***@127.0.0.1:5432/be_ag_py"
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = False
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())")
+    conn.commit()
+    mig_dir = Path(__file__).parent / "db" / "migrations"
+    for p in sorted(mig_dir.glob("*.sql")):
+        cur.execute("SELECT 1 FROM schema_migrations WHERE filename=%s", (p.name,))
+        if cur.fetchone():
+            continue
+        try:
+            cur.execute(p.read_text())
+            cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (p.name,))
+            conn.commit()
+            logger.info("migrated", file=p.name)
+        except Exception as e:
+            conn.rollback()
+            logger.error("migrate failed — startup halted", file=p.name, err=str(e)[:200])
+            raise RuntimeError(f"migration {p.name} failed: {e}") from e
+    conn.close()
     from app.tasks import start_worker
     start_worker()
     # Cron decoupling: the ROLE=cron process runs the cron queue worker so the
