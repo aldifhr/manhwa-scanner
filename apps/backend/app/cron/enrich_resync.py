@@ -75,8 +75,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
                     """,
                     (cutoff, limit),
                 )
-                _cols = [d[0] for d in _cur.description] if _cur.description else []
-                rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
+                rows = [dict(r) for r in _cur.fetchall()] if _cur.description else []
                 _pc(_conn)
             except Exception as _e:
                 logger.debug("enrich_resync miss_only fallback to Supabase", err=str(_e)[:120])
@@ -253,8 +252,7 @@ def enrich_stale_series_meta(stale_days: int = 7, limit: int = 50) -> dict:
                 """,
                 (cutoff, limit),
             )
-            _cols = [d[0] for d in _cur.description] if _cur.description else []
-            rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
+            rows = [dict(r) for r in _cur.fetchall()] if _cur.description else []
             _pc2(_conn)
         except Exception:
             # Fallback: Supabase client
@@ -364,8 +362,7 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             """,
             (cutoff, limit),
         )
-        _cols = [d[0] for d in _cur.description] if _cur.description else []
-        rows = [dict(zip(_cols, r)) for r in _cur.fetchall()] if _cols else []
+        rows = [dict(r) for r in _cur.fetchall()] if _cur.description else []
         _pc3(_conn)
     except Exception as e:
         logger.error("voratoon cover: list failed", exc=e)
@@ -428,8 +425,7 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
             """,
             (_cfg.VORATOON_COVER_BUCKET, limit,),
         )
-        _cols2 = [d[0] for d in _cur2.description] if _cur2.description else []
-        rc_rows = [dict(zip(_cols2, r)) for r in _cur2.fetchall()] if _cols2 else []
+        rc_rows = [dict(r) for r in _cur2.fetchall()] if _cur2.description else []
         _pc3(_conn2)
         # filter via _is_expiring logic (reuse enrich_whitelist helper if available)
         try:
