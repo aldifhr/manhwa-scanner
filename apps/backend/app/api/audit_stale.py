@@ -20,14 +20,15 @@ async def audit_stale(request: Request):
         from app.db import q
         rows = q("""
             SELECT w.title_key, w.title,
-                   COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max) as last_update,
-                   EXTRACT(DAY FROM NOW() - COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max))::int as days_idle,
+                   COALESCE(GREATEST(rc2.rc_max, dh.dh_max, sm.sm_max), rc2.rc_max, dh.dh_max, sm.sm_max) as last_update,
+                   EXTRACT(DAY FROM NOW() - COALESCE(GREATEST(rc2.rc_max, dh.dh_max, sm.sm_max), rc2.rc_max, dh.dh_max, sm.sm_max))::int as days_idle,
                    COALESCE(rc2.cnt,0)::int as chapter_count
             FROM whitelist w
             LEFT JOIN (SELECT title_key, MAX(updated_time) as rc_max, COUNT(*) as cnt FROM recent_chapters GROUP BY title_key) rc2 ON rc2.title_key = w.title_key
             LEFT JOIN (SELECT title_key, MAX(sent_at) as dh_max FROM dispatch_history GROUP BY title_key) dh ON dh.title_key = w.title_key
-            WHERE COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max) IS NULL
-               OR COALESCE(GREATEST(rc2.rc_max, dh.dh_max), rc2.rc_max, dh.dh_max) < NOW() - (%s || ' days')::interval
+            LEFT JOIN (SELECT title_key, MAX(updated_at) as sm_max FROM series_meta GROUP BY title_key) sm ON sm.title_key = w.title_key
+            WHERE COALESCE(GREATEST(rc2.rc_max, dh.dh_max, sm.sm_max), rc2.rc_max, dh.dh_max, sm.sm_max) IS NULL
+               OR COALESCE(GREATEST(rc2.rc_max, dh.dh_max, sm.sm_max), rc2.rc_max, dh.dh_max, sm.sm_max) < NOW() - (%s || ' days')::interval
             ORDER BY 3 ASC NULLS FIRST
             LIMIT %s
         """, [str(days), str(limit)])
