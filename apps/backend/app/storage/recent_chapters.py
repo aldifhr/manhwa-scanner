@@ -244,9 +244,28 @@ def batch_insert_recent_chapters(rows: list[dict]) -> None:
         _r["chapter_url"] = row["chapter_url"]
         cleaned.append(_r)
     try:
-        # Dedup within the batch itself (ikiru feed can return the same
-        # chapter_url multiple times across its duplicated pages; the feed
-        # pass and whitelist pass may also emit the same chapter).
+        # Backfill missing covers from series_meta (collect_whitelisted_shinigami sets cover=None)
+        _need_cover = [r for r in cleaned if not r.get("cover")]
+        if _need_cover:
+            _tks = list({(r.get("title_key",""), r.get("source","")) for r in _need_cover if r.get("title_key")})
+            if _tks:
+                _covers = {}
+                for i in range(0, len(_tks), 100):
+                    chunk = _tks[i:i+100]
+                    _sb = get_supabase()
+                    try:
+                        for src in set(s for _, s in chunk):
+                            _src_tks = [tk for tk, s in chunk if s == src]
+                            _res = _sb.table("series_meta").select("title_key,source,cover").in_("title_key", _src_tks).eq("source", src).limit(len(_src_tks)*2).execute()
+                            for row in _res.data or []:
+                                _covers[(row["title_key"], src)] = row.get("cover")
+                    except Exception:
+                        pass
+                for r in cleaned:
+                    if not r.get("cover"):
+                        r["cover"] = _covers.get((r.get("title_key",""), r.get("source","")), "")
+                        if r["cover"] is None:
+                            r["cover"] = ""
         _seen_url: set[str] = set()
         _seen_ch: set[tuple[str, str, str]] = set()
         _uniq: list[dict] = []
