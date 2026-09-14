@@ -19,7 +19,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
     origin = (m.get("country_id") or "").upper()
     _meta: dict = {}
     if fetch_meta:
-        _meta = _cached_series_meta("shinigami", manga_id)
+        _meta = _cached_series_meta("shinigami", slugify_title_key(title or ""))
     _meta_rating = _meta.get("rating") if _meta.get("rating") not in (None, "", 0) else (normalize_rating(m.get("rating") or m.get("user_rate")) or 0.0)
     _meta_desc = _meta.get("description") or ""
     _meta_genres = _meta.get("genres") or []
@@ -99,7 +99,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         description = (m.get("description") or "").strip()
         _meta_item: dict = {}
         if fetch_meta:
-            _meta_item = _cached_series_meta("shinigami", manga_id)
+            _meta_item = _cached_series_meta("shinigami", tk)
         if not rating and isinstance(_meta_item, dict):
             rating = normalize_rating(_meta_item.get("rating")) or 0.0
         if not description and isinstance(_meta_item, dict):
