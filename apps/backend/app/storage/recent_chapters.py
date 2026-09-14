@@ -166,16 +166,17 @@ def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
             from app.db import get_supabase as _gsb_wl
             _sb_wl = _gsb_wl()
             _wl_rows = _sb_wl.table("whitelist").select("title_key,source,origin").execute().data or []
-            _wl_origins = {}
+            _new_origins = {}
             for _wl in _wl_rows:
                 _tk_wl = str(_wl.get("title_key") or "").strip()
                 _src_wl = str(_wl.get("source") or "").strip()
                 _orig_wl = str(_wl.get("origin") or "").strip().upper()
                 if _tk_wl and _src_wl and _orig_wl:
-                    _wl_origins[(_tk_wl, _src_wl)] = _orig_wl
+                    _new_origins[(_tk_wl, _src_wl)] = _orig_wl
+            _wl_origins = _new_origins
             _WL_ORIGIN_TS = _t.time()
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warn("wl_origins refresh failed — using stale cache", err=str(_e)[:160])
         return _wl_origins
 
 
