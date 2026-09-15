@@ -16,7 +16,6 @@ interface UiState {
   genreFilter: string | null;
   minRating: string | null;
   whitelistOnly: boolean;
-  noDescription: boolean;
   setFeed: (f: Feed) => void;
   toggleGroupMode: () => void;
   setSortMode: (s: SortMode) => void;
@@ -50,7 +49,6 @@ export const useUiStore = create<UiState>()(
       genreFilter: null,
       minRating: null,
       whitelistOnly: false,
-      noDescription: false,
       setFeed: (feed) => set({ feed }),
       toggleGroupMode: () => set((s) => ({ groupMode: !s.groupMode })),
       setSortMode: (sortMode) => set({ sortMode }),
@@ -61,7 +59,6 @@ export const useUiStore = create<UiState>()(
       setGenreFilter: (genreFilter) => set({ genreFilter }),
       setMinRating: (minRating) => set({ minRating }),
       setWhitelistOnly: (whitelistOnly) => set({ whitelistOnly }),
-      setNoDescription: (noDescription) => set({ noDescription }),
       resetFilters: () =>
         set({
           sourceFilter: null,

@@ -5,28 +5,21 @@ import { filterButtonClass } from "@/lib/styles";
 interface Props {
   sources: string[];
   typeCounts: Record<string, number>;
-  noDescCount: number;
   sourceFilter: string | null;
   typeFilter: string | null;
-  noDescription: boolean;
   setSourceFilter: (v: string | null) => void;
   setTypeFilter: (v: string | null) => void;
-  setNoDescription: (v: boolean) => void;
 }
 
 export default function AllTabFilters({
   sources,
   typeCounts,
-  noDescCount,
   sourceFilter,
   typeFilter,
-  noDescription,
   setSourceFilter,
   setTypeFilter,
-  setNoDescription,
 }: Props) {
-  const hasActive =
-    sourceFilter !== null || typeFilter !== null || noDescription;
+  const hasActive = sourceFilter !== null || typeFilter !== null;
   return (
     <div className="sticky top-[57px] z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 flex flex-col gap-2.5 bg-black/80 backdrop-blur-xl border-y border-white/8 supports-[backdrop-filter]:bg-black/40">
       {/* Row 1: Source filter */}
@@ -82,19 +75,11 @@ export default function AllTabFilters({
             </button>
           );
         })}
-        <span className="w-px h-4 bg-white/10 mx-1 shrink-0" aria-hidden />
-        <button
-          onClick={() => setNoDescription(!noDescription)}
-          className={filterButtonClass(noDescription)}
-        >
-          No Desc {noDescCount > 0 && <span className="opacity-60">({noDescCount})</span>}
-        </button>
         {hasActive && (
           <button
             onClick={() => {
               setSourceFilter(null);
               setTypeFilter(null);
-              setNoDescription(false);
             }}
             className="ml-auto inline-flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors min-h-0 min-w-0 shrink-0 whitespace-nowrap"
           >
