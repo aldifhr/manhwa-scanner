@@ -202,8 +202,10 @@ def collect_voratoon() -> list[dict]:
     _combos = [
         ("manhwa", None),
         ("manhua", None),
+        ("mangatoon", None),
         ("manhwa", "type==project"),
         ("manhua", "type==project"),
+        ("mangatoon", "type==project"),
     ]
 
     def _fetch_combo(fmt: str, filt) -> list[dict]:
@@ -291,7 +293,7 @@ def _emit_series(results: list[dict], s: dict) -> None:
     title = data.get("title", "")
     if not slug:
         return
-    # ponytail: filter JP — voratoon format manhwa(CN?)/manhua, skip manga/JP (format==manga or origin JP)
+    # ponytail: filter JP — skip manga/JP origin (these are Japanese, not KR/CN)
     _fmt = str(data.get("format") or "").lower()
     _orig_raw = str(data.get("origin") or data.get("country") or "").upper()
     if _fmt == "manga" or _fmt == "jp" or _orig_raw == "JP":
