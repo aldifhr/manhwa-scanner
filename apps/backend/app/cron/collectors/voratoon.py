@@ -24,13 +24,6 @@ def _collect_voratoon_source(latest_sent: dict) -> list[dict]:
         _ut = u.get("updated_time") or ""
         if not _ut:
             continue
-        try:
-            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-            _dtp = _dt.fromisoformat(_ut.replace("Z", "+00:00"))
-            if _dtp < (_dt.now(_tz.utc) - _td(hours=24)):
-                continue
-        except (ValueError, TypeError):
-            continue
         _ceil = latest_sent.get((slugify_title_key(series_title or ""), "voratoon"), 0)
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
