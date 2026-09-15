@@ -61,6 +61,16 @@ export function useFeedActions() {
   const addMutation = useMutation({
     mutationFn: async (item: FlatChapter) => {
       const optKey = `${item.titleKey}:${item.source}`;
+      // Pre-check: refetch whitelist to get latest state (prevents duplicate add across devices)
+      try {
+        const fresh = (await Reader.getWhitelist(1, 1000, false)) as unknown as Array<{ titleKey?: string; source?: string }>;
+        const exists = fresh.some((e) => `${e.titleKey}:${e.source}` === optKey);
+        if (exists) {
+          return { item, result: { status: "already_exists" as const }, optKey };
+        }
+      } catch {
+        // If refetch fails, proceed with add attempt (BE upsert handles it)
+      }
       return {
         item,
         result: (await Reader.addWhitelistEntry({
@@ -124,16 +134,56 @@ export function useFeedActions() {
 
   const addGroupMutation = useMutation({
     mutationFn: async (series: GroupedSeries) => {
-      // Use per-chapter titleKey (dedup merges dash/space/uuid) so optimistic keys match flat rows
       const chapterKeys = series.chapters.map(
         (c: any) => `${c.titleKey || series.titleKey}:${c.source}`
       );
       const optKeys = [...new Set(chapterKeys)];
-      // Group by source for backend calls (title_key per source should use that source's actual titleKey)
-      const bySource = new Map<
-        string,
-        { titleKey: string; seriesUrl: string }
-      >();
+      // Pre-check: refetch whitelist to get latest state (prevents duplicate add across devices)
+      try {
+        const fresh = (await Reader.getWhitelist(1, 1000, false)) as unknown as Array<{ titleKey?: string; source?: string }>;
+        const freshKeys = new Set(fresh.map((e) => `${e.titleKey}:${e.source}`));
+        const alreadyPresent = optKeys.filter((k) => freshKeys.has(k));
+        const missing = optKeys.filter((k) => !freshKeys.has(k));
+        // If all already exist, short-circuit
+        if (missing.length === 0) {
+          return { results: alreadyPresent.map(() => ({ status: "already_exists" as const })), optKeys, skipped: true };
+        }
+        // Build bySource only for missing keys
+        const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
+        for (const k of missing) {
+          const src = k.split(":")[1];
+          const tk = k.split(":")[0];
+          if (!bySource.has(src)) {
+            const chapter = series.chapters.find((c: any) => (c.titleKey || series.titleKey) === tk && c.source === src) as any;
+            bySource.set(src, { titleKey: tk, seriesUrl: (chapter?.seriesUrl) || series.seriesUrl });
+          }
+        }
+        const results = await Promise.all(
+          [...bySource.entries()].map(([s, v]) =>
+            Reader.addWhitelistEntry({
+              title: series.title,
+              seriesUrl: v.seriesUrl || undefined,
+              source: s,
+              title_key: v.titleKey,
+              cover: series.cover,
+              rating: series.rating,
+              origin: series.origin,
+              genres: series.genres,
+              description: series.description ?? undefined,
+            } as Record<string, unknown>)
+          )
+        );
+        // Combine with already-existing
+        const allResults = [
+          ...alreadyPresent.map(() => ({ status: "already_exists" as const })),
+          ...results,
+        ];
+        return { results: allResults, optKeys, skipped: false };
+      } catch {
+        // If refetch fails, proceed with original behavior
+      }
+      // Fallback: original behavior
+      const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
       for (const c of series.chapters as any[]) {
         if (!bySource.has(c.source))
           bySource.set(c.source, {
@@ -156,14 +206,14 @@ export function useFeedActions() {
           } as Record<string, unknown>)
         )
       );
-      return { results, optKeys };
+      return { results, optKeys, skipped: false };
     },
     onMutate: (series) => setAddingKey(series.titleKey),
     onSuccess: ({ results, optKeys }, series) => {
-      // Bandel fix: already_exists also counts as added for optimistic
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
-      toast(`Added ${series.title} to whitelist`, {
+      const allExist = results.every((r) => r.status === "already_exists");
+      toast(allExist ? "Already in whitelist" : `Added ${series.title} to whitelist`, {
         type: "success",
         duration: 5000,
         action: {
