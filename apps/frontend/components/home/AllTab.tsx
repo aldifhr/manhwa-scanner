@@ -11,7 +11,6 @@ import {
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { queryKeys } from "@/lib/queryKeys";
-<longcat_arg_value>
 import { cn } from "@/lib/utils";
 import { SkeletonGrid } from "@/components/SkeletonGrid";
 import { ErrorFallback } from "@/components/ErrorFallback";
