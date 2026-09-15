@@ -1,4 +1,4 @@
-const CACHE_NAME = "manhwa-images-v5";
+const CACHE_NAME = "manhwa-images-v6"; // bumped — force invalidate stale v5 covers
 const MAX_AGE_MS = 6 * 60 * 60 * 1000; // SWR window: serve cache instantly while this fresh, else network-first
 const MAX_ENTRIES = 800;
 

@@ -23,7 +23,7 @@ export function WhitelistGrid() {
       Reader.getWhitelist(1, 1000, false) as unknown as Promise<
         WhitelistRouteItem[]
       >,
-    staleTime: 30_000,
+    staleTime: 1_000, // ponytail: 1s — user-centric, needs fresh data for add/delete actions
   });
 
   const [sourceFilter, setSourceFilter] = useState("All");
