@@ -138,9 +138,11 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             except Exception as e:
                 logger.warn("unclaim_stale failed", err=str(e)[:160])
             whitelist = wl_store.load_whitelist()
-            # dispatch ONLY whitelisted items to Discord — if deep queue already claimed+filtered, skip filter
+            # ALWAYS filter whitelisted — both paths (claimed + recent) need it
+            # ponytail: whitelist filter was skipped when deep-queue claim path had items,
+            # causing non-whitelisted chapters to dispatch to Discord
             if _use_claimed:
-                to_dispatch = enriched_all
+                to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
             else:
                 to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
             channels = channel_ids or dispatch_mod._load_channels()
