@@ -26,7 +26,6 @@ interface UiState {
   setGenreFilter: (g: string | null) => void;
   setMinRating: (r: string | null) => void;
   setWhitelistOnly: (v: boolean) => void;
-  setNoDescription: (v: boolean) => void;
   resetFilters: () => void;
 }
 
