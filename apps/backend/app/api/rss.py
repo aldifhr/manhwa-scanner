@@ -121,10 +121,6 @@ async def _rss_impl(request: Request):
     if len(request.query_params.get("q", "") or "") > 100:
         return JSONResponse(content={"success": False, "error": "q too long (max 100)"}, status_code=400)
     exclude_origin = request.query_params.get("exclude_origin", "")
-    # Default: exclude Japanese manga unless user explicitly requests JP or sets exclude_origin
-    # ponytail: NULL/unknown origin not excluded — "" not in ["JP"] so shown (only JP filtered)
-    if not origin_f and not exclude_origin:
-        exclude_origin = "JP"
     type_f = request.query_params.get("type", "")
     # Custom filters (merged from /rss/custom) — handled in Python post-filter for now
     genres_f = request.query_params.get("genres", "")
