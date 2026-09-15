@@ -212,23 +212,37 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
 
     logger.info("dispatch: send-pass start", to_send=len(to_send), claimed_db=len(claimed_keys))
 
-    # Build a title_key+source -> cover map from the whitelist so we can
-    # fall back to the whitelist cover when recent_chapters.cover is empty
-    # (ikiru chapters frequently arrive without a cover in the scrape).
+    # Build title_key+source -> meta map from series_meta (rating/description/genres/type/cover)
+    # rss_service does sm_map > it > wl; dispatch was only using it.cover → rating jadi 0/No rating
+    _sm_map: dict[tuple[str, str], dict] = {}
     _wl_cover_map: dict[tuple[str, str], str] = {}
     try:
         from app.db import get_supabase
         _sb = get_supabase()
-        # cover canonical in series_meta since 052 — whitelist minimal
-        _sm_rows = _sb.table("series_meta").select("title_key, source, cover").execute().data or []
-        for _w in _sm_rows:
-            _c = str(_w.get("cover") or "").strip()
-            _tk = str(_w.get("title_key") or "").strip()
-            _src = str(_w.get("source") or "").strip()
-            if _c and _tk:
-                _wl_cover_map[(_tk, _src)] = _c
+        _tks = list({str(it.get("title_key") or "").strip() for it in to_send if it.get("title_key")})
+        if _tks:
+            for i in range(0, len(_tks), 100):
+                chunk = _tks[i:i+100]
+                _rows = _sb.table("series_meta").select("title_key, source, cover, rating, description, genres, type").in_("title_key", chunk).execute().data or []
+                for _r in _rows:
+                    _tk = str(_r.get("title_key") or "").strip()
+                    _src = str(_r.get("source") or "").strip()
+                    if _tk and _src:
+                        _sm_map[(_tk, _src)] = _r
+                        _c = str(_r.get("cover") or "").strip()
+                        if _c:
+                            _wl_cover_map[(_tk, _src)] = _c
+        # fallback: if no tks matched (empty title_key), load all cover map like before
+        if not _wl_cover_map:
+            _sm_rows = _sb.table("series_meta").select("title_key, source, cover").execute().data or []
+            for _w in _sm_rows:
+                _c = str(_w.get("cover") or "").strip()
+                _tk = str(_w.get("title_key") or "").strip()
+                _src = str(_w.get("source") or "").strip()
+                if _c and _tk:
+                    _wl_cover_map[(_tk, _src)] = _c
     except Exception as _e:
-        logger.warn("dispatch: whitelist cover map build failed", err=str(_e)[:120])
+        logger.warn("dispatch: series_meta map build failed", err=str(_e)[:120])
 
     sent = 0
     for ch in channel_ids:
@@ -263,12 +277,17 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 continue
             seen_key_run.add(norm)
 
-            # Cover: prefer recent_chapters cover, fall back to whitelist cover.
-            _cover = str(it.get("cover") or "").strip()
+            # Merge static fields from series_meta (canonical) — rss_service does sm > it
+            _tk = str(it.get("title_key") or "").strip()
+            _src = str(it.get("source") or "").strip()
+            _sm = _sm_map.get((_tk, _src), {})
+            _cover = str(it.get("cover") or _sm.get("cover") or "").strip()
             if not _cover:
-                _tk = str(it.get("title_key") or "").strip()
-                _src = str(it.get("source") or "").strip()
                 _cover = _wl_cover_map.get((_tk, _src), "") or _wl_cover_map.get((_tk, ""), "")
+            _rating = it.get("rating") if it.get("rating") not in (None, "", 0, "0", 0.0) else _sm.get("rating")
+            _desc = it.get("description") or _sm.get("description") or ""
+            _genres = it.get("genres") or _sm.get("genres") or []
+            _type = it.get("type") or _sm.get("type") or ""
 
             # NOTE: We intentionally do NOT fetch the cover as a file attachment.
             # The gateway fallback path (used because this VPS IP is banned at
@@ -285,9 +304,9 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 series_url=it.get("series_url", ""),
                 source=it.get("source", ""),
                 cover=_cover,
-                rating=str(it.get("rating", "")),
-                genres=it.get("genres", []),
-                description=it.get("description", ""),
+                rating=str(_rating if _rating not in (None, "") else ""),
+                genres=_genres,
+                description=_desc,
                 updated_time=it.get("updated_time", ""),
             )
             content = f"🔔 New Release on **{html.unescape(it.get('title', 'Unknown'))}** — Chapter {it.get('chapter', '?')}"
