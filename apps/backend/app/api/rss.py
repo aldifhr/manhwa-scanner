@@ -145,7 +145,7 @@ async def _rss_impl(request: Request):
 
     try:
         from app.services.rss_service import fetch_rss_data
-        hours = 24
+        hours = 24  # RSS shows last 24h by design — fresh discovery feed
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         # ponytail: fetch_limit capped 300 (not 1000) — Python group_results + filtering was O(fetch_limit) per varied q=

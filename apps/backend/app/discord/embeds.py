@@ -18,6 +18,11 @@ except Exception:
     _PUBLIC_BASE = "https://scanner.aldifhr.fun"
 
 
+def _escape_discord_md(text: str) -> str:
+    """Escape Discord markdown characters in URLs to prevent injection."""
+    return text.replace("\\", "\\\\").replace("]", "\\]").replace(")", "\\)")
+
+
 def _proxy_cover(cover: str | None) -> str | None:
     """Return the cover URL for Discord embeds.
 
@@ -213,7 +218,7 @@ def _build_embed(
     _chapter_links = []
     for _ch, _url in _chapters_sorted:
         if _url:
-            _chapter_links.append(f"[ch {_ch}]({_url})")
+            _chapter_links.append(f"[ch {_ch}]({_escape_discord_md(_url)})")
         else:
             _chapter_links.append(f"ch {_ch}")
     _latest_url = _chapters_sorted[-1][1] if _chapters_sorted else ""
@@ -232,9 +237,9 @@ def _build_embed(
 
     action_parts = []
     if _latest_tracked:
-        action_parts.append(f"[📖 Read Latest]({_latest_tracked})")
+        action_parts.append(f"[📖 Read Latest]({_escape_discord_md(_latest_tracked)})")
     if series_url and series_url != _latest_url:
-        action_parts.append(f"[📚 Series Page]({series_url})")
+        action_parts.append(f"[📚 Series Page]({_escape_discord_md(series_url)})")
     action_line = f"**Links:** {' • '.join(action_parts)}" if action_parts else ""
     synopsis_text = _short_synopsis(description_clean)
     desc = ""
