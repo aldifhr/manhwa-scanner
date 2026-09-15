@@ -35,15 +35,6 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
         chapter_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}" if ch_id else ""
         if not chapter_url:
             continue
-        _rd = ch.get("release_date") or ""
-        if _rd:
-            try:
-                from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-                _dtp = _dt.fromisoformat(_rd.replace("Z", "+00:00"))
-                if _dtp < (_dt.now(_tz.utc) - _td(hours=24)):
-                    continue
-            except (ValueError, TypeError):
-                pass
         _chn = _parse_chapter_num(ch_str)
         _ceil = latest_sent.get((slugify_title_key(title or ""), "shinigami"), 0)
         if _chn is not None and _ceil and _chn <= _ceil:
@@ -126,16 +117,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
             if not ch_id:
                 continue
             ch_str = str(ch.get("chapter_number") or "")
-            _rd = ch.get("created_at") or m.get("latest_chapter_time") or ""
-            if _rd:
-                try:
-                    _dtp = _dt.fromisoformat(_rd.replace("Z", "+00:00"))
-                    if _dtp.tzinfo is None:
-                        _dtp = _dtp.replace(tzinfo=_tz.utc)
-                    if _dtp < _cutoff:
-                        continue
-                except (ValueError, TypeError):
-                    pass
             chapter_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}"
             _chn = _parse_chapter_num(ch_str)
             _ceil = latest_sent.get((tk, "shinigami"), 0)
@@ -156,5 +137,5 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                         _type2 = (_meta_item.get("type") or "").lower() if isinstance(_meta_item, dict) else ""
                     except Exception:
                         pass
-            items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _rd or m.get("latest_chapter_time") or m.get("updated_at", ""), "rating": rating, "genres": genres, "description": description, "type": _type2})
+            items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": m.get("latest_chapter_time") or m.get("updated_at", ""), "rating": rating, "genres": genres, "description": description, "type": _type2})
     return attach_confidence(items, "shinigami")
