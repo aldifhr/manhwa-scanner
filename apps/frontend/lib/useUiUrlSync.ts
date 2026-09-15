@@ -25,7 +25,6 @@ export function useUiUrlSync() {
     if (source !== null) store.setSourceFilter(source || null);
     if (q !== null) store.setSearchQuery(q);
     if (type !== null) store.setTypeFilter(type || null);
-    if (country !== null) store.setCountryFilter(country || null);
     if (feed && ["all", "nowl", "wl"].includes(feed)) store.setFeed(feed as "all" | "nowl" | "wl");
     if (group !== null && group === "1" && !store.groupMode) store.toggleGroupMode();
     hydrated.current = true;
@@ -36,7 +35,6 @@ export function useUiUrlSync() {
   const sourceFilter = useUiStore((s) => s.sourceFilter);
   const searchQuery = useUiStore((s) => s.searchQuery);
   const typeFilter = useUiStore((s) => s.typeFilter);
-  const countryFilter = useUiStore((s) => s.countryFilter);
   const feed = useUiStore((s) => s.feed);
   const groupMode = useUiStore((s) => s.groupMode);
 
@@ -47,11 +45,10 @@ export function useUiUrlSync() {
     if (sourceFilter) sp.set("source", sourceFilter); else sp.delete("source");
     if (searchQuery) sp.set("q", searchQuery); else sp.delete("q");
     if (typeFilter) sp.set("type", typeFilter); else sp.delete("type");
-    if (countryFilter) sp.set("country", countryFilter); else sp.delete("country");
     if (feed !== "all") sp.set("feed", feed); else sp.delete("feed");
     if (groupMode) sp.set("group", "1"); else sp.delete("group");
     const next = sp.toString();
     const cur = window.location.search.replace(/^\?/, "");
     if (next !== cur) router.replace(next ? `?${next}` : window.location.pathname, { scroll: false });
-  }, [sourceFilter, searchQuery, typeFilter, countryFilter, feed, groupMode, router]);
+  }, [sourceFilter, searchQuery, typeFilter, feed, groupMode, router]);
 }

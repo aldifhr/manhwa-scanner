@@ -75,7 +75,6 @@ function AllTabInner() {
   const sortMode = useUiStore((s) => s.sortMode);
   const view = useUiStore((s) => s.contentView);
   const sourceFilter = useUiStore((s) => s.sourceFilter);
-  const countryFilter = useUiStore((s) => s.countryFilter);
   const typeFilter = useUiStore((s) => s.typeFilter);
   const searchQuery = useUiStore((s) => s.searchQuery);
   const genreFilter = useUiStore((s) => s.genreFilter);
@@ -87,7 +86,6 @@ function AllTabInner() {
   const toggleGroupMode = useUiStore((s) => s.toggleGroupMode);
   const setSortMode = useUiStore((s) => s.setSortMode);
   const setSourceFilter = useUiStore((s) => s.setSourceFilter);
-  const setCountryFilter = useUiStore((s) => s.setCountryFilter);
   const setTypeFilter = useUiStore((s) => s.setTypeFilter);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
   const resetFilters = useUiStore((s) => s.resetFilters);
@@ -220,15 +218,6 @@ function AllTabInner() {
         return t === typeFilter;
       });
     }
-    if (countryFilter === "__unknown__")
-      f = f.filter(
-        (c) =>
-          !KNOWN_ORIGINS.includes(
-            normalizeOrigin(c.origin) as (typeof KNOWN_ORIGINS)[number]
-          )
-      );
-    else if (countryFilter)
-      f = f.filter((c) => normalizeOrigin(c.origin) === countryFilter);
     if (feed === "nowl")
       f = f.filter(
         (c) =>
@@ -280,7 +269,6 @@ function AllTabInner() {
     minRating,
     whitelistOnly,
     noDescription,
-    countryFilter,
     optimisticWhitelist,
     searchQuery,
     feed,
@@ -493,11 +481,9 @@ function AllTabInner() {
         typeCounts={typeCounts}
         unknownCount={unknownCount}
         noDescCount={all.filter((c) => !c.description || String(c.description).trim() === "" || String(c.description).trim() === "-").length}
-        countryFilter={countryFilter}
         sourceFilter={sourceFilter}
         typeFilter={typeFilter}
         noDescription={noDescription}
-        setCountryFilter={setCountryFilter}
         setSourceFilter={setSourceFilter}
         setTypeFilter={setTypeFilter}
         setNoDescription={setNoDescription}
@@ -525,7 +511,6 @@ function AllTabInner() {
               all.length > 0 &&
               (sourceFilter ||
                 typeFilter ||
-                countryFilter ||
                 searchQuery ||
                 feed !== "all") ? (
                 <button

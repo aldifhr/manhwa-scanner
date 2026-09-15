@@ -11,7 +11,6 @@ interface UiState {
   sortMode: SortMode;
   contentView: ContentView;
   sourceFilter: string | null;
-  countryFilter: string | null;
   typeFilter: string | null;
   searchQuery: string;
   genreFilter: string | null;
@@ -23,7 +22,6 @@ interface UiState {
   setSortMode: (s: SortMode) => void;
   setContentView: (v: ContentView) => void;
   setSourceFilter: (s: string | null) => void;
-  setCountryFilter: (c: string | null) => void;
   setTypeFilter: (t: string | null) => void;
   setSearchQuery: (q: string) => void;
   setGenreFilter: (g: string | null) => void;
@@ -47,7 +45,6 @@ export const useUiStore = create<UiState>()(
       sortMode: "newest",
       contentView: "all",
       sourceFilter: null,
-      countryFilter: null,
       typeFilter: null,
       searchQuery: "",
       genreFilter: null,
@@ -59,7 +56,6 @@ export const useUiStore = create<UiState>()(
       setSortMode: (sortMode) => set({ sortMode }),
       setContentView: (contentView) => set({ contentView }),
       setSourceFilter: (sourceFilter) => set({ sourceFilter }),
-      setCountryFilter: (countryFilter) => set({ countryFilter }),
       setTypeFilter: (typeFilter) => set({ typeFilter }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setGenreFilter: (genreFilter) => set({ genreFilter }),
@@ -69,13 +65,12 @@ export const useUiStore = create<UiState>()(
       resetFilters: () =>
         set({
           sourceFilter: null,
-          countryFilter: null,
           typeFilter: null,
           searchQuery: "",
           genreFilter: null,
           minRating: null,
           whitelistOnly: false,
-      noDescription: false,
+          noDescription: false,
         }),
     }),
     {
@@ -87,7 +82,6 @@ export const useUiStore = create<UiState>()(
         sortMode: s.sortMode,
         contentView: s.contentView,
         sourceFilter: s.sourceFilter,
-        countryFilter: s.countryFilter,
         typeFilter: s.typeFilter,
         searchQuery: s.searchQuery,
         genreFilter: s.genreFilter,

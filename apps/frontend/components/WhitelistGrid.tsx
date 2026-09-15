@@ -28,7 +28,6 @@ export function WhitelistGrid() {
 
   const [sourceFilter, setSourceFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
-  const [originFilter, setOriginFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [sort, setSort] = useState<"title" | "rating" | "recent">("title");
@@ -46,7 +45,6 @@ export function WhitelistGrid() {
   const filtered = useWhitelistFilters(items, {
     sourceFilter,
     typeFilter,
-    originFilter,
     debouncedSearch,
     sort,
   });
@@ -161,19 +159,6 @@ export function WhitelistGrid() {
           ]}
         />
 
-        {/* Origin filter */}
-        <Select
-          ariaLabel="Filter by origin"
-          value={originFilter}
-          onChange={(e) => setOriginFilter(e.target.value)}
-          options={[
-            { value: "All", label: "Origin: All" },
-            { value: "KR", label: "KR" },
-            { value: "CN", label: "CN" },
-            { value: "JP", label: "JP" },
-          ]}
-        />
-
         {/* Sort */}
         <Select
           ariaLabel="Sort by"
@@ -188,18 +173,13 @@ export function WhitelistGrid() {
           ]}
         />
 
-        {(sourceFilter !== "All" ||
-          typeFilter !== "All" ||
-          originFilter !== "All" ||
-          debouncedSearch !== "" ||
-          sort !== "recent") && (
+        {(sourceFilter !== "All" || typeFilter !== "All" || debouncedSearch !== "" || sort !== "recent") && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
               setSourceFilter("All");
               setTypeFilter("All");
-              setOriginFilter("All");
               setSearchTerm("");
               setSort("recent");
             }}

@@ -1,6 +1,5 @@
 "use client";
 import { useMemo } from "react";
-import { normalizeOrigin } from "@/lib/constants";
 import type { WhitelistRouteItem } from "@/lib/types";
 
 export function useWhitelistFilters(
@@ -8,13 +7,11 @@ export function useWhitelistFilters(
   opts: {
     sourceFilter: string;
     typeFilter: string;
-    originFilter: string;
     debouncedSearch: string;
     sort: "title" | "rating" | "recent";
   }
 ) {
-  const { sourceFilter, typeFilter, originFilter, debouncedSearch, sort } =
-    opts;
+  const { sourceFilter, typeFilter, debouncedSearch, sort } = opts;
   return useMemo(() => {
     const out = items.filter((item) => {
       if (
@@ -28,11 +25,6 @@ export function useWhitelistFilters(
         const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
         if (t !== typeFilter.toLowerCase()) return false;
       }
-      if (
-        originFilter !== "All" &&
-        normalizeOrigin(item.origin) !== normalizeOrigin(originFilter)
-      )
-        return false;
       return true;
     });
     out.sort((a, b) => {
@@ -47,5 +39,5 @@ export function useWhitelistFilters(
       return tb - ta;
     });
     return out;
-  }, [items, sourceFilter, typeFilter, originFilter, debouncedSearch, sort]);
+  }, [items, sourceFilter, typeFilter, debouncedSearch, sort]);
 }

@@ -1,20 +1,14 @@
 "use client";
 
-import { getOriginFlag } from "@/lib/constants";
 import { filterButtonClass } from "@/lib/styles";
-import { WarningCircle } from "@phosphor-icons/react";
 
 interface Props {
   sources: string[];
-  countryCounts: Record<string, number>;
   typeCounts: Record<string, number>;
-  unknownCount: number;
   noDescCount: number;
-  countryFilter: string | null;
   sourceFilter: string | null;
   typeFilter: string | null;
   noDescription: boolean;
-  setCountryFilter: (v: string | null) => void;
   setSourceFilter: (v: string | null) => void;
   setTypeFilter: (v: string | null) => void;
   setNoDescription: (v: boolean) => void;
@@ -22,76 +16,26 @@ interface Props {
 
 export default function AllTabFilters({
   sources,
-  countryCounts,
   typeCounts,
-  unknownCount,
   noDescCount,
-  countryFilter,
   sourceFilter,
   typeFilter,
   noDescription,
-  setCountryFilter,
   setSourceFilter,
   setTypeFilter,
   setNoDescription,
 }: Props) {
   const hasActive =
-    countryFilter !== null || sourceFilter !== null || typeFilter !== null || noDescription;
+    sourceFilter !== null || typeFilter !== null || noDescription;
   return (
     <div className="sticky top-[57px] z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 flex flex-col gap-2.5 bg-black/80 backdrop-blur-xl border-y border-white/8 supports-[backdrop-filter]:bg-black/40">
-      {/* Row 1: Country + Source — single horizontal scroll */}
+      {/* Row 1: Source filter */}
       <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6">
         <div
           className="filter-scroll flex gap-2 pb-1 pr-6 scrollbar-hide"
           style={{ WebkitOverflowScrolling: "touch" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={() => setCountryFilter(null)}
-            className={filterButtonClass(countryFilter === null)}
-          >
-            All Countries
-          </button>
-          {[
-            { code: "korean", label: "Korea" },
-            { code: "chinese", label: "China" },
-            { code: "japanese", label: "Japan" },
-          ].map(({ code, label }) => {
-            const n = countryCounts[code] ?? 0;
-            return (
-              <button
-                key={code}
-                onClick={() =>
-                  setCountryFilter(countryFilter === code ? null : code)
-                }
-                className={`inline-flex items-center gap-1.5 whitespace-nowrap ${filterButtonClass(countryFilter === code)}`}
-              >
-                {getOriginFlag(code) && (
-                  <img
-                    src={getOriginFlag(code)}
-                    alt={code}
-                    className="w-4 h-auto rounded-sm"
-                  />
-                )}
-                {label}
-                {n > 0 && <span className="opacity-60">({n})</span>}
-              </button>
-            );
-          })}
-          {unknownCount > 0 && (
-            <button
-              onClick={() => setCountryFilter("__unknown__")}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap ${filterButtonClass(countryFilter === "__unknown__")}`}
-            >
-              <WarningCircle size={14} weight="regular" className="shrink-0" />
-              Unknown
-              <span className="opacity-60">({unknownCount})</span>
-            </button>
-          )}
-          <span
-            className="mx-1 h-4 w-px bg-white/10 shrink-0 self-center hidden sm:block"
-            aria-hidden
-          />
           <button
             onClick={() => setSourceFilter(null)}
             className={filterButtonClass(sourceFilter === null)}
@@ -110,7 +54,7 @@ export default function AllTabFilters({
         </div>
       </div>
 
-      {/* Row 2: Type filter + clear — compact, scroll on narrow */}
+      {/* Row 2: Type filter + clear */}
       <div className="flex items-center gap-2 flex-nowrap overflow-x-auto scrollbar-hide filter-scroll py-0.5">
         <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30 shrink-0">
           Type
@@ -147,7 +91,6 @@ export default function AllTabFilters({
         {hasActive && (
           <button
             onClick={() => {
-              setCountryFilter(null);
               setSourceFilter(null);
               setTypeFilter(null);
               setNoDescription(false);
