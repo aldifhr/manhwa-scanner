@@ -21,13 +21,13 @@ import { useReadItems } from "./useReadItems";
 import { useFeedGrouping } from "./hooks/useFeedGrouping";
 import { useFeedMeta } from "./hooks/useFeedMeta";
 import dynamic from "next/dynamic";
-const AllCard = dynamic(() => import(/* webpackInclude: /\.tsx$/ */ "./AllCard"), {
+const AllCard = dynamic(() => import("./AllCard"), {
   ssr: false,
   loading: () => (
     <div className="skeleton h-28 rounded-xl border border-white/10" />
   ),
 });
-const GroupedSeriesCard = dynamic(() => import(/* webpackInclude: /\.tsx$/ */ "./GroupedSeriesCard"), {
+const GroupedSeriesCard = dynamic(() => import("./GroupedSeriesCard"), {
   ssr: false,
   loading: () => (
     <div className="skeleton h-28 rounded-xl border border-white/10" />
