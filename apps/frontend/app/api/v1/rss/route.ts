@@ -161,23 +161,8 @@ export async function GET(request: NextRequest) {
           `[rss] ${parseFailures}/${results.length} rows failed schema validation`
         );
       }
-      // Defense-in-depth: strip Japanese-origin rows server-side.
-      // BE comment claimed JP was stripped since 2026-08, but live audit
-      // 2026-08-21 showed 74 JP in 1000 rows. FE AllTab already filters
-      // client-side (hideJapanActive=true), but stripping here saves bandwidth
-      // and makes /api/reader/rss consistent. If caller explicitly filters
-      // source=japanese or country, respect it — otherwise hide JP.
-      const wantsJapan =
-        source.toLowerCase() === "japanese" ||
-        source.toLowerCase() === "jp" ||
-        exclude.toLowerCase().includes("japanese");
-      if (!wantsJapan) {
-        normalized = normalized.filter(
-          (r) =>
-            normalizeOrigin((r as { origin?: string }).origin ?? "") !==
-            "japanese"
-        );
-      }
+      // Note: JP stripping disabled — user wants to see all origins
+      // (Sovereign Of A Hundred Blades is JP but user wants it visible)
       // Server-side type filter (BE ignores ?type= — verified live: ?type=manhua still returns manhwa/manga)
       if (type) {
         const wanted = type.toLowerCase();
