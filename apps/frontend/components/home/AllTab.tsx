@@ -209,7 +209,7 @@ function AllTabInner() {
         const raw = String(c.type || "")
           .toLowerCase()
           .trim();
-        const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
+        const t = raw === "manhwa" || raw === "manhua" || raw === "manga" ? raw : "no_type";
         return t === typeFilter;
       });
     }

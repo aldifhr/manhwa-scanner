@@ -11,7 +11,7 @@ export function useFeedMeta(
     const map: Record<string, number> = {};
     for (const c of all) {
       const raw = String(c.type || "").toLowerCase().trim();
-      const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
+      const t = raw === "manhwa" || raw === "manhua" || raw === "manga" ? raw : "no_type";
       map[t] = (map[t] || 0) + 1;
     }
     return map;

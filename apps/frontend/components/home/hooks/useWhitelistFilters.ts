@@ -22,7 +22,7 @@ export function useWhitelistFilters(
       if (sourceFilter !== "All" && item.source !== sourceFilter) return false;
       if (typeFilter !== "All") {
         const raw = String(item.type || "").toLowerCase().trim();
-        const t = raw === "manhwa" || raw === "manhua" ? raw : "no_type";
+        const t = raw === "manhwa" || raw === "manhua" || raw === "manga" ? raw : "no_type";
         if (t !== typeFilter.toLowerCase()) return false;
       }
       return true;
