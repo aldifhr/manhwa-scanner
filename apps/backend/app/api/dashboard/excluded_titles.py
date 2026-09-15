@@ -208,7 +208,7 @@ async def delete_excluded(request: Request):
             if isinstance(ve, _VE):
                 return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
             raise
-        title_key = slugify_title_key(data.title_key.strip())
+        title_key = data.title_key.strip()  # Don't slugify - use as-is to match DB
         source = data.source or "all"
         res = excl_store.remove_excluded_title(title_key=title_key, source=source)
         if res.get("status") == "error":

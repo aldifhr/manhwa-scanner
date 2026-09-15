@@ -127,7 +127,7 @@ def add_excluded_title(
 
 def remove_excluded_title(title_key: str, source: str = "all") -> dict:
     """Delete an excluded-title row."""
-    tk = slugify_title_key(title_key)
+    tk = title_key.strip()  # Use as-is to match DB (spaces, not dashes)
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
