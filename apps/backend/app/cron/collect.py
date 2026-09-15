@@ -322,7 +322,6 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
         if not chapters:
             continue
         series_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{mid}"
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         _sent = _notified.get(f"{wk}:shinigami") or set()
         for ch in chapters:
             num = ch.get("chapter_number") or ch.get("number") or ch.get("chapter")
@@ -330,22 +329,10 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
             ch_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}" if ch_id else (ch.get("url") or "")
             if not ch_url or num is None:
                 continue
-            rel_raw = ch.get("release_date") or ch.get("published_at") or ch.get("created_at")
-            rel_iso = None
-            if rel_raw:
-                try:
-                    rel_iso = datetime.fromisoformat(str(rel_raw).replace("Z", "+00:00"))
-                except (ValueError, TypeError):
-                    rel_iso = None
-            if rel_iso is None or rel_iso < cutoff:
+            # Note: no 24h cutoff here — rely on _sent + latest_sent + ON CONFLICT dedup
+            if num in _sent:
                 continue
-            try:
-                _num_f = float(num)
-            except (ValueError, TypeError):
-                _num_f = 0
-            if _num_f > 0 and _num_f in _sent:
-                continue
-            items.append({"title": (wtitle or wk.replace("_", " ").title()).replace("’", "'"), "title_key": wk, "chapter": str(num), "chapter_num": float(num) if str(num).replace(".", "", 1).isdigit() else 0, "url": ch_url, "source": "shinigami", "cover": None, "series_url": series_url, "chapter_url": ch_url, "origin": "", "updated_time": rel_iso.isoformat()})
+            items.append({"title": (wtitle or wk.replace("_", " ").title()).replace("’", "'"), "title_key": wk, "chapter": str(num), "chapter_num": float(num) if str(num).replace(".", "", 1).isdigit() else 0, "url": ch_url, "source": "shinigami", "cover": None, "series_url": series_url, "chapter_url": ch_url, "origin": "", "updated_time": ch.get("release_date") or ch.get("created_at") or ""})
     return items
 
 
