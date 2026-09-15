@@ -11,7 +11,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { queryKeys } from "@/lib/queryKeys";
-import { normalizeOrigin } from "@/lib/constants";
+<longcat_arg_value>
 import { cn } from "@/lib/utils";
 import { SkeletonGrid } from "@/components/SkeletonGrid";
 import { ErrorFallback } from "@/components/ErrorFallback";
@@ -54,11 +54,7 @@ import AllTabToolbar from "./AllTabToolbar";
 import InfiniteSentinel from "./InfiniteSentinel";
 import FilterDrawer from "./FilterDrawer";
 import type { FlatChapter } from "@/lib/feed";
-import {
-  KNOWN_ORIGINS,
-  resolveSeriesUrl,
-  compareFlatByNewest,
-} from "@/lib/feed";
+import { resolveSeriesUrl, compareFlatByNewest } from "@/lib/feed";
 
 // re-export for external consumers (app/page.tsx)
 export type { FlatChapter } from "@/lib/feed";
@@ -367,10 +363,8 @@ function AllTabInner() {
   const {
     sources,
     typeCounts,
-    countryCounts,
     wlCount: _wlCount,
     nowlCount: _nowlCount,
-    unknownCount,
     distinctTotal: _distinctTotal,
   } = useFeedMeta(all, optimisticWhitelist);
   const distinctTotal = filteredDistinctTotal || _distinctTotal;
@@ -477,9 +471,7 @@ function AllTabInner() {
       <FilterDrawer open={filterOpen} onClose={() => setFilterOpen(false)} />
       <AllTabFilters
         sources={sources}
-        countryCounts={countryCounts}
         typeCounts={typeCounts}
-        unknownCount={unknownCount}
         noDescCount={all.filter((c) => !c.description || String(c.description).trim() === "" || String(c.description).trim() === "-").length}
         sourceFilter={sourceFilter}
         typeFilter={typeFilter}
