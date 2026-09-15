@@ -112,6 +112,9 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
             _type_from_tax = ""
         series_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}"
         chaps = m.get("chapters") or []
+        # Fallback: API may return empty chapters for some series (e.g. Project type)
+        if not chaps and m.get("latest_chapter_number") and m.get("latest_chapter_id"):
+            chaps = [{"chapter_id": m["latest_chapter_id"], "chapter_number": m["latest_chapter_number"], "release_date": m.get("latest_chapter_time") or ""}]
         for ch in chaps:
             ch_id = ch.get("chapter_id") or ""
             if not ch_id:

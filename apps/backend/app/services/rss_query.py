@@ -223,6 +223,7 @@ def map_result(
         "chapterNumber": chapter_number(str(it.get("chapter") or "")),
         "chapterUrl": chapter_url,
         "sentAt": it.get("updated_time") or it.get("created_at"),
+        "updated_time": it.get("updated_time") or it.get("created_at"),
         "isSent": _is_sent(it, tk, src, dh_sent),
         "lastCheckedChapter": _chapter_num_f,
         "latestSentChapter": float(ls) if ls else None,
