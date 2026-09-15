@@ -232,7 +232,9 @@ def map_result(
 
 
 def group_results(results: list[dict]) -> list[dict]:
-    """Group RSS results by (canonicalTitleKey, source) — per-source split."""
+    """Group RSS results by (canonicalTitleKey, source) — per-source split.
+    Groups are sorted by most recent activity (latest updated_time).
+    """
     groups: dict[str, dict] = {}
     for r in results:
         gk_raw = r.get("canonicalTitleKey") or r.get("titleKey") or r.get("title") or ""
@@ -256,6 +258,7 @@ def group_results(results: list[dict]) -> list[dict]:
                 "lastCheckedChapter": r["lastCheckedChapter"],
                 "latestSentChapter": r["latestSentChapter"],
                 "latestChapter": r["latestChapter"],
+                "latestUpdated": r.get("updated_time") or r.get("createdAt") or "",
                 "chapters": [],
             }
         else:
@@ -275,6 +278,10 @@ def group_results(results: list[dict]) -> list[dict]:
                 cur["genres"] = r["genres"]
             if not cur.get("type") and r.get("type"):
                 cur["type"] = r["type"]
+            # Track most recent updated_time
+            new_updated = r.get("updated_time") or r.get("createdAt") or ""
+            if new_updated > (cur.get("latestUpdated") or ""):
+                cur["latestUpdated"] = new_updated
             try:
                 if float(r.get("lastCheckedChapter") or 0) > float(cur.get("lastCheckedChapter") or 0):
                     cur["lastCheckedChapter"] = r["lastCheckedChapter"]
@@ -301,4 +308,4 @@ def group_results(results: list[dict]) -> list[dict]:
         })
     for g in groups.values():
         g["chapters"].sort(key=lambda c: c.get("chapterNumber") or 0, reverse=True)
-    return list(groups.values())
+    return sorted(groups.values(), key=lambda g: g.get("latestUpdated") or "", reverse=True)
