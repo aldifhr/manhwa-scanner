@@ -9,11 +9,9 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
   const genreFilter = useUiStore((s) => s.genreFilter);
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
-  const noDescription = useUiStore((s) => s.noDescription);
   const setGenreFilter = useUiStore((s) => s.setGenreFilter);
   const setMinRating = useUiStore((s) => s.setMinRating);
   const setWhitelistOnly = useUiStore((s) => s.setWhitelistOnly);
-  const setNoDescription = useUiStore((s) => s.setNoDescription);
   const resetFilters = useUiStore((s) => s.resetFilters);
 
   const { data: meta } = useQuery({
@@ -63,7 +61,6 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
             <p className="text-xs font-semibold tracking-widest uppercase text-white/40 mb-2">Other</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setWhitelistOnly(!whitelistOnly)} className={filterButtonClass(whitelistOnly)}>Whitelist only</button>
-              <button onClick={() => setNoDescription(!noDescription)} className={filterButtonClass(noDescription)}>No description</button>
             </div>
           </div>
         </div>

@@ -67,7 +67,6 @@ export const useUiStore = create<UiState>()(
           genreFilter: null,
           minRating: null,
           whitelistOnly: false,
-          noDescription: false,
         }),
     }),
     {
@@ -84,7 +83,6 @@ export const useUiStore = create<UiState>()(
         genreFilter: s.genreFilter,
         minRating: s.minRating,
         whitelistOnly: s.whitelistOnly,
-        noDescription: s.noDescription,
       }),
     }
   )
