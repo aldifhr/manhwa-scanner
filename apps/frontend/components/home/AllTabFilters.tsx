@@ -55,6 +55,7 @@ export default function AllTabFilters({
           {[
             { code: "korean", label: "Korea" },
             { code: "chinese", label: "China" },
+            { code: "japanese", label: "Japan" },
           ].map(({ code, label }) => {
             const n = countryCounts[code] ?? 0;
             return (
