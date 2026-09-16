@@ -45,6 +45,7 @@ import { useDebounced } from "@/lib/useDebounced";
 import { usePacerThrottledScroll } from "@/lib/usePacerThrottles";
 import { PageShell } from "@/components/PageShell";
 import { normalizeTitleKey } from "@/lib/groupChapters";
+import { normalizeType } from "@/lib/feed";
 import { usePinnedSet } from "./hooks/usePinnedSet";
 import { useInfiniteFeed } from "./hooks/useInfiniteFeed";
 import { useFeedActions } from "./hooks/useFeedActions";
@@ -207,7 +208,7 @@ function AllTabInner() {
         const raw = String(c.type || "")
           .toLowerCase()
           .trim();
-        const t = raw === "manhwa" || raw === "manhua" || raw === "manga" ? raw : "no_type";
+        const t = normalizeType(c.type);
         return t === typeFilter;
       });
     }

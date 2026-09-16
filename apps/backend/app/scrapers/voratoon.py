@@ -323,7 +323,7 @@ def _emit_series(results: list[dict], s: dict) -> None:
             "description": synopsis[:500] if synopsis else "",
             "rating": float(rating) if rating else 0.0,
             "genres": genres,
-            "type": fmt,
+            "type": fmt if fmt in ("manhwa", "manhua", "manga") else "manga" if fmt == "mangatoon" else "",
             "origin": "CN" if fmt == "manhua" else "KR" if fmt == "manhwa" else "", # ponytail: unknown fmt → "" not KR (was leaking voratoon CN→KR)
             "updated_time": _created,
             "created_at": datetime.now(timezone.utc).isoformat(),

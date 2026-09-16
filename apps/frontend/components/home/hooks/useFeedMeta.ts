@@ -1,5 +1,6 @@
 "use client";
 import { useMemo } from "react";
+import { normalizeType } from "@/lib/feed";
 import type { FlatChapter } from "@/lib/feed";
 
 export function useFeedMeta(
@@ -11,7 +12,7 @@ export function useFeedMeta(
     const map: Record<string, number> = {};
     for (const c of all) {
       const raw = String(c.type || "").toLowerCase().trim();
-      const t = raw === "manhwa" || raw === "manhua" || raw === "manga" ? raw : "no_type";
+      const t = normalizeType(c.type);
       map[t] = (map[t] || 0) + 1;
     }
     return map;

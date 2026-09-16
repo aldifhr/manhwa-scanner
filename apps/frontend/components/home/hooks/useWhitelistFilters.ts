@@ -1,5 +1,6 @@
 "use client";
 import { useMemo } from "react";
+import { normalizeType } from "@/lib/feed";
 import type { WhitelistRouteItem } from "@/lib/types";
 
 export function useWhitelistFilters(
@@ -22,7 +23,7 @@ export function useWhitelistFilters(
       if (sourceFilter !== "All" && item.source !== sourceFilter) return false;
       if (typeFilter !== "All") {
         const raw = String(item.type || "").toLowerCase().trim();
-        const t = raw === "manhwa" || raw === "manhua" || raw === "manga" ? raw : "no_type";
+        const t = normalizeType(item.type);
         if (t !== typeFilter.toLowerCase()) return false;
       }
       return true;
