@@ -94,6 +94,7 @@ export function useFeedActions() {
       // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
       setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       const isExists = result.status === "already_exists";
       toast(
         isExists ? "Already in whitelist" : `Added ${item.title} to whitelist`,
@@ -212,6 +213,8 @@ export function useFeedActions() {
     onSuccess: ({ results, optKeys }, series) => {
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       const allExist = results.every((r) => r.status === "already_exists");
       toast(allExist ? "Already in whitelist" : `Added ${series.title} to whitelist`, {
         type: "success",
