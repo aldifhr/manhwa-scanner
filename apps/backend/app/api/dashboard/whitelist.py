@@ -1,7 +1,7 @@
 """Auto-split from dashboard.py — whitelist routes."""
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal, Optional
 
 from app.logger import get_logger
@@ -21,14 +21,13 @@ router = APIRouter()
 
 
 class WhitelistCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
     title: str = Field(..., min_length=1, max_length=200)
     source: Literal["ikiru", "shinigami", "voratoon"] = Field(default="ikiru")
     title_key: Optional[str] = Field(default=None, max_length=200)
     titleKey: Optional[str] = Field(default=None, max_length=200)
     cover: Optional[str] = Field(default=None, max_length=2000)
     rating: Optional[float | str] = None
-    origin: Optional[Literal["KR", "CN", "JP"]] = None
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
@@ -36,16 +35,9 @@ class WhitelistCreate(BaseModel):
     seriesUrl: Optional[str] = Field(default=None, max_length=500)
     series_url: Optional[str] = Field(default=None, max_length=500)
 
-    @field_validator("origin", mode="before")
-    @classmethod
-    def _empty_origin_to_none(cls, v):
-        if v is None or v == "":
-            return None
-        return v
-
 
 class WhitelistPatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
     title_key: Optional[str] = Field(default=None, max_length=200)
     titleKey: Optional[str] = Field(default=None, max_length=200)
     title: Optional[str] = Field(default=None, max_length=200)
@@ -55,17 +47,9 @@ class WhitelistPatch(BaseModel):
     series_url: Optional[str] = Field(default=None, max_length=500)
     rating: Optional[float | str] = None
     cover: Optional[str] = Field(default=None, max_length=2000)
-    origin: Optional[Literal["KR", "CN", "JP"]] = None
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
-
-    @field_validator("origin", mode="before")
-    @classmethod
-    def _empty_origin_to_none(cls, v):
-        if v is None or v == "":
-            return None
-        return v
 
 
 class WhitelistDeleteRequest(BaseModel):
