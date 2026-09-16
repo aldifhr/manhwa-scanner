@@ -521,7 +521,9 @@ function AllTabInner() {
             const s = series as GroupedSeries;
             const isRead =
               s.chapters.length > 0 &&
-              s.chapters.every((c) => readItems.has(c.url));
+              s.chapters.every(
+                (c) => readItems.has(c.url) || readItems.has(c.chapterUrl)
+              );
             const isWL =
               s.isWhitelisted ||
               optimisticWhitelist.has(
@@ -582,7 +584,7 @@ function AllTabInner() {
           scrollToTitleKey={deepLinkSeries}
           titleKeyOf={(c) => c.titleKey}
           renderItem={(item, i) => {
-            const isRead = readItems.has(item.url);
+            const isRead = readItems.has(item.url) || readItems.has(item.chapterUrl);
             const optKey = `${item.titleKey}:${item.source}`;
             const isWL = item.isWhitelisted || optimisticWhitelist.has(optKey);
             const isDeepMatch = i === flatDeepLinkIndex;
