@@ -1,7 +1,7 @@
 """Auto-split from dashboard.py — whitelist routes."""
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Literal, Optional
 
 from app.logger import get_logger
@@ -36,6 +36,13 @@ class WhitelistCreate(BaseModel):
     seriesUrl: Optional[str] = Field(default=None, max_length=500)
     series_url: Optional[str] = Field(default=None, max_length=500)
 
+    @field_validator("origin", mode="before")
+    @classmethod
+    def _empty_origin_to_none(cls, v):
+        if v is None or v == "":
+            return None
+        return v
+
 
 class WhitelistPatch(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -52,6 +59,13 @@ class WhitelistPatch(BaseModel):
     type: Optional[Literal["manhwa", "manhua", "manga"]] = None
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
+
+    @field_validator("origin", mode="before")
+    @classmethod
+    def _empty_origin_to_none(cls, v):
+        if v is None or v == "":
+            return None
+        return v
 
 
 class WhitelistDeleteRequest(BaseModel):
