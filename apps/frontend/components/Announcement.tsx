@@ -38,7 +38,7 @@ export default function Announcement() {
       const h = j?.data?.sourceHealth as Record<string, { status: string }> | undefined;
       if (!h) return null;
       const degraded = Object.entries(h)
-        .filter(([, v]) => v.status !== "healthy")
+        .filter(([, v]) => (v.status || "").toLowerCase() !== "healthy")
         .map(([k]) => k);
       return degraded;
     },
