@@ -146,33 +146,44 @@ def collect_recent_chapters(
         def _run_phase(sources: list[str]):
             if not sources:
                 return
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(sources)) as _executor:
-                _futures: dict = {}
-                for _src in sources:
-                    _t0_map[_src] = _health_start(_src)
-                    logger.info("collect start", source=_src)
-                    _futures[_executor.submit(_try_collect, _src)] = _src
-                try:
-                    for _future in concurrent.futures.as_completed(_futures, timeout=_SOURCE_TIMEOUT):
-                        _src = _futures[_future]
-                        _t0 = _t0_map.get(_src, _health_start(_src))
+            _executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(sources))
+            _futures: dict = {}
+            for _src in sources:
+                _t0_map[_src] = _health_start(_src)
+                logger.info("collect start", source=_src)
+                _futures[_executor.submit(_try_collect, _src)] = _src
+            try:
+                for _future in concurrent.futures.as_completed(_futures, timeout=_SOURCE_TIMEOUT):
+                    _src = _futures[_future]
+                    _t0 = _t0_map.get(_src, _health_start(_src))
+                    try:
+                        result = _future.result(timeout=5)
+                        if not result.success:
+                            _health_end(_src, _t0, False, result.error or "provider failed")
+                            logger.warn("collect failed", source=_src, err=result.error or "provider failed")
+                            continue
+                        items.extend(result.items)
+                        _health_end(_src, _t0, True)
+                        logger.info("collect done", source=_src, count=len(result.items), response_time_ms=result.latency_ms)
+                    except Exception as e:
+                        _health_end(_src, _t0, False, str(e)[:300])
+                        logger.warn("collect failed", source=_src, err=str(e)[:200])
+            except concurrent.futures.TimeoutError:
+                for _future, _src in _futures.items():
+                    if not _future.done():
+                        _health_end(_src, _t0_map.get(_src, _health_start(_src)), False, f"timeout after {_SOURCE_TIMEOUT}s")
+                        logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
                         try:
-                            result = _future.result(timeout=5)
-                            if not result.success:
-                                _health_end(_src, _t0, False, result.error or "provider failed")
-                                logger.warn("collect failed", source=_src, err=result.error or "provider failed")
-                                continue
-                            items.extend(result.items)
-                            _health_end(_src, _t0, True)
-                            logger.info("collect done", source=_src, count=len(result.items), response_time_ms=result.latency_ms)
-                        except Exception as e:
-                            _health_end(_src, _t0, False, str(e)[:300])
-                            logger.warn("collect failed", source=_src, err=str(e)[:200])
-                except concurrent.futures.TimeoutError:
-                    for _future, _src in _futures.items():
-                        if not _future.done():
-                            _health_end(_src, _t0_map.get(_src, _health_start(_src)), False, f"timeout after {_SOURCE_TIMEOUT}s")
-                            logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
+                            _future.cancel()
+                        except Exception:
+                            pass
+            finally:
+                # ponytail P1: jangan wait worker stuck — shutdown non-blocking, worker tetap jalan di background tapi collect return cepat
+                try:
+                    _executor.shutdown(wait=False, cancel_futures=True)
+                except TypeError:
+                    # Python <3.9 cancel_futures not supported
+                    _executor.shutdown(wait=False)
 
         _run_phase(_phase1)
         _run_phase(_phase2)

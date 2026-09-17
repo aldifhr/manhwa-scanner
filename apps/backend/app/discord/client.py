@@ -98,6 +98,8 @@ def _discord_request(method: str, url: str, *, json_data: dict | None = None, fi
 
     D1 FIX: Reads Retry-After header on 429, uses exponential backoff with jitter.
     Circuit-aware: fast-fails when discord CB is OPEN.
+    ponytail P1: unknown delivery — Discord menerima tapi timeout sebelum response → retry duplicate
+    → jangan retry timeout (httpx.TimeoutException) — return None (unknown) biar caller tidak double-send
     """
     if not cb_discord.allow():
         logger.warn("discord circuit OPEN — dropping request", method=method)
@@ -133,8 +135,14 @@ def _discord_request(method: str, url: str, *, json_data: dict | None = None, fi
                 cb_discord.record_failure()
             return r
         except Exception as e:
+            # ponytail P1: timeout/connection after server accepted → unknown delivery → jangan retry (avoid duplicate)
+            msg = str(e).lower()
+            is_timeout = isinstance(e, httpx.TimeoutException) or "timeout" in msg or "timed out" in msg or "readtimeout" in msg
             cb_discord.record_failure()
-            logger.error("discord request failed", method=method, err=str(e))
+            logger.error("discord request failed", method=method, err=str(e), timeout=is_timeout)
+            if is_timeout:
+                # unknown → caller akan treat sebagai None (skip retry, next cron FCFS akan skip jika sudah tercatat)
+                return None
             if attempt < max_retries:
                 time.sleep(min(2 ** attempt, 10) + random.uniform(0, 1.0))
                 continue
@@ -149,15 +157,27 @@ def send_channel_message(channel_id: str, content: str | None = None, embeds: li
     Primary path: Discord REST API. If that fails (e.g. VPS IP banned at
     the REST layer — Cloudflare 1010 / Discord 40333), fall back to the
     gateway websocket sender.
+    ponytail P1: REST→gateway duplicate risk — jika REST timeout unknown, jangan fallback (sudah maybe delivered)
     """
     try:
         r = _discord_request("POST", f"https://discord.com/api/v10/channels/{channel_id}/messages", json_data=_build_payload(content, embeds))
         if r is not None and r.status_code < 400:
             return r.json()
+        # ponytail: hanya fallback pada 403/banned, bukan timeout/5xx unknown
+        if r is not None and r.status_code not in (403, 404):
+            # 429 sudah di-handle di _discord_request, 5xx sudah return r (bukan None) → jangan gateway
+            if r.status_code >= 500 or r.status_code == 429:
+                return None
+        # 403/404 banned → fallback gateway
+        if r is None:
+            # None = timeout/unknown → jangan gateway (avoid duplicate), return None
+            return None
     except Exception as e:
         logger.warn("send_channel_message REST failed, trying gateway", channel=channel_id, err=str(e)[:120])
+        # exception unknown → jangan gateway
+        return None
 
-    # Fallback: gateway websocket (not IP-banned like REST)
+    # Fallback: gateway websocket (not IP-banned like REST) — hanya untuk 403
     try:
         from app.discord.gateway_sender import send_via_gateway
         if send_via_gateway(channel_id, content=content, embeds=embeds):

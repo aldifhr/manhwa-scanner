@@ -91,6 +91,8 @@ class CircuitBreaker:
         self._successes = 0
         self._opened_at = 0.0
         self._lock = threading.RLock()
+        # ponytail P1: half-open must allow exactly one probe — not 4 workers
+        self._half_open_probe_in_flight = False
 
     @property
     def state(self) -> CircuitState:
@@ -99,6 +101,7 @@ class CircuitBreaker:
                 if time.monotonic() - self._opened_at >= self.recovery_timeout:
                     self._state = CircuitState.HALF_OPEN
                     self._successes = 0
+                    self._half_open_probe_in_flight = False
                     logger.info("circuit_half_open", name=self.name)
             return self._state
 
@@ -108,11 +111,18 @@ class CircuitBreaker:
             s = self.state
             if s == CircuitState.OPEN:
                 return False
+            if s == CircuitState.HALF_OPEN:
+                # ponytail P1: exactly one probe in half-open (atomic)
+                if self._half_open_probe_in_flight:
+                    return False
+                self._half_open_probe_in_flight = True
+                return True
             return True
 
     def record_success(self):
         with self._lock:
             if self._state == CircuitState.HALF_OPEN:
+                self._half_open_probe_in_flight = False
                 self._successes += 1
                 if self._successes >= self.success_threshold:
                     self._state = CircuitState.CLOSED
@@ -125,6 +135,7 @@ class CircuitBreaker:
     def record_failure(self):
         with self._lock:
             if self._state == CircuitState.HALF_OPEN:
+                self._half_open_probe_in_flight = False
                 self._state = CircuitState.OPEN
                 self._opened_at = time.monotonic()
                 logger.debug("circuit_open", name=self.name, reason="half_open_failure")
