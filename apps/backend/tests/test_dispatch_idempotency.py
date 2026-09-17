@@ -51,18 +51,18 @@ class FakeCursor:
         elif "SELECT TITLE_KEY, CHAPTER_TITLE FROM DISPATCH_HISTORY" in s:
             self._last_result = []
         elif "INSERT INTO DISPATCH_CLAIMS" in s:
-            # Simulate ON CONFLICT (fcfs_key): raise if already inserted
+            # Simulate ON CONFLICT (fcfs_key) DO NOTHING: swallow duplicate,
+            # return only actually-inserted rows (RETURNING fcfs_key).
             vals = list(params or [])
-            row_sz = 6  # title_key, chapter_url, fcfs_key, created_at, expires_at, status
+            row_sz = 6
+            returned = []
             for i in range(0, len(vals), row_sz):
-                fk = vals[i + 2]  # fcfs_key is 3rd column
+                fk = vals[i + 2]
                 if fk in self.inserted_fcfs:
-                    raise Exception(
-                        'duplicate key value violates unique constraint '
-                        '"dispatch_claims_fcfs_key_key"'
-                    )
+                    continue  # DO NOTHING — skip duplicate
                 self.inserted_fcfs.add(fk)
-            self._last_result = []
+                returned.append({"fcfs_key": fk})
+            self._last_result = returned
         else:
             self._last_result = []
 

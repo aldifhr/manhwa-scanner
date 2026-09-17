@@ -273,15 +273,13 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
                     for row in with_fk:
                         cols = list(row.keys())
                         vals = [row[c] for c in cols]
-                        # Build INSERT ... ON CONFLICT (fcfs_key) DO UPDATE
+                        # Build INSERT ... ON CONFLICT (fcfs_key) DO NOTHING
+                        # P1 fix: DO UPDATE would let a second worker silently
+                        # overwrite an active claim; DO NOTHING means only the
+                        # first INSERT wins (caller checks which rows inserted).
                         placeholders = ", ".join(["%s"] * len(cols))
                         col_list = ", ".join(cols)
-                        update_cols = [c for c in cols if c != "fcfs_key"]
-                        if update_cols:
-                            upd = ", ".join(f"{c}=EXCLUDED.{c}" for c in update_cols)
-                            sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (fcfs_key) DO UPDATE SET {upd}"
-                        else:
-                            sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (fcfs_key) DO NOTHING"
+                        sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (fcfs_key) DO NOTHING"
                         _cur.execute(sql, vals)
                 if without_fk:
                     for row in without_fk:
@@ -289,12 +287,8 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
                         vals = [row[c] for c in cols]
                         placeholders = ", ".join(["%s"] * len(cols))
                         col_list = ", ".join(cols)
-                        update_cols = [c for c in cols if c != "chapter_url"]
-                        if update_cols:
-                            upd = ", ".join(f"{c}=EXCLUDED.{c}" for c in update_cols)
-                            sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (chapter_url) DO UPDATE SET {upd}"
-                        else:
-                            sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (chapter_url) DO NOTHING"
+                        # P1 fix: DO NOTHING for consistency — first INSERT wins.
+                        sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (chapter_url) DO NOTHING"
                         _cur.execute(sql, vals)
                 _pre_conn.commit()
             else:

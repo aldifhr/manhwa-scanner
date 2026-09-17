@@ -177,6 +177,7 @@ def claim_recent_chapters_for_dispatch(
                     continue
             to_claim.append(c)
 
+        _inserted_fks: set[str] = set()
         if to_claim:
             try:
                 _seen_fcfs: set[str] = set()
@@ -206,11 +207,11 @@ def claim_recent_chapters_for_dispatch(
                     _claim_vals.extend(_r)
                 cur.execute(
                     f"INSERT INTO dispatch_claims (title_key, chapter_url, fcfs_key, created_at, expires_at, status) "
-                    f"VALUES {_claim_ph} ON CONFLICT (fcfs_key) DO UPDATE SET "
-                    f"chapter_url=EXCLUDED.chapter_url, created_at=EXCLUDED.created_at, "
-                    f"expires_at=EXCLUDED.expires_at, status=EXCLUDED.status",
+                    f"VALUES {_claim_ph} ON CONFLICT (fcfs_key) DO NOTHING "
+                    f"RETURNING fcfs_key",
                     _claim_vals,
                 )
+                _inserted_fks = {row["fcfs_key"] for row in cur.fetchall() if row.get("fcfs_key")}
             except Exception as e:
                 logger.warn("dispatch_claims insert failed", err=str(e)[:120])
                 try:
@@ -220,21 +221,24 @@ def claim_recent_chapters_for_dispatch(
                 conn.commit()
                 return []
 
+        # P1 fix: only return items whose INSERT actually succeeded (won the ON CONFLICT race)
+        if to_claim and _inserted_fks:
+            _claimed_items = [c for c in to_claim if fcfs_key(c.get("title") or "", c.get("chapter") or "") in _inserted_fks]
+        else:
+            _claimed_items = []
         conn.commit()
-        return [_row_to_item(r) for r in to_claim]
-    except Exception:
+        return [_row_to_item(r) for r in _claimed_items]
+    except Exception as e:
         if conn:
             try:
                 conn.rollback()
             except Exception:
                 pass
-        try:
-            from app.storage.recent_chapters import get_recent_chapters as _fallback
-
-            return _fallback(hours=hours)
-        except Exception as e:
-            logger.error("claim fallback get_recent_chapters failed", exc=e)
-            return []
+        # P2 fix: fail-closed — on any error, return [] (never fall back to
+        # get_recent_chapters which would bypass the claim guard and send
+        # unclaimed chapters).
+        logger.error("claim_recent_chapters_for_dispatch failed — fail-closed returning []", exc=e)
+        return []
     finally:
         if conn:
             try:
