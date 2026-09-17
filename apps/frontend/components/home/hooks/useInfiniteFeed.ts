@@ -63,7 +63,7 @@ export function useInfiniteFeed(opts: {
     const seen = new Set<string>();
     const flat: FlatChapter[] = [];
     for (const pg of data.pages) {
-      for (const c of (pg.results as unknown as FlatChapter[])) {
+      for (const c of ((pg?.results ?? []) as unknown as FlatChapter[])) {
         const k = chapterKey(c);
         if (!seen.has(k)) {
           seen.add(k);
