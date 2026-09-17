@@ -171,6 +171,16 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             retry_stats = {}
 
         duration = round(time.time() - start, 1)
+        # ponytail P1: partial failure detection — jangan report "ok" jika satu source Cloudflare (silent missing)
+        _status = "ok"
+        if _health_map:
+            _vals = list(_health_map.values())
+            _has_ok = any((v.get("status") or "").upper() in ("HEALTHY","OK") for v in _vals)
+            _has_fail = any((v.get("status") or "").upper() in ("DEGRADED","DOWN","FAILED","BLOCKED","RATE_LIMITED") for v in _vals)
+            if _has_fail and _has_ok:
+                _status = "partial"
+            elif _has_fail and not _has_ok:
+                _status = "failed"
         stats = {
             "sent": sent,
             "skipped": 0,
@@ -181,9 +191,11 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             "matched": len(to_dispatch) if do_dispatch else 0,
             "dispatched": do_dispatch,
             "retry_failed": retry_stats,
+            "status": _status,
+            "sources": {k: v.get("status") for k, v in _health_map.items()},
         }
         logger.info("Cron completed", **stats)
-        health.write_cron_status("ok", chapters_sent=sent, matched=stats.get("matched", 0), duration=duration)
+        health.write_cron_status(_status, chapters_sent=sent, matched=stats.get("matched", 0), duration=duration)
 
         return stats
     except Exception as e:

@@ -2,22 +2,30 @@
 import { withCsrf } from "@/lib/csrf";
 import { parseErrorMessage } from "@/lib/fetchError";
 
-// global 401 handler — triggers refreshSession then redirect to /login
+// ponytail P2: single-flight 401 refresh + retry — jangan biarkan A/B/C/D semua 401 lalu refresh sukses tapi tetap error
 let _handling401 = false;
+let _refreshPromise: Promise<boolean> | null = null;
 async function handle401() {
-  if (typeof window === "undefined" || _handling401) return;
-  // ponytail: jangan redirect kalau sudah di login page — avoid infinite refresh
-  if (typeof window !== "undefined" && window.location.pathname === "/login") return;
+  if (typeof window === "undefined") return false;
+  if (window.location.pathname === "/login") return false;
+  if (_handling401 && _refreshPromise) return _refreshPromise;
   _handling401 = true;
-  try {
-    const { refreshSession } = await import("@/lib/server-api");
-    const ok = await refreshSession();
-    if (!ok) window.location.href = "/login";
-  } catch {
-    window.location.href = "/login";
-  } finally {
-    _handling401 = false;
-  }
+  _refreshPromise = (async () => {
+    try {
+      const { refreshSession } = await import("@/lib/server-api");
+      const ok = await refreshSession();
+      if (!ok) window.location.href = "/login";
+      return ok;
+    } catch {
+      window.location.href = "/login";
+      return false;
+    } finally {
+      _handling401 = false;
+      // jangan langsung null — biarkan pending caller lain await promise yang sama; reset 1s setelah selesai
+      setTimeout(() => { _refreshPromise = null; }, 1000);
+    }
+  })();
+  return _refreshPromise;
 }
 
 export type FetchImpl = typeof fetch;
@@ -45,19 +53,33 @@ export async function readerFetch<T>(
 ): Promise<T> {
   const cache = cacheForPath(path, init);
   const baseInit: RequestInit = cache ? { cache } : {};
-  const mergedInit = init ? { ...baseInit, ...init, ...(cache && !init.cache ? { cache } : {}) } : (cache ? { cache } as RequestInit : undefined);
+  // ponytail P2: default timeout 15s (API) — scraper via backend 30s, FE 10-15s cukup; AbortSignal.timeout jika caller tidak provide signal
+  const hasSignal = !!(init?.signal || (baseInit as RequestInit).signal);
+  const timeoutSignal = hasSignal ? undefined : AbortSignal.timeout(15_000);
+  const baseWithTimeout: RequestInit = timeoutSignal ? { ...baseInit, signal: timeoutSignal } : baseInit;
+  const mergedInit = init ? { ...baseWithTimeout, ...init, ...(cache && !init.cache ? { cache } : {}), ...(timeoutSignal && !init.signal ? { signal: timeoutSignal } : {}) } : (cache || timeoutSignal ? { ...baseWithTimeout } as RequestInit : undefined);
   const csrfInit = mergedInit
     ? (withCsrf(mergedInit as RequestInit) as RequestInit)
     : undefined;
-  const res = await fetchImpl(path, { ...(csrfInit as RequestInit), credentials: "include" });
+  // ponytail P2: abort propagation — caller yang punya filter/navigation harus pass signal ke paginatedGet/readerFetch
+  let res = await fetchImpl(path, { ...(csrfInit as RequestInit), credentials: "include" });
   if (res.status === 204) return { success: true, data: { results: [] } } as T;
+  if (res.status === 401) {
+    const refreshed = await handle401();
+    if (refreshed) {
+      // retry sekali dengan cookie baru
+      const retryCsrf = withCsrf((mergedInit as RequestInit) ?? {} as RequestInit) as RequestInit;
+      res = await fetchImpl(path, { ...(retryCsrf as RequestInit), credentials: "include" });
+      if (res.status === 204) return { success: true, data: { results: [] } } as T;
+      if (res.ok) return res.json() as Promise<T>;
+    }
+    const text = await res.text().catch(() => res.statusText);
+    const msg = parseErrorMessage(res.status, text);
+    throw new Error(`401 Unauthorized: ${msg}`);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     const msg = parseErrorMessage(res.status, text);
-    if (res.status === 401) {
-      void handle401();
-      throw new Error(`401 Unauthorized: ${msg}`);
-    }
     throw new Error(msg);
   }
   return res.json() as Promise<T>;
@@ -108,7 +130,10 @@ export async function paginatedGet<T>(
           fetchImpl
         );
       });
+      // ponytail P1: Promise.allSettled partial — untuk RSS infinite, page 3 gagal jangan bikin page 1/2/4 hilang
+      // operasi lengkap butuh dataset utuh → log & kembalikan partial (caller putuskan retry per-page via fetchNextPage)
       const batched: unknown[] = [];
+      let failedPages = 0;
       for (let i = 0; i < fetchers.length; i += 4) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const batch = await Promise.allSettled(
@@ -117,9 +142,15 @@ export async function paginatedGet<T>(
         for (const r of batch) {
           if (r.status === "fulfilled")
             batched.push(...(r.value.data?.results ?? []));
-          else if ((r.reason as Error)?.name !== "AbortError") throw r.reason;
+          else if ((r.reason as Error)?.name === "AbortError") throw r.reason;
+          else {
+            failedPages++;
+            console.warn(`[paginatedGet] page fetch failed (partial tolerated)`, r.reason);
+          }
         }
       }
+      if (failedPages > 0 && batched.length === 0 && firstRows.length === 0) throw new Error(`paginatedGet all pages failed (${failedPages})`);
+      if (failedPages > 0) console.warn(`[paginatedGet] partial success: ${failedPages} pages failed, returning ${firstRows.length + batched.length} rows`);
       return [...firstRows, ...batched.map(map)];
     }
     const data = await readerFetch<{

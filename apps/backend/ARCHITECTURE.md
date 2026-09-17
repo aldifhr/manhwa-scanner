@@ -98,7 +98,7 @@
 | created_at   | timestamptz | NO       | now()        | Scrape time             |
 | updated_time | timestamptz | YES      | -            | Source update time      |
 
-**Constraints:** UNIQUE (chapter_url), CHECK (source IN ('ikiru', 'shinigami')), NOT NULL (id, chapter_url, title_key, created_at)
+**Constraints:** UNIQUE (chapter_url), CHECK (source IN ('ikiru', 'shinigami', 'voratoon')), NOT NULL (id, chapter_url, title_key, created_at) — `048_type_drift.sql:12` sinkron dengan pipeline `ikiru+shinigami+voratoon`
 **Indexes:** idx_recent_chapters_created_at (created_at DESC), idx_recent_chapters_title_key (title_key), idx_recent_chapters_source (source), idx_recent_chapters_created_at_source (created_at DESC, source)
 
 ---
@@ -195,7 +195,7 @@
 | created_at           | timestamptz | YES      | -       | Creation           |
 | updated_at           | timestamptz | YES      | -       | Last update        |
 
-**Constraints:** PK (source), CHECK (source IN ('ikiru', 'shinigami')), NOT NULL (source)
+**Constraints:** PK (source), CHECK (source IN ('ikiru', 'shinigami', 'voratoon')), NOT NULL (source) — sinkron `048`
 
 ---
 

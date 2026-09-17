@@ -49,6 +49,7 @@ export const Reader = {
       1000
     ) as unknown as Promise<import("@/lib/types").WhitelistRouteItem[]>;
   },
+  /** @deprecated ponytail P1: history skala 10k→100k, jangan fetch bulk 1000 — pakai getDispatchHistoryPage + useInfiniteQuery page-based */
   getDispatchHistory: async (
     page = 1,
     pageSize = 1000,
@@ -60,7 +61,7 @@ export const Reader = {
         page_size: String(pageSize),
       });
       if (search) p.set("search", search);
-      // ponytail: dispatch-history supports page_size 1000 → single request, not 10×100
+      // ponytail: dispatch-history supports page_size 1000 → single request, not 10×100, tapi UI harus page-based
       return (await paginatedGet(
         "/api/v1/reader/dispatch-history",
         p,

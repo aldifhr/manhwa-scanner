@@ -129,10 +129,11 @@ function AllTabInner() {
   // "Sent to Discord" label
   const isSentAvailable =
     all.length > 0 && all.some((c) => c.isSent !== undefined);
+  // ponytail P1: history 10k→100k, bulk 10000 = 10×1000 requests; feed sudah punya isSent dari RSS join — fallback ini hanya untuk data lama tanpa isSent
   const { data: dispatchHistory } = useQuery({
     queryKey: queryKeys.dispatchHistory(),
     queryFn: () =>
-      Reader.getDispatchHistory(1, 10000) as unknown as Promise<
+      Reader.getDispatchHistory(1, 2000) as unknown as Promise<
         import("@/lib/types").DispatchHistoryItem[]
       >,
     staleTime: staleTimes.dispatch,
