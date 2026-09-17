@@ -36,6 +36,8 @@ _HEADERS = {
 
 def _cf_get(url: str, timeout: float = TIMEOUT) -> object:
     """GET via curl_cffi with Chrome impersonation. Respects circuit breaker."""
+    from app.utils.ssrf import assert_allowed_url
+    assert_allowed_url(url)
     if not cb_ikiru.allow():
         raise RuntimeError("circuit ikiru OPEN — fast fail")
     from curl_cffi import requests as cffi_req

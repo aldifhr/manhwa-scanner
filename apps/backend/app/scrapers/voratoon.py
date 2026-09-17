@@ -16,7 +16,11 @@ from app.services.resilience import cb_voratoon
 logger = get_logger("scraper:voratoon")
 
 def _base_url() -> str:
-    return settings.VORATOON_API_URL.rstrip("/")
+    # ponytail P1 SSRF: validate base URL once
+    from app.utils.ssrf import assert_allowed_url
+    _b = settings.VORATOON_API_URL.rstrip("/")
+    assert_allowed_url(_b)
+    return _b
 TIMEOUT = 60.0
 _CLIENTS: dict[int, httpx.Client] = {}
 _CLIENTS_LOCK = threading.Lock()

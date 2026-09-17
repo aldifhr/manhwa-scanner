@@ -41,6 +41,8 @@ _CLIENT = httpx.Client(timeout=TIMEOUT, headers=_HEADERS, verify=True)
 
 
 def _get(path: str, retries: int = 4):
+    from app.utils.ssrf import assert_allowed_url
+    assert_allowed_url(f"{API}{path}")
     if not cb_shinigami.allow():
         logger.debug("shinigami circuit OPEN — skipping fetch", path=path)
         return None
