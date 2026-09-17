@@ -28,10 +28,10 @@ def _normalize(title_key: str) -> str:
 
 @router.get("/sources/health")
 async def sources_health(request: Request):
-    # ponytail: public GET for navbar Operation Stale dot
+    # ponytail: public GET for navbar Operation Stale dot — cacheable but not shared
     _now = time.monotonic()
     if _SRC_HEALTH_CACHE[0] is not None and (_now - _SRC_HEALTH_CACHE[0]) < _SRC_HEALTH_TTL:
-        return JSONResponse(content=_SRC_HEALTH_CACHE[1])
+        return JSONResponse(content=_SRC_HEALTH_CACHE[1], headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
     from app.config import settings as s
 
     hm = health_store.load_source_health_map(s.SOURCE_KEYS)
@@ -57,17 +57,17 @@ async def sources_health(request: Request):
     payload = {"success": True, "data": results}
     _SRC_HEALTH_CACHE[0] = time.monotonic()
     _SRC_HEALTH_CACHE[1] = payload
-    return JSONResponse(content=payload)
+    return JSONResponse(content=payload, headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
 
 
 @router.get("/dashboard-snapshot")
 async def dashboard_snapshot(request: Request):
-    # ponytail: public GET for anon dashboard
+    # ponytail: public GET for anon dashboard — allow stale-while-revalidate, private karena bisa berisi queue info
     # 15s in-memory cache — frontend polls every 30-60s, so this absorbs
     # duplicate bursts and cuts Supabase query volume by ~60%.
     now = time.monotonic()
     if _SNAP_CACHE[0] and (now - _SNAP_CACHE[0]) < _SNAP_TTL:
-        return JSONResponse(content=_SNAP_CACHE[1])
+        return JSONResponse(content=_SNAP_CACHE[1], headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
     try:
         # Read the materialized singleton row (cron writes it every run).
         # ~20ms vs ~3s for the full recompute. Fallback to compute
@@ -78,13 +78,14 @@ async def dashboard_snapshot(request: Request):
             payload = _row["payload"]
             _SNAP_CACHE[0] = time.monotonic()
             _SNAP_CACHE[1] = payload
-            return JSONResponse(content=payload)
+            return JSONResponse(content=payload, headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
         # Fallback: compute live (same as before).
-        return JSONResponse(content=await _build_snapshot())
+        payload = await _build_snapshot()
+        return JSONResponse(content=payload, headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
     except Exception:
         # on error, return stale cache if available, else empty
         if _SNAP_CACHE[1] is not None:
-            return JSONResponse(content=_SNAP_CACHE[1])
+            return JSONResponse(content=_SNAP_CACHE[1], headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
         raise
 
 

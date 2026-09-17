@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Reader } from "@/lib/reader";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 
 type Agg = "operational" | "degraded" | "stale";
 
@@ -59,7 +59,8 @@ export default function NavbarStatus({
         cronStatus?: { timestamp: string } | null;
       } | null>,
     refetchInterval: 30_000,
-    staleTime: 15_000,
+    staleTime: staleTimes.dashboard,
+    gcTime: gcTimes.dashboard,
     retry: false,
     refetchOnWindowFocus: false,
   });

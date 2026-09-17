@@ -108,7 +108,14 @@ export async function GET(request: NextRequest) {
   const q = (request.nextUrl.searchParams.get("q") || "").trim().slice(0, 100);
   const cacheKeyStr = `whitelist:${session}:${page}:${pageSize}:${q}:${mergeParam}`;
   const cached = whitelistCache.get(cacheKeyStr);
-  if (cached) return NextResponse.json(cached);
+  if (cached)
+    return NextResponse.json(cached, {
+      headers: {
+        "Cache-Control": "private, no-store, must-revalidate",
+        Vary: "Cookie",
+        Pragma: "no-cache",
+      },
+    });
 
   try {
     const params = new URLSearchParams({
@@ -282,7 +289,13 @@ export async function GET(request: NextRequest) {
       },
     };
     whitelistCache.set(cacheKeyStr, responseBody);
-    return NextResponse.json(responseBody);
+    return NextResponse.json(responseBody, {
+      headers: {
+        "Cache-Control": "private, no-store, must-revalidate",
+        Vary: "Cookie",
+        Pragma: "no-cache",
+      },
+    });
   } catch (err) {
     return catchError(err);
   }

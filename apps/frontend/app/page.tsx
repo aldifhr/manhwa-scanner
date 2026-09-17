@@ -27,7 +27,7 @@ import { ErrorFallback } from "@/components/ErrorFallback";
 import VirtualizedList from "@/components/home/VirtualizedList";
 import { groupChapters, type GroupedSeries } from "@/lib/groupChapters";
 import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
-import { queryKeys, staleTimes } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import type { FlatChapter } from "@/components/home/AllTab";
 import { RatingRow } from "@/components/home/seriesShared";
 import { useFeedActions } from "@/components/home/hooks/useFeedActions";
@@ -362,10 +362,11 @@ export default function HomePage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.homeFeed,
     queryFn: ({ signal }) => fetchFeed({ signal }),
-    staleTime: staleTimes.rss,
-    gcTime: 300_000,
+    staleTime: staleTimes.homeFeed,
+    gcTime: gcTimes.homeFeed,
     placeholderData: keepPreviousData,
     retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const { optimisticWhitelist, optimisticExcluded, addingKey, handleAddGroup } = useFeedActions();
@@ -381,6 +382,7 @@ export default function HomePage() {
         import("@/lib/types").DashboardSnapshot
       >,
     staleTime: staleTimes.dashboard,
+    gcTime: gcTimes.dashboard,
     retry: false,
     refetchOnWindowFocus: false,
     enabled: isLoggedInForSnapshot,

@@ -22,13 +22,32 @@ async function handle401() {
 
 export type FetchImpl = typeof fetch;
 
+// Klasifikasi endpoint: publik boleh HTTP cache (private SWR), privat jangan
+// credentials: include + Cache-Control private → browser cache per-user (Vary: Cookie)
+// Privat tanpa cache biar React Query yang jadi source of truth (stale/gc per P1)
+// Publik: /rss (flat), /public/stats, /sources/health, /dashboard-snapshot (anon, aggregate)
+// Privat: whitelist, dispatch-history, excluded, continue-reading, auth — must-revalidate no-store
+const PUBLIC_RE = /\/rss(\?|$)|^\/api\/public\/stats|^\/api\/v1\/public\/stats|^\/api\/v1\/sources\/health|\/dashboard-snapshot/;
+const PRIVATE_RE = /\/whitelist|\/dispatch-history|\/excluded-titles|\/continue-reading|auth|\/queue|\/failed-dispatches/;
+function cacheForPath(path: string, init?: RequestInit): RequestCache | undefined {
+  // Mutasi tidak pernah cache
+  const m = (init?.method ?? "GET").toUpperCase();
+  if (m !== "GET" && m !== "HEAD") return "no-store";
+  if (PUBLIC_RE.test(path)) return undefined; // default → hormati Cache-Control backend (private SWR)
+  if (PRIVATE_RE.test(path)) return "no-store";
+  return undefined;
+}
+
 export async function readerFetch<T>(
   path: string,
   init?: RequestInit,
   fetchImpl: FetchImpl = fetch
 ): Promise<T> {
-  const csrfInit = init
-    ? (withCsrf(init as RequestInit) as RequestInit)
+  const cache = cacheForPath(path, init);
+  const baseInit: RequestInit = cache ? { cache } : {};
+  const mergedInit = init ? { ...baseInit, ...init, ...(cache && !init.cache ? { cache } : {}) } : (cache ? { cache } as RequestInit : undefined);
+  const csrfInit = mergedInit
+    ? (withCsrf(mergedInit as RequestInit) as RequestInit)
     : undefined;
   const res = await fetchImpl(path, { ...(csrfInit as RequestInit), credentials: "include" });
   if (res.status === 204) return { success: true, data: { results: [] } } as T;
@@ -44,56 +63,75 @@ export async function readerFetch<T>(
   return res.json() as Promise<T>;
 }
 
+// ponytail: dedup concurrent identical paginatedGet (A: React Query cache alone still
+// triggers N parallel fetches if N components mount before first resolves; inflight collapses to 1)
+const _inflightPaginated = new Map<string, Promise<unknown[]>>();
+
 export async function paginatedGet<T>(
   basePath: string,
   params: URLSearchParams,
   map: (r: unknown) => T,
   signal?: AbortSignal,
-  fetchImpl: FetchImpl = fetch
+  fetchImpl: FetchImpl = fetch,
+  hardCap = 100
 ): Promise<T[]> {
   const pageSize = Number(
     params.get("page_size") ?? params.get("limit") ?? 100
   );
-  const q = new URLSearchParams(params); // clone to avoid mutating caller
-  if (pageSize > 100) {
-    q.set(q.has("page_size") ? "page_size" : "limit", "100");
-    const first = await readerFetch<{
-      success: boolean;
-      data: { results: unknown[]; totalPages?: number; total_pages?: number };
-    }>(`${basePath}?${q}`, signal ? { signal } : undefined, fetchImpl);
-    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    const totalPages = (first.data?.totalPages ??
-      (first.data as { total_pages?: number })?.total_pages ??
-      1) as number;
-    const firstRows = (first.data?.results ?? []).map(map);
-    if (totalPages <= 1) return firstRows;
-    const fetchers = Array.from({ length: totalPages - 1 }, (_, i) => () => {
-      const p = new URLSearchParams(q);
-      p.set("page", String(i + 2));
-      p.set(q.has("page_size") ? "page_size" : "limit", "100");
-      return readerFetch<{ success: boolean; data: { results: unknown[] } }>(
-        `${basePath}?${p}`,
-        signal ? { signal } : undefined,
-        fetchImpl
-      );
-    });
-    const batched: unknown[] = [];
-    for (let i = 0; i < fetchers.length; i += 4) {
-      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      const batch = await Promise.allSettled(
-        fetchers.slice(i, i + 4).map((f) => f())
-      );
-      for (const r of batch) {
-        if (r.status === "fulfilled")
-          batched.push(...(r.value.data?.results ?? []));
-        else if ((r.reason as Error)?.name !== "AbortError") throw r.reason;
-      }
-    }
-    return [...firstRows, ...batched.map(map)];
+  // Respect per-endpoint bulk limit: whitelist/dispatch support 1000, RSS capped 100
+  const cap = hardCap;
+  const inflightKey = `${basePath}?${params.toString()}|cap=${cap}`;
+  if (_inflightPaginated.has(inflightKey) && !signal?.aborted) {
+    return _inflightPaginated.get(inflightKey)! as Promise<T[]>;
   }
-  const data = await readerFetch<{
-    success: boolean;
-    data: { results: unknown[] };
-  }>(`${basePath}?${q}`, signal ? { signal } : undefined, fetchImpl);
-  return (data.data?.results ?? []).map(map);
+  const promise = (async (): Promise<T[]> => {
+    const q = new URLSearchParams(params); // clone to avoid mutating caller
+    if (pageSize > cap) {
+      q.set(q.has("page_size") ? "page_size" : "limit", String(cap));
+      const first = await readerFetch<{
+        success: boolean;
+        data: { results: unknown[]; totalPages?: number; total_pages?: number };
+      }>(`${basePath}?${q}`, signal ? { signal } : undefined, fetchImpl);
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const totalPages = (first.data?.totalPages ??
+        (first.data as { total_pages?: number })?.total_pages ??
+        1) as number;
+      const firstRows = (first.data?.results ?? []).map(map);
+      if (totalPages <= 1) return firstRows;
+      const fetchers = Array.from({ length: totalPages - 1 }, (_, i) => () => {
+        const p = new URLSearchParams(q);
+        p.set("page", String(i + 2));
+        p.set(q.has("page_size") ? "page_size" : "limit", String(cap));
+        return readerFetch<{ success: boolean; data: { results: unknown[] } }>(
+          `${basePath}?${p}`,
+          signal ? { signal } : undefined,
+          fetchImpl
+        );
+      });
+      const batched: unknown[] = [];
+      for (let i = 0; i < fetchers.length; i += 4) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        const batch = await Promise.allSettled(
+          fetchers.slice(i, i + 4).map((f) => f())
+        );
+        for (const r of batch) {
+          if (r.status === "fulfilled")
+            batched.push(...(r.value.data?.results ?? []));
+          else if ((r.reason as Error)?.name !== "AbortError") throw r.reason;
+        }
+      }
+      return [...firstRows, ...batched.map(map)];
+    }
+    const data = await readerFetch<{
+      success: boolean;
+      data: { results: unknown[] };
+    }>(`${basePath}?${q}`, signal ? { signal } : undefined, fetchImpl);
+    return (data.data?.results ?? []).map(map);
+  })();
+  _inflightPaginated.set(inflightKey, promise as Promise<unknown[]>);
+  try {
+    return await promise;
+  } finally {
+    _inflightPaginated.delete(inflightKey);
+  }
 }

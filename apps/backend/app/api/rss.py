@@ -99,10 +99,10 @@ async def _rss_impl(request: Request):
             import hashlib as _hl, json as _js
             etag = 'W/"' + _hl.sha256(_js.dumps(cached, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16] + '"'
             if request.headers.get("If-None-Match", "") == etag:
-                return Response(status_code=304, headers={"ETag": etag})
-            return JSONResponse(content=cached, headers={"ETag": etag})
+                return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
+            return JSONResponse(content=cached, headers={"ETag": etag, "Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
         except Exception:
-            return JSONResponse(content=cached)
+            return JSONResponse(content=cached, headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
 
     page = int_safe(request.query_params.get("page", "1"), 1)
     if page < 1 or page > 100:
@@ -258,7 +258,18 @@ async def _rss_impl(request: Request):
             },
         }
         _rss_cache_put(cache_key, body)
-        return JSONResponse(content=body, headers={"Cache-Control": "no-store, max-age=0"})
+        # publik/non-sensitive → private max-age 30 SWR 60 (credentials:include but not shared cache)
+        # whitelist-filtered variant tetap private (tidak bocor antar user via shared cache)
+        etag = None
+        try:
+            import hashlib as _hl2, json as _js2
+            etag = 'W/"' + _hl2.sha256(_js2.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16] + '"'
+        except Exception:
+            pass
+        headers = {"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"}
+        if etag:
+            headers["ETag"] = etag
+        return JSONResponse(content=body, headers=headers)
 
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
@@ -287,7 +298,7 @@ async def rss_new(request: Request):
     if cache_key in _rss_new_cache:
         _cache_ts, _cache_val = _rss_new_cache[cache_key]
         if _now - _cache_ts < 30.0:
-            resp = JSONResponse(content=_cache_val)
+            resp = JSONResponse(content=_cache_val, headers={"Cache-Control": "private, no-store, must-revalidate", "Vary": "Cookie"})
             resp.headers["X-Cache"] = "HIT"
             return resp
 
@@ -306,7 +317,7 @@ async def rss_new(request: Request):
             _cutoff = _now - 60.0
             for k in [k for k, v in _rss_new_cache.items() if v[0] < _cutoff]:
                 _rss_new_cache.pop(k, None)
-        resp = JSONResponse(content=payload)
+        resp = JSONResponse(content=payload, headers={"Cache-Control": "private, no-store, must-revalidate", "Vary": "Cookie"})
         resp.headers["X-Cache"] = "MISS"
         return resp
     except Exception as e:

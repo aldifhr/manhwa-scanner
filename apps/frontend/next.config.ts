@@ -129,19 +129,51 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Dynamic APIs: no-store (redundant with default, but explicit)
+      // Dynamic APIs: no-store (redundant with default, but explicit) — private session data
       {
         source: "/api/v1/dispatch-history",
         headers: [
           { key: "Content-Type", value: "application/json" },
-          { key: "Cache-Control", value: "no-store" },
+          { key: "Cache-Control", value: "private, no-store, must-revalidate" },
+          { key: "Vary", value: "Cookie" },
+          { key: "Pragma", value: "no-cache" },
         ],
       },
       {
         source: "/api/v1/dashboard-snapshot",
         headers: [
           { key: "Content-Type", value: "application/json" },
-          { key: "Cache-Control", value: "no-store" },
+          { key: "Cache-Control", value: "private, max-age=30, stale-while-revalidate=60" },
+          { key: "Vary", value: "Cookie" },
+        ],
+      },
+      // Public / semi-public: allow stale-while-revalidate, private karena credentials: include
+      // Jangan asal public — response bisa beda per filter (type/source) & per session (whitelist flag)
+      {
+        source: "/api/v1/rss",
+        headers: [
+          { key: "Cache-Control", value: "private, max-age=30, stale-while-revalidate=60" },
+          { key: "Vary", value: "Cookie" },
+        ],
+      },
+      {
+        source: "/api/v1/reader/rss",
+        headers: [
+          { key: "Cache-Control", value: "private, max-age=30, stale-while-revalidate=60" },
+          { key: "Vary", value: "Cookie" },
+        ],
+      },
+      {
+        source: "/api/public/stats",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=60, stale-while-revalidate=120" },
+        ],
+      },
+      {
+        source: "/api/v1/sources/health",
+        headers: [
+          { key: "Cache-Control", value: "private, max-age=30, stale-while-revalidate=60" },
+          { key: "Vary", value: "Cookie" },
         ],
       },
     ];

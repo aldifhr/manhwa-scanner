@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import { SkeletonGrid } from "@/components/SkeletonGrid";
 import { ErrorFallback } from "@/components/ErrorFallback";
@@ -135,8 +135,10 @@ function AllTabInner() {
       Reader.getDispatchHistory(1, 10000) as unknown as Promise<
         import("@/lib/types").DispatchHistoryItem[]
       >,
-    staleTime: 300_000,
+    staleTime: staleTimes.dispatch,
+    gcTime: gcTimes.dispatch,
     refetchInterval: 300_000,
+    refetchOnWindowFocus: false,
     enabled: all.length > 0 && !isSentAvailable,
   });
   const sentKeys = useMemo(() => {

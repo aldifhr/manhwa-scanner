@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
 import { usePacerRateLimitedWL } from "@/lib/usePacerThrottles";
 import type { FlatChapter } from "@/lib/feed";
@@ -43,6 +43,8 @@ export function useFeedActions() {
         { titleKey: string; source?: string }[]
       >,
     enabled: isLoggedIn,
+    staleTime: staleTimes.excluded,
+    gcTime: gcTimes.excluded,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -61,9 +63,14 @@ export function useFeedActions() {
   const addMutation = useMutation({
     mutationFn: async (item: FlatChapter) => {
       const optKey = `${item.titleKey}:${item.source}`;
-      // Pre-check: refetch whitelist to get latest state (prevents duplicate add across devices)
+      // Pre-check via React Query cache (A: jangan langsung API tiap call) — reuse stale 2m cache
       try {
-        const fresh = (await Reader.getWhitelist(1, 1000, false)) as unknown as Array<{ titleKey?: string; source?: string }>;
+        const fresh = (await queryClient.fetchQuery({
+          queryKey: queryKeys.whitelist(false),
+          queryFn: () => Reader.getWhitelist(1, 1000, false) as Promise<unknown>,
+          staleTime: staleTimes.whitelist,
+          gcTime: gcTimes.whitelist,
+        })) as unknown as Array<{ titleKey?: string; source?: string }>;
         const exists = fresh.some((e) => `${e.titleKey}:${e.source}` === optKey);
         if (exists) {
           return { item, result: { status: "already_exists" as const }, optKey };
@@ -93,8 +100,13 @@ export function useFeedActions() {
     onSuccess: ({ result, optKey, item }) => {
       // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
       setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
+      // ponytail #7: invalidasi bersamaan — jangan cuma whitelist, RSS & home juga stale
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSnapshot });
       const isExists = result.status === "already_exists";
       toast(
         isExists ? "Already in whitelist" : `Added ${item.title} to whitelist`,
@@ -139,9 +151,14 @@ export function useFeedActions() {
         (c: any) => `${c.titleKey || series.titleKey}:${c.source}`
       );
       const optKeys = [...new Set(chapterKeys)];
-      // Pre-check: refetch whitelist to get latest state (prevents duplicate add across devices)
+      // Pre-check via cache (A) — bulk whitelist fetched once & shared
       try {
-        const fresh = (await Reader.getWhitelist(1, 1000, false)) as unknown as Array<{ titleKey?: string; source?: string }>;
+        const fresh = (await queryClient.fetchQuery({
+          queryKey: queryKeys.whitelist(false),
+          queryFn: () => Reader.getWhitelist(1, 1000, false) as Promise<unknown>,
+          staleTime: staleTimes.whitelist,
+          gcTime: gcTimes.whitelist,
+        })) as unknown as Array<{ titleKey?: string; source?: string }>;
         const freshKeys = new Set(fresh.map((e) => `${e.titleKey}:${e.source}`));
         const alreadyPresent = optKeys.filter((k) => freshKeys.has(k));
         const missing = optKeys.filter((k) => !freshKeys.has(k));
@@ -212,9 +229,13 @@ export function useFeedActions() {
     onMutate: (series) => setAddingKey(series.titleKey),
     onSuccess: ({ results, optKeys }, series) => {
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
+      // ponytail #7: bulk add invalidasi RSS per-page cache juga (buildRssParams filter-aware)
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSnapshot });
       const allExist = results.every((r) => r.status === "already_exists");
       toast(allExist ? "Already in whitelist" : `Added ${series.title} to whitelist`, {
         type: "success",
@@ -301,8 +322,11 @@ export function useFeedActions() {
         setOptimisticExcluded((prev) => new Set(prev).add(key));
         toast("Excluded from feed", "success");
       }
+      // ponytail #7 & #8: exclude mengubah RSS filtered cache per (source,type,whitelist) key
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
     },
     onError: (err) =>
@@ -376,8 +400,11 @@ export function useFeedActions() {
         setOptimisticExcluded((prev) => new Set([...prev, ...keys]));
         toast("Excluded from feed", "success");
       }
+      // ponytail #7 & #8: group exclude juga invalidate RSS per-filter key
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
     },
     onError: (err) =>

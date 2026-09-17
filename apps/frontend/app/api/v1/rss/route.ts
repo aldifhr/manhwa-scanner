@@ -84,7 +84,13 @@ export async function GET(request: NextRequest) {
   // 10s TTL cache: absorbs repeat page loads + protects the backend from
   // redundant cold-start hits (which caused intermittent 504s).
   const cached = rssCache.get(key);
-  if (cached) return NextResponse.json(cached);
+  if (cached)
+    return NextResponse.json(cached, {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        "Vary": "Cookie",
+      },
+    });
 
   try {
     const params = new URLSearchParams({
@@ -191,8 +197,12 @@ export async function GET(request: NextRequest) {
     }
 
     rssCache.set(key, body);
+    // Publik tapi per-session (cookies ikut) → private, tidak share antar user via CDN
     return NextResponse.json(body, {
-      headers: { "Cache-Control": "no-store, max-age=0" },
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        "Vary": "Cookie",
+      },
     });
   } catch (err) {
     // Timeout / network error from the upstream fetch.

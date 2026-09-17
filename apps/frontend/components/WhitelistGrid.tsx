@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import type { WhitelistRouteItem } from "@/lib/types";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { MangaCardSkeleton } from "@/components/MangaCard";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import { useDebounced } from "@/lib/useDebounced";
@@ -23,7 +23,9 @@ export function WhitelistGrid() {
       Reader.getWhitelist(1, 1000, false) as unknown as Promise<
         WhitelistRouteItem[]
       >,
-    staleTime: 1_000, // ponytail: 1s — user-centric, needs fresh data for add/delete actions
+    staleTime: staleTimes.whitelist,
+    gcTime: gcTimes.whitelist,
+    refetchOnWindowFocus: false,
   });
 
   const [sourceFilter, setSourceFilter] = useState("All");
@@ -35,10 +37,11 @@ export function WhitelistGrid() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const debouncedCatalogSearch = useDebounced(catalogSearch, 400);
   const { data: catalogResults } = useQuery({
-    queryKey: ["catalog-search", debouncedCatalogSearch],
+    queryKey: queryKeys.catalogSearch(debouncedCatalogSearch),
     queryFn: () => Reader.searchCatalog(debouncedCatalogSearch),
     enabled: debouncedCatalogSearch.length > 0,
-    staleTime: 30_000,
+    staleTime: staleTimes.catalogSearch,
+    gcTime: gcTimes.catalogSearch,
   });
 
   const items = data ?? [];

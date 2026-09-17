@@ -1,6 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { filterButtonClass } from "@/lib/styles";
 import { X } from "@phosphor-icons/react";
 import { useUiStore } from "@/lib/uiStore";
@@ -15,9 +16,10 @@ export default function FilterDrawer({ open, onClose }: { open: boolean; onClose
   const resetFilters = useUiStore((s) => s.resetFilters);
 
   const { data: meta } = useQuery({
-    queryKey: ["rss-filters-metadata"],
+    queryKey: queryKeys.rssFilterMetadata,
     queryFn: () => Reader.getRssFilterMetadata() as Promise<{ genres: string[] }>,
-    staleTime: 300_000,
+    staleTime: staleTimes.rssFilterMetadata,
+    gcTime: gcTimes.rssFilterMetadata,
     enabled: open,
   });
 

@@ -232,11 +232,15 @@ export function WhitelistCard({
       deletePayload as Record<string, unknown>
     )
       .then(() => {
+        // ponytail #7: whitelist mutation → invalidate semua consumer (RSS per-page cache harus bust)
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(false) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(true) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
         queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
         queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+        queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
         queryClient.invalidateQueries({
           queryKey: queryKeys.dashboardSnapshot,
         });

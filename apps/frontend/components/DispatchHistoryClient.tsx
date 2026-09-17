@@ -10,7 +10,7 @@ import {
   safeUrl,
 } from "@/lib/utils";
 import type { DispatchHistoryItem } from "@/lib/types";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { timeAgo } from "@/lib/timeAgo";
 import { useDebounced } from "@/lib/useDebounced";
 import { SourceBadge } from "@/components/ui/SourceBadge";
@@ -98,12 +98,13 @@ export default function DispatchHistoryClient() {
 
   // reset page when search changes
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [
-      ...queryKeys.dispatchHistory(debouncedSearch || undefined),
-      page,
-    ],
+    queryKey: queryKeys.dispatchHistoryPage(debouncedSearch || undefined, page, pageSize),
     queryFn: () =>
       Reader.getDispatchHistoryPage(page, pageSize, debouncedSearch || ""),
+    staleTime: staleTimes.dispatchPage,
+    gcTime: gcTimes.dispatch,
+    placeholderData: (prev) => prev,
+    refetchOnWindowFocus: false,
   });
 
   const items = (data?.results ?? []) as DispatchHistoryItem[];

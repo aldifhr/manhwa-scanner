@@ -85,7 +85,7 @@ async def public_stats():
         data["generated_at"] = datetime.now(timezone.utc).isoformat()
         return JSONResponse(
             content={"success": True, "data": data},
-            headers={"Cache-Control": "public, max-age=60"},
+            headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=120"},
         )
     except Exception:
         return JSONResponse(

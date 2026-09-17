@@ -82,7 +82,8 @@ async def dispatch_history(request: Request):
         if page_size > 1000 or page_size < 1:
             return JSONResponse(content={"success": False, "error": "page_size must be between 1 and 1000"}, status_code=400)
         search = request.query_params.get("search", "").strip().lower()
-        return JSONResponse(content=get_dispatch_history(page, page_size, search))
+        # private session-dependent → never HTTP cache (prevent cross-user leak)
+        return JSONResponse(content=get_dispatch_history(page, page_size, search), headers={"Cache-Control": "private, no-store, must-revalidate", "Vary": "Cookie", "Pragma": "no-cache"})
     except Exception as e:
         logger.warn("dispatch-history failed", err=str(e))
         return JSONResponse(content=safe_error(e), status_code=500)
@@ -105,7 +106,11 @@ async def get_whitelist_reader(request: Request):
     _merge_raw = (request.query_params.get("merge") or "false").lower()
     _merge = _merge_raw not in ("false", "0", "no")
     cursor = request.query_params.get("cursor")
-    return get_whitelist(page=page, page_size=page_size, merge=_merge, cursor=cursor)
+    data = get_whitelist(page=page, page_size=page_size, merge=_merge, cursor=cursor)
+    # whitelist is private per-user (auth required) → never allow shared or browser HTTP cache
+    if isinstance(data, dict):
+        return JSONResponse(content=data, headers={"Cache-Control": "private, no-store, must-revalidate", "Vary": "Cookie", "Pragma": "no-cache"})
+    return data
 
 
 @router.get("/whitelist")
@@ -122,7 +127,7 @@ async def whitelist_get(request: Request):
         _merge = _merge_raw not in ("false", "0", "no")
         cursor = request.query_params.get("cursor")
         result = get_whitelist(source=source, title=title, page=page, page_size=page_size, merge=_merge, cursor=cursor)
-        return JSONResponse(content=result)
+        return JSONResponse(content=result, headers={"Cache-Control": "private, no-store, must-revalidate", "Vary": "Cookie", "Pragma": "no-cache"})
     except Exception as e:
         logger.warn("whitelist failed", err=str(e))
         return JSONResponse(content=safe_error(e), status_code=500)

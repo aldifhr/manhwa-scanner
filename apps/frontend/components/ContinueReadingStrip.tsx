@@ -3,6 +3,7 @@
 import { BookOpen } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { useContinueReading } from "@/lib/continueReading";
 import type { ContinueReadingEntry } from "@/lib/continueReading";
 import { decodeHtml, getChapterLabel, rewriteCoverUrl } from "@/lib/utils";
@@ -84,8 +85,11 @@ function ContinueReadingCard({ entry }: { entry: ContinueReadingEntry }) {
 export default function ContinueReadingStrip() {
   const { entries, clearAll } = useContinueReading();
   const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["continueReadingUnreadCount"],
+    queryKey: queryKeys.continueReadingUnreadCount,
     queryFn: () => Reader.getContinueReadingUnreadCount(),
+    staleTime: staleTimes.continueReading,
+    gcTime: gcTimes.continueReading,
+    refetchOnWindowFocus: false,
   });
 
   const sortedEntries = [...entries.values()]

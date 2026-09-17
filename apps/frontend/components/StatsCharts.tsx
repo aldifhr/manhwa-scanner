@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { decodeHtml, getChapterLabel, rewriteCoverUrl } from "@/lib/utils";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import StatCard from "@/components/ui/StatCard";
 import { timeAgo } from "@/lib/timeAgo";
 import { PageShell } from "@/components/PageShell";
@@ -52,7 +52,9 @@ export default function StatsCharts() {
   const { data: d, isLoading, error } = useQuery({
     queryKey: queryKeys.stats,
     queryFn: () => Reader.getStats() as Promise<import("@/lib/types").StatsData | null>,
-    staleTime: 60_000,
+    staleTime: staleTimes.stats,
+    gcTime: gcTimes.stats,
+    refetchOnWindowFocus: false,
   });
 
   if (isLoading) {

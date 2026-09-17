@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import type { ExcludedTitleItem } from "@/lib/types";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
 import { MagnifyingGlass, Prohibit, Trash, Plus } from "@phosphor-icons/react";
 import Button from "@/components/ui/Button";
@@ -36,7 +36,9 @@ export function ExcludeListClient() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.excludedTitles,
     queryFn: () => Reader.getExcludedTitles() as Promise<ExcludedTitleItem[]>,
-    staleTime: 15 * 1000,
+    staleTime: staleTimes.excluded,
+    gcTime: gcTimes.excluded,
+    refetchOnWindowFocus: false,
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -134,12 +136,21 @@ export function ExcludeListClient() {
               queryClient.invalidateQueries({
                 queryKey: queryKeys.excludedTitles,
               });
+              queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+              queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+              queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+              queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
               toast(`Re-excluded ${displayTitle(it)}`, { type: "success" });
             } catch {}
           },
         },
       });
+      // ponytail #7: un-exclude bust RSS filtered cache
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
     } catch (err) {
       queryClient.setQueryData(queryKeys.excludedTitles, prev);
       toast(err instanceof Error ? err.message : "Failed to remove", {
@@ -160,7 +171,12 @@ export function ExcludeListClient() {
     setBulkLoading(true);
     try {
       const res = await Reader.bulkExcludeBySource(bulkSource);
+      // ponytail #7: bulk exclude bust semua RSS variant
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       let added: ExcludedTitleItem[] = [];
       try {
         const fresh = (await Reader.getExcludedTitles()) as ExcludedTitleItem[];
@@ -191,6 +207,10 @@ export function ExcludeListClient() {
                   queryClient.invalidateQueries({
                     queryKey: queryKeys.excludedTitles,
                   });
+                  queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+                  queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
                   toast(`Undid ${undone} excludes`, { type: "info" });
                 },
               }

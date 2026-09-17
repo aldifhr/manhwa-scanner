@@ -14,6 +14,8 @@ export function useRefreshAll() {
     try {
       await Promise.all([
         queryClient.refetchQueries({ queryKey: ["rss-feed-flat"] }),
+        queryClient.refetchQueries({ queryKey: ["rss-feed-flat-infinite"] }),
+        queryClient.refetchQueries({ queryKey: queryKeys.homeFeed }),
         queryClient.refetchQueries({ queryKey: queryKeys.whitelistAll }),
         queryClient.refetchQueries({ queryKey: queryKeys.dispatchHistory() }),
         queryClient.refetchQueries({ queryKey: queryKeys.dashboardSnapshot }),

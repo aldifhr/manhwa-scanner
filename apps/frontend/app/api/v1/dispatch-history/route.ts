@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(body, {
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "no-store",
+        "Cache-Control": "private, no-store, must-revalidate",
+        Vary: "Cookie",
+        Pragma: "no-cache",
         "X-Cache": "MISS",
       },
     });
