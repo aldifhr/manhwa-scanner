@@ -39,12 +39,30 @@ _CHAPTER_CACHE_TTL = 300.0
 _CHAPTER_CACHE_MAX = 512
 
 _IKIRU_META_CACHE: dict[str, tuple[float, dict]] = {}
-_IKIRU_META_CACHE_TTL = 21600.0
+_IKIRU_META_CACHE_TTL = 21600.0  # 6h — sama dengan DB TTL di bawah
 _IKIRU_META_CACHE_MAX = 512
 
 _SHINIGAMI_META_CACHE: dict[str, tuple[float, dict]] = {}
-_SHINIGAMI_META_CACHE_TTL = 21600.0
+_SHINIGAMI_META_CACHE_TTL = 21600.0  # 6h
 _SHINIGAMI_META_CACHE_MAX = 512
+
+# ponytail P1: series_meta sebagai SSoT lazy — tanpa TTL bisa stale selamanya.
+# Policy: <6h pakai cache/DB, >=6h refresh upstream, gagal → stale cache (cover/rating 6-24h wajar)
+_SERIES_META_TTL_S = 6 * 3600  # 6h (cover/rating/genre boleh 6-24h)
+
+
+def _is_series_meta_stale(updated_at: str | None) -> bool:
+    if not updated_at:
+        return True
+    try:
+        from datetime import datetime, timezone
+        dt = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - dt).total_seconds()
+        return age >= _SERIES_META_TTL_S
+    except Exception:
+        return True
 
 _CHAPTER_CACHE_LOCK = threading.Lock()
 
@@ -106,7 +124,7 @@ def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
                 chunk = need[i:i+100]
                 rows = (
                     _gsb2().table("series_meta")
-                    .select("title_key, source, rating, genres, description, cover, type")
+                    .select("title_key, source, rating, genres, description, cover, type, origin, updated_at")
                     .in_("title_key", chunk)
                     .eq("source", src)
                     .execute()
@@ -116,6 +134,9 @@ def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
                 for r in rows:
                     tk = r.get("title_key")
                     if tk and (r.get("rating") not in (None, "", 0) or (r.get("description") or "").strip()):
+                        # ponytail P1: jangan warm stale row — biarkan _cached_series_meta refresh (6h TTL)
+                        if _is_series_meta_stale(r.get("updated_at")):
+                            continue
                         # use tk as sid key for cache (both sid and tk forms)
                         with _CHAPTER_CACHE_LOCK:
                             cache[tk] = (now, r)
@@ -136,11 +157,12 @@ def _cached_series_meta(source: str, sid: str) -> dict:
         if c and (now - c[0]) < ttl:
             return c[1]
     _key = sid
+    _stale_db_row: dict | None = None
     try:
         from app.db import get_supabase as _gsb
         _existing = (
             _gsb().table("series_meta")
-            .select("title_key, source, rating, genres, description, cover, type")
+            .select("title_key, source, rating, genres, description, cover, type, origin, updated_at")
             .eq("title_key", _key)
             .eq("source", source)
             .limit(1)
@@ -151,9 +173,13 @@ def _cached_series_meta(source: str, sid: str) -> dict:
         if _existing:
             _e = _existing[0]
             if (_e.get("rating") not in (None, "", 0)) or (_e.get("description") or "").strip():
-                with _CHAPTER_CACHE_LOCK:
-                    cache[sid] = (now, _e)
-                return _e
+                # ponytail P1: DB TTL 6h — jika fresh (<6h) langsung pakai, jika stale coba refresh
+                if not _is_series_meta_stale(_e.get("updated_at")):
+                    with _CHAPTER_CACHE_LOCK:
+                        cache[sid] = (now, _e)
+                    return _e
+                # stale → simpan untuk fallback jika refresh gagal
+                _stale_db_row = _e
     except Exception:
         pass
     meta: dict = {}
@@ -183,8 +209,31 @@ def _cached_series_meta(source: str, sid: str) -> dict:
             _sb.table("series_meta").upsert(_row, on_conflict="title_key,source").execute()
             # Invalidate memory cache so next read gets fresh data
             cache.pop(sid, None)
+            # Cache fresh upstream result (reset TTL)
+            with _CHAPTER_CACHE_LOCK:
+                cache[sid] = (now, meta)
+                if len(cache) > mx:
+                    for _k in list(cache)[: len(cache) - mx]:
+                        cache.pop(_k, None)
+            return meta
         except Exception:
             pass
+        # Upsert gagal → fallback ke upstream meta tanpa DB persistance
+        with _CHAPTER_CACHE_LOCK:
+            cache[sid] = (now, meta)
+            if len(cache) > mx:
+                for _k in list(cache)[: len(cache) - mx]:
+                    cache.pop(_k, None)
+        return meta
+    # Refresh gagal atau tidak ada upstream meta → fallback stale DB jika ada
+    if _stale_db_row is not None:
+        with _CHAPTER_CACHE_LOCK:
+            cache[sid] = (now, _stale_db_row)
+            if len(cache) > mx:
+                for _k in list(cache)[: len(cache) - mx]:
+                    cache.pop(_k, None)
+        return _stale_db_row
+    # Tidak ada DB dan upstream gagal → cache empty
     with _CHAPTER_CACHE_LOCK:
         cache[sid] = (now, meta)
         if len(cache) > mx:
