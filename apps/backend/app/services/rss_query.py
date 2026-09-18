@@ -218,6 +218,8 @@ def map_result(
         "country": origin,
         "format": _type,
         "genres": _genres,
+        "rating": _rating,
+        "description": sm.get("description") or it.get("description") or wl.get("description") or "",
         "isWhitelisted": is_wl,
         "chapterLabel": chapter_label(str(it.get("chapter") or "")),
         "chapterNumber": chapter_number(str(it.get("chapter") or "")),
@@ -239,21 +241,17 @@ def group_results(results: list[dict]) -> list[dict]:
             groups[gk] = {
                 "title": r["title"],
                 "titleKey": r["titleKey"],
-                "canonicalTitleKey": r["canonicalTitleKey"],
                 "source": r["source"],
-                "sources": list(r["sources"] or []),
-                "cover": r["cover"],
-                "seriesUrl": r["seriesUrl"],
-                "url": r["url"],
-                "origin": r["origin"],
+                "sources": list(r.get("sources") or []),
+                "cover": r.get("cover"),
+                "seriesUrl": r.get("seriesUrl"),
+                "country": r.get("country") or r.get("origin"),
+                "format": r.get("format"),
                 "type": r.get("type"),
-                "rating": r["rating"],
-                "genres": r["genres"],
-                "description": r["description"],
-                "isWhitelisted": r["isWhitelisted"],
-                "lastCheckedChapter": r["lastCheckedChapter"],
-                "latestSentChapter": r["latestSentChapter"],
-                "latestChapter": r["latestChapter"],
+                "rating": r.get("rating"),
+                "genres": r.get("genres"),
+                "description": r.get("description") or "",
+                "isWhitelisted": r.get("isWhitelisted"),
                 "latestUpdated": r.get("updated_time") or r.get("createdAt") or "",
                 "chapters": [],
             }
@@ -267,13 +265,10 @@ def group_results(results: list[dict]) -> list[dict]:
                 cur["cover"] = r["cover"]
             if not cur.get("seriesUrl") and r.get("seriesUrl"):
                 cur["seriesUrl"] = r["seriesUrl"]
-                cur["url"] = r["url"]
             if cur.get("rating") is None and r.get("rating") is not None:
                 cur["rating"] = r["rating"]
             if not cur.get("genres") and r.get("genres"):
                 cur["genres"] = r["genres"]
-            if not cur.get("type") and r.get("type"):
-                cur["type"] = r["type"]
             # Track most recent updated_time
             new_updated = r.get("updated_time") or r.get("createdAt") or ""
             if new_updated > (cur.get("latestUpdated") or ""):
@@ -298,8 +293,6 @@ def group_results(results: list[dict]) -> list[dict]:
             "chapterNumber": r["chapterNumber"],
             "url": r["chapterUrl"],
             "source": r["source"],
-            "sentAt": r["sentAt"],
-            "createdAt": r.get("createdAt") or r.get("sentAt"),
             "isSent": r["isSent"],
         })
     for g in groups.values():
