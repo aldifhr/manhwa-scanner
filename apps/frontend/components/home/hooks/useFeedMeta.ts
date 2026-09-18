@@ -7,12 +7,12 @@ export function useFeedMeta(
   all: FlatChapter[],
   optimisticWhitelist: Set<string>
 ) {
-  const sources: string[] = useMemo(() => ["ikiru", "shinigami", "voratoon"], []);
+  const sources: string[] = useMemo(() => ["shinigami", "voratoon"], []);
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of all) {
-      const raw = String(c.type || "").toLowerCase().trim();
-      const t = normalizeType(c.type);
+      const raw = String((c as any).format ?? c.type ?? "").toLowerCase().trim();
+      const t = normalizeType((c as any).format ?? c.type);
       map[t] = (map[t] || 0) + 1;
     }
     return map;

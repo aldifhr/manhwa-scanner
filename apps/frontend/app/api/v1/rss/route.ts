@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     if (source) params.set("source", source);
     if (whitelist === "true") params.set("whitelist", "true");
     if (exclude) params.set("exclude", exclude);
-    if (type) params.set("type", type);
+    if (type) { params.set("type", type); params.set("format", type); }
 
     const res = await fetch(`${rssBaseUrl()}?${params}`, {
       headers: authHeaders(request),
@@ -142,14 +142,6 @@ export async function GET(request: NextRequest) {
             "japanese"
         );
       }
-      // Type filter for grouped (BE ignores ?type= for grouped too)
-      if (type) {
-        const wanted = type.toLowerCase();
-        grouped = grouped.filter(
-          (r) =>
-            String((r as { type?: string }).type ?? "").toLowerCase() === wanted
-        );
-      }
       data.results = grouped;
     } else if (data && results) {
       // Flat mode: validate + normalize each row with zod (snake_case → camelCase, cover URL rewrite, url/chapterUrl fallbacks, coerced chapterNumber).
@@ -169,14 +161,6 @@ export async function GET(request: NextRequest) {
       }
       // Note: JP stripping disabled — user wants to see all origins
       // (Sovereign Of A Hundred Blades is JP but user wants it visible)
-      // Server-side type filter (BE ignores ?type= — verified live: ?type=manhua still returns manhwa/manga)
-      if (type) {
-        const wanted = type.toLowerCase();
-        normalized = normalized.filter(
-          (r) =>
-            String((r as { type?: string }).type ?? "").toLowerCase() === wanted
-        );
-      }
       // Ensure stable DESC sort by createdAt (BE was not strictly sorted, causing pagination inversions).
       normalized.sort((a, b) => {
         const ta = Date.parse((a as { createdAt?: string }).createdAt ?? "");

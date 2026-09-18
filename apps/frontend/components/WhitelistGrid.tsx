@@ -56,12 +56,12 @@ export function WhitelistGrid() {
   const sources = useMemo(() => {
     const set = new Set<string>();
     items.forEach((i) => {
-      if (i.source) set.add(i.source);
+      if (i.source && i.source !== "ikiru") set.add(i.source);
       if (Array.isArray(i.sources))
         i.sources.forEach((s: string | { source: string }) => {
           const v =
             typeof s === "string" ? s : (s as { source: string }).source;
-          if (v) set.add(v);
+          if (v && v !== "ikiru") set.add(v);
         });
     });
     return [...set].sort();

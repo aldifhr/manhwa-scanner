@@ -206,15 +206,8 @@ function AllTabInner() {
     if (optimisticExcluded.size > 0)
       f = f.filter((c) => !isExcludedFlat(c));
     if (sourceFilter) f = f.filter((c) => (c.source || "") === sourceFilter);
-    if (typeFilter) {
-      f = f.filter((c) => {
-        const raw = String(c.type || "")
-          .toLowerCase()
-          .trim();
-        const t = normalizeType(c.type);
-        return t === typeFilter;
-      });
-    }
+    // typeFilter already handled by BE WHERE before LIMIT (0079734 dual format/type) — no client re-filter
+
     if (feed === "nowl")
       f = f.filter(
         (c) =>
@@ -281,6 +274,10 @@ function AllTabInner() {
     sortMode,
     view,
   });
+
+  useEffect(() => {
+    console.log("[AllTab] sort:", sortMode, "group:", groupMode, "filtered:", filtered.length, "grouped:", grouped.length, "top3:", grouped.slice(0,3).map(g=>g.title).join(" | "));
+  }, [all.length, filtered.length, typeFilter, feed, sourceFilter, sortMode, groupMode, grouped.length, flatDisplay.length, hasMore, isLoading, error?.message]);
 
   // nowl + type filter: client filter after fetch 100 can be empty while hasMore true → auto fetch next page until filled
   useEffect(() => {

@@ -28,7 +28,7 @@ function buildRssParams(
   if (opts.exclude) p.set("exclude", opts.exclude);
   if (opts.whitelist) p.set("whitelist", "true");
   if (opts.source) p.set("source", opts.source);
-  if (opts.type) p.set("type", opts.type);
+  if (opts.type) { p.set("type", opts.type); p.set("format", opts.type); }
   return p;
 }
 
@@ -136,7 +136,7 @@ export const Reader = {
     } = {}
   ) =>
     paginatedGet(
-      "/api/v1/reader/rss",
+      "/api/v1/rss",
       buildRssParams(page, limit, opts),
       mapRss,
       undefined,
@@ -376,7 +376,7 @@ export const Reader = {
         totalPages: number;
         hasMore: boolean;
       };
-    }>(`/api/v1/reader/rss?${p}`);
+    }>(`/api/v1/rss?${p}`);
     const d = data.data;
     const results = (d?.results ?? []).map(mapRss) as Record<string, unknown>[];
     const totalPages =
