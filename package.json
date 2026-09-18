@@ -12,9 +12,6 @@
     "typecheck": "pnpm --recursive typecheck",
     "test": "pnpm --filter manhwa-reader test"
   },
-  "dependencies": {
-    "@dietrichgebert/ponytail": "^4.9.0"
-  },
   "devDependencies": {
     "prettier": "^3.9.6"
   }

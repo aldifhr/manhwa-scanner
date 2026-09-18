@@ -18,7 +18,6 @@ interface CatalogItem {
   cover: string;
   sources: { source: string; url: string }[];
   metadata: {
-    status: string;
     rating: string;
     genres: string[];
     description: string;
@@ -47,7 +46,6 @@ interface WhitelistBackendItem {
   origin?: string | null;
   type?: string | null;
   description?: string | null;
-  status?: string | null;
   rating?: string | number | null;
   genres?: string[];
   chapterLabel?: string;
@@ -249,7 +247,6 @@ export async function GET(request: NextRequest) {
         origin: item.origin || null,
         type: item.type ? String(item.type).toLowerCase() : null,
         description: item.description || null,
-        status: item.status || null,
         rating: item.rating || null,
         genres: item.genres || [],
         chapterLabel:

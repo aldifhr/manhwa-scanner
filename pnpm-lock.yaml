@@ -11,10 +11,6 @@ overrides:
 importers:
 
   .:
-    dependencies:
-      '@dietrichgebert/ponytail':
-        specifier: ^4.9.0
-        version: 4.9.0
     devDependencies:
       prettier:
         specifier: ^3.9.6
@@ -406,9 +402,6 @@ packages:
     peerDependencies:
       '@csstools/css-parser-algorithms': ^2.1.1
       '@csstools/css-tokenizer': ^2.1.1
-
-  '@dietrichgebert/ponytail@4.9.0':
-    resolution: {integrity: sha512-OSdybtBZ3uDd5m/+zyz4h8/+BVBR9nGFhqTDmQkQb1v7k4Vfc1qql78naY64UjocdBPqR94htZEkKu2wpKTJaw==}
 
   '@dotenvx/dotenvx@1.75.1':
     resolution: {integrity: sha512-/BITOC9dmS/edY2zQwZNicQ059O6RKabtQfyEafV0nGtfYRNHYy1DIPiYVcov40+tob9hfmBnbR963dS+EQ1DQ==}
@@ -3693,8 +3686,6 @@ snapshots:
     dependencies:
       '@csstools/css-parser-algorithms': 3.0.4(@csstools/css-tokenizer@3.0.3)
       '@csstools/css-tokenizer': 3.0.3
-
-  '@dietrichgebert/ponytail@4.9.0': {}
 
   '@dotenvx/dotenvx@1.75.1':
     dependencies:
