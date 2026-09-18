@@ -27,7 +27,8 @@ def _get_redis():
             settings.REDIS_URL,
             decode_responses=True,
             socket_connect_timeout=5,
-            socket_timeout=None,
+            socket_timeout=5,
+            socket_keepalive=True,
             retry_on_timeout=True,
         )
     return _redis

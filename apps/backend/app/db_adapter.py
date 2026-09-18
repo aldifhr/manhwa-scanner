@@ -101,6 +101,7 @@ def get_conn():
             try:
                 with conn.cursor() as _tzcur:
                     _tzcur.execute("SET TIME ZONE UTC")
+                    _tzcur.execute("SET statement_timeout = '10000'")
             except Exception:
                 pass
             cb_db.record_success()

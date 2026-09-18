@@ -21,7 +21,7 @@ def _base_url() -> str:
     _b = settings.VORATOON_API_URL.rstrip("/")
     assert_allowed_url(_b)
     return _b
-TIMEOUT = 60.0
+TIMEOUT = 30.0
 _CLIENTS: dict[int, httpx.Client] = {}
 _CLIENTS_LOCK = threading.Lock()
 

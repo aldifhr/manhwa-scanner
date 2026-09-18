@@ -114,7 +114,7 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
         _cached = _EXISTING_RC_CACHE.get(_key)
         if _cached and (_t.time() - _cached[2]) < _EXISTING_RC_TTL:
             return _cached[0], _cached[1]
-    _cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    _cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()  # feed window 24h (decoupled from _RECENT_CHAPTERS_RETENTION_DAYS 7d safety net)
     try:
         for i in range(0, len(tks), 100):
             chunk = tks[i:i + 100]

@@ -29,7 +29,7 @@
 
 ## 3. Sumber Aktif
 
-- Hanya `ikiru` + `shinigami` (`app/config.py:36` `SOURCE_KEYS`). Jangan tambah sumber tanpa migrasi & `PROXY_ALLOWED_HOSTS`.
+- `ikiru` + `shinigami` + `voratoon` (`app/config.py:62` `SOURCE_KEYS`). Voratoon sengaja aktif (BUG-7 WONTFIX) — toggle via `DISABLED_SOURCES` jika perlu.
 - `collect` & `dispatch` flat-per-source — chapter yang sama di dua sumber tetap 2 row di `recent_chapters` (untuk audit), tapi 1 notif via FCFS.
 
 ## 4. Whitelist & Exclude — Source-Aware
@@ -38,9 +38,10 @@
 - `filter_whitelisted` (`app/cron/collect.py:391`) match `normalize(title_key) + ":" + source` — jangan pakai `title` mentah.
 - `is_excluded` cek `(tk, source)` or `(tk, "all")` (`app/storage/excluded_titles.py:79`).
 
-## 5. No Rate Limit Inbound & No MinIO
+## 5. Rate Limiting (Inbound)
 
-- Inbound `rate limiting` dihapus (`app/main.py:123` dihapus, `app/config.py:81` `CRON_RATE_LIMIT_*` dihapus) — auth via `CRON_SECRET`/`MONITOR_AUTH_TOKEN` + `CORS` allowlist (`app/main.py:62`).
+- `app/middleware/rate_limit.py:17` `5/min` untuk `/auth`, `1000/min` general, wired `app/main.py:133` — single-process in-memory.
+- No MinIO (`app/config.py:64`, `app/utils/minio_presign.py` stub, `PROXY_ALLOWED_HOSTS` tanpa `minio`). Cover langsung `ikiru/shinigami/assets.shngm.id` via `/api/reader/proxy`.
 - `MinIO` dihapus (`app/config.py:64`, `app/utils/minio_presign.py` stub, `PROXY_ALLOWED_HOSTS` tanpa `minio`). Cover langsung `ikiru/shinigami/assets.shngm.id` via `/api/reader/proxy`.
 
 ## 6. Validasi

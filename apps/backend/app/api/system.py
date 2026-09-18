@@ -187,8 +187,8 @@ def _run_pipeline_bg(action: str):
 @router.get("/cron")
 @router.post("/cron")
 async def cron_trigger(request: Request):
-    from app.utils.request_auth import require_monitor_auth
-    if not (require_cron_auth(request) or require_monitor_auth(request)):
+    # Strict trust boundary: cron is CRON_SECRET only (dashboard fallback removed — CSRF+JWT fallback is mitigated but separate boundary is cleaner; FE proxy injects ?token=CRON_SECRET server-side)
+    if not require_cron_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     action = request.query_params.get("action", "update")
     source = request.query_params.get("source")
