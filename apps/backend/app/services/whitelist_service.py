@@ -282,9 +282,7 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
     materializes whitelist from recent_chapters) reflects the deletion instead of
     showing a stale entry that lives only in recent_chapters.
     """
-    from app.db import get_supabase, get_conn, put_conn
-    import json as _json
-
+    from app.db import get_supabase
     sb = get_supabase()
     _tk = (title_key or "").strip()
     _src = (source or "").strip()

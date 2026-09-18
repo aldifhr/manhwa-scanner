@@ -2,7 +2,7 @@
 import pytest
 from app.services.shared import (
     parse_chapter_number, normalize_chapter, fcfs_key, chapter_label,
-    normalize_cover, whitelist_key, is_whitelisted, get_whitelisted_items,
+    whitelist_key, is_whitelisted,
 )
 
 
@@ -46,20 +46,6 @@ def test_chapter_label():
     assert chapter_label("Chapter 50 Special") == "Chapter 50 - Special"
 
 
-def test_normalize_cover():
-    # passthrough http(s)
-    assert normalize_cover("https://x.com/a.jpg") == "https://x.com/a.jpg"
-    assert normalize_cover("http://x.com/a.jpg") == "http://x.com/a.jpg"
-    # proxy wrapper (already full https URL) is returned as-is
-    proxy = "https://scanner.aldifhr.fun/api/reader/proxy?url=https%3A%2F%2Fx.com%2Fa.jpg"
-    assert normalize_cover(proxy) == proxy
-    # bare proxy path (no scheme) gets unwrapped
-    bare = "/api/reader/proxy?url=https%3A%2F%2Fx.com%2Fa.jpg"
-    assert normalize_cover(bare) == "https://x.com/a.jpg"
-    # None
-    assert normalize_cover(None) is None
-
-
 def test_whitelist_key():
     from app.utils.text import normalize_title_key
     k = whitelist_key("Example Series", "shinigami")
@@ -70,15 +56,3 @@ def test_is_whitelisted():
     wl = {(("example series", "shinigami")): {"title": "Example Series"}}
     assert is_whitelisted("example series", "shinigami", wl) is True
     assert is_whitelisted("nope", "shinigami", wl) is False
-
-
-def test_get_whitelisted_items():
-    wl = {(("example series", "shinigami")): {}, (("tower", "ikiru")): {}}
-    items = [
-        {"title_key": "example series", "source": "shinigami"},
-        {"title_key": "tower", "source": "ikiru"},
-        {"title_key": "nope", "source": "ikiru"},
-    ]
-    out = get_whitelisted_items(items, wl)
-    assert len(out) == 2
-    assert all(it["title_key"] in ("example series", "tower") for it in out)

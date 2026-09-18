@@ -99,5 +99,4 @@ def send_via_gateway(
     return False
 
 
-def close_gateway() -> None:
-    return
+

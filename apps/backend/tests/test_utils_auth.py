@@ -6,7 +6,6 @@ from app.utils.auth import (
     cron_token_matches,
     monitor_token_matches,
     check_monitor_auth,
-    role_from_request,
     require_role,
     check_cron_auth,
 )
@@ -137,27 +136,6 @@ class TestCheckMonitorAuth:
             mock_settings.ENVIRONMENT = "production"
             mock_settings.MONITOR_AUTH_TOKEN = "secret"
             assert check_monitor_auth("") is False
-
-
-class TestRoleFromRequest:
-    """Test role_from_request() — resolve role from request."""
-
-    def test_bearer_admin(self):
-        with patch("app.utils.auth.settings") as mock_settings:
-            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
-            mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
-            mock_settings.CRON_SECRET = "cron-secret"
-            assert role_from_request("Bearer monitor-secret") == "user"
-
-    def test_token_param_admin(self):
-        with patch("app.utils.auth.settings") as mock_settings:
-            mock_settings.DASHBOARD_PASSWORD = "manhwascan"
-            mock_settings.MONITOR_AUTH_TOKEN = "monitor-secret"
-            mock_settings.CRON_SECRET = "cron-secret"
-            assert role_from_request("", token_param="monitor-secret") == "user"
-
-    def test_no_auth(self):
-        assert role_from_request("") is None
 
 
 class TestRequireRole:

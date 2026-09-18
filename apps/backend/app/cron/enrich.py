@@ -9,7 +9,7 @@ from __future__ import annotations
 import html as _html
 import re
 
-from app.cron.collect import _parse_types
+from app.cron.collectors.common import _parse_types
 from app.logger import get_logger
 from app.scrapers import ikiru, shinigami
 from app.scrapers.shinigami import _country_to_type

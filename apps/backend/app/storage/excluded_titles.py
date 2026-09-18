@@ -80,15 +80,6 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
             return _CACHE if _CACHE is not None else set()
 
 
-def is_excluded(title_key: str, source: str) -> bool:
-    """True if title_key is excluded for `source` OR for 'all'."""
-    tk = slugify_title_key(title_key)
-    if not tk:
-        return False
-    keys = load_excluded_keys()
-    return (tk, _norm_source(source)) in keys or (tk, "all") in keys
-
-
 def add_excluded_title(
     title_key: str,
     title: Optional[str] = None,

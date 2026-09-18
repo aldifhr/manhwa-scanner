@@ -20,6 +20,14 @@ _cron_locks: dict[str, threading.Lock] = collections.defaultdict(threading.Lock)
 # preload known actions so introspection still works
 for _k in CRON_ACTIONS:
     _cron_locks[_k]  # touch
+
+
+def get_cron_lock(action: str) -> threading.Lock:
+    """Expose the per-action cron lock so other modules (e.g. dispatches'
+    retry-all) can reuse the SAME lock and avoid double-running update."""
+    return _cron_locks.get(action, _cron_locks["update"])
+
+
 import hashlib as _hl
 
 _cron_running = False
@@ -47,141 +55,6 @@ def _record_job(action: str, status: str, stats: dict | None = None):
         _cron_jobs.pop()
 
 
-def get_cron_jobs() -> list[dict]:
-    return list(_cron_jobs)
-
-
-def get_cron_lock(action: str) -> threading.Lock:
-    """Expose the per-action cron lock so other modules (e.g. dispatches'
-    retry-all) can reuse the SAME lock and avoid double-running update."""
-    return _cron_locks.get(action, _cron_locks["update"])
-
-
-def _run_pipeline_bg(action: str):
-    """Run pipeline in a daemon thread (cron endpoint fires and forgets).
-
-    Concurrency guard: per-action threading.Lock prevents overlapping
-    runs of the SAME action. rss-fetch and update can run concurrently.
-    The DB advisory lock is ONLY used to avoid two long `rss-fetch`
-    scrapes running at once — it must never block `update`/`dispatch` runs.
-    """
-    global _cron_running
-    lock = _cron_locks.get(action, _cron_locks["update"])
-    if not lock.acquire(blocking=False):
-        logger.warn("cron skipped: action=%s already running (in-process lock)", action=action)
-        _record_job(action, "skipped")
-        return
-    _cron_running = True
-    _db_conn = None
-    _has_db_lock = False
-    try:
-        # Only `rss-fetch` (the slow scrape) takes the cross-process lock.
-        # Per-source key so rss-fetch:ikiru doesn't block rss-fetch:shinigami (P0 #5)
-        if action == "rss-fetch" or action.startswith("rss-fetch:"):
-            try:
-                from app.db import get_conn, put_conn
-                _db_conn = get_conn()
-                cur = _db_conn.cursor()
-                _key = _advisory_key(action)
-                cur.execute("SELECT pg_try_advisory_lock(%s)", (_key,))
-                _has_db_lock = bool(cur.fetchone()[0])
-                if not _has_db_lock:
-                    logger.warn("cron skipped: rss-fetch already running (DB advisory lock)", action=action)
-                    put_conn(_db_conn)
-                    _db_conn = None
-                    return
-            except Exception as e:
-                logger.warn("cron DB lock check failed, proceeding without it", err=str(e)[:120])
-                _has_db_lock = False
-                if _db_conn:
-                    try:
-                        from app.db import put_conn as _pc
-                        _pc(_db_conn)
-                    except Exception:
-                        pass
-                    _db_conn = None
-
-        from app.cron.pipeline import run_pipeline
-        if action == "sync-meta":
-            from app.cron.series_meta_sync import sync_series_meta
-            _record_job(action, "running")
-            stats = sync_series_meta()
-            _record_job(action, "done", stats)
-            logger.info("cron series-meta sync done", **stats)
-            return
-        if action == "enrich":
-            from app.cron.enrich_resync import enrich_recent_chapters
-            _record_job(action, "running")
-            stats = enrich_recent_chapters()
-            _record_job(action, "done", stats)
-            logger.info("cron enrich resync done", **stats)
-            return
-        if action == "enrich-missing":
-            from app.cron.enrich_resync import enrich_recent_chapters as _enrich_miss
-            _record_job(action, "running")
-            stats = _enrich_miss(limit=100, miss_only=True)
-            _record_job(action, "done", stats)
-            logger.info("cron enrich-missing done", **stats)
-            return
-        if action == "enrich-refresh":
-            from app.cron.enrich_resync import enrich_stale_series_meta
-            _record_job(action, "running")
-            stats = enrich_stale_series_meta(stale_days=7, limit=50)
-            _record_job(action, "done", stats)
-            logger.info("cron enrich-refresh done", **stats)
-            return
-        if action == "voratoon-cover":
-            from app.cron.enrich_resync import enrich_voratoon_covers
-            _record_job(action, "running")
-            stats = enrich_voratoon_covers(limit=50)
-            _record_job(action, "done", stats)
-            logger.info("cron voratoon-cover done", **stats)
-            return
-        if action == "health":
-            from app.storage import health as hs
-            from app.config import settings as _s
-            hm = hs.load_source_health_map(_s.SOURCE_KEYS)
-            logger.info("cron health done", sources=len(hm or {}))
-        else:
-            do_dispatch = action in ("update", "dispatch")
-   
-            # Parse source from action string (e.g., "rss-fetch:ikiru" → source="ikiru")
-            source = None
-            pipeline_action = action
-            if ":" in action:
-                pipeline_action, source = action.split(":", 1)
-   
-            _record_job(action, "running")
-            stats = run_pipeline(do_dispatch=do_dispatch, action=action)
-            _record_job(action, "done", stats)
-            logger.info("cron pipeline done", action=action, stats=stats)
-    except Exception as e:
-        logger.error("cron pipeline failed", action=action, exc=e)
-    finally:
-        _cron_running = False
-        if _has_db_lock and _db_conn:
-            try:
-                cur = _db_conn.cursor()
-                cur.execute("SELECT pg_advisory_unlock(%s)", (_advisory_key(action),))
-                _db_conn.commit()
-            except Exception:
-                try:
-                    _db_conn.rollback()
-                except Exception:
-                    pass
-            try:
-                from app.db import put_conn as _pc2
-                _pc2(_db_conn)
-            except Exception:
-                pass
-        elif _db_conn:
-            try:
-                from app.db import put_conn as _pc3
-                _pc3(_db_conn)
-            except Exception:
-                pass
-        # ALWAYS release the in-process lock — this is the critical fix.
-        lock.release()
 
 
 @router.get("/cron")

@@ -69,13 +69,6 @@ def check_monitor_auth(authorization: str = "", token_param: str = "", cookie: s
     return False
 
 
-def role_from_request(authorization: str = "", token_param: str = "", cookie: str = "") -> str | None:
-    """Compat — returns 'user' if authenticated, else None. Roles removed."""
-    if check_monitor_auth(authorization, token_param, cookie):
-        return "user"
-    return None
-
-
 def require_role(allowed: set[str], authorization: str = "", token_param: str = "", cookie: str = "") -> bool:  # noqa: ARG001
     # ponytail: roles removed — any authenticated caller passes
     return check_monitor_auth(authorization, token_param, cookie)

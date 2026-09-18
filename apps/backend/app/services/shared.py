@@ -47,37 +47,6 @@ def is_whitelisted(title_key: str, source: str, whitelist_map: dict[tuple[str, s
     return whitelist_key(title_key, source) in whitelist_map
 
 
-def get_whitelisted_items(items: list[dict], whitelist_map: dict[tuple[str, str], dict]) -> list[dict]:
-    """Filter items to only whitelisted ones."""
-    result = []
-    for it in items:
-        tk = it.get("title_key", "") or it.get("title", "")
-        src = it.get("source", "")
-        if is_whitelisted(tk, src, whitelist_map):
-            result.append(it)
-    return result
-
-
-# ── Cover URL Normalization ──
-
-def normalize_cover(cov: str | None) -> str | None:
-    """Extract raw URL from proxy wrapper, handle double-encoding."""
-    if not cov or not isinstance(cov, str) or cov.startswith(("http://", "https://")):
-        return cov
-    # ponytail: stdlib parse_qs replaces 3-prefix loop + manual unquote chain, restore manual when parse_qs fails on double-encoded bare % URLs
-    from urllib.parse import parse_qs, urlparse, unquote as _uq
-    try:
-        q = parse_qs(urlparse(cov).query)
-        raw = (q.get("url") or [""])[0]
-        if raw:
-            if "%" in raw:
-                try: raw = _uq(_uq(raw))
-                except Exception: raw = _uq(raw)
-            return raw if raw.startswith(("http://", "https://")) else cov
-    except Exception:
-        pass
-    return cov
-
 
 # ── FCFS Dedupe Key — delegate to centralized FCFS ──
 from app.services.fcfs import fcfs_key as fcfs_key  # noqa: F401, re-export

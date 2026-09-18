@@ -7,18 +7,8 @@ import threading
 
 from app.config import settings
 from app.logger import get_logger
-from app.services.fcfs import parse_chapter_number as _parse_chapter_num
-from app.services.rating_utils import normalize_rating
-from app.utils.cover_scrub import scrub_cover
 
 logger = get_logger("cron:collect:common")
-
-_TYPE_TO_ORIGIN = {"manhwa": "KR", "manhua": "CN", "manga": "JP"}
-
-
-def _type_to_origin(type_str: str) -> str:
-    t = (type_str or "").lower()
-    return _TYPE_TO_ORIGIN.get(t, "")
 
 
 def _origin_to_type(origin: str) -> str:

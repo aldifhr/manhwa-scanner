@@ -9,13 +9,11 @@ load_dotenv()
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.config import settings
 from app.logger import get_logger
 
 logger = get_logger("hono-server")
 
 from app.routers import register_routers
-from fastapi.openapi.utils import get_openapi  # kept for custom_openapi delegate
 
 
 @asynccontextmanager
@@ -133,7 +131,7 @@ app.middleware("http")(security_headers_middleware)
 app.middleware("http")(rate_limit_middleware)
 
 
-from app.utils.request_auth import safe_error, require_monitor_auth
+from app.utils.request_auth import require_monitor_auth
 
 # CSRF/metrics/legacy now in app/middleware/* (extracted)
 

@@ -3,14 +3,12 @@ import pytest
 from unittest.mock import MagicMock, patch
 from app.storage.excluded_titles import (
     load_excluded_keys,
-    is_excluded,
     add_excluded_title,
     remove_excluded_title,
     list_excluded_titles,
     exclude_all_by_source,
     _norm_source,
 )
-from app.utils.text import normalize_title_key
 
 
 @pytest.fixture(autouse=True)
@@ -78,32 +76,6 @@ class TestLoadExcludedKeys:
         with patch("app.storage.excluded_titles.get_supabase", return_value=mock_sb):
             result = load_excluded_keys(force=True)
             assert result == set()
-
-
-class TestIsExcluded:
-    """Test is_excluded() — checks if title is excluded."""
-
-    def test_excluded_for_source(self):
-        mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.execute.return_value.data = [
-            {"title_key": "title 1", "source": "ikiru"},
-        ]
-        with patch("app.storage.excluded_titles.get_supabase", return_value=mock_sb):
-            assert is_excluded("title 1", "ikiru") is True
-
-    def test_excluded_for_all(self):
-        mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.execute.return_value.data = [
-            {"title_key": "title 1", "source": "all"},
-        ]
-        with patch("app.storage.excluded_titles.get_supabase", return_value=mock_sb):
-            assert is_excluded("title 1", "shinigami") is True
-
-    def test_not_excluded(self):
-        mock_sb = MagicMock()
-        mock_sb.table.return_value.select.return_value.execute.return_value.data = []
-        with patch("app.storage.excluded_titles.get_supabase", return_value=mock_sb):
-            assert is_excluded("title 1", "ikiru") is False
 
 
 class TestAddExcludedTitle:

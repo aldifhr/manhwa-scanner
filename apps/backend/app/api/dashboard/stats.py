@@ -7,7 +7,6 @@ from app.utils.request_auth import require_monitor_auth
 from app.config import settings
 from app.logger import get_logger
 from app.storage import health as health_store
-from app.utils.text import normalize_title_key
 from app.utils.cover_scrub import scrub_cover
 
 # Cache for /sources/health (30s TTL).
@@ -20,10 +19,6 @@ router = APIRouter()
 # In-memory snapshot cache (15s TTL) — absorbs frontend poll bursts.
 _SNAP_CACHE: list = [0.0, None]
 _SNAP_TTL = 15.0
-
-
-def _normalize(title_key: str) -> str:
-    return normalize_title_key(title_key or "")
 
 
 @router.get("/sources/health")

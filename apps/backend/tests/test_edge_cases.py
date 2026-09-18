@@ -45,10 +45,10 @@ def test_whitelist_empty():
 
 
 def test_whitelist_duplicates():
-    from app.services.shared import get_whitelisted_items
-    wl = {(("a", "ikiru")): {}, (("a", "ikiru")): {}}  # dict dedups keys
+    from app.services.shared import is_whitelisted
+    wl = {(("a", "ikiru")): {}}
     items = [{"title_key": "a", "source": "ikiru"}, {"title_key": "a", "source": "ikiru"}]
-    out = get_whitelisted_items(items, wl)
+    out = [it for it in items if is_whitelisted(it["title_key"], it["source"], wl)]
     assert len(out) == 2  # both items match same key
 
 
@@ -59,9 +59,4 @@ def test_concurrent_fcfs():
     assert k1 == k2
 
 
-def test_db_failure_graceful():
-    from app.services.shared import normalize_cover
-    # bad input shouldn't throw
-    assert normalize_cover("not a url") == "not a url"
-    assert normalize_cover("") == ""
-    assert normalize_cover(None) is None
+

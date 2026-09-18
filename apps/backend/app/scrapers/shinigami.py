@@ -89,8 +89,7 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
     Uses is_update=true filter but also fetches full catalog (without filter)
     to avoid missing series due to API cache staleness.
     """
-    from datetime import datetime, timezone, timedelta
-
+    
     all_items: list[dict] = []
     seen_ids: set[str] = set()
     

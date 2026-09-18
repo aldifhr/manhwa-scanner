@@ -592,10 +592,6 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             return FastResponse(status_code=502)
 
 
-async def _proxy_url(url: str) -> "FastResponse":
-    """Compat alias — delegates to shared _fetch_image (single seam)."""
-    return await _fetch_image(url, cache_control="public, max-age=3600")
-
 
 @router.get("/reader/cover-img")
 async def reader_cover_public(request: Request):

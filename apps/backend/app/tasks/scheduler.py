@@ -26,8 +26,7 @@ _stop = threading.Event()
 
 
 def _scheduler_loop() -> None:
-    from app.tasks.queue import enqueue_cron, CRON_QUEUE_KEY, CRON_QUEUE_SET, CRON_PROCESSING_KEY, _get_redis
-    from datetime import datetime, timezone
+    from app.tasks.queue import enqueue_cron, CRON_QUEUE_KEY, CRON_PROCESSING_KEY, _get_redis
 
     last_enrich = 0.0
     last_enrich_missing = 0.0

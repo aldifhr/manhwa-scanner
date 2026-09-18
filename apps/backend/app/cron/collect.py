@@ -1,16 +1,13 @@
 """Source collection orchestrator — ponytail: 407L collect (distinct from gap_detector 419L), merge when unified pipeline covers scrape+gap. Source collection orchestrator — delegates per-source to collectors/*."""
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone, timedelta
 
 from app.config import settings
 from app.logger import get_logger
-from app.services.fcfs import parse_chapter_number as _parse_chapter_num
-from app.services.rating_utils import normalize_rating
 from app.utils.text import slugify_title_key
 from app.storage import health, whitelist as wl_store
-from app.cron.collectors.common import _SOURCE_TIMEOUT, _parse_types
+from app.cron.collectors.common import _SOURCE_TIMEOUT
 from app.cron.collectors.ikiru import _collect_ikiru_source
 from app.cron.collectors.shinigami import _collect_shinigami_source
 from app.cron.collectors.voratoon import _collect_voratoon_source
@@ -405,7 +402,7 @@ def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
     for slug in slugs:
         _tk = slugify_title_key(slug)
         _sent = _slug_notified.get(f"{_tk}:ikiru") or set()
-        from app.cron.collectors.common import _cached_chapter_list, _ikiru_re_touch_anchor, _is_ikiru_re_touch, MAX_CHAPTERS_PER_SERIES
+        from app.cron.collectors.common import _cached_chapter_list, _ikiru_re_touch_anchor, _is_ikiru_re_touch
         from app.scrapers import ikiru
         chapters = _cached_chapter_list("ikiru", slug, lambda: ikiru.get_ikiru_chapters(slug))
         if not chapters:
