@@ -247,7 +247,6 @@ def group_results(results: list[dict]) -> list[dict]:
                 "seriesUrl": r.get("seriesUrl"),
                 "country": r.get("country") or r.get("origin"),
                 "format": r.get("format"),
-                "type": r.get("type"),
                 "rating": r.get("rating"),
                 "genres": r.get("genres"),
                 "description": r.get("description") or "",
