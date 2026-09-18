@@ -96,7 +96,7 @@ def run_cron_inline(action: str) -> None:
         from app.storage import recent_chapters
         from datetime import datetime, timezone, timedelta
         from app.tasks.retention import _DISPATCH_HISTORY_RETENTION_DAYS as _LEDGER_DAYS
-        recent_chapters.prune_older_than(24)  # feed 24h
+        recent_chapters.prune_older_than(72)  # feed 3d
         recent_chapters.prune_dispatch_history_older_than(_LEDGER_DAYS * 24)  # ledger 30d — decoupled
         get_supabase().table("cron_run_status").delete().lt(
             "created_at", (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
