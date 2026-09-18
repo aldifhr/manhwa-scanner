@@ -13,6 +13,7 @@ from app.logger import get_logger
 from app.utils.text import normalize_title_key, normalize_shinigami_url
 from app.utils.origin import normalize_origin
 from app.utils.cover_scrub import scrub_cover
+from app.services.rss_query import chapter_label
 
 logger = get_logger("services:dispatch_history")
 
@@ -198,6 +199,9 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             "title": title,
             "cover": _cover,
             "sentAt": r.get("sent_at") or "",
+            "source": r.get("source") or rc.get("source") or "",
+            "chapterLabel": chapter_label(str(r.get("chapter_title") or rc.get("chapter") or "")),
+            "seriesUrl": r.get("series_url") or rc.get("series_url") or "",
         })
 
     if search:
