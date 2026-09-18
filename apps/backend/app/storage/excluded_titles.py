@@ -88,14 +88,14 @@ def add_excluded_title(
     series_url: Optional[str] = None,
 ) -> dict:
     """Upsert an excluded-title row (idempotent via unique (title_key,source))."""
-    tk = slugify_title_key(title_key)
+    tk = slugify_title_key(str(title_key or "").strip())  # guard: trim leading/trailing spaces
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
     try:
         payload: dict = {"title_key": tk, "source": src}
         if title is not None:
-            payload["title"] = title
+            payload["title"] = str(title).strip()  # guard: trim spaces
         if cover is not None:
             payload["cover"] = cover
         if series_url is not None:
