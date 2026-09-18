@@ -185,7 +185,7 @@ def run_cron_worker() -> None:
                         pass
                     result = (_k, raw)
         except Exception as e:
-            logger.warn("redis unavailable in cron worker, retrying", err=str(e)[:160])
+            logger.debug("redis unavailable in cron worker, retrying", err=str(e)[:160])
             _stop.wait(10)
             continue
         if not result:
@@ -196,7 +196,7 @@ def run_cron_worker() -> None:
         try:
             _get_redis().srem(CRON_QUEUE_SET, raw)
         except Exception as e:
-            logger.warn("srem dedup cleanup failed (will retry via orphan sweep)", err=str(e)[:120])
+            logger.debug("srem dedup cleanup failed (will retry via orphan sweep)", err=str(e)[:120])
         try:
             item = json.loads(raw)
         except json.JSONDecodeError:
@@ -319,7 +319,7 @@ def worker_loop() -> None:
         except Exception as e:
             _fail_streak += 1
             if _fail_streak <= 3:
-                logger.warn("redis unavailable, retrying (dev: install Redis or set REDIS_URL)", err=str(e)[:160])
+                logger.debug("redis unavailable, retrying (dev: install Redis or set REDIS_URL)", err=str(e)[:160])
             else:
                 logger.debug("redis still unavailable", err=str(e)[:80])
             wait = min(5 * (2 ** min(_fail_streak - 1, 3)), 30)
