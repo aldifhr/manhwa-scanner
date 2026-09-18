@@ -275,9 +275,7 @@ function AllTabInner() {
     view,
   });
 
-  useEffect(() => {
-    console.log("[AllTab] sort:", sortMode, "group:", groupMode, "filtered:", filtered.length, "grouped:", grouped.length, "top3:", grouped.slice(0,3).map(g=>g.title).join(" | "));
-  }, [all.length, filtered.length, typeFilter, feed, sourceFilter, sortMode, groupMode, grouped.length, flatDisplay.length, hasMore, isLoading, error?.message]);
+  // sort/group debug removed
 
   // nowl + type filter: client filter after fetch 100 can be empty while hasMore true → auto fetch next page until filled
   useEffect(() => {

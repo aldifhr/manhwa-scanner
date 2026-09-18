@@ -157,9 +157,9 @@ export function WhitelistGrid() {
           onChange={(e) => setTypeFilter(e.target.value)}
           options={[
             { value: "All", label: "Type: All" },
-            { value: "manhwa", label: "Manhwa (KR)" },
-            { value: "manhua", label: "Manhua (CN)" },
-            { value: "no_type", label: "No Type" },
+            { value: "manhwa", label: "Manhwa" },
+            { value: "manhua", label: "Manhua" },
+            { value: "manga", label: "Manga" },
           ]}
         />
 
