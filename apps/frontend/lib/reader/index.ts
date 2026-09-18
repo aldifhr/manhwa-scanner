@@ -41,7 +41,7 @@ export const Reader = {
     });
     // ponytail: BE supports page_size up to 10000 for whitelist → use bulk 1000 in one shot (B: jangan dipaksa 100)
     return paginatedGet(
-      "/api/v1/reader/whitelist",
+      "/api/v1/whitelist",
       p,
       mapWhitelist,
       undefined,
@@ -63,7 +63,7 @@ export const Reader = {
       if (search) p.set("search", search);
       // ponytail: dispatch-history supports page_size 1000 → single request, not 10×100, tapi UI harus page-based
       return (await paginatedGet(
-        "/api/v1/reader/dispatch-history",
+        "/api/v1/dispatch-history",
         p,
         mapHistory,
         undefined,
@@ -104,7 +104,7 @@ export const Reader = {
         pageSize: number;
         totalPages: number;
       };
-    }>(`/api/v1/reader/dispatch-history?${p}`);
+    }>(`/api/v1/dispatch-history?${p}`);
     const d = data.data as {
       results: unknown[];
       total: number;
@@ -271,7 +271,7 @@ export const Reader = {
   addWhitelistEntry: async (data: Record<string, unknown>) => {
     try {
       const res = await readerFetch<{ status?: string; success?: boolean }>(
-        "/api/v1/reader/whitelist",
+        "/api/v1/whitelist",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -298,7 +298,7 @@ export const Reader = {
         deleted?: number;
         success?: boolean;
         error?: string | { message?: string };
-      }>("/api/v1/reader/whitelist", {
+      }>("/api/v1/whitelist", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

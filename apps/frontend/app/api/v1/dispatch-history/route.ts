@@ -8,6 +8,7 @@ import {
   errorResponse,
   catchError,
 } from "@/lib/server-api";
+import { rewriteCoverUrl } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   const search = (request.nextUrl.searchParams.get("search") || "")
@@ -19,6 +20,8 @@ export async function GET(request: NextRequest) {
       1000
     )
   );
+  // Clamp page_size (1..1000) to match the backend's validation bound
+  // ("page_size must be between 1 and 1000"). Requesting more would 400.
   const pageSize = String(
     Math.min(
       Math.max(Number(request.nextUrl.searchParams.get("page_size")) || 50, 1),
@@ -42,24 +45,38 @@ export async function GET(request: NextRequest) {
     try {
       body = await res.json();
     } catch {
-      return errorResponse(`Upstream produced non-JSON body`, 502);
+      return errorResponse(`Upstream returned non-JSON body`, 502);
     }
 
     if (!res.ok || !body.success) {
-      return errorResponse(
-        (body.error as string) ?? `Upstream error`,
-        res.status
-      );
+      const msg =
+        typeof body.error === "string" ? body.error : `Upstream ${res.status}`;
+      return errorResponse(msg, res.status);
     }
 
-    return NextResponse.json(body, {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, no-store, must-revalidate",
-        Vary: "Cookie",
-        Pragma: "no-cache",
-        "X-Cache": "MISS",
-      },
+    // Normalize backend field casing + rewrite covers so the FE contract
+    // ({seriesUrl, titleKey, cover}) holds regardless of backend naming.
+    const data = (body.data ?? {}) as Record<string, unknown>;
+    const results = (Array.isArray(data.results) ? data.results : []) as Record<
+      string,
+      unknown
+    >[];
+    const normalized = results.map((item) => ({
+      ...item,
+      titleKey: item.titleKey ?? item.title_key ?? null,
+      seriesUrl: item.seriesUrl ?? item.series_url ?? null,
+      chapterLabel: item.chapterLabel ?? item.chapter_label ?? null,
+      canonicalTitleKey:
+        item.canonicalTitleKey ?? item.canonical_title_key ?? null,
+      isDuplicate: item.isDuplicate ?? item.is_duplicate ?? false,
+      cover: rewriteCoverUrl(
+        typeof item.cover === "string" ? item.cover : null
+      ),
+    }));
+
+    return NextResponse.json({
+      ...body,
+      data: { ...data, results: normalized },
     });
   } catch (err) {
     return catchError(err);
