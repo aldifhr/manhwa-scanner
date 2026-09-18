@@ -53,7 +53,7 @@ class WhitelistPatch(BaseModel):
 
 
 class WhitelistDeleteRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     title_key: Optional[str] = Field(default=None, max_length=200)
     titleKey: Optional[str] = Field(default=None, max_length=200)
     title: Optional[str] = Field(default=None, max_length=200)
@@ -63,7 +63,7 @@ class WhitelistDeleteRequest(BaseModel):
 
 
 class WhitelistNormalizeRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     dry_run: Optional[bool] = None
 
 
