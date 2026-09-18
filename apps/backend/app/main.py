@@ -117,7 +117,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://fe.aldifhr.fun", "https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"],
+    allow_origins=["https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"],
     allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*", "X-CSRF-Token", "Authorization"],
     allow_credentials=True,
