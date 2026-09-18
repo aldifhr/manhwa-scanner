@@ -153,10 +153,6 @@ export const baseRssItemSchema = z.preprocess(
       .string()
       .nullish()
       .catch(() => undefined),
-    status: z
-      .string()
-      .nullish()
-      .catch(() => undefined),
     rating: strOrNum.nullish().catch(() => undefined),
     genres: z.array(z.string()).catch([]),
     description: z

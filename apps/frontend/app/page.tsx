@@ -366,7 +366,7 @@ export default function HomePage() {
     gcTime: gcTimes.homeFeed,
     placeholderData: keepPreviousData,
     retry: false,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 
   const { optimisticWhitelist, optimisticExcluded, addingKey, handleAddGroup } = useFeedActions();
@@ -384,7 +384,7 @@ export default function HomePage() {
     staleTime: staleTimes.dashboard,
     gcTime: gcTimes.dashboard,
     retry: false,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     enabled: isLoggedInForSnapshot,
   });
 

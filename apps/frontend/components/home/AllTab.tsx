@@ -139,7 +139,7 @@ function AllTabInner() {
     staleTime: staleTimes.dispatch,
     gcTime: gcTimes.dispatch,
     refetchInterval: 300_000,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     enabled: all.length > 0 && !isSentAvailable,
   });
   const sentKeys = useMemo(() => {

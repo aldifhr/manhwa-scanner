@@ -1,11 +1,14 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const DISMISS_KEY = "announcement_dismissed_at";
 const DISMISS_TTL = 24 * 60 * 60 * 1000;
 
 export default function Announcement() {
+  const pathname = usePathname();
+  if (pathname === "/login") return null;
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
     try {
