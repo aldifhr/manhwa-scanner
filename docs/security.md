@@ -42,48 +42,42 @@ Frontend sends `x-csrf-token` via `withCsrf()` in `lib/csrf.ts` + `reader/transp
 
 ## Rate limiting
 
-**No inbound rate limiting.** Auth is the gate:
-- `CRON_SECRET` for cron triggers
-- `MONITOR_AUTH_TOKEN` for monitor endpoints
-- `DASHBOARD_PASSWORD` for admin
-- CORS allowlist (`app/main.py`)
+`app/middleware/rate_limit.py:12` `rate_limit_middleware` (in-memory, per-IP per-minute, wired in `app/main.py:133`):
+
+- `POST /api/v1/auth` (login/refresh) → **5/min per IP** (`429 rate_limited`)
+- all other routes → **1000/min per IP**
+- eviction of stale buckets at 50k entries to bound memory
+
+Still gated by auth + CORS allowlist (`app/main.py`).
 
 ## P0 security findings (from BUG.md)
 
 | ID | Severity | Issue | Status |
 |----|----------|-------|--------|
-| BUG-2 | 🔴 Critical | Hardcoded default `DASHBOARD_PASSWORD="manhwascan"` + boot guard doesn't check it | Documented, unpatched |
-| BUG-4 | 🔴 High | CSRF bypass: `SameSite=None` + whitelist includes `/api/v1/whitelist` and `/api/v1/cron` | Documented, unpatched |
-| BUG-6 | 🔴 High | `autocommit=True` breaks `FOR UPDATE SKIP LOCKED` dispatch claims → double Discord | Documented, unpatched |
+| BUG-2 | 🔴 Critical | Hardcoded default `DASHBOARD_PASSWORD="manhwascan"` + boot guard doesn't check it | **FIXED** — `config.py:76` default `""` + `_validate_settings:205` enforces in production |
+| BUG-4 | 🔴 High | CSRF bypass: `SameSite=None` + whitelist includes `/api/v1/whitelist` and `/api/v1/cron` | **FIXED** — `app/middleware/csrf.py:5` whitelist now only `{auth,interactive}`; `/whitelist` and `/cron` require `x-csrf-token` or `Bearer` |
+| BUG-6 | 🔴 High | `autocommit=True` breaks `FOR UPDATE SKIP LOCKED` dispatch claims → double Discord | **FIXED** — `app/services/claim.py:84` `conn.autocommit=False` + `conn.commit()` + same pattern in `app/storage/dispatch.py:269` |
 | BUG-14 | 🔴 P1 | CI `pytest \| tail` hides failures (no `pipefail`) | **FIXED** |
 | BUG-15 | 🔴 P1 | CI frontend `pnpm` vs `bun` mismatch | **FIXED** |
 | BUG-16 | 🔴 P1 | Auth `?token=` query string leaks in logs | **FIXED** (deprecated) |
 | BUG-17 | 🔴 P1 | Audit log disabled | **FIXED** (added `audit_log` table) |
 | BUG-18 | 🔴 P1 | Debug API public (exposed `BACKEND_URL`, `Set-Cookie`) | **FIXED** |
 
-### BUG-2 detail — hardcoded password
+### BUG-2 detail — hardcoded password — FIXED
 
-`config.py:58` has `DASHBOARD_PASSWORD: str = "manhwascan"`. Boot guard (`config.py:138`) checks 5 secrets but **not** `DASHBOARD_PASSWORD`. If deploy forgets to set env, production is wide open with a guessable password.
+Was `config.py:76` `DASHBOARD_PASSWORD="manhwascan"` with boot guard not checking it. Now default `""` and `_validate_settings:205` raises `BOOT GUARD: ... DASHBOARD_PASSWORD` in production if missing. Fix verified.
 
-**Fix:** Change default to `""` + add to boot guard, or guard against the known default value.
+### BUG-4 detail — CSRF bypass — FIXED
 
-### BUG-4 detail — CSRF bypass
+Was `SameSite=None` + `_CSRF_WHITELIST` including `/whitelist` and `/cron`. Now `app/middleware/csrf.py:5` only whitelists `{auth,interactive}`. `/cron` and `/whitelist` require `x-csrf-token == ikiru_csrf_token` or `Authorization: Bearer`. FE `withCsrf()` already sends it; state-changing cross-site without token now `403`.
 
-`SameSite=None` on session cookie is needed for cross-subdomain (`scanner` ↔ `komik` on `.aldifhr.fun`), but combined with CSRF whitelist including state-changing routes (`/api/v1/whitelist`, `/api/v1/cron`), cross-site requests succeed without `x-csrf-token`.
+### BUG-6 detail — autocommit breaks dispatch claims — FIXED
 
-**Fix:** Remove state-changing routes from `_CSRF_WHITELIST`. FE already sends `x-csrf-token` for all mutations.
-
-### BUG-6 detail — autocommit breaks dispatch claims
-
-`db_adapter.py:125` sets `conn.autocommit = True` globally to fix stale snapshot reads. But `claim_recent_chapters_for_dispatch()` uses `SELECT ... FOR UPDATE SKIP LOCKED` which requires holding a transaction. With `autocommit=True`, the lock is released immediately → concurrent workers can claim the same chapter → double Discord.
-
-**Fix:** Temporarily set `autocommit=False` within the claim transaction.
+Was `db_adapter.py:get_conn` `autocommit=True` releasing `FOR UPDATE SKIP LOCKED` immediately. Now `app/services/claim.py:84` sets `conn.autocommit=False`, holds lock across `SELECT ... FOR UPDATE SKIP LOCKED` + `INSERT dispatch_claims ... ON CONFLICT DO NOTHING` + `conn.commit()`, with `rollback` on error and `put_conn` in `finally`. Same transactional pattern applied in `app/storage/dispatch.py:269`.
 
 ## Security recommendations
 
-1. **Patch BUG-2 immediately** — remove hardcoded default, add to boot guard
-2. **Patch BUG-4** — remove state-changing routes from CSRF whitelist
-3. **Patch BUG-6** — use transaction-scoped `autocommit=False` for claim
-4. Add `DASHBOARD_PASSWORD=change-me` to `.env.example`
-5. Consider `SameSite=Lax` + `Origin` check instead of `SameSite=None`
-6. Add rate limiting on `/api/v1/auth` login endpoint
+1. ~~Patch BUG-2/4/6~~ — done (see above)
+2. Keep `DASHBOARD_PASSWORD` documented in `.env.example` as `change-me` for production
+3. Consider `SameSite=Lax` + `Origin` check if cross-subdomain `scanner↔komik` no longer needs `None`
+4. Rate limiting on `/api/v1/auth` is now **5/min** via `rate_limit_middleware` — monitor `429` metrics
