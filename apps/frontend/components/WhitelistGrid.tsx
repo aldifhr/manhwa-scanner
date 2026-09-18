@@ -25,7 +25,8 @@ export function WhitelistGrid() {
       >,
     staleTime: staleTimes.whitelist,
     gcTime: gcTimes.whitelist,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
 
   const [sourceFilter, setSourceFilter] = useState("All");

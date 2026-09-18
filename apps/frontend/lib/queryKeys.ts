@@ -65,8 +65,8 @@ export const staleTimes = {
   rss: 30_000,
   homeFeed: 30_000,
   dashboard: 60_000,
-  // whitelist: relatif stabil → 1-5 menit
-  whitelist: 2 * 60_000,
+  // whitelist: cross-device harus cepat sinkron → 30s
+  whitelist: 30_000,
   // dispatch: history tidak sering berubah
   dispatch: 5 * 60_000,
   dispatchPage: 2 * 60_000,
