@@ -149,7 +149,11 @@ async def _rss_impl(request: Request):
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         # ponytail: fetch_limit capped 300 (not 1000) — Python group_results + filtering was O(fetch_limit) per varied q=
-        _fetch_limit = min(300, max(100, limit * page * 2 + 20))
+        # For grouped RSS, fetch all 24h chapters (bounded by cutoff) — per-series chapters must not be truncated
+        if group:
+            _fetch_limit = 2000
+        else:
+            _fetch_limit = min(300, max(100, limit * page * 2 + 20))
         results, wl_map, sm_map, dh_sent = await fetch_rss_data(
             cutoff=cutoff,
             source_f=source_f,

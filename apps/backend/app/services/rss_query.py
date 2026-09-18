@@ -139,6 +139,12 @@ def map_result(
     sm = sm_map.get((tk, src)) or sm_map.get((nk, src), {}) or {}
 
     is_wl = (tk, src) in wl_map or (nk, src) in wl_map
+    if not is_wl:
+        # Cross-source whitelist: if title is whitelisted in any source, mark as whitelisted
+        for (wtk, wsrc) in wl_map:
+            if normalize_title_key(wtk) == nk:
+                is_wl = True
+                break
     _title_norm = normalize_title_key(it.get("title") or "")
     if _title_norm and src in ("ikiru", "voratoon") and not is_wl:
         if wl_title_set is not None:
