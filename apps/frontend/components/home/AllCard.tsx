@@ -136,7 +136,7 @@ function AllCard({
 
         <RatingRow rating={item.rating} genres={item.genres} />
         {(item.sentAt || item.createdAt) && (
-          <span className="text-[11px] text-white/50">{timeAgo(item.sentAt || item.createdAt)}</span>
+          <span suppressHydrationWarning className="text-[11px] text-white/50">{timeAgo(item.sentAt || item.createdAt)}</span>
         )}
 
         <Synopsis text={item.description} />

@@ -104,7 +104,7 @@ function GroupedSeriesCard({
 
         <RatingRow rating={series.rating} genres={series.genres} />
         {(series.chapters[0]?.sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt) && (
-          <span className="text-[11px] text-white/50">{timeAgo(series.chapters[0].sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt)}</span>
+          <span suppressHydrationWarning className="text-[11px] text-white/50">{timeAgo(series.chapters[0].sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt)}</span>
         )}
 
         <Synopsis text={series.description} />
