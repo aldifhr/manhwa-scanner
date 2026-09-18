@@ -53,7 +53,8 @@ export function useInfiniteFeed(opts: {
       lastPage.hasMore ? (lastPage.page + 1) : undefined,
     staleTime: staleTimes.rss,
     gcTime: gcTimes.rss,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
     retry: 1,
   });
 
