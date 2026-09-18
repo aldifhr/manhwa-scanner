@@ -236,11 +236,10 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         if not row.get("type") and _norm:
             _origin_to_type = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
             row["type"] = _origin_to_type.get(_norm, "")
-        _r = {k: row.get(k) for k in allowed}
+        _r = {k: row.get(k) for k in allowed if k != "origin"}
         for _k in ("rating", "description", "type"):
             if _r.get(_k) is None:
                 _r[_k] = ""
-        _r["origin"] = _norm or None
         if _r.get("genres") is None:
             _r["genres"] = []
         for _k in ("chapter_num", "rating"):
@@ -524,7 +523,6 @@ def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:
                 "title_key": r.get("title_key", ""),
                 "source": r.get("source", ""),
                 "title": r.get("title", ""),
-                "origin": r.get("origin") or "",
                 "cover": r.get("cover") or "",
                 "series_url": r.get("series_url") or "",
                 "chapter_count": int(r.get("chapter_count") or 0),
@@ -625,7 +623,6 @@ def _row_to_item(r: dict) -> dict:
         # rewrites on read so the backend proxy resolves it server-side.
         "cover": r.get("cover") or "",
         "series_url": r.get("series_url") or "",
-        "origin": r.get("origin") or "",
         "updated_time": r.get("updated_time") or "",
         "description": r.get("description") or "",
         # Carry rating + genres through to dispatch embeds. Previously dropped
