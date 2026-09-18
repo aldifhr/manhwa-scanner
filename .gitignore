@@ -1,50 +1,47 @@
-# dependencies
+# OS
+.DS_Store
+
+# Node
 node_modules/
-
-# bun
-bun.lockb
-
-# build
 .next/
-dist/
-tsconfig.tsbuildinfo
+out/
 
-# env
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
 .env
 .env.local
-.env.bak.*
-.env*.local
 
-# committed session cookies (NEVER track — contain live auth JWTs)
-cookies.txt
-*-cookies.txt
-be-cookies.txt
-fe-cookies.txt
+# Logs
+logs/
+*.log
+npm-debug.log*
 
-# vercel
-.vercel/
-.svelte-kit/
-.superpowers/
-.output/
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# misc
-.slim/
-.qoder/
-*.pyc
-__pycache__/
-
-# coverage + test artifacts (CI-only)
-.coverage
-coverage.xml
+# Test artifacts
 htmlcov/
+.coverage
 .pytest_cache/
+.mypy_cache/
 
-# clerk configuration (can include secrets)
-/.clerk/
-.vercel
+# Vercel
+.vercel/
 
-# backend next cache + local bin
-apps/backend/.next/
-apps/backend/.local/
-.git-rewrite/
-.git-rewrite/*.bak*
+# Audit artifacts — do NOT commit to main
+BUG.md
+QUERY.md
+bug_file.md
+verified_file.md
+*.audit.md

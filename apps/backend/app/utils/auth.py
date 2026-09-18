@@ -11,7 +11,8 @@ logger = get_logger("utils:auth")
 
 
 def _dashboard_passwords() -> list[str]:
-    return [c for c in (settings.DASHBOARD_PASSWORD, settings.MONITOR_AUTH_TOKEN) if c]
+    # ponytail: DASHBOARD_PASSWORD only — MONITOR_AUTH_TOKEN removed as fallback (P1)
+    return [c for c in (settings.DASHBOARD_PASSWORD,) if c]
 
 
 def token_matches(provided: str, *, role: str = "both") -> bool:

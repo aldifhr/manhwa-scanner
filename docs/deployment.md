@@ -95,7 +95,7 @@ All secrets are set via PM2 `env` in `ecosystem.config.js` or system environment
 | `DASHBOARD_PASSWORD` | Admin login |
 | `AUTH_SECRET` | JWT signing |
 | `CRON_SECRET` | Cron trigger auth |
-| `MONITOR_AUTH_TOKEN` | Monitor/health auth |
+| `MONITOR_AUTH_TOKEN` | ⚠️ Deprecated — removed as fallback, use `DASHBOARD_PASSWORD` |
 | `DISCORD_BOT_TOKEN` | Discord dispatch |
 | `DATABASE_URL` | PostgreSQL |
 | `REDIS_URL` | Redis queue |
