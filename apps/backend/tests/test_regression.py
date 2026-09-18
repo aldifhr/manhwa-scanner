@@ -27,7 +27,7 @@ class TestRecentChaptersDedup:
 
     def test_load_existing_rc_raises_on_error(self):
         from app.storage.recent_chapters import _load_existing_rc
-        with patch("app.storage.recent_chapters.get_supabase") as mock_sb:
+        with patch("app.storage.recent_chapters_sql.get_supabase") as mock_sb:
             mock_sb.return_value.table.return_value.select.return_value.in_.return_value.gte.return_value.execute.side_effect = Exception("DB down")
             with pytest.raises(Exception, match="DB down"):
                 _load_existing_rc([{"title_key": "solo-leveling"}])
@@ -49,7 +49,7 @@ class TestWhitelistCache:
     """Whitelist origin cache should invalidate on add."""
 
     def test_invalidate_chain(self):
-        from app.storage import recent_chapters as rc
+        from app.storage import recent_chapters_sql as rc
         rc._wl_origins = {("test", "ikiru"): "KR"}
         rc._WL_ORIGIN_TS = 9999999999
         rc.invalidate_whitelist_origin_cache()
