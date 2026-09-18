@@ -17,14 +17,14 @@ export function useWhitelistFilters(
     const out = items.filter((item) => {
       if (
         debouncedSearch &&
-        !item.title.toLowerCase().includes(debouncedSearch.toLowerCase())
+        !String(item.title ?? "").toLowerCase().includes(String(debouncedSearch ?? "").toLowerCase())
       )
         return false;
       if (sourceFilter !== "All" && item.source !== sourceFilter) return false;
       if (typeFilter !== "All") {
-        const raw = String(item.type || "").toLowerCase().trim();
-        const t = normalizeType(item.type);
-        if (t !== typeFilter.toLowerCase()) return false;
+        const raw = String((item as any).format ?? item.type ?? "").toLowerCase().trim();
+        const t = normalizeType((item as any).format ?? item.type);
+        if (t !== String(typeFilter ?? "").toLowerCase()) return false;
       }
       return true;
     });

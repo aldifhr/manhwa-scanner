@@ -14,11 +14,17 @@ export function mapHistory(r: unknown) {
 }
 export function mapRss(r: unknown) {
   const x = r as Record<string, unknown>;
+  const rawTk = (x.title_key as string) ?? (x.titleKey as string);
+  const fallbackTk = rawTk ?? (x.title ? String(x.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) : "");
+  const rawCl = (x.chapter_label as string) ?? (x.chapterLabel as string) ?? (x.chapter as string);
+  const rawCn = (x.chapter_number as number) ?? (x.chapterNumber as number);
   return {
     ...x,
-    titleKey: (x.title_key as string) ?? (x.titleKey as string),
-    chapterUrl: (x.chapter_url as string) ?? (x.chapterUrl as string),
-    seriesUrl: (x.series_url as string) ?? (x.seriesUrl as string),
+    titleKey: fallbackTk,
+    chapterLabel: rawCl ?? (rawCn != null ? `Chapter ${rawCn}` : undefined),
+    chapterNumber: rawCn,
+    chapterUrl: (x.chapter_url as string) ?? (x.chapterUrl as string) ?? (x.url as string),
+    seriesUrl: (x.series_url as string) ?? (x.seriesUrl as string) ?? (x.url as string) ?? "",
     isWhitelisted:
       (x.is_whitelisted as boolean) ?? (x.isWhitelisted as boolean),
     type: (x.format as string) ?? (x.type as string),

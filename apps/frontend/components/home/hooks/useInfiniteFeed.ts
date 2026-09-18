@@ -34,13 +34,14 @@ export function useInfiniteFeed(opts: {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: queryKeys.rssFeedInfinite(
-      exclude,
+    queryKey: [
+      "rss-feed-flat-infinite",
+      exclude ?? "",
       PAGE_SIZE,
-      sourceFilter || null,
+      sourceFilter || "all",
       whitelistParam,
-      typeParam
-    ),
+      typeParam ?? "all",
+    ] as const,
     queryFn: ({ pageParam }) =>
       Reader.getRssFlatPage(pageParam as number, PAGE_SIZE, {
         exclude,

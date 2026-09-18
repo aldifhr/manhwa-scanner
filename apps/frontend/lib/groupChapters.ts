@@ -95,8 +95,8 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
         titleKey: tk,
         title: it.title,
         cover: it.cover,
-        origin: it.origin,
-        type: (it as unknown as { type?: string | null }).type ?? null,
+        origin: (it as unknown as { country?: string | null }).country ?? it.origin,
+        type: (it as unknown as { format?: string | null }).format ?? (it as unknown as { type?: string | null }).type ?? null,
         seriesUrl: it.seriesUrl,
         rating: it.rating,
         genres: it.genres,
@@ -108,10 +108,11 @@ export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
       if (it.cover) coverSource.set(gk, it.source);
     } else {
       // keep type if missing (for flag visibility)
-      if (!g!.type && it.type) g!.type = it.type;
+      const itFmt = (it as unknown as { format?: string | null }).format ?? (it as unknown as { type?: string | null }).type;
+      if (!g!.type && itFmt) g!.type = itFmt;
     }
     g!.chapters.push({
-      key: `${gk}:${it.source}:${it.chapter}`,
+      key: `${gk}:${chapId}:${it.chapterUrl || it.url || ""}`,
       titleKey: tk,
       chapter: it.chapter,
       chapterLabel: it.chapterLabel,

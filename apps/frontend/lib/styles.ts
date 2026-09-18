@@ -44,14 +44,14 @@ const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
     chip: "bg-orange-500/15 text-orange-400",
   },
 };
-export function sourceBadgeClass(source: string): string {
+export function sourceBadgeClass(source: string | null | undefined): string {
   return (
-    SOURCE_MAP[source.toLowerCase()]?.badge ??
+    SOURCE_MAP[String(source ?? "").toLowerCase()]?.badge ??
     "bg-white/10 text-white/80 border border-white/10"
   );
 }
-export function sourceChipClass(source: string): string {
-  return SOURCE_MAP[source.toLowerCase()]?.chip ?? "bg-white/10 text-white/80";
+export function sourceChipClass(source: string | null | undefined): string {
+  return SOURCE_MAP[String(source ?? "").toLowerCase()]?.chip ?? "bg-white/10 text-white/80";
 }
 
 // Canonical status / severity colors (single source of truth).
