@@ -134,6 +134,7 @@ async def get_excluded(request: Request):
                 "title": title,
                 "source": r.get("source"),
                 "createdAt": r.get("created_at"),
+                "cover": row_cover or cover_map.get(tk) or None,
                 "seriesUrl": series_url,
             }
             results.append(item)
