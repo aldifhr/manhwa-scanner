@@ -282,6 +282,13 @@ function AllTabInner() {
     view,
   });
 
+  // nowl + type filter: client filter after fetch 100 can be empty while hasMore true → auto fetch next page until filled
+  useEffect(() => {
+    if (filtered.length === 0 && hasMore && !isLoading && !loadingMore && !error) {
+      loadMore();
+    }
+  }, [filtered.length, hasMore, isLoading, loadingMore, error, loadMore]);
+
   const deepLinkLower = deepLinkSeries?.toLowerCase() ?? "";
   const groupedDeepLinkIndex = useMemo(() => {
     if (!deepLinkLower) return -1;
