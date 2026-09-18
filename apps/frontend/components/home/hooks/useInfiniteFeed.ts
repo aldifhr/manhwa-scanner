@@ -54,7 +54,6 @@ export function useInfiniteFeed(opts: {
     staleTime: staleTimes.rss,
     gcTime: gcTimes.rss,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
     retry: 1,
   });
 
