@@ -1,13 +1,32 @@
 # CONTEXT.md — Domain Glossary for manhwa-scanner
 
-> Monorepo `apps/frontend` (Next 16) + `apps/backend` (FastAPI) → `openapi.json` sync, `komik` (FE) + `scanner` (BE).
+> Monorepo `apps/frontend` (Next 16) + `apps/backend` (FastAPI) → `openapi.json` sync, `komik` (FE manhwa.aldifhr.fun) + `scanner` (BE scanner.aldifhr.fun).
 
 ## Roles — Full Admin Only (single password `DASHBOARD_PASSWORD`)
 
 - **Anon** — belum login: `localStorage` untuk `continueReading`/`readItems`/`bookmarks` (max 100), lihat `Home` `/`, `Recent` `/recent`, `Bookmarks` lokal. `GET /whitelist` public buat badge `Added`, tapi halaman `/whitelist`, `/exclude-list`, `/dispatch-history`, `/admin`, `/status` → `302 /login`.
 - **Admin** — `POST /api/v1/auth?action=login` `{password: DASHBOARD_PASSWORD}` → `ikiru_dashboard_session` `httpOnly` + `ikiru_csrf_token` readable (nav gating `Navbar.tsx:21` cek `csrf`) → full: `whitelist`/`exclude`/`dispatch`/`health/refresh`/`cron`/`queue/retry` + `GET /admin` + `GET/POST /bookmarks` & `continue-reading` per `session_hash` (DB `chapter_bookmarks`).
 
-Cookie: `ikiru_dashboard_session` `httpOnly` + `ikiru_csrf_token` readable (7d, `AUTH_SECRET` HS256). Tidak ada `ikiru_role`/`app_users`/`member` lagi.
+Cookie: `ikiru_dashboard_session` `httpOnly` + `ikiru_csrf_token` readable (7d, `AUTH_SECRET` HS256, `SameSite=None; Secure; domain=.aldifhr.fun`). Tidak ada `ikiru_role`/`app_users`/`member` lagi.
+
+## Sources — 3 Active
+
+- `ikiru` (08.ikiru.wtf), `shinigami` (api.shngm.io), `voratoon` (api.voratoon.com) — `SOURCE_KEYS=[ikiru,shinigami,voratoon]` `config.py:62`. Toggle via `DISABLED_SOURCES`.
+- Scheduler: `update 120s`, `rss-fetch:ikiru/shinigami/voratoon 600s`, `enrich 3600s`.
+
+## Security — Hardened 2026-09-10
+
+- CSRF `app/middleware/csrf.py:5` whitelist hanya `{auth,interactive}` — `/cron` & `/whitelist` wajib `x-csrf-token` atau `Bearer` (Lua dedup `queue.py:47` tanpa RPOP race).
+- CORS explicit `scanner.aldifhr.fun` + `manhwa.aldifhr.fun` `main.py:120` (no regex), `fe.` removed.
+- Rate limit `rate_limit.py:17` `5/min` auth, `1000/min` general, in-memory per-IP.
+- Cron trust strict: `POST /api/v1/cron` `CRON_SECRET` only `system.py:191` (FE proxy injects `?token` server-side), `/metrics` allow both.
+- Pydantic `extra="forbid"` strict (`whitelist.py:24` fix), `/healthz` generic `unavailable` `health.py:19`.
+
+## Queue & Retention — Decoupled
+
+- Queue `beag:cron` Lua `SADD→RPUSH→EXPIRE` atomik `queue.py:47` + `SREM` on pop `lifecycle.py:196` + orphan sweep `queue.py:116` + `socket_timeout 5s`.
+- Retention: `recent_chapters` feed `24h` (`lifecycle.py:98`), `dispatch_history` ledger `30d` `retention.py:8` + cap `500/series` (toleransi downtime >2d).
+- DB `statement_timeout 10s` `db_adapter.py:103`, Voratoon `TIMEOUT 30s` `scrapers/voratoon.py:24`.
 
 ## Routes — Public vs Protected
 
