@@ -198,7 +198,24 @@ def get_shinigami_chapters(manga_id: str, per_page: int = 100) -> list[dict]:
     dicts with chapter_number and chapter_id. Alias of the
     canonical fetcher (preserved for callers in gap_detector,
     backfill scripts)."""
-    data = _get(f"/chapter/{manga_id}/list?page=1&page_size={per_page}&sort_by=chapter_number&sort_order=desc")
-    if not data:
-        return []
-    return data.get("data", [])
+    all_ch: list[dict] = []
+    seen_ids: set[str] = set()
+    # ponytail: shinigami API page_size max 100, but may return fewer under CF pressure.
+    # Paginate until no rows or gap >50 chapters (safety bound).
+    for page in range(1, 6):  # max 5 pages = 500 chapters
+        data = _get(f"/chapter/{manga_id}/list?page={page}&page_size={per_page}&sort_by=chapter_number&sort_order=desc")
+        if not data:
+            break
+        items = data.get("data", [])
+        if not items:
+            break
+        new_count = 0
+        for ch in items:
+            ch_id = ch.get("chapter_id") or ch.get("id")
+            if ch_id and ch_id not in seen_ids:
+                seen_ids.add(ch_id)
+                all_ch.append(ch)
+                new_count += 1
+        if new_count == 0 or len(items) < per_page:
+            break
+    return all_ch

@@ -296,7 +296,7 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
         seen_ids.add(mid)
         ids.append((mid, wk, w.get("title") or wk.replace("_", " ").title()))
     items: list[dict] = []
-    API_CHAPTER_LIMIT = 30
+    API_CHAPTER_LIMIT = 100
     _notified: dict[str, set[float]] = {}
     try:
         from app.db import get_supabase as _gsb2
