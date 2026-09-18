@@ -492,9 +492,7 @@ async def _build_snapshot() -> dict:
         "data": {
             "overview": overview,
             "sourceHealth": hm,
-            "health": {"providerMetrics": provider_metrics},
             "recentChapters": recent_chapters_list,
-            "recentFeed": recent_feed,
             "whitelistCount": len(rows),
             "queueLength": overview["queueLength"],
             "cronStatus": cron_status_data,
