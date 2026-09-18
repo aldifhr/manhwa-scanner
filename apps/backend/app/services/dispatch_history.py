@@ -196,22 +196,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
         _cover = scrub_cover(r.get("cover") or rc.get("cover") or "")
         results.append({
             "title": title,
-            "titleKey": r.get("title_key") or "",
-            "chapter": chapter,
-            "chapterLabel": (r.get("chapter_title") or rc.get("chapter") or ""),
-            "url": _norm or _raw or "",
-            "source": r.get("source") or rc.get("source") or "",
             "cover": _cover,
-            "origin": _origin,
-            "seriesUrl": r.get("series_url") or rc.get("series_url") or "",
-            "rating": _rating,
-            "description": _desc,
-            "genres": _genres,
             "sentAt": r.get("sent_at") or "",
-            "fcfsKey": r.get("fcfs_key") or "",
-            "chapterUrl": _norm or _raw or "",
-            "isDuplicate": idx in _dup_set,
-            "canonicalTitleKey": normalize_title_key(r.get("title_key", "") or ""),
         })
 
     if search:
