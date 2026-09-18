@@ -9,6 +9,7 @@ import { useContinueReading } from "@/lib/continueReading";
 import { useReadItems } from "./useReadItems";
 import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
 import { SeriesShell, Synopsis, CardActions, RatingRow } from "./seriesShared";
+import { timeAgo } from "@/lib/timeAgo";
 
 interface GroupedSeries {
   title: string;
@@ -102,6 +103,9 @@ function GroupedSeriesCard({
         </div>
 
         <RatingRow rating={series.rating} genres={series.genres} />
+        {(series.chapters[0]?.sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt) && (
+          <span className="text-[11px] text-white/50">{timeAgo(series.chapters[0].sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt)}</span>
+        )}
 
         <Synopsis text={series.description} />
 

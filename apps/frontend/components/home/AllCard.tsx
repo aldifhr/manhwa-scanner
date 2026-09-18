@@ -8,6 +8,7 @@ import { useLongPress } from "@/lib/hooks/useLongPress";
 import { useContinueReading } from "@/lib/continueReading";
 import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
 import { SeriesShell, Synopsis, CardActions, RatingRow } from "./seriesShared";
+import { timeAgo } from "@/lib/timeAgo";
 
 interface AllCardItem {
   title: string;
@@ -134,6 +135,9 @@ function AllCard({
         </div>
 
         <RatingRow rating={item.rating} genres={item.genres} />
+        {(item.sentAt || item.createdAt) && (
+          <span className="text-[11px] text-white/50">{timeAgo(item.sentAt || item.createdAt)}</span>
+        )}
 
         <Synopsis text={item.description} />
 
