@@ -14,7 +14,9 @@ export interface FlatChapter {
   source: string;
   cover: string;
   origin: string;
+  country?: string | null;
   type?: string | null;
+  format?: string | null;
   seriesUrl: string;
   rating?: string | number | null;
   genres?: string[];
