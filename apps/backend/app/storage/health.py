@@ -175,7 +175,7 @@ def read_dashboard_snapshot() -> dict | None:
                         ct = ct.replace(tzinfo=timezone.utc)
                     age = (datetime.now(timezone.utc) - ct).total_seconds()
                     if age > 300:
-                        logger.warn("dashboard_snapshot redis stale", age_seconds=int(age))
+                        logger.debug("dashboard_snapshot redis stale", age_seconds=int(age))
                         raise ValueError(f"stale redis age={int(age)}s")
                 except ValueError:
                     # stale -> fall through to supabase backup
@@ -214,7 +214,7 @@ def read_dashboard_snapshot() -> dict | None:
                         ct = ct.replace(tzinfo=timezone.utc)
                     age = (datetime.now(timezone.utc) - ct).total_seconds()
                     if age > 300:  # 5-minute TTL
-                        logger.warn("dashboard_snapshot supabase stale", age_seconds=int(age))
+                        logger.debug("dashboard_snapshot supabase stale", age_seconds=int(age))
                         return None
                 except Exception:
                     return res.data  # unparseable timestamp — return data anyway
