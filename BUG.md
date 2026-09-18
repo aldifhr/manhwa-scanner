@@ -401,7 +401,7 @@ Sama untuk `app/storage/dispatch.py:197` `claim_and_record`. Alternatif: pakai `
 
 ### 5. Status
 
-- Dicatat 2026-09-09 — valid, solusi ubah `SOURCE_KEYS` atau `DISABLED_SOURCES`, patch menunggu approval.
+- Dicatat 2026-09-09 — **INVALID per 2026-09-10**: `config.py:61` kontrak diupdate `# 3 sources (ikiru, shinigami, voratoon) are active` + `SOURCE_KEYS=[ikiru,shinigami,voratoon]` + `CRON_ACTIONS` `rss-fetch:voratoon` — voratoon **sengaja aktif**. `DISABLED_SOURCES=""` toggle ops tetap tersedia. Close as WONTFIX.
 
 ---
 
