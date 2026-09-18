@@ -69,8 +69,8 @@ write_cron_status() → cron_run_status (INSERT)
 |-------|---------|-----------|------|
 | `whitelist` | Tracked series for Discord notif | Permanent | ~343 |
 | `recent_chapters` | Scraped chapters (24h rolling) | 24h | ~329 |
-| `dispatch_history` | Audit trail of sent chapters | 90d | ~922 |
-| `cron_run_status` | Audit trail of each cron run | 90d | ~200/d |
+| `dispatch_history` | Audit trail of sent chapters (FCFS ledger) | 30d | ~922 |
+| `cron_run_status` | Audit trail of each cron run | 7d | ~200/d |
 | `dashboard_snapshot` | Materialized dashboard (singleton) | Singleton | 1 |
 | `source_health` | Health per source | Permanent | 2 |
 | `excluded_titles` | Titles hidden from RSS | Permanent | ~14 |
@@ -84,15 +84,18 @@ write_cron_status() → cron_run_status (INSERT)
 
 See [apps/backend/ARCHITECTURE.md](../apps/backend/ARCHITECTURE.md) for full column-level catalog, index map (21 indexes), and migration history.
 
-## FCFS dedup
+## FCFS dedup — per chapter, not per title
 
 ```
 fcfs_key = normalize_title(title) + "#" + normalize_chapter(chapter)
+# Title A ch 115 → "title a#115", Title A ch 116 → "title a#116" (different keys)
+# Cross-source same chapter: shinigami 116 vs voratoon 116 share "title a#116" → first wins, second skipped
+# Different chapter numbers never block each other: voratoon 116 does NOT block shinigami 115
 ```
 
-- `dispatch_history`: UNIQUE (chapter_url) + UNIQUE (fcfs_key)
-- `dispatch_claims`: 48h TTL race guard via `FOR UPDATE SKIP LOCKED`
-- `recent_chapters`: UNIQUE (title_key, source, chapter_num)
+- `dispatch_history`: UNIQUE (chapter_url) + UNIQUE (fcfs_key) — ledger 30d + cap 500/series
+- `dispatch_claims`: 1h TTL race guard via `FOR UPDATE SKIP LOCKED` + `ON CONFLICT DO NOTHING`
+- `recent_chapters`: UNIQUE (title_key, source, chapter_num) + 24h feed window
 
 ## RSS feed generation
 

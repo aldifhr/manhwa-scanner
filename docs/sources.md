@@ -32,7 +32,7 @@
 - **voratoon** — secondary source, API + HTML fallback
 - **ikiru** — gap-fill scanner: only fetches titles **not already present** in shinigami or voratoon. HTML behind Cloudflare, least reliable.
 
-The whitelist only contains shinigami and voratoon entries. ikiru operates in gap-fill mode to catch titles the other two miss.
+The whitelist tracks `(title_key, source)` for all 3 sources. FCFS is per-chapter: `title key + chapter` (e.g., `title a#116`). Same chapter from two sources → first source wins, second skipped. Different chapter numbers (e.g., 115 vs 116) are independent and never block each other.
 
 ## Type mapping
 
