@@ -44,6 +44,7 @@ def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
     try:
         r = _get_redis()
         # Atomic SADD+RPUSH+EXPIRE via Lua — no outer RPOP needed (RPOP would pop чужой tail on race)
+        # EXPIRE 86400 is orphan safety net for CRON_QUEUE_SET only (queue dedup), NOT dispatch_history ledger (30d in retention.py)
         _lua = """
 if redis.call('SADD', KEYS[1], ARGV[1]) == 1 then
   redis.call('RPUSH', KEYS[2], ARGV[1])
