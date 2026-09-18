@@ -21,6 +21,10 @@ export function mapRss(r: unknown) {
     seriesUrl: (x.series_url as string) ?? (x.seriesUrl as string),
     isWhitelisted:
       (x.is_whitelisted as boolean) ?? (x.isWhitelisted as boolean),
+    type: (x.format as string) ?? (x.type as string),
+    format: (x.format as string) ?? (x.type as string),
+    origin: (x.country as string) ?? (x.origin as string),
+    country: (x.country as string) ?? (x.origin as string),
   };
 }
 export function mapExcluded(r: unknown) {

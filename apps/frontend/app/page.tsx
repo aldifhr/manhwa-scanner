@@ -138,7 +138,7 @@ function HomeGroupedCard({
   onAdd?: () => void;
 }) {
   const origin = normalizeOrigin(series.origin);
-  const t = (series.type || "").toLowerCase().trim();
+  const t = ((series as any).format ?? series.type ?? "").toString().toLowerCase().trim();
   const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
   const [hasRetried, setHasRetried] = useState(false);

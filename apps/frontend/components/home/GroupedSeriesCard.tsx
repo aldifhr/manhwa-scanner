@@ -72,7 +72,7 @@ function GroupedSeriesCard({
   const { trackChapter } = useContinueReading();
   const { readItems } = useReadItems();
   const origin = normalizeOrigin(series.origin);
-  const t = (series.type || "").toLowerCase().trim();
+  const t = ((series as any).format ?? series.type ?? "").toString().toLowerCase().trim();
   const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
 
   const first = series.chapters[0];

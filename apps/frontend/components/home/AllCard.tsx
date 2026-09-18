@@ -68,7 +68,7 @@ function AllCard({
   const { onTouchStart, onTouchEnd, onTouchMove, wasLongPressed } = useLongPress((pos) => setMenu(pos));
   const { trackChapter } = useContinueReading();
   const origin = normalizeOrigin(item.origin);
-  const t = (item.type || "").toLowerCase().trim();
+  const t = ((item as any).format ?? item.type ?? "").toString().toLowerCase().trim();
   const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
   const lbl = getChapterLabel(item);
   const doTrack = () => {
