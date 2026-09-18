@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useCallback, useRef, useMemo } from "react";
 import {
-  useQuery,
+  useInfiniteQuery,
 } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { staleTimes, gcTimes } from "@/lib/queryKeys";
@@ -11,7 +11,6 @@ import { compareFlatByNewest, chapterKey } from "@/lib/feed";
 
 // ponytail: public /rss hard cap 100 (was 1000) — so first page is 100, rest via infinite scroll
 // 24h volume ~327 chapters still fits in 4 pages; was single 1000 fetch before P1 hardening.
-// DEBUG: useInfiniteQuery Turbopack chunk 19anfgt4d crash (length) on Next 16 → fallback to useQuery single page
 const PAGE_SIZE = 100;
 
 export function useInfiniteFeed(opts: {
@@ -26,12 +25,15 @@ export function useInfiniteFeed(opts: {
   const typeParam = typeFilter && typeFilter !== "no_type" ? typeFilter : null;
 
   const {
-    data: single,
+    data,
     isLoading,
     isFetching,
     error,
     refetch,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: [
       "rss-feed-flat-infinite",
       exclude ?? "",
@@ -40,22 +42,21 @@ export function useInfiniteFeed(opts: {
       whitelistParam,
       typeParam ?? "all",
     ] as const,
-    queryFn: () =>
-      Reader.getRssFlatPage(1, PAGE_SIZE, {
+    queryFn: ({ pageParam }) =>
+      Reader.getRssFlatPage(pageParam as number, PAGE_SIZE, {
         exclude,
         whitelist: whitelistParam,
         source: sourceFilter || null,
         type: typeParam,
       }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? (lastPage.page + 1) : undefined,
     staleTime: staleTimes.rss,
     gcTime: gcTimes.rss,
     refetchOnWindowFocus: true,
     retry: 1,
   });
-  const data = single ? { pages: [single] } as any : undefined;
-  const hasNextPage = false as any;
-  const isFetchingNextPage = false as any;
-  const fetchNextPage: any = async () => {};
 
   // Flatten, dedup, sort — single source of truth derived from cache
   const allItems = useMemo(() => {
