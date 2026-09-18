@@ -80,10 +80,10 @@ async def rss_reader(request: Request):
 
 # ponytail: public endpoint hardening — whitelist query params + limit cap 100 to prevent Python-side group/filter blowup on varied q=?
 _ALLOWED_RSS_PARAMS = {
-    "page", "limit", "group", "format",
-    "source", "sources", "origin", "origins",
+    "page", "limit", "group", "format", "type", "country", "origin",
+    "source", "sources", "origins",
     "exclude", "exclude_origin",
-    "q", "type", "genres", "min_rating", "max_rating",
+    "q", "genres", "min_rating", "max_rating",
     "subscribed_only", "sort", "whitelist", "exclude_notified", "unread_only",
 }
 
@@ -114,8 +114,10 @@ async def _rss_impl(request: Request):
     if limit > 100 or limit < 1:
         return JSONResponse(content={"success": False, "error": "limit must be between 1 and 100"}, status_code=400)
     group = (request.query_params.get("group", "true") or "true").lower() != "false"
+    # ponytail: dual-read for backward compat — new FE sends format/country, old FE sends type/origin
     source_f = request.query_params.get("source", "")
-    origin_f = request.query_params.get("origin", "")
+    type_f = request.query_params.get("format", "") or request.query_params.get("type", "")
+    origin_f = request.query_params.get("country", "") or request.query_params.get("origin", "")
     exclude = request.query_params.get("exclude", "")
     q = (request.query_params.get("q", "") or "")[:100]
     if len(request.query_params.get("q", "") or "") > 100:
