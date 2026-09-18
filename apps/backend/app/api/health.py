@@ -29,6 +29,7 @@ async def healthz():
 
 @router.get("/health")
 async def api_health(request: Request):
+    """Health + source status overview (monitor auth)."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
@@ -63,75 +64,23 @@ async def api_health(request: Request):
                 pending = sum(1 for u in urls if u not in sent_urls)
         except Exception:
             pending = -1
-        # ponytail: snapshot staleness 900s (1.5x source_interval) -> degraded signal, per-endpoint split when >1000L
-        _snap_age_s = None
-        _snap_stale = False
-        try:
-            from datetime import datetime as _dt_snap, timezone as _tz_snap
-            _sr = _gsb().table("dashboard_snapshot").select("computed_at").eq("id", 1).maybe_single().execute()
-            _comp = (_sr.data or {}).get("computed_at") if _sr else None
-            if _comp:
-                _ct = _dt_snap.fromisoformat(str(_comp).replace("Z", "+00:00"))
-                if _ct.tzinfo is None:
-                    _ct = _ct.replace(tzinfo=_tz_snap.utc)
-                _snap_age_s = int((_dt_snap.now(_tz_snap.utc) - _ct).total_seconds())
-                _snap_stale = _snap_age_s > 900
-        except Exception:
-            pass
+
         return JSONResponse(content={
             "success": True,
             "data": {
                 "sources": sources,
                 "pending": pending,
-                "lastScrapeAt": max((s["lastScrape"] for s in sources), default=""),
                 "service": "be-ag-py",
-                "snapshot_age_s": _snap_age_s,
-                "snapshot_stale": _snap_stale,
-                "status": "degraded" if _snap_stale else "healthy",
+                "status": "healthy",
             },
         })
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
 
 
-def _parse_voratoon_expiry(cover: str) -> tuple[str | None, float | None]:
-    """Parse X-Amz-Date/X-Amz-Expires from presigned voratoon cover. Returns (expiry_iso, hours_remaining) or (None, None)."""
-    from app.config import settings as _cfg
-    if not cover or _cfg.VORATOON_COVER_BUCKET not in cover:
-        return None, None
-    import re as _re
-    import time as _time
-    from datetime import datetime as _dt, timezone as _tz
-    m = _re.search(r"X-Amz-Date=([^&]+).*?X-Amz-Expires=(\d+)", cover)
-    if not m:
-        return None, None
-    try:
-        d = m.group(1)
-        exp = int(m.group(2))
-        dt = _dt.strptime(d, "%Y%m%dT%H%M%SZ").replace(tzinfo=_tz.utc)
-        expiry_ts = dt.timestamp() + exp
-        expiry_iso = _dt.fromtimestamp(expiry_ts, tz=_tz.utc).isoformat()
-        hours_remaining = (expiry_ts - _time.time()) / 3600
-        return expiry_iso, round(hours_remaining, 1)
-    except Exception:
-        return None, None
-
-
-@router.post("/health/refresh-voratoon")
-async def refresh_voratoon(request: Request):
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    try:
-        from app.cron.enrich_whitelist import enrich_all_whitelist
-        # force refresh voratoon expiring soon (5d window) — reuse same logic
-        count = enrich_all_whitelist(refresh_days=5, force=True)
-        return JSONResponse(content={"success": True, "data": {"refreshed": count}})
-    except Exception as e:
-        return JSONResponse(content=safe_error(e), status_code=500)
-
-
 @router.get("/health/detailed")
 async def health_detailed(request: Request):
+    """Detailed health — circuit breakers, pool stats, voratoon cover expiry."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami, cb_voratoon
@@ -157,60 +106,19 @@ async def health_detailed(request: Request):
             "lastError": row.get("last_error"),
             "disabledUntil": row.get("disabled_until"),
         })
+    overall = "healthy"
     down_count = sum(1 for s in sources if s["status"] == "down")
     degraded_count = sum(1 for s in sources if s["status"] == "degraded")
-    overall = "down" if down_count > 0 else ("degraded" if degraded_count > 0 else "healthy")
-    import time as _t_up
-    _uptime_s = _t_up.time() - health_store.APP_START_TS if hasattr(health_store, "APP_START_TS") else 0
-    if not _uptime_s:
-        try:
-            from app.api.observability import APP_START_TS as _api_start
-            _uptime_s = _t_up.time() - _api_start
-        except Exception:
-            _uptime_s = 0
-    _avg_err = sum(s["errorRate24h"] for s in sources) / len(sources) if sources else 0
-    _uptime_pct = round(max(0, 100 - _avg_err), 1) if sources else 100.0
-    # voratoon whitelist cover expiry countdown (reuse _is_voratoon_expiring_soon logic)
-    voratoon_covers: list[dict] = []
-    try:
-        from app.db import get_supabase as _gsb2
-        _rows = _gsb2().table("series_meta").select("title_key, cover").eq("source", "voratoon").limit(100).execute().data or []
-        # enrich title via whitelist join (whitelist minimal since 052)
-        try:
-            _wl2 = _gsb2().table("whitelist").select("title_key, title").eq("source", "voratoon").limit(100).execute().data or []
-            _title_map = {r.get("title_key"): r.get("title") for r in _wl2}
-            for _r in _rows:
-                _r["title"] = _title_map.get(_r.get("title_key"), "")
-        except Exception:
-            pass
-        for _r in _rows:
-            _cover = _r.get("cover") or ""
-            from app.config import settings as _cfg
-            if _cfg.VORATOON_COVER_BUCKET not in _cover:
-                continue
-            expiry_iso, hours_remaining = _parse_voratoon_expiry(_cover)
-            if expiry_iso is None:
-                continue
-            voratoon_covers.append({
-                "title_key": _r.get("title_key", ""),
-                "title": _r.get("title", ""),
-                "cover": _cover,
-                "expiry": expiry_iso,
-                "hours_remaining": hours_remaining,
-                "expiring_soon": (hours_remaining is not None and hours_remaining < 24),
-                "expired": (hours_remaining is not None and hours_remaining < 0),
-            })
-        voratoon_covers.sort(key=lambda x: x["hours_remaining"] if x["hours_remaining"] is not None else 9999)
-    except Exception:
-        voratoon_covers = []
+    if down_count > 0:
+        overall = "down"
+    elif degraded_count > 0:
+        overall = "degraded"
     return {
         "success": True,
         "data": {
             "sources": sources,
             "overall": overall,
-            "uptime": _uptime_pct,
-            "uptime_human": f"{int(_uptime_s//3600)}h {int((_uptime_s%3600)//60)}m" if _uptime_s else "0m",
-            "version": "1.0.0",
+            "pool": pool,
             "circuit_breakers": {
                 "discord": cb_discord.state.value,
                 "db": cb_db.state.value,
@@ -218,7 +126,5 @@ async def health_detailed(request: Request):
                 "shinigami": cb_shinigami.state.value,
                 "voratoon": cb_voratoon.state.value,
             },
-            "db_pool": pool,
-            "voratoon_covers": voratoon_covers,
-        }
+        },
     }
