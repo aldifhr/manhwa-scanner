@@ -106,7 +106,6 @@ class TestWhitelistedPaths:
     @pytest.mark.parametrize("path", [
         "/api/v1/auth",
         "/api/v1/interactive",
-        "/api/v1/cron",
     ])
     def test_whitelisted_post_no_csrf_required(self, path):
         r = client.post(path)

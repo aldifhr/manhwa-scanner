@@ -34,7 +34,7 @@ def _get_redis():
 
 
 def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
-    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload - atomic via MULTI/EXEC."""
+    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload — atomic without RPOP compensation."""
     payload: dict = {"action": action}
     if source:
         payload["source"] = source
@@ -43,20 +43,62 @@ def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
     payload_json = json.dumps(payload, sort_keys=True)
     try:
         r = _get_redis()
-        # ponytail: MULTI/EXEC makes SADD+RPUSH+EXPIRE atomic — no phantom SET entry on crash between them
-        # EXPIRE gives whole set 24h TTL — safety net for any entries orphan cleanup misses
-        pipe = r.pipeline(transaction=True)
-        pipe.sadd(CRON_QUEUE_SET, payload_json)
-        pipe.rpush(CRON_QUEUE_KEY, payload_json)
-        pipe.expire(CRON_QUEUE_SET, 86400)
-        results = pipe.execute()
-        added = results[0]  # SADD returns 1 if new, 0 if already member
-        if added == 0:
-            # Duplicate detected — undo our RPUSH to keep queue clean
+        # Atomic SADD+RPUSH+EXPIRE via Lua — no outer RPOP needed (RPOP would pop чужой tail on race)
+        _lua = """
+if redis.call('SADD', KEYS[1], ARGV[1]) == 1 then
+  redis.call('RPUSH', KEYS[2], ARGV[1])
+  redis.call('EXPIRE', KEYS[1], 86400)
+  return 1
+else
+  return 0
+end
+"""
+        try:
+            # redis-py eval signature: eval(script, numkeys, *keys_and_args)
+            added = r.eval(_lua, 2, CRON_QUEUE_SET, CRON_QUEUE_KEY, payload_json)
+            # fakeredis / StrictRedis may return int directly
+            added = int(added) if added is not None else 0
+        except AttributeError:
+            # FakeRedis / mock without EVAL — fallback to SADD-then-RPUSH (no RPOP)
+            added = None
+        except Exception as e:
+            # real redis EVAL unknown / NOSCRIPT / permission → fallback; otherwise bubble to outer except (redis down)
+            msg = str(e).lower()
+            if "unknown" in msg or "eval" in msg or "nosript" in msg or "not supported" in msg:
+                added = None
+            else:
+                raise
+        if added is None:
+            # Fallback path: SADD first; only RPUSH if we won. No compensation RPOP.
+            added = r.sadd(CRON_QUEUE_SET, payload_json)
+            if added == 0:
+                logger.info("cron job already in queue (dedup set), skipping", action=action, source=source)
+                return
             try:
-                r.rpop(CRON_QUEUE_KEY)
-            except Exception:
-                pass
+                if hasattr(r, "pipeline"):
+                    pipe = r.pipeline(transaction=True)
+                    pipe.rpush(CRON_QUEUE_KEY, payload_json)
+                    # expire may not exist on FakeRedis — best-effort
+                    try:
+                        pipe.expire(CRON_QUEUE_SET, 86400)
+                    except Exception:
+                        pass
+                    pipe.execute()
+                else:
+                    r.rpush(CRON_QUEUE_KEY, payload_json)
+                    if hasattr(r, "expire"):
+                        try:
+                            r.expire(CRON_QUEUE_SET, 86400)
+                        except Exception:
+                            pass
+            except Exception as pe:
+                # rollback SET — next try must be able to re-enqueue
+                try:
+                    r.srem(CRON_QUEUE_SET, payload_json)
+                except Exception:
+                    pass
+                raise pe
+        if added == 0:
             logger.info("cron job already in queue (dedup set), skipping", action=action, source=source)
             return
         logger.info("enqueued cron job", action=action, source=source)
