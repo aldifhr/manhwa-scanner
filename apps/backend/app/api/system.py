@@ -95,24 +95,6 @@ async def cron_trigger(request: Request):
     return JSONResponse(content={"success": True, "data": {"status": "enqueued", "action": action}}, status_code=202)
 
 
-@router.get("/cleanup")
-async def cleanup(request: Request):
-    if not require_cron_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    try:
-        from app.db import get_supabase
-        from datetime import datetime, timedelta, timezone
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
-        sb = get_supabase()
-        r1 = sb.table("dispatch_history").delete().lt("sent_at", cutoff).execute()
-        deleted = len(r1.data) if r1.data else 0
-        logger.info("cleanup done", deleted=deleted)
-        return JSONResponse(content={"success": True, "data": {"deleted_old": deleted}})
-    except Exception as e:
-        logger.warn("cleanup failed", err=str(e)[:160])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
-
-
 @router.get("/metrics")
 async def metrics(request: Request):
     # Accepts either cron or monitor auth (unified JSON metrics endpoint).
