@@ -124,7 +124,7 @@ function AllTabInner() {
     handleExcludeSeries,
   } = useFeedActions();
 
-  const all = allItems;
+  const all = (allItems ?? []) as typeof allItems;
 
   // "Sent to Discord" label
   const isSentAvailable =

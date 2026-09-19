@@ -9,7 +9,7 @@ import type { FlatChapter } from "@/lib/feed";
 import { compareFlatByNewest } from "@/lib/feed";
 
 export function useFeedGrouping(
-  filtered: FlatChapter[],
+  filtered: FlatChapter[] | undefined,
   opts: {
     pinnedSet: Set<string>;
     sortMode: "newest" | "title";
@@ -17,9 +17,10 @@ export function useFeedGrouping(
   }
 ) {
   const { pinnedSet, sortMode, view } = opts;
+  const safeFiltered = (filtered ?? []) as FlatChapter[];
 
   const grouped = useMemo<GroupedSeries[]>(() => {
-    let groups = groupChapters(filtered);
+    let groups = groupChapters(safeFiltered);
     if (view === "fav")
       groups = groups.filter((g) => pinnedSet.has(g.titleKey));
     if (sortMode === "title")
@@ -51,13 +52,13 @@ export function useFeedGrouping(
 
   const flatDisplay = useMemo(() => {
     if (view === "fav")
-      return filtered.filter((c) => pinnedSet.has(c.titleKey));
+      return safeFiltered.filter((c) => pinnedSet.has(c.titleKey));
     let arr: FlatChapter[];
     if (sortMode === "title")
-      arr = [...filtered].sort(
+      arr = [...safeFiltered].sort(
         (a, b) => a.title.localeCompare(b.title) || compareFlatByNewest(a, b)
       );
-    else arr = [...filtered].sort(compareFlatByNewest);
+    else arr = [...safeFiltered].sort(compareFlatByNewest);
     if (pinnedSet.size === 0) return arr;
     arr.sort(
       (a, b) =>
@@ -72,5 +73,5 @@ export function useFeedGrouping(
     return s;
   }, [grouped]);
 
-  return { grouped, flatDisplay, newSeriesKeys } as const;
+  return { grouped: grouped ?? [], flatDisplay: flatDisplay ?? [], newSeriesKeys } as const;
 }
