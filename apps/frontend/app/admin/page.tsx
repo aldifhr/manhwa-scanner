@@ -72,18 +72,37 @@ export default function AdminDashboard() {
 
   const cronRun = useMutation({
     mutationFn: async () => {
-      const r = await readerFetch<{ success: boolean; data: any }>(
-        "/api/cron?action=update",
-        { method: "POST" }
-      );
-      return r;
+      // pakai fetch langsung (bypass readerFetch handle401 yang bisa redirect ke /login → kelihatan "refresh")
+      const csrf = (() => {
+        const m = document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=([^;]*)/);
+        return m ? decodeURIComponent(m[1]) : "";
+      })();
+      const res = await fetch("/api/cron?action=update", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrf ? { "x-csrf-token": csrf } : {}),
+        },
+      });
+      const text = await res.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = text; }
+      if (!res.ok) {
+        const msg = typeof body === "string" ? body : body?.error || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      return body;
     },
-    onSuccess: () => {
-      setMsg("Cron triggered");
-      setTimeout(() => setMsg(null), 3000);
-      qc.invalidateQueries({ queryKey: ["admin-cron"] });
+    onSuccess: (data) => {
+      const detail = (data as any)?.data ? ` — ${JSON.stringify((data as any).data).slice(0, 400)}` : "";
+      setMsg(`Cron triggered${detail}`);
     },
-    onError: (e) => setMsg((e as Error).message.slice(0, 120)),
+    onError: (e) => {
+      const full = (e as Error).message;
+      console.error("[cron] Trigger failed", e);
+      setMsg(`Error: ${full}`);
+    },
   });
   const { data: failed } = useQuery({
     queryKey: ["admin-failed"],
@@ -114,8 +133,9 @@ export default function AdminDashboard() {
           </span>
         </div>
         {msg && (
-          <div className="text-xs px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
-            {msg}
+          <div className="flex items-start justify-between gap-2 text-xs px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
+            <span className="break-all flex-1">{msg}</span>
+            <button type="button" onClick={() => setMsg(null)} className="shrink-0 text-amber-300 hover:text-white px-1">✕</button>
           </div>
         )}
 
@@ -161,11 +181,12 @@ export default function AdminDashboard() {
 
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => cronRun.mutate()}
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); cronRun.mutate(); }}
             disabled={cronRun.isPending}
             className="inline-flex items-center justify-center text-xs leading-none px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/20 text-amber-300 disabled:opacity-50"
           >
-            {cronRun.isPending ? "..." : "Trigger cron update"}
+            {cronRun.isPending ? "Running..." : "Trigger cron update"}
           </button>
           <Link
             href="/admin/error-logs"

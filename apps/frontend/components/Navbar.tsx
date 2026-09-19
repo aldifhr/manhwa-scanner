@@ -19,8 +19,18 @@ export default function Navbar() {
   const prefetch = usePrefetch();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    // ponytail: session is httpOnly (invisible to JS) → check readable csrf twin set alongside session
-    setIsLoggedIn(!!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/));
+    console.log("[Navbar] check auth", { pathname, cookie: document.cookie.slice(0, 150) });
+    const hasCsrf = !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
+    console.log("[Navbar] hasCsrf", hasCsrf);
+    if (hasCsrf) { setIsLoggedIn(true); console.log("[Navbar] isLoggedIn -> true via csrf"); return; }
+    // fallback: cek via API (csrf bisa ke-clear tapi session masih valid)
+    fetch("/api/v1/auth/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j) => {
+        console.log("[Navbar] /auth/me", j);
+        setIsLoggedIn(!!j?.success && !!j?.data);
+      })
+      .catch((e) => { console.log("[Navbar] /auth/me error", e); setIsLoggedIn(false); });
   }, [pathname]);
 
   useEffect(() => {
@@ -78,9 +88,9 @@ export default function Navbar() {
                 onClick={logout}
                 title="Logout"
                 aria-label="Logout"
-                className="hidden md:flex items-center justify-center p-2 ml-1 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 text-xs font-medium transition-colors"
               >
-                <SignOut size={18} />
+                <SignOut size={14} /> Logout
               </button>
             ) : (
               <Link

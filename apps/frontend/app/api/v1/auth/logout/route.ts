@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { COOKIE_NAME } from "@/lib/auth";
 
 export async function POST(request: Request) {
+  console.log("[logout route] POST", { cookie: (request.headers.get("cookie") || "").slice(0, 200) });
   // Best-effort backend invalidation — JWT is stateless but backend may
   // have a blocklist/revocation path in future. Ignore failures.
   try {
