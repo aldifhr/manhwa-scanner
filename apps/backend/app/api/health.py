@@ -223,6 +223,9 @@ async def health_detailed(request: Request):
         "data": {
             "sources": sources,
             "overall": overall,
+            "uptime_seconds": int(_time.time() - APP_START_TS),
+            "uptime": _fmt_uptime(_time.time() - APP_START_TS),
+            "version": "1.1.0",
             "pool": pool,
             "circuit_breakers": {
                 "discord": cb_discord.state.value,
