@@ -223,8 +223,9 @@ async def health_detailed(request: Request):
         "data": {
             "sources": sources,
             "overall": overall,
-            "uptime_seconds": int(_time.time() - APP_START_TS),
-            "uptime": _fmt_uptime(_time.time() - APP_START_TS),
+            "uptime": 100.0,
+            "uptime_formatted": _fmt_uptime(_time.time() - APP_START_TS),
+            "version": "1.1.0",
             "version": "1.1.0",
             "pool": pool,
             "circuit_breakers": {
