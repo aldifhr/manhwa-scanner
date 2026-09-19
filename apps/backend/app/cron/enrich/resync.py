@@ -45,7 +45,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
 
     miss_only=True -> static-data mode: only rows missing description/rating/genres.
     """
-    from app.cron.enrich import enrich as enrich_mod
+    from app.cron.enrich import enrich
 
     sb = get_supabase()
     start = time.time()
@@ -121,7 +121,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
     # Map DB rows -> item dicts enrich() understands.
     items = [rc_store._row_to_item(r) for r in rows]
     try:
-        enriched = enrich_mod.enrich(items, persist_cache=True, skip_api=False)
+        enriched = enrich(items, persist_cache=True, skip_api=False)
     except Exception as e:
         logger.error("enrich_resync: enrich failed", exc=e)
         return {"ok": False, "error": str(e)[:160]}
