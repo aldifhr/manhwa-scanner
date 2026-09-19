@@ -84,7 +84,7 @@ def claim_recent_chapters_for_dispatch(
         conn.autocommit = False
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM recent_chapters WHERE updated_time >= %s ORDER BY id DESC LIMIT %s FOR UPDATE SKIP LOCKED",
+            "SELECT * FROM recent_chapters WHERE release_date >= %s ORDER BY id DESC LIMIT %s FOR UPDATE SKIP LOCKED",
             (cutoff, limit),
         )
         rows = cur.fetchall()
