@@ -39,9 +39,9 @@ def _fetch_rss_data_sync(
     rc_q = (
         sb.table("recent_chapters")
         .select(
-            "chapter_url, title_key, title, chapter, chapter_num, source, cover, origin, updated_time, created_at, series_url, description, type, rating, genres"
+            "chapter_url, title_key, title, chapter, chapter_num, source, cover, origin, updated_time, release_date, created_at, series_url, description, type, rating, genres"
         )
-        .gte("updated_time", cutoff)
+        .gte("release_date", cutoff)
     )
     if source_f:
         rc_q = rc_q.eq("source", source_f)
@@ -50,18 +50,18 @@ def _fetch_rss_data_sync(
     if exclude_origin:
         excl_o = [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]
         for o in excl_o:
-            rc_q = rc_q.neq("origin", o)  # ponytail: NULL origin not excluded — neq JP keeps NULL rows (post-filter via build_filter uses "" not in ["JP"] so shown); upgrade to `or(origin.neq.JP,origin.is.null)` if DB strips NULLs
+            rc_q = rc_q.neq("origin", o)
     if type_f:
         rc_q = rc_q.eq("type", type_f.lower())
     if q:
         _q = q.replace("%", r"\%").replace("_", r"\_")
         rc_q = rc_q.ilike("title", f"%{_q}%")
-    rc_rows = rc_q.order("updated_time", desc=True).limit(fetch_limit).execute().data or []
+    rc_rows = rc_q.order("release_date", desc=True).limit(fetch_limit).execute().data or []
 
     if exclude_notified:
         try:
             from app.db import q as _raw_q
-            _where = ["rc.updated_time >= %s"]
+            _where = ["rc.release_date >= %s"]
             _params: list = [cutoff]
             if source_f:
                 _where.append("rc.source = %s")
@@ -89,9 +89,9 @@ def _fetch_rss_data_sync(
             _params.append(cutoff)
             _sql = (
                 "SELECT chapter_url, title_key, title, chapter, chapter_num, source, "
-                "cover, origin, updated_time, created_at, series_url, description, type "
+                "cover, origin, updated_time, release_date, created_at, series_url, description, type "
                 f"FROM recent_chapters rc WHERE {' AND '.join(_where)} "
-                "ORDER BY rc.updated_time DESC LIMIT %s"
+                "ORDER BY rc.release_date DESC LIMIT %s"
             )
             _params.append(fetch_limit)
             rc_rows = _raw_q(_sql, _params) or []

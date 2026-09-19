@@ -212,6 +212,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         "cover",
         "series_url",
         "updated_time",
+        "release_date",
         "origin",
         "description",
         "type",

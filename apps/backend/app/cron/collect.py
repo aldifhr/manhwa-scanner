@@ -340,7 +340,7 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
             # Note: no 24h cutoff here — rely on _sent + latest_sent + ON CONFLICT dedup
             if num in _sent:
                 continue
-            items.append({"title": (wtitle or wk.replace("_", " ").title()).replace("’", "'"), "title_key": wk, "chapter": str(num), "chapter_num": float(num) if str(num).replace(".", "", 1).isdigit() else 0, "url": ch_url, "source": "shinigami", "cover": None, "series_url": series_url, "chapter_url": ch_url, "origin": "", "updated_time": ch.get("release_date") or ch.get("created_at") or ""})
+            items.append({"title": (wtitle or wk.replace("_", " ").title()).replace("’", "'"), "title_key": wk, "chapter": str(num), "chapter_num": float(num) if str(num).replace(".", "", 1).isdigit() else 0, "url": ch_url, "source": "shinigami", "cover": None, "series_url": series_url, "chapter_url": ch_url, "origin": "", "updated_time": ch.get("release_date") or ch.get("created_at") or "", "release_date": ch.get("release_date") or ""})
     return items
 
 
