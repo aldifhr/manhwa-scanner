@@ -14,7 +14,10 @@ function getCsrfToken(): string {
   try {
     const escaped = CSRF_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
-    return match ? decodeURIComponent(match[2]) : "";
+    const raw = match ? decodeURIComponent(match[2]) : "";
+    // guard: token "undefined"/"null"/empty harus dianggap kosong (bug lama kirim header "undefined")
+    if (!raw || raw === "undefined" || raw === "null" || raw.length < 5) return "";
+    return raw;
   } catch {
     return "";
   }
@@ -30,8 +33,8 @@ export function withCsrf(init: RequestInit = {}): RequestInit {
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return base;
 
   const token = getCsrfToken();
-  // merge headers handling Headers instance / array
+  // merge headers handling Headers instance / array — jangan pernah kirim "undefined"
   const headers = new Headers(base.headers as HeadersInit | undefined);
-  if (token) headers.set(CSRF_HEADER, token);
+  if (token && token !== "undefined" && token.length > 5) headers.set(CSRF_HEADER, token);
   return { ...base, headers };
 }
