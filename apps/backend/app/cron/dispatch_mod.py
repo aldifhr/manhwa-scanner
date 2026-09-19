@@ -258,8 +258,12 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             if not url or not _acq_map.get(url):
                 continue
             # per-guild origin filter
-            if _origin_f and str(it.get("origin") or "").upper() not in _origin_f:
-                continue
+            # ponytail: NULL origin = unknown metadata, don't block — include it
+            _origin_f = _origin_f  # keep for excluded check below
+            if _origin_f:
+                _item_origin = str(it.get("origin") or "").strip().upper()
+                if _item_origin and _item_origin not in _origin_f:
+                    continue
             # per-guild excluded titles
             if _excl_titles and slugify_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:
                 continue
