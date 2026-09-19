@@ -230,12 +230,6 @@ export const Reader = {
     );
     return data.data as unknown;
   },
-  resolveCatalogUrl: async (url: string) => {
-    const data = await readerFetch<{ success: boolean; data: unknown }>(
-      `/api/v1/catalog/resolve?url=${encodeURIComponent(url)}`
-    );
-    return (data.data ?? null) as unknown;
-  },
   getCronMonitor: async () => {
     const data = await readerFetch<Record<string, unknown>>(
       "/api/v1/cron/status"
