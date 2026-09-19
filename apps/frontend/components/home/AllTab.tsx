@@ -536,7 +536,7 @@ function AllTabInner() {
               );
             const isDeepMatch = i === groupedDeepLinkIndex;
             return (
-              <div
+              <motion.div
                 key={s.titleKey}
                 data-title-key={s.titleKey}
                 ref={
@@ -544,6 +544,9 @@ function AllTabInner() {
                     ? (deepLinkRef as unknown as React.RefObject<HTMLDivElement>)
                     : undefined
                 }
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: Math.min(i % 10, 6) * 0.04, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
                   isDeepMatch &&
                     "ring-2 ring-white ring-offset-2 ring-offset-black rounded-xl"
@@ -576,7 +579,7 @@ function AllTabInner() {
                     (c) => c.isSent === true || sentKeys.has(c.key)
                   )}
                 />
-              </div>
+              </motion.div>
             );
           }}
         />
@@ -594,8 +597,11 @@ function AllTabInner() {
             const isWL = item.isWhitelisted || optimisticWhitelist.has(optKey);
             const isDeepMatch = i === flatDeepLinkIndex;
             return (
-              <div
+              <motion.div
                 data-title-key={item.titleKey}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: Math.min(i % 10, 6) * 0.035, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
                   isDeepMatch &&
                     "ring-2 ring-accent ring-offset-2 ring-offset-background transition-all"
@@ -621,7 +627,7 @@ function AllTabInner() {
                     )
                   }
                 />
-              </div>
+              </motion.div>
             );
           }}
         />

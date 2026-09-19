@@ -1,4 +1,6 @@
+"use client";
 import type { ReactNode } from "react";
+import { motion } from "framer-motion";
 
 type Variant = "default" | "narrow" | "bleached";
 
@@ -15,7 +17,16 @@ export function PageShell({
   variant?: Variant;
   children: ReactNode;
 }) {
-  return <div className={`${variantClass[variant]} space-y-6`}>{children}</div>;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className={`${variantClass[variant]} space-y-6`}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 // Convenience: re-export as default for page wrappers that want <PageShell> without import churn

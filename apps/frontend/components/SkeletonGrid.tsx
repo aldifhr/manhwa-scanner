@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { motion } from "framer-motion";
 
 interface SkeletonGridProps {
   count?: number;
@@ -17,12 +18,21 @@ export const SkeletonGrid = ({
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {Array.from({ length: count }).map((_, i) => (
-          <div
+          <motion.div
             key={i}
-            className="rounded-2xl border border-white/8 bg-white/5 p-3 space-y-2"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.03, duration: 0.3 }}
+            className="rounded-2xl border border-white/8 bg-white/5 p-3 space-y-2 overflow-hidden relative"
           >
             <div className="relative w-full aspect-2/3 rounded-lg overflow-hidden">
               <div className="skeleton absolute inset-0 rounded-lg" />
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
+                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.1, ease: "linear" }}
+              />
             </div>
             <div className="skeleton h-4 w-3/4 rounded" />
             <div className="skeleton h-2.5 w-16 rounded" />
@@ -30,7 +40,7 @@ export const SkeletonGrid = ({
               <div className="skeleton h-4 w-12 rounded-md" />
               <div className="skeleton h-4 w-10 rounded-md" />
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     );

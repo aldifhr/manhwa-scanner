@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 const DISMISS_KEY = "announcement_dismissed_at";
 const DISMISS_TTL = 24 * 60 * 60 * 1000;
@@ -51,29 +52,37 @@ export default function Announcement() {
     refetchOnWindowFocus: false,
   });
 
-  if (dismissed) return null;
   const total = count?.total ?? null;
-  if (total == null && (!health || health.length === 0)) return null;
-
+  const shouldShow = !dismissed && !(total == null && (!health || health.length === 0));
   const degraded = health && health.length > 0 ? ` • ${health.join(", ")} degraded` : "";
 
   return (
-    <div className="w-full bg-zinc-900 border-b border-white/10 text-white text-xs font-medium py-1.5 px-3 flex items-center gap-2">
-      <span className="flex-1 text-center">
-        ✨ {total ?? "?"} new releases today — don&apos;t miss out!{degraded}
-      </span>
-      <button
-        aria-label="Dismiss"
-        onClick={() => {
-          try {
-            localStorage.setItem(DISMISS_KEY, String(Date.now()));
-          } catch {}
-          setDismissed(true);
-        }}
-        className="shrink-0 inline-flex items-center justify-center w-6 h-6 text-white/60 hover:text-white transition-colors text-sm leading-none"
-      >
-        ×
-      </button>
-    </div>
+    <AnimatePresence>
+      {shouldShow && (
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -20, opacity: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full bg-zinc-900 border-b border-white/10 text-white text-xs font-medium py-1.5 px-3 flex items-center gap-2 overflow-hidden"
+        >
+          <span className="flex-1 text-center">
+            ✨ {total ?? "?"} new releases today — don&apos;t miss out!{degraded}
+          </span>
+          <button
+            aria-label="Dismiss"
+            onClick={() => {
+              try {
+                localStorage.setItem(DISMISS_KEY, String(Date.now()));
+              } catch {}
+              setDismissed(true);
+            }}
+            className="shrink-0 inline-flex items-center justify-center w-6 h-6 text-white/60 hover:text-white transition-colors text-sm leading-none"
+          >
+            ×
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
