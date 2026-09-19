@@ -150,12 +150,12 @@ async def _rss_impl(request: Request):
         hours = 24  # RSS shows last 24h by design — fresh discovery feed
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        # ponytail: fetch_limit capped 300 (not 1000) — Python group_results + filtering was O(fetch_limit) per varied q=
-        # For grouped RSS, fetch all 24h chapters (bounded by cutoff) — per-series chapters must not be truncated
+        # ponytail: fetch_limit 1000 — per-source voratoon/shinigami/ikiru all represented in All
+        # (voratoon 70 + shinigami 121 in 24h = 191, 1000 covers all + margin for filtering)
         if group:
             _fetch_limit = 2000
         else:
-            _fetch_limit = min(300, max(100, limit * page * 2 + 20))
+            _fetch_limit = 1000
         results, wl_map, sm_map, dh_sent = await fetch_rss_data(
             cutoff=cutoff,
             source_f=source_f,
