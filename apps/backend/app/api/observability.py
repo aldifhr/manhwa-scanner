@@ -624,8 +624,7 @@ async def reader_cover_public(request: Request):
 
 @router.get("/reader/proxy")
 async def reader_proxy(request: Request):
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    # ponytail: public — FE fetches <img> without auth cookie
     raw_query = request.url.query or ""
     if raw_query.startswith("url="):
         url = raw_query[4:]

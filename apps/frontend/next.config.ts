@@ -40,6 +40,9 @@ const nextConfig: NextConfig = {
       { source: "/api/v1/audit", destination: "https://scanner.aldifhr.fun/api/v1/audit" },
       { source: "/api/v1/enrich/:path*", destination: "https://scanner.aldifhr.fun/api/v1/enrich/:path*" },
       { source: "/api/v1/reader/badge-counts", destination: "https://scanner.aldifhr.fun/api/v1/reader/badge-counts" },
+      { source: "/api/v1/reader/cover", destination: "https://scanner.aldifhr.fun/api/v1/reader/cover" },
+      { source: "/api/v1/reader/proxy", destination: "https://scanner.aldifhr.fun/api/v1/reader/proxy" },
+      { source: "/api/v1/reader/cover-img", destination: "https://scanner.aldifhr.fun/api/v1/reader/cover-img" },
       { source: "/api/v1/catalog/badge-counts", destination: "https://scanner.aldifhr.fun/api/v1/catalog/badge-counts" },
       // Legacy compat — deleted duplicate route files now served via rewrites (no duplicate handler)
       { source: "/api/auth/:path*", destination: "/api/v1/auth/:path*" },
