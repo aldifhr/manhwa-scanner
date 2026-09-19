@@ -32,6 +32,11 @@ function LoginInner() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          const msg = (data as { error?: string })?.error || "Rate limit 5/min — tunggu 60 detik sebelum coba lagi.";
+          setError(msg);
+          return;
+        }
         const err = data.error;
         setError((err && typeof err === "object" ? err.message : err) || "Login failed");
         return;

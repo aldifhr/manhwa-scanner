@@ -37,7 +37,11 @@ export function getSecurityHeaders(isDev: boolean): Record<string, string> {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy":
-      "camera=(), microphone=(), geolocation=(), payment=()",
+    // Minimal Permissions-Policy — only stable features. Chrome warns "Unrecognized feature"
+    // when header CONTAINS unknown tokens (e.g. attribution-reporting on older Chrome),
+    // so keep list minimal. Warning is harmless; browser just ignores unknown features.
+    // If you see attribution-reporting/private-aggregation warnings, they come from
+    // the *expanded* header previously set — hard-reload (Ctrl+Shift+R) or restart dev server.
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
   };
 }

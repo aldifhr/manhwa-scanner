@@ -3,21 +3,10 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { COOKIE_NAME } from "@/lib/auth";
 
-export async function POST(request: Request) {
-  console.log("[logout route] POST", { cookie: (request.headers.get("cookie") || "").slice(0, 200) });
-  // Best-effort backend invalidation — JWT is stateless but backend may
-  // have a blocklist/revocation path in future. Ignore failures.
-  try {
-    const { backendUrl } = await import("@/lib/server-api");
-    const cookie = request.headers.get("cookie") || "";
-    await fetch(`${backendUrl()}/api/v1/auth?action=logout`, {
-      method: "POST",
-      headers: cookie ? { Cookie: cookie } : {},
-      signal: AbortSignal.timeout(5000),
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
+async function handleLogout(_request: Request) {
+  // NOTE: tidak call backend /auth?action=logout — backend tidak punya handler logout
+  // dan call tersebut cuma buang kuota rate_limit 5/min untuk /auth. JWT stateless,
+  // clear cookie di FE sudah cukup. Jika backend nanti punya blocklist, aktifkan lagi.
 
   const response = NextResponse.json({ success: true });
   const clearOpts = {
@@ -34,5 +23,16 @@ export async function POST(request: Request) {
   // also clear none variant if still present
   response.cookies.set(COOKIE_NAME, "", { ...clearOpts, httpOnly: true, sameSite: "none" as const, secure: true, domain: ".aldifhr.fun" });
   response.cookies.set("ikiru_csrf_token", "", { ...clearOpts, httpOnly: false, sameSite: "none" as const, secure: true, domain: ".aldifhr.fun" });
+  // Ensure caches don't retain auth'd responses after logout
+  response.headers.set("Clear-Site-Data", '"cookies"');
+  response.headers.set("Cache-Control", "no-store");
   return response;
+}
+
+export async function POST(request: Request) {
+  return handleLogout(request);
+}
+
+export async function GET(request: Request) {
+  return handleLogout(request);
 }

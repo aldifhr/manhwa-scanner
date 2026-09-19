@@ -16,9 +16,20 @@ export async function POST(request: Request) {
       body: JSON.stringify({ password }),
       signal: AbortSignal.timeout(15000),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 429) {
+      const msg = (json as { message?: string })?.message || "Rate limit exceeded (5/min). Coba lagi 60 detik.";
+      return NextResponse.json({ error: msg }, { status: 429, headers: { "Retry-After": "60" } });
+    }
     if (!res.ok || !json.success || !json.data?.ok) {
-      return NextResponse.json({ error: json.error?.message || "Invalid credentials" }, { status: 401 });
+      // Backend may return {error: "rate_limited"} with 429 or {error: "Invalid credentials"} with 401
+      const backendMsg =
+        (json as { message?: string; error?: string | { message?: string } })?.message ||
+        (typeof json.error === "string" ? json.error : (json.error as { message?: string } | undefined)?.message);
+      if (backendMsg?.includes("Rate limit") || json.error === "rate_limited") {
+        return NextResponse.json({ error: "Rate limit exceeded (5/min). Tunggu 60 detik." }, { status: 429 });
+      }
+      return NextResponse.json({ error: backendMsg || "Invalid credentials" }, { status: 401 });
     }
     const setCookies = res.headers.getSetCookie?.() ?? [];
     const backendJwt = setCookies.map((c) => c.split(";")[0]).find((c) => c.startsWith("ikiru_dashboard_session="));

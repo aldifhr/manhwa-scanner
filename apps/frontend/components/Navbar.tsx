@@ -19,18 +19,14 @@ export default function Navbar() {
   const prefetch = usePrefetch();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    console.log("[Navbar] check auth", { pathname, cookie: document.cookie.slice(0, 150) });
     const hasCsrf = !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
-    console.log("[Navbar] hasCsrf", hasCsrf);
-    if (hasCsrf) { setIsLoggedIn(true); console.log("[Navbar] isLoggedIn -> true via csrf"); return; }
-    // fallback: cek via API (csrf bisa ke-clear tapi session masih valid)
+    if (hasCsrf) { setIsLoggedIn(true); return; }
     fetch("/api/v1/auth/me", { credentials: "include" })
       .then((r) => r.json())
       .then((j) => {
-        console.log("[Navbar] /auth/me", j);
         setIsLoggedIn(!!j?.success && !!j?.data);
       })
-      .catch((e) => { console.log("[Navbar] /auth/me error", e); setIsLoggedIn(false); });
+      .catch(() => { setIsLoggedIn(false); });
   }, [pathname]);
 
   useEffect(() => {
@@ -85,6 +81,7 @@ export default function Navbar() {
             />
             {isLoggedIn ? (
               <button
+                type="button"
                 onClick={logout}
                 title="Logout"
                 aria-label="Logout"
@@ -180,6 +177,7 @@ export default function Navbar() {
                 <NavbarStatus variant="mobile" />
                 {isLoggedIn ? (
                   <button
+                    type="button"
                     onClick={() => {
                       setOpen(false);
                       logout();

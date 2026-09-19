@@ -90,14 +90,7 @@ export function WhitelistCard({
       rawTitleKey ||
       lowerTitle ||
       dashedSlug;
-    console.log("[whitelist delete] keys", {
-      rawTitleKey,
-      canonical,
-      lowerTitle,
-      dashedSlug,
-      effective: titleKey,
-      title: item.title,
-    });
+
     // sources only needed for Undo (re-add per source)
     const rawSources = (
       item.sources && item.sources.length > 0

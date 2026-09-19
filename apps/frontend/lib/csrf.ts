@@ -13,7 +13,7 @@ function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
   try {
     const escaped = CSRF_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = document.cookie.match(new RegExp(`(^| )${escaped}=([^;]+)`));
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
     return match ? decodeURIComponent(match[2]) : "";
   } catch {
     return "";
