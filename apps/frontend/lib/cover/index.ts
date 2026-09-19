@@ -124,7 +124,7 @@ export function resolveCoverUrl(
           raw = decodeURIComponent(inner);
       } catch {}
       try {
-        if (isDirectAllowed(new URL(raw).hostname)) return putCover(cover, raw);
+        if (isDirectAllowed(new URL(raw).hostname) && !raw.includes("X-Amz-")) return putCover(cover, raw);
       } catch {}
       return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
     }

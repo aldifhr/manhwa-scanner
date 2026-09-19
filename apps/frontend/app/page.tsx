@@ -181,7 +181,7 @@ function HomeGroupedCard({
               onError={() => {
                 if (!hasRetried && series.titleKey) {
                   setCoverSrc(
-                    `/api/v1/reader/cover?series=${encodeURIComponent(series.titleKey)}`
+                    `/api/v1/cover?series=${encodeURIComponent(series.titleKey)}`
                   );
                   setHasRetried(true);
                 } else {
