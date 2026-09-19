@@ -37,7 +37,7 @@ def prune_older_than(hours: int = 24) -> int:
             logger.info("pruned recent_chapters via DROP PARTITION", hours=hours, dropped=n)
             return n
     except Exception as _e:
-        logger.warn("prune_recent_partition failed — falling back to DELETE", err=str(_e)[:160], exc_info=True)
+        logger.debug("prune_recent_partition failed — falling back to DELETE", err=str(_e)[:160])
     try:
         sb = get_supabase()
         res = sb.table("recent_chapters").delete().lt("updated_time", cutoff).execute()
