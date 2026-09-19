@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { withCsrf } from "@/lib/csrf";
+import { useState, useEffect, useCallback } from "react";
 
 export interface ContinueReadingEntry {
   title: string;
@@ -84,36 +83,7 @@ export function createInMemoryStore(
   };
 }
 
-// — sync (was sync.ts) —
-const SYNC_ENDPOINT = "/api/v1/continue-reading";
-export async function fetchRemote(): Promise<
-  Record<string, ContinueReadingEntry>
-> {
-  const res = await fetch(SYNC_ENDPOINT, { cache: "no-store", credentials: "include" });
-  if (!res.ok) return {};
-  const body = await res.json().catch(() => null);
-  const remote: Record<string, ContinueReadingEntry> = body?.data ?? body ?? {};
-  if (!remote || typeof remote !== "object") return {};
-  return remote;
-}
-export async function pushRemote(
-  clean: Record<string, ContinueReadingEntry>
-): Promise<void> {
-  const res = await fetch(
-    SYNC_ENDPOINT,
-    withCsrf({
-      method: "PUT",
-      credentials: "include" as RequestCredentials,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(clean),
-    })
-  ).catch(() => null as unknown as Response);
-  if (!res || !res.ok) {
-    const err = new Error(`push failed ${res?.status ?? "network"}`);
-    (err as unknown as { status?: number }).status = res?.status;
-    throw err;
-  }
-}
+// — sync removed — localStorage only, no BE
 
 // — builder helpers —
 export function buildEntryFromChapter(ch: {
@@ -151,137 +121,19 @@ export function buildEntryFromChapter(ch: {
   };
 }
 
-let globalLastPushed = "";
-let globalLastPushTime = 0;
-let consecutiveFailures = 0;
-let globalHasFetchedRemote = false;
-let globalFetchPromise: Promise<Record<string, ContinueReadingEntry>> | null =
-  null;
-
 export function useContinueReading(
-  store: ContinueReadingStore = localStorageStore,
-  sync: {
-    fetchRemote?: typeof fetchRemote;
-    pushRemote?: typeof pushRemote;
-  } = {}
+  store: ContinueReadingStore = localStorageStore
 ) {
-  const {
-    fetchRemote: doFetch = fetchRemote,
-    pushRemote: doPush = pushRemote,
-  } = sync;
   const [entries, setEntries] = useState<Map<string, ContinueReadingEntry>>(
     () => new Map()
   );
-  const hasHydrated = useRef(false);
   useEffect(() => {
     const loaded = store.load();
     if (loaded.size > 0) setEntries(loaded);
-    const id = setTimeout(() => {
-      hasHydrated.current = true;
-    }, 0);
-    return () => clearTimeout(id);
   }, [store]);
   useEffect(() => {
-    if (
-      typeof document !== "undefined" &&
-      !document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/)
-    ) {
-      hasHydrated.current = true;
-      globalHasFetchedRemote = true;
-      return;
-    }
-    if (globalHasFetchedRemote) {
-      hasHydrated.current = true;
-      return;
-    }
-    globalHasFetchedRemote = true;
-    let cancelled = false;
-    let didFinish = false;
-    (async () => {
-      try {
-        if (!globalFetchPromise) globalFetchPromise = doFetch();
-        const remote = await globalFetchPromise;
-        if (cancelled || !remote || typeof remote !== "object") return;
-        setEntries((prev) => {
-          const next = new Map(prev);
-          let changed = false;
-          for (const [k, v] of Object.entries(remote)) {
-            if (!v?.titleKey || !v?.updatedAt) continue;
-            const cur = next.get(k);
-            if (!cur || new Date(v.updatedAt) > new Date(cur.updatedAt)) {
-              next.set(k, v);
-              changed = true;
-            }
-          }
-          if (changed) store.save(next);
-          return changed ? next : prev;
-        });
-      } catch {
-        globalHasFetchedRemote = false;
-        globalFetchPromise = null;
-        setTimeout(() => {
-          globalHasFetchedRemote = false;
-        }, 60000);
-      } finally {
-        didFinish = true;
-        if (!cancelled) hasHydrated.current = true;
-      }
-    })();
-    return () => {
-      cancelled = true;
-      // StrictMode: first mount unmounted before fetch finished — reset globals so second mount fetches
-      if (!didFinish) {
-        globalHasFetchedRemote = false;
-        globalFetchPromise = null;
-      }
-    };
-  }, [store, doFetch]);
-  useEffect(() => {
-    if (entries.size === 0 && !hasHydrated.current) {
-      const loaded = store.load();
-      if (loaded.size > 0) return;
-    }
     store.save(entries);
-    if (!hasHydrated.current) return;
-    if (entries.size === 0) return;
-    if (
-      typeof document !== "undefined" &&
-      !document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/)
-    )
-      return;
-    if (typeof document !== "undefined" && document.hidden) return;
-    if (consecutiveFailures >= 3 && Date.now() - globalLastPushTime < 60000)
-      return;
-    const clean = Object.fromEntries(
-      [...entries].filter(
-        ([, v]) => v?.titleKey?.trim() && v?.chapterUrl?.trim()
-      )
-    );
-    if (Object.keys(clean).length === 0) {
-      if (entries.size > 0) store.clear();
-      return;
-    }
-    const payloadStr = JSON.stringify(clean);
-    if (payloadStr === globalLastPushed) return;
-    const delay = 8000 + Math.random() * 2000;
-    const id = setTimeout(() => {
-      if (payloadStr === globalLastPushed) return;
-      if (consecutiveFailures >= 3 && Date.now() - globalLastPushTime < 60000)
-        return;
-      globalLastPushed = payloadStr;
-      globalLastPushTime = Date.now();
-      doPush(clean as Record<string, ContinueReadingEntry>).then(
-        () => {
-          consecutiveFailures = 0;
-        },
-        () => {
-          consecutiveFailures += 1;
-          if (consecutiveFailures < 3) globalLastPushed = "";
-        }
-      );
-    }, delay);
-    return () => clearTimeout(id);
-  }, [entries, store, doPush]);
+  }, [entries, store]);
   const trackReading = useCallback((entry: ContinueReadingEntry) => {
     if (!entry?.titleKey || !entry?.chapterUrl) return;
     setEntries((prev) => {

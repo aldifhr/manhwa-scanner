@@ -1,9 +1,7 @@
 "use client";
 
 import { BookOpen } from "@phosphor-icons/react";
-import { useQuery } from "@tanstack/react-query";
-import { Reader } from "@/lib/reader";
-import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
+
 import { useContinueReading } from "@/lib/continueReading";
 import type { ContinueReadingEntry } from "@/lib/continueReading";
 import { decodeHtml, getChapterLabel, rewriteCoverUrl } from "@/lib/utils";
@@ -84,13 +82,6 @@ function ContinueReadingCard({ entry }: { entry: ContinueReadingEntry }) {
 
 export default function ContinueReadingStrip() {
   const { entries, clearAll } = useContinueReading();
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: queryKeys.continueReadingUnreadCount,
-    queryFn: () => Reader.getContinueReadingUnreadCount(),
-    staleTime: staleTimes.continueReading,
-    gcTime: gcTimes.continueReading,
-    refetchOnWindowFocus: false,
-  });
 
   const sortedEntries = [...entries.values()]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -104,11 +95,7 @@ export default function ContinueReadingStrip() {
         <h2 className="text-lg sm:text-xl font-bold text-white">
           Continue Reading
         </h2>
-        {unreadCount > 0 && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/90 text-white">
-            {unreadCount}
-          </span>
-        )}
+
         <span className="text-xs text-white/50">({sortedEntries.length})</span>
         <button
           onClick={clearAll}

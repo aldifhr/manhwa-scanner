@@ -55,7 +55,6 @@ export const queryKeys = {
   analyticsEngagement: ["analytics-engagement"] as const,
   analyticsRetention: ["analytics-retention"] as const,
   catalogSearch: (q: string) => ["catalog-search", q] as const,
-  continueReadingUnreadCount: ["continue-reading-unread-count"] as const,
   rssFilterMetadata: ["rss-filter-metadata"] as const,
   rssHealthDetail: ["rss-health-detail"] as const,
 };
@@ -79,7 +78,6 @@ export const staleTimes = {
   rssHealth: 30_000,
   cronStatus: 30_000,
   catalogSearch: 30_000,
-  continueReading: 60_000,
 } as const;
 
 export const gcTimes = {
@@ -93,6 +91,5 @@ export const gcTimes = {
   rssFilterMetadata: 60 * 60_000,
   dashboard: 5 * 60_000,
   catalogSearch: 5 * 60_000,
-  continueReading: 5 * 60_000,
   queue: 5 * 60_000,
 } as const;

@@ -419,20 +419,6 @@ export const Reader = {
     return (data.data ?? null) as unknown;
   },
 
-  getContinueReadingUnreadCount: async () => {
-    const data = await readerFetch<{ success: boolean; data: { unread_count?: number } }>("/api/v1/continue-reading/unread-count");
-    return data.data?.unread_count ?? 0;
-  },
-
-  getContinueReadingHistory: async () => {
-    const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/continue-reading/history");
-    return (data.data ?? null) as unknown;
-  },
-
-  markContinueReadingRead: async (data: { title_key: string; chapter_number?: number }) => {
-    await readerFetch("/api/v1/continue-reading/mark-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-  },
-
   getFailedDispatchesQueue: async () => {
     const data = await readerFetch<{ success: boolean; data: unknown }>("/api/v1/failed-dispatches/queue");
     return (data.data ?? null) as unknown;
