@@ -22,15 +22,9 @@ logger = get_logger("services:fcfs")
 
 
 def normalize_title(title: str) -> str:
-    """Collapse title for FCFS: html-unescape, lower, non-alnum → space.
-
-    "Academy&#8217;s" == "Academy's" → "academy s"
-    "The Great Ruler!" == "the great ruler"
-    """
-    t = html.unescape(str(title or "")).lower()
-    t = re.sub(r"[^a-z0-9\s]", " ", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
+    """Canonical title for FCFS — match whitelist slugify_title_key."""
+    from app.utils.text import slugify_title_key as _slugify
+    return _slugify(str(title or ""))
 
 
 def normalize_chapter(ch_str: str | int | float | None) -> str:
