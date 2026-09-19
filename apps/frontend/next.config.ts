@@ -118,7 +118,7 @@ const nextConfig: NextConfig = {
           { key: "Content-Type", value: "image/webp" },
           {
             key: "Cache-Control",
-            value: "public, max-age=86400, s-maxage=86400",
+            value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=3600",
           },
         ],
       },
@@ -128,7 +128,7 @@ const nextConfig: NextConfig = {
           { key: "Content-Type", value: "image/webp" },
           {
             key: "Cache-Control",
-            value: "public, max-age=86400, s-maxage=86400",
+            value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=3600",
           },
         ],
       },
