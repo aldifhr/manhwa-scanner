@@ -46,7 +46,7 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
             _type = "manhwa"
         if not _type and isinstance(_meta, dict):
             _type = (_meta.get("type") or "").lower()
-        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": m.get("release_date") or m.get("latest_chapter_time") or m.get("updated_time", ""), "release_date": m.get("release_date") or "", "rating": _meta_rating, "description": _meta_desc, "genres": _meta_genres, "type": _type})
+        items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": ch.get("release_date") or m.get("latest_chapter_time") or m.get("updated_time", ""), "release_date": ch.get("release_date") or "", "rating": _meta_rating, "description": _meta_desc, "genres": _meta_genres, "type": _type})
     return items
 
 
