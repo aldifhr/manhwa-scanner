@@ -12,7 +12,7 @@ logger = get_logger("cron:collect:shinigami")
 
 def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float], fetch_meta: bool = True) -> list[dict]:
     items: list[dict] = []
-    title = (m.get("title") or m.get("manga_name") or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
+    title = (m.get("title") or m.get("manga_name") or "").replace("�", "'").replace("�", "'")
     manga_id = m.get("manga_id", "")
     if not manga_id:
         return items
@@ -39,13 +39,11 @@ def _shinigami_process_series(m: dict, latest_sent: dict[tuple[str, str], float]
         _ceil = latest_sent.get((slugify_title_key(title or ""), "shinigami"), 0)
         if _chn is not None and _ceil and _chn <= _ceil:
             continue
-        # ponytail: origin CN=manhua KR=manhwa — enforce sync (was CN/manhwa mismatch)
         _type = _country_to_type_fn(m.get("country_id")) or ""
         if origin == "CN":
             _type = "manhua"
         elif origin == "KR":
             _type = "manhwa"
-        # Fallback: use type from series meta if country_id missing/empty
         if not _type and isinstance(_meta, dict):
             _type = (_meta.get("type") or "").lower()
         items.append({"title": title, "title_key": slugify_title_key(title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "shinigami", "cover": m.get("cover_image_url") or m.get("cover"), "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}" if manga_id else "", "chapter_url": chapter_url, "origin": origin, "updated_time": m.get("release_date") or m.get("latest_chapter_time") or m.get("updated_time", ""), "release_date": m.get("release_date") or "", "rating": _meta_rating, "description": _meta_desc, "genres": _meta_genres, "type": _type})
@@ -66,7 +64,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     except Exception as _pe:
         logger.warn("shinigami latest fetch failed", err=str(_pe)[:120])
         return items
-    # ponytail: bulk preload 1 query vs N
     if fetch_meta and _series:
         try:
             from app.cron.collectors.common import preload_series_meta_bulk
@@ -99,7 +96,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         _tax = m.get("taxonomy") or {}
         if isinstance(_tax, dict):
             genres = [g.get("name") for g in (_tax.get("Genre") or []) if g.get("name")]
-            # Extract type from Format taxonomy (manhwa/manhua/manga)
             _format_items = _tax.get("Format") or []
             _type_from_tax = ""
             if _format_items and isinstance(_format_items, list):
@@ -112,7 +108,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
             _type_from_tax = ""
         series_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{manga_id}"
         chaps = m.get("chapters") or []
-        # Fallback: API may return empty chapters for some series (e.g. Project type)
         if not chaps and m.get("latest_chapter_number") and m.get("latest_chapter_id"):
             chaps = [{"chapter_id": m["latest_chapter_id"], "chapter_number": m["latest_chapter_number"], "release_date": m.get("latest_chapter_time") or ""}]
         for ch in chaps:
@@ -130,7 +125,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                 _type2 = "manhua"
             elif origin == "KR":
                 _type2 = "manhwa"
-            # Fallback: use type from taxonomy or fetch series meta
             if not _type2:
                 if _type_from_tax:
                     _type2 = _type_from_tax
@@ -140,5 +134,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                         _type2 = (_meta_item.get("type") or "").lower() if isinstance(_meta_item, dict) else ""
                     except Exception:
                         pass
-            items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": m.get("latest_chapter_time") or m.get("updated_at", ""), "release_date": m.get("latest_chapter_time") or "", "rating": rating, "genres": genres, "description": description, "type": _type2})
+            _ch_release = ch.get("release_date") or m.get("latest_chapter_time") or ""
+            items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ch_release, "release_date": _ch_release, "rating": rating, "genres": genres, "description": description, "type": _type2})
     return attach_confidence(items, "shinigami")
