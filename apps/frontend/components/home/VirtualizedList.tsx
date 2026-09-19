@@ -113,25 +113,20 @@ export default function VirtualizedList<T>({
     return () => window.removeEventListener("scroll", onScroll);
   }, [virtualizer]);
 
-  // When items prepend (new chapters stream at top), restore anchor instead of jumping
+  // When items prepend (new chapters at top), restore anchor. Append (infinite load older) should not jump.
   const prevLenRef = useRef(items.length);
-  const prevScrollYRef = useRef(window.scrollY);
+  const prevFirstKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    const firstKey = items.length > 0 && titleKeyOf ? titleKeyOf(items[0]) : items[0] != null ? String((items[0] as unknown as Record<string, unknown>).titleKey ?? "") : null;
     const lenDiff = items.length - prevLenRef.current;
-    if (lenDiff > 0 && anchorIndexRef.current !== null) {
+    const isPrepend = firstKey !== null && prevFirstKeyRef.current !== null && firstKey !== prevFirstKeyRef.current;
+    if (lenDiff > 0 && isPrepend && anchorIndexRef.current !== null) {
       const anchor = anchorIndexRef.current + lenDiff;
       virtualizer.scrollToIndex(anchor, { align: "start" });
-    } else if (lenDiff === 0) {
-      // Same length (e.g. whitelist toggle) — preserve scroll position
-      requestAnimationFrame(() => window.scrollTo({ top: prevScrollYRef.current }));
     }
     prevLenRef.current = items.length;
-  }, [items.length, virtualizer]);
-
-  // Save scroll position before items change (next render)
-  useEffect(() => {
-    prevScrollYRef.current = window.scrollY;
-  });
+    prevFirstKeyRef.current = firstKey;
+  }, [items, titleKeyOf, virtualizer]);
 
   const scrollRestoredRef = useRef(false);
 
