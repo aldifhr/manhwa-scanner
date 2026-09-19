@@ -12,7 +12,7 @@ logger = get_logger("api:queue_dashboard")
 router = APIRouter()
 
 
-@router.get("/api/v1/queue/cron")
+@router.get("/queue/cron")
 async def cron_list(request: Request):
     """Full cron job list from Redis queue."""
     if not require_monitor_auth(request):
@@ -51,7 +51,7 @@ async def cron_list(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.get("/api/v1/queue/status")
+@router.get("/queue/status")
 async def queue_status(request: Request):
     """Redis queue status — pending jobs, breakdown, pending chapters."""
     if not require_monitor_auth(request):
@@ -179,7 +179,7 @@ async def queue_status(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.post("/api/v1/queue/retry-dlq")
+@router.post("/queue/retry-dlq")
 async def retry_dlq(request: Request):
     """Move all DLQ jobs back to main queue for retry."""
     if not require_monitor_auth(request):
@@ -206,7 +206,7 @@ async def retry_dlq(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.delete("/api/v1/queue/pending")
+@router.delete("/queue/pending")
 async def clear_pending(request: Request):
     """Mark all pending chapters as dispatched (add to dispatch_history)."""
     if not require_monitor_auth(request):
@@ -277,7 +277,7 @@ async def clear_pending(request: Request):
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.delete("/api/v1/queue/cron")
+@router.delete("/queue/cron")
 async def clear_cron_queue(request: Request):
     """Clear all jobs from the cron queue."""
     if not require_monitor_auth(request):
