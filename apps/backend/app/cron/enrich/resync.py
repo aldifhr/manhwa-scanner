@@ -45,7 +45,7 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
 
     miss_only=True -> static-data mode: only rows missing description/rating/genres.
     """
-    from app.cron import enrich as enrich_mod
+    from app.cron.enrich import enrich as enrich_mod
 
     sb = get_supabase()
     start = time.time()
@@ -429,7 +429,7 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
         _pc3(_conn2)
         # filter via _is_expiring logic (reuse enrich_whitelist helper if available)
         try:
-            from app.cron.enrich_whitelist import _is_voratoon_expiring_soon as _is_exp
+            from app.cron.enrich.whitelist import _is_voratoon_expiring_soon as _is_exp
         except Exception:
             _is_exp = lambda c, **kw: "X-Amz-" in (c or "")
         rc_rows = [r for r in rc_rows if _is_exp(r.get("cover") or "", hours=24)]
@@ -477,3 +477,4 @@ if __name__ == "__main__":
     os.environ.setdefault("PYTHONPATH", ".")
     res = enrich_recent_chapters()
     print(res, file=sys.stderr)
+

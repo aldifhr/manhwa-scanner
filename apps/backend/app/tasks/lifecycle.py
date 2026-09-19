@@ -48,7 +48,7 @@ def run_cron_inline(action: str) -> None:
     do_dispatch = not is_scrape
 
     if action in ("enrich", "enrich-missing", "enrich-refresh"):
-        from app.cron.enrich_resync import enrich_recent_chapters, enrich_stale_series_meta
+        from app.cron.enrich.resync import enrich_recent_chapters, enrich_stale_series_meta
         if action == "enrich":
             stats = enrich_recent_chapters(limit=100)
         elif action == "enrich-missing":
@@ -59,7 +59,7 @@ def run_cron_inline(action: str) -> None:
         return
 
     if action == "voratoon-cover":
-        from app.cron.enrich_resync import enrich_voratoon_covers
+        from app.cron.enrich.resync import enrich_voratoon_covers
         stats = enrich_voratoon_covers(limit=50)
         logger.info("cron voratoon-cover done", **stats)
         return
@@ -81,13 +81,13 @@ def run_cron_inline(action: str) -> None:
         return
 
     if action == "dashboard-snapshot":
-        from app.api.dashboard.stats import build_snapshot_sync
+        from app.api.admin.stats import build_snapshot_sync
         from app.storage import health
         health.write_dashboard_snapshot(build_snapshot_sync())
         return
 
     if action == "whitelist-enrich":
-        from app.cron.enrich_whitelist import enrich_all_whitelist
+        from app.cron.enrich.whitelist import enrich_all_whitelist
         enrich_all_whitelist()
         return
 
@@ -384,3 +384,5 @@ def stop_worker(timeout: float = 5.0) -> None:
                 _t.join(timeout=timeout / 2)
             except Exception:
                 pass
+
+

@@ -13,7 +13,7 @@ from app.logger import get_logger
 from app.services.resilience import cb_shinigami
 
 from app.services.rating_utils import normalize_rating
-from app.scrapers.shinigami_models import ShinigamiLatestResponse, ShinigamiDetailResponse
+from app.scrapers.shinigami.models import ShinigamiLatestResponse, ShinigamiDetailResponse
 logger = get_logger("shinigami:api")
 
 # Lazy BASE/API so tests can patch settings.SECONDARY_SOURCE_URL at runtime (was import-time binding)

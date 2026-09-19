@@ -19,9 +19,10 @@ async def enrich_missing(request: Request):
     except Exception as e:
         # fallback inline if redis down
         try:
-            from app.cron.enrich_resync import enrich_recent_chapters
+            from app.cron.enrich.resync import enrich_recent_chapters
             stats = enrich_recent_chapters(limit=20, miss_only=True)
             return JSONResponse(content={"success": True, "data": stats})
         except Exception as e2:
             logger.error("enrich_missing failed", exc=e2)
             return JSONResponse(content=safe_error(e), status_code=500)
+
