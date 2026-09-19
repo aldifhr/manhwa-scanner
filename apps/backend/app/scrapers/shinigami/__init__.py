@@ -88,12 +88,36 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
 
     Uses is_update=true filter but also fetches full catalog (without filter)
     to avoid missing series due to API cache staleness.
+
+    Ponytail: paginasi sampai mentok fresh 24 jam (early-stop), bukan single page.
+    Mirip voratoon: stop kalau oldest di page udah lewat cutoff, biar gak miss kalau
+    update >24 dalam 24 jam tapi juga gak boros fetch 10 page terus kalau cuma 1 page fresh.
     """
-    
+    from datetime import datetime, timezone, timedelta
+
+    try:
+        _cutoff = datetime.now(timezone.utc) - timedelta(hours=int(hours_cutoff or 24))
+    except Exception:
+        _cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    def _is_fresh(item: dict) -> bool:
+        # latest_chapter_time adalah waktu chapter terbaru (paling akurat untuk early-stop)
+        # fallback ke updated_at/created_at kalau field missing
+        ts_raw = item.get("latest_chapter_time") or item.get("updated_at") or item.get("created_at") or ""
+        if not ts_raw:
+            return False
+        try:
+            dt = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt >= _cutoff
+        except Exception:
+            return False
+
     all_items: list[dict] = []
     seen_ids: set[str] = set()
     
-    # Fetch with is_update filter (fast, but may be cached/stale)
+    # Fetch with is_update filter (fast, but may be cached/stale) — early-stop kalau page udah gak fresh
     for mtype in ("mirror", "project"):
         for p in range(1, max_pages + 1):
             data = _get(f"/manga/list?type={mtype}&page={p}&page_size={per_page}&is_update=true&sort=latest&sort_order=desc")
@@ -105,13 +129,22 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
                 break
             if not items:
                 break
+            # simpan dulu (dedup), tapi cek fresh untuk early-stop
+            has_fresh = False
             for it in items:
+                if _is_fresh(it):
+                    has_fresh = True
                 mid = it.get("manga_id")
                 if mid and mid not in seen_ids:
                     seen_ids.add(mid)
                     all_items.append(it)
+            # kalau di page ini udah gak ada yg fresh, page selanjutnya pasti lebih tua (sort latest) -> stop
+            if not has_fresh:
+                break
+            if len(items) < per_page:
+                break
     
-    # Also fetch full catalog (without is_update) to catch missed series
+    # Also fetch full catalog (without is_update) to catch missed series — juga early-stop
     for mtype in ("mirror", "project"):
         for p in range(1, 3):  # Limit pages to avoid rate limits
             data = _get(f"/manga/list?type={mtype}&page={p}&page_size={per_page}&sort=latest&sort_order=desc")
@@ -123,11 +156,18 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
                 break
             if not items:
                 break
+            has_fresh = False
             for it in items:
+                if _is_fresh(it):
+                    has_fresh = True
                 mid = it.get("manga_id")
                 if mid and mid not in seen_ids:
                     seen_ids.add(mid)
                     all_items.append(it)
+            if not has_fresh:
+                break
+            if len(items) < per_page:
+                break
     
     return all_items
 

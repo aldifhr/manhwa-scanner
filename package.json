@@ -5,14 +5,18 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev:frontend": "pnpm --filter manhwa-reader dev",
-    "dev:backend": "echo \"backend: cd apps/backend && uv run uvicorn app.main:app --reload\"",
-    "dev": "pnpm --filter manhwa-reader dev",
+    "dev:backend": "node scripts/dev-backend.js",
+    "dev:backend:win": "py -3 -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir apps/backend",
+    "dev:backend:unix": "python3 -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir apps/backend",
+    "dev": "npx --yes concurrently \"pnpm:dev:frontend\" \"pnpm:dev:backend\"",
+    "dev:all": "npx --yes concurrently \"pnpm:dev:frontend\" \"pnpm:dev:backend\"",
     "build": "pnpm --filter manhwa-reader build",
     "lint": "pnpm --recursive lint",
     "typecheck": "pnpm --recursive typecheck",
     "test": "pnpm --filter manhwa-reader test"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "prettier": "^3.9.6"
   }
 }

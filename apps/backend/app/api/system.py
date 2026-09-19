@@ -81,6 +81,7 @@ async def cron_trigger(request: Request):
     # a 60-90s scrape inline would block the HTTP thread and 502 other users.
     # The ROLE=cron worker still falls back inline, so cron survives Redis outages.
     from app.tasks import enqueue_cron
+    from app.config import settings as _cron_s
     try:
         enqueue_cron(action)
         try:
@@ -88,6 +89,16 @@ async def cron_trigger(request: Request):
         except Exception:
             pass
     except Exception as e:
+        # local dev tanpa Redis (REDIS_URL="" di .env) -> fallback inline biar gak 503, VPS prod tetap 503
+        if (getattr(_cron_s, "ENVIRONMENT", "production").lower() != "production" and not getattr(_cron_s, "REDIS_URL", "")):
+            try:
+                from app.cron.pipeline import run_pipeline
+                # rss-fetch:* -> do_dispatch False, lain -> True
+                _do_disp = not action.startswith("rss-fetch")
+                stats = run_pipeline(do_dispatch=_do_disp, action=action)
+                return JSONResponse(content={"success": True, "data": {"status": "completed (inline dev)", "action": action, "stats": stats}}, status_code=200)
+            except Exception as ie:
+                return JSONResponse(content={"success": False, "error": f"inline cron failed: {ie!s:.120}"}, status_code=500)
         return JSONResponse(
             content={"success": False, "error": f"cron queue unavailable: {e!s:.120}"},
             status_code=503,

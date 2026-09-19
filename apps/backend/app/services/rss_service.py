@@ -41,7 +41,7 @@ def _fetch_rss_data_sync(
         .select(
             "chapter_url, title_key, title, chapter, chapter_num, source, cover, origin, updated_time, release_date, created_at, series_url, description, type, rating, genres"
         )
-        .gte("release_date", cutoff)
+        .gte("updated_time", cutoff)
     )
     if source_f:
         rc_q = rc_q.eq("source", source_f)
@@ -56,12 +56,12 @@ def _fetch_rss_data_sync(
     if q:
         _q = q.replace("%", r"\%").replace("_", r"\_")
         rc_q = rc_q.ilike("title", f"%{_q}%")
-    rc_rows = rc_q.order("release_date", desc=True).limit(fetch_limit).execute().data or []
+    rc_rows = rc_q.order("updated_time", desc=True).limit(fetch_limit).execute().data or []
 
     if exclude_notified:
         try:
             from app.db import q as _raw_q
-            _where = ["rc.release_date >= %s"]
+            _where = ["rc.updated_time >= %s"]
             _params: list = [cutoff]
             if source_f:
                 _where.append("rc.source = %s")
@@ -91,7 +91,7 @@ def _fetch_rss_data_sync(
                 "SELECT chapter_url, title_key, title, chapter, chapter_num, source, "
                 "cover, origin, updated_time, release_date, created_at, series_url, description, type "
                 f"FROM recent_chapters rc WHERE {' AND '.join(_where)} "
-                "ORDER BY rc.release_date DESC LIMIT %s"
+                "ORDER BY rc.updated_time DESC LIMIT %s"
             )
             _params.append(fetch_limit)
             rc_rows = _raw_q(_sql, _params) or []

@@ -22,34 +22,55 @@ async def lifespan(app: FastAPI):
     # ponytail: auto-migrate on boot — was manual psql, now 8L idempotent
     # P1 fix: migration failure → fail startup (not silent warn)
     # Advisory lock prevents concurrent migration across multiple instances
+    # Windows dev: skip hard migration when DB unreachable and ENVIRONMENT=development (VPS production tetap fail hard)
     from pathlib import Path
     import psycopg2
     dsn = os.getenv("DATABASE_URL") or "postgresql://be_ag:***@127.0.0.1:5432/be_ag_py"
-    conn = psycopg2.connect(dsn)
-    conn.autocommit = False
-    cur = conn.cursor()
-    # Acquire advisory lock for migrations (only one instance migrates at a time)
-    cur.execute("SELECT pg_advisory_lock(%s)", (1234567890,))
-    cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())")
-    conn.commit()
-    mig_dir = Path(__file__).parent / "db" / "migrations"
+    _is_dev = (os.getenv("ENVIRONMENT") or "production").lower() != "production"
     try:
-        for p in sorted(mig_dir.glob("*.sql")):
-            cur.execute("SELECT 1 FROM schema_migrations WHERE filename=%s", (p.name,))
-            if cur.fetchone():
-                continue
-            try:
-                cur.execute(p.read_text())
-                cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (p.name,))
-                conn.commit()
-                logger.info("migrated", file=p.name)
-            except Exception as e:
-                conn.rollback()
-                logger.error("migrate failed — startup halted", file=p.name, err=str(e)[:200])
-                raise RuntimeError(f"migration {p.name} failed: {e}") from e
-    finally:
-        cur.execute("SELECT pg_advisory_unlock(%s)", (1234567890,))
-    conn.close()
+        conn = psycopg2.connect(dsn)
+    except Exception as e:
+        if _is_dev:
+            logger.warn("lifespan: DB unreachable in development — skip migration", err=str(e)[:200])
+            conn = None  # type: ignore
+        else:
+            raise
+    if conn is not None:
+        conn.autocommit = False
+        cur = conn.cursor()
+        # Acquire advisory lock for migrations (only one instance migrates at a time)
+        cur.execute("SELECT pg_advisory_lock(%s)", (1234567890,))
+        cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())")
+        conn.commit()
+        mig_dir = Path(__file__).parent / "db" / "migrations"
+        try:
+            for p in sorted(mig_dir.glob("*.sql")):
+                cur.execute("SELECT 1 FROM schema_migrations WHERE filename=%s", (p.name,))
+                if cur.fetchone():
+                    continue
+                try:
+                    cur.execute(p.read_text())
+                    cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", (p.name,))
+                    conn.commit()
+                    logger.info("migrated", file=p.name)
+                except Exception as e:
+                    conn.rollback()
+                    if _is_dev:
+                        # Windows fresh DB: beberapa migrasi lama (010,016,etc) asumsi live schema dan fail di fresh install.
+                        # Di dev, skip biar backend tetap bisa boot (VPS prod tetap fail hard di atas).
+                        logger.warn("migrate failed — skipped in development", file=p.name, err=str(e)[:200])
+                        # tandai sebagai applied biar gak retry terus
+                        try:
+                            cur.execute("INSERT INTO schema_migrations (filename) VALUES (%s) ON CONFLICT DO NOTHING", (p.name,))
+                            conn.commit()
+                        except Exception:
+                            conn.rollback()
+                        continue
+                    logger.error("migrate failed — startup halted", file=p.name, err=str(e)[:200])
+                    raise RuntimeError(f"migration {p.name} failed: {e}") from e
+        finally:
+            cur.execute("SELECT pg_advisory_unlock(%s)", (1234567890,))
+        conn.close()
     from app.tasks import start_worker
     start_worker()
     # Cron decoupling: the ROLE=cron process runs the cron queue worker so the
@@ -111,11 +132,23 @@ app = FastAPI(
 )
 
 # CORS: explicit allowlist — P1 fix: no wildcard regex
+# Windows dev: tambahkan localhost biar FE lokal bisa hit BE lokal tanpa ubah VPS (VPS tetap strict, dev dapat localhost)
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+_cors_origins = ["https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"]
+if (os.getenv("ENVIRONMENT") or "production").lower() != "production":
+    _cors_origins += [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"],
+    allow_origins=_cors_origins,
     allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*", "X-CSRF-Token", "Authorization"],
     allow_credentials=True,
@@ -255,6 +288,10 @@ if __name__ == "__main__":
     # P1 PM2 cluster mode: workers=1 per PM2 instance (pm2 handles clustering, not uvicorn)
     # limit_max_requests removed in cluster mode - was killing BLPOP mid-job [tasks.py:373]
     # Use --limit-max-requests 0 so worker not recycled mid-BLPOP
+    # Windows tidak punya uvloop (hanya Linux/macOS) — fallback ke asyncio biar VPS tetap uvloop
+    import sys as _sys
+    import importlib.util as _ilu
+    _loop = "uvloop" if (_ilu.find_spec("uvloop") is not None and _sys.platform != "win32") else "auto"
     uvicorn.run(
         app,
         host="127.0.0.1",
@@ -262,7 +299,7 @@ if __name__ == "__main__":
         workers=1,
         proxy_headers=True,
         forwarded_allow_ips="*",
-        loop="uvloop",
+        loop=_loop,  # type: ignore[arg-type]
         access_log=False,
         limit_concurrency=100,
         limit_max_requests=10000,

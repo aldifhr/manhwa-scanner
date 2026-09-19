@@ -11,9 +11,22 @@ logger = get_logger("cron:collect:shinigami")
 
 
 def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool = True) -> list[dict]:
+    from datetime import datetime, timezone, timedelta
+
     from app.scrapers import shinigami as _shinigami_scraper
     from app.utils.text import slugify_title_key as _ntk
     from app.services.scanner_confidence import attach_confidence
+
+    # ponytail: RSS_LOOKBACK_HOURS guard — shinigami embedded `chapters` contains
+    # 3 most recent chapters regardless of age (e.g. ch 25 today + ch 24 from 7 days
+    # ago). Without cutoff, old chapters flood recent_chapters + Discord.
+    # Mirrors ikiru collector's 24h filter.
+    try:
+        _lookback = int(getattr(settings, "RSS_LOOKBACK_HOURS", 24))
+    except Exception:
+        _lookback = 24
+    _cutoff = datetime.now(timezone.utc) - timedelta(hours=_lookback)
+
     items: list[dict] = []
     _series: list[dict] = []
     try:
@@ -55,6 +68,20 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
             _ceil = latest_sent.get((tk, "shinigami"), 0)
             if _chn is not None and _ceil and _chn <= _ceil:
                 continue
+            # 24h cutoff — skip chapters older than RSS_LOOKBACK_HOURS (parity with ikiru)
+            # Use chapter-specific timestamp only; don't fallback to latest_chapter_time
+            # which would make a 7-day-old chapter appear fresh.
+            _raw_ts = ch.get("created_at") or ch.get("release_date") or ""
+            if not _raw_ts:
+                continue
+            try:
+                _dt = datetime.fromisoformat(str(_raw_ts).replace("Z", "+00:00"))
+                if _dt.tzinfo is None:
+                    _dt = _dt.replace(tzinfo=timezone.utc)
+                if _dt < _cutoff:
+                    continue
+            except (ValueError, TypeError):
+                continue
             _type2 = _country_to_type_fn(m.get("country_id")) or ""
             if origin == "CN":
                 _type2 = "manhua"
@@ -62,6 +89,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
                 _type2 = "manhwa"
             if not _type2 and isinstance(_meta_item, dict):
                 _type2 = (_meta_item.get("type") or "").lower()
-            _ch_release = ch.get("created_at") or m.get("latest_chapter_time") or ""
+            _ch_release = ch.get("created_at") or ch.get("release_date") or m.get("latest_chapter_time") or ""
             items.append({"title": title, "title_key": tk, "chapter": ch_str, "chapter_num": _chn, "url": chapter_url, "source": "shinigami", "cover": cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ch_release, "release_date": _ch_release, "rating": rating, "genres": genres, "description": description, "type": _type2})
     return attach_confidence(items, "shinigami")

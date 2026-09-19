@@ -215,7 +215,14 @@ async def _rss_impl(request: Request):
             _seen: dict[tuple[str, float, str], dict] = {}
             _deduped: list[dict] = []
             for r in results:
-                ctk = r.get("canonicalTitleKey") or ""
+                # ponytail: canonicalTitleKey missing in map_result (hanya titleKey), fallback ke titleKey biar gak dedup false (semua "" + 65 -> 1)
+                ctk = r.get("canonicalTitleKey") or r.get("titleKey") or r.get("title") or ""
+                # normalisasi biar "Chronicles Of The Lazy Sovereign " vs "Chronicles of the Lazy Sovereign" gak beda
+                try:
+                    from app.utils.text import normalize_title_key as _ntk2
+                    ctk = _ntk2(ctk)
+                except Exception:
+                    ctk = str(ctk).lower()
                 cn = r.get("chapterNumber")
                 if cn is None:
                     _deduped.append(r)

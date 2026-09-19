@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     VORATOON_SERIES_PATH: str = "/series/"  # ponytail: voratoon path prefix
     VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
 
+    # Discord toggle — set false to run locally without bot / disable dispatch
+    # ponytail: .env DISCORD_ENABLED=false -> skip Discord sends, boot guard juga skip token check
+    DISCORD_ENABLED: bool = True
+
     # Telegram (optional — chapter release notifications)
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
@@ -204,6 +208,9 @@ def _validate_settings(s: "Settings") -> None:
         missing.append("DISCORD_BOT_TOKEN")
     if not s.DASHBOARD_PASSWORD:
         missing.append("DASHBOARD_PASSWORD")
+    # ponytail: DISCORD_ENABLED=false -> allow boot without bot token (local dev / discord off)
+    if not s.DISCORD_ENABLED:
+        missing = [m for m in missing if m != "DISCORD_BOT_TOKEN"]
     if missing:
         raise RuntimeError(
             "BOOT GUARD: production environment missing required secrets: "

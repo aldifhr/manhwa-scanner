@@ -22,14 +22,17 @@ _redis = None
 def _get_redis():
     global _redis
     if _redis is None:
+        if not getattr(settings, "REDIS_URL", ""):
+            # local dev without Redis (REDIS_URL="" in .env) -> fail fast, caller will fallback to DB/inline
+            raise RuntimeError("REDIS_URL empty — Redis disabled for local dev")
         import redis
         _redis = redis.Redis.from_url(
             settings.REDIS_URL,
             decode_responses=True,
-            socket_connect_timeout=5,
-            socket_timeout=5,
+            socket_connect_timeout=0.2,
+            socket_timeout=0.2,
             socket_keepalive=True,
-            retry_on_timeout=True,
+            retry_on_timeout=False,
         )
     return _redis
 

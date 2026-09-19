@@ -118,17 +118,21 @@ def write_dashboard_snapshot(payload: dict) -> None:
 
     computed_at = datetime.now(timezone.utc).isoformat()
     # --- Redis primary (1s timeout so missing redis doesn't stall tests/cron) ---
-    try:
-        import json
+    from app.config import settings as _wds
+    if getattr(_wds, "REDIS_URL", ""):
+        try:
+            import json
 
-        import redis
+            import redis
 
-        from app.config import settings
+            from app.config import settings
 
-        _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
-        _r.setex("dashboard_snapshot", 600, json.dumps({"payload": payload, "computed_at": computed_at}))
-    except Exception as re:
-        logger.error("write_dashboard_snapshot redis failed", exc=re)
+            _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+            _r.setex("dashboard_snapshot", 600, json.dumps({"payload": payload, "computed_at": computed_at}))
+        except Exception as re:
+            logger.debug("write_dashboard_snapshot redis failed (local dev without Redis ok)", exc=re)
+    else:
+        logger.debug("write_dashboard_snapshot redis skipped (REDIS_URL empty)")
     # --- Supabase backup (best-effort) ---
     try:
         get_supabase().table("dashboard_snapshot").upsert(
@@ -154,45 +158,47 @@ def read_dashboard_snapshot() -> dict | None:
     ponytail: Redis primary, Supabase backup.
     """
     from datetime import datetime, timezone
+    from app.config import settings as _rds
 
-    # --- Redis primary ---
-    try:
-        import json
+    # --- Redis primary (skip if REDIS_URL empty for local dev without Redis) ---
+    if getattr(_rds, "REDIS_URL", ""):
+        try:
+            import json
 
-        import redis
+            import redis
 
-        from app.config import settings
+            from app.config import settings
 
-        _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1)
-        raw = _r.get("dashboard_snapshot")
-        if raw:
-            data = json.loads(raw) if isinstance(raw, str) else raw
-            computed = data.get("computed_at")
-            if computed:
-                try:
-                    ct = datetime.fromisoformat(computed.replace("Z", "+00:00"))
-                    if ct.tzinfo is None:
-                        ct = ct.replace(tzinfo=timezone.utc)
-                    age = (datetime.now(timezone.utc) - ct).total_seconds()
-                    if age > 300:
-                        logger.debug("dashboard_snapshot redis stale", age_seconds=int(age))
-                        raise ValueError(f"stale redis age={int(age)}s")
-                except ValueError:
-                    # stale -> fall through to supabase backup
-                    pass
-                except Exception:
-                    return data  # unparseable timestamp — return data anyway
+            _r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+            raw = _r.get("dashboard_snapshot")
+            if raw:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                computed = data.get("computed_at")
+                if computed:
+                    try:
+                        ct = datetime.fromisoformat(computed.replace("Z", "+00:00"))
+                        if ct.tzinfo is None:
+                            ct = ct.replace(tzinfo=timezone.utc)
+                        age = (datetime.now(timezone.utc) - ct).total_seconds()
+                        if age > 300:
+                            logger.debug("dashboard_snapshot redis stale", age_seconds=int(age))
+                            raise ValueError(f"stale redis age={int(age)}s")
+                    except ValueError:
+                        # stale -> fall through to supabase backup
+                        pass
+                    except Exception:
+                        return data  # unparseable timestamp — return data anyway
+                    else:
+                        return data
                 else:
                     return data
-            else:
-                return data
-        if raw is None:
-            raise ValueError("no redis snapshot")
-    except ValueError:
-        # stale/missing -> fallback to supabase (not an error)
-        pass
-    except Exception as e:
-        logger.error("read_dashboard_snapshot redis failed — trying supabase", exc=e)
+            if raw is None:
+                raise ValueError("no redis snapshot")
+        except ValueError:
+            # stale/missing -> fallback to supabase (not an error)
+            pass
+        except Exception as e:
+            logger.error("read_dashboard_snapshot redis failed — trying supabase", exc=e)
 
     # --- Supabase backup ---
     try:

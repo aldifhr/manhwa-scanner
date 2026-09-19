@@ -1,6 +1,6 @@
 import pytest
 
-from app.scrapers.shinigami_models import (
+from app.scrapers.shinigami.models import (
     ShinigamiDetailResponse,
     ShinigamiLatestResponse,
 )

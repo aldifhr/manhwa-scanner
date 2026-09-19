@@ -45,6 +45,10 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     force=True → skip the FCFS guard (used to bypass dedupe when an explicit
     re-send is required, e.g. manual backfill or operator-triggered resend).
     """
+    # ponytail: DISCORD_ENABLED=false -> skip sends entirely (local / no-bot mode)
+    if not getattr(settings, "DISCORD_ENABLED", True):
+        logger.info("dispatch: skipped (DISCORD_ENABLED=false)")
+        return 0
     if not items or not channel_ids:
         return 0
     if guild_rows is None:
