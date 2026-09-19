@@ -38,11 +38,11 @@ export async function POST(request: Request) {
     const csrfTokenValue = csrfCookie ? csrfCookie.split("=").slice(1).join("=") : "";
     const response = NextResponse.json({ success: true });
     if (backendJwtValue) {
-      // ponytail: lax host-only = first-party, not blocked as 3rd-party cookie (none+domain was causing loop on Brave/Incognito)
-      // Domain .aldifhr.fun sharing handled server-side via authHeaders forwarding, no need for client cross-site
+      const isProd = process.env.NODE_ENV === "production";
+      // host-only lax for same-site (Brave/Incognito tidak blok 3rd-party)
       response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isProd,
         sameSite: "lax",
         path: "/",
         maxAge: 7 * 24 * 60 * 60,
@@ -50,11 +50,33 @@ export async function POST(request: Request) {
       if (csrfTokenValue) {
         response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
           httpOnly: false,
-          secure: process.env.NODE_ENV === "production",
+          secure: isProd,
           sameSite: "lax",
           path: "/",
           maxAge: 7 * 24 * 60 * 60,
         });
+      }
+      // domain .aldifhr.fun + SameSite none untuk cross-subdomain (manhwa -> scanner via server-side forward
+      // butuh fallback jika FE di-cached cross-site). Set tambahan, tidak replace host-only.
+      if (isProd) {
+        response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+          domain: ".aldifhr.fun",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60,
+        });
+        if (csrfTokenValue) {
+          response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
+            httpOnly: false,
+            secure: true,
+            sameSite: "none",
+            domain: ".aldifhr.fun",
+            path: "/",
+            maxAge: 7 * 24 * 60 * 60,
+          });
+        }
       }
       return response;
     }
