@@ -370,7 +370,7 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                         "scan_reason": "metadata refreshed",
                         "confidence_score": 100,
                     }
-                    for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type"):
+                    for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type", "release_date"):
                         v = r.get(k)
                         if v not in (None, "", []):
                             # ponytail: also refresh rating/genres/type on touch so A launch miss gets fixed next cron (was only cover/origin)
