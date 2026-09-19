@@ -171,9 +171,10 @@ function AllTabInner() {
 
   const isExcludedSeries = useCallback(
     (s: GroupedSeries) => {
+      const chs = Array.isArray(s?.chapters) ? s.chapters : [];
       const keys = [
         ...new Set(
-          s.chapters.map(
+          chs.map(
             (ch) =>
               `${ch.titleKey || s.titleKey}:${(ch.source || "").toLowerCase()}`
           )
@@ -524,15 +525,16 @@ function AllTabInner() {
           titleKeyOf={(s) => (s as GroupedSeries).titleKey}
           renderItem={(series, i) => {
             const s = series as GroupedSeries;
+            const sCh = Array.isArray(s?.chapters) ? s.chapters : [];
             const isRead =
-              s.chapters.length > 0 &&
-              s.chapters.every(
+              sCh.length > 0 &&
+              sCh.every(
                 (c) => readItems.has(c.url) || readItems.has(c.chapterUrl)
               );
             const isWL =
               s.isWhitelisted ||
               optimisticWhitelist.has(
-                `${s.titleKey}:${s.chapters[0]?.source || ""}`
+                `${s.titleKey}:${sCh[0]?.source || ""}`
               );
             const isDeepMatch = i === groupedDeepLinkIndex;
             return (
@@ -559,23 +561,23 @@ function AllTabInner() {
                   isNew={newSeriesKeys.has(s.titleKey)}
                   isPinned={pinnedSet.has(s.titleKey)}
                   unreadCount={
-                    s.chapters.filter((c) => !readItems.has(c.url)).length
+                    sCh.filter((c) => !readItems.has(c.url)).length
                   }
                   readCount={
-                    s.chapters.filter((c) => readItems.has(c.url)).length
+                    sCh.filter((c) => readItems.has(c.url)).length
                   }
-                  totalChapters={s.chapters.length}
+                  totalChapters={sCh.length}
                   adding={addingKey === s.titleKey}
                   onToggleRead={() =>
-                    toggleReadAll(s.chapters.map((c) => c.url))
+                    toggleReadAll(sCh.map((c) => c.url))
                   }
                   onTogglePin={() => togglePin(s.titleKey)}
-                  onMarkRead={() => markAllRead(s.chapters.map((c) => c.url))}
+                  onMarkRead={() => markAllRead(sCh.map((c) => c.url))}
                   onExclude={() => handleExcludeSeries(s)}
                   isExcluded={isExcludedSeries(s)}
                   excluding={excludingKey === s.titleKey}
                   onAdd={() => handleAddGroup(s)}
-                  isSentToDiscord={s.chapters.some(
+                  isSentToDiscord={sCh.some(
                     (c) => c.isSent === true || sentKeys.has(c.key)
                   )}
                 />

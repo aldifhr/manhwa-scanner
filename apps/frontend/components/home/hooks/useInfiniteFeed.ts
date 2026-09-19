@@ -1,116 +1,155 @@
 "use client";
-import { useEffect, useCallback, useRef, useMemo } from "react";
-import {
-  useInfiniteQuery,
-} from "@tanstack/react-query";
+import { useEffect, useCallback, useRef, useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { staleTimes, gcTimes } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
 import type { FlatChapter } from "@/lib/feed";
 import { compareFlatByNewest, chapterKey } from "@/lib/feed";
 
-// ponytail: public /rss hard cap 100 (was 1000) — so first page is 100, rest via infinite scroll
-// 24h volume ~327 chapters still fits in 4 pages; was single 1000 fetch before P1 hardening.
+// ponytail: public /rss hard cap 100 — tanpa useInfiniteQuery (sering crash .length di Turbopack)
+// pakai useQuery single-page + manual append untuk page 2+ (stabil, tidak sentuh data.pages.length internal)
 const PAGE_SIZE = 100;
 
 export function useInfiniteFeed(opts: {
-  sourceFilter: string | null;
-  typeFilter: string | null;
-  feed: "all" | "nowl" | "wl";
+  sourceFilter: string | null | undefined;
+  typeFilter: string | null | undefined;
+  feed: "all" | "nowl" | "wl" | string | null | undefined;
 }) {
-  const { sourceFilter, typeFilter, feed } = opts;
+  const { sourceFilter: sfRaw, typeFilter: tfRaw, feed: feedRaw } = opts;
+  const sourceFilter = typeof sfRaw === "string" ? sfRaw : null;
+  const typeFilter = typeof tfRaw === "string" ? tfRaw : null;
+  const feed = (feedRaw === "wl" || feedRaw === "nowl" || feedRaw === "all") ? feedRaw : "all";
   const { toast } = useToast();
   const whitelistParam = feed === "wl";
-  const exclude = undefined; // server strips JP
+  const exclude = undefined;
   const typeParam = typeFilter && typeFilter !== "no_type" ? typeFilter : null;
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    error,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: [
+  const queryKey = useMemo(() => [
       "rss-feed-flat-infinite",
       exclude ?? "",
       PAGE_SIZE,
       sourceFilter || "all",
       whitelistParam,
       typeParam ?? "all",
-    ] as const,
-    queryFn: ({ pageParam }) =>
-      Reader.getRssFlatPage(pageParam as number, PAGE_SIZE, {
+    ] as const, [exclude, sourceFilter, whitelistParam, typeParam]);
+
+  // page 1 via useQuery (cache, staleTime, keepPreviousData biar tidak flash)
+  const {
+    data: firstPage,
+    isLoading,
+    isFetching: isFetchingFirst,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: async ({ signal }) => {
+      return Reader.getRssFlatPage(1, PAGE_SIZE, {
         exclude,
         whitelist: whitelistParam,
         source: sourceFilter || null,
         type: typeParam,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? (lastPage.page + 1) : undefined,
+      });
+    },
     staleTime: staleTimes.rss,
     gcTime: gcTimes.rss,
     refetchOnWindowFocus: true,
     retry: 1,
+    placeholderData: keepPreviousData,
   });
 
-  // Flatten, dedup, sort — single source of truth derived from cache
-  const allItems = useMemo(() => {
-    if (!data?.pages) return [];
-    const seen = new Set<string>();
-    const flat: FlatChapter[] = [];
-    for (const pg of data.pages) {
-      for (const c of ((pg?.results ?? []) as unknown as FlatChapter[])) {
-        const k = chapterKey(c);
-        if (!seen.has(k)) {
-          seen.add(k);
-          flat.push(c);
-        }
-      }
-    }
-    return flat.sort(compareFlatByNewest);
-  }, [data]);
+  // manual pages 2+ (append-only, tidak pakai TanStack infinite)
+  const [extraPages, setExtraPages] = useState<Array<{ results: FlatChapter[]; hasMore: boolean; page: number }>>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreExtra, setHasMoreExtra] = useState<boolean | null>(null);
 
-  const hasMore = hasNextPage ?? false;
-  const loadingMore = isFetchingNextPage;
+  // reset saat filter ganti
+  useEffect(() => {
+    setExtraPages([]);
+    setHasMoreExtra(null);
+  }, [sourceFilter, typeParam, whitelistParam, exclude]);
 
-  // Keep derived page number for backward compat (last fetched page)
-  const page = data?.pages?.length ?? 1;
-
-  const loadMore = useCallback(async () => {
-    if (!hasNextPage || isFetchingNextPage || isLoading) return;
-    try {
-      await fetchNextPage();
-    } catch (e) {
-      if ((e as Error)?.name === "AbortError") return;
-      toast("Failed to load more — check connection", "error");
-    }
-  }, [hasNextPage, isFetchingNextPage, isLoading, fetchNextPage, toast]);
-
-  // reset scroll on server-filter change only (whitelistParam, source, type)
+  // reset scroll on filter change
   useEffect(() => {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, [sourceFilter, typeParam, whitelistParam]);
 
-  // scroll posisi juga reset saat feed ganti (nowl) meski tidak refetch
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [feed]);
 
-  // infinite scroll observer — callback ref biar re-attach tiap mount/unmount
+  const hasMore = useMemo(() => {
+    if (hasMoreExtra !== null) return hasMoreExtra;
+    const fp: any = firstPage as any;
+    if (!fp) return false;
+    if (typeof fp.hasMore === "boolean") return fp.hasMore;
+    // fallback: kalau totalPages ada
+    if (typeof fp.totalPages === "number" && typeof fp.page === "number") return fp.page < fp.totalPages;
+    return false;
+  }, [firstPage, hasMoreExtra]);
+
+  const allItems = useMemo(() => {
+    const seen = new Set<string>();
+    const flat: FlatChapter[] = [];
+    const push = (arr: unknown) => {
+      const list = Array.isArray(arr) ? (arr as FlatChapter[]) : [];
+      for (const c of list) {
+        if (!c || typeof (c as any).titleKey !== "string") continue;
+        try {
+          const k = chapterKey(c as FlatChapter);
+          if (!k) continue;
+          if (!seen.has(k)) { seen.add(k); flat.push(c as FlatChapter); }
+        } catch {}
+      }
+    };
+    const fp: any = firstPage as any;
+    push(fp?.results);
+    for (const pg of extraPages) push(pg.results);
+    try { return flat.sort(compareFlatByNewest); } catch { return flat; }
+  }, [firstPage, extraPages]);
+
+  const nextPageRef = useRef(2);
+  useEffect(() => { nextPageRef.current = 2; }, [sourceFilter, typeParam, whitelistParam, exclude]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || isLoading) return;
+    if (!hasMore) return;
+    setLoadingMore(true);
+    const p = nextPageRef.current;
+    try {
+      const res: any = await Reader.getRssFlatPage(p, PAGE_SIZE, {
+        exclude,
+        whitelist: whitelistParam,
+        source: sourceFilter || null,
+        type: typeParam,
+      });
+      const results: FlatChapter[] = Array.isArray(res?.results) ? res.results : [];
+      const hm = typeof res?.hasMore === "boolean" ? res.hasMore : results.length === PAGE_SIZE;
+      setExtraPages((prev) => [...prev, { results, hasMore: hm, page: p }]);
+      setHasMoreExtra(hm);
+      nextPageRef.current = p + 1;
+      if (!hm) toast("Sudah paling akhir", "info");
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+      toast("Failed to load more — check connection", "error");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, isLoading, hasMore, exclude, whitelistParam, sourceFilter, typeParam, toast]);
+
+  const isFetching = isFetchingFirst || loadingMore;
+  const page = 1 + extraPages.length;
+  const hasNextPage = hasMore;
+  const isFetchingNextPage = loadingMore;
+  const fetchNextPage = loadMore as unknown as () => Promise<void>;
+
+  // infinite scroll observer
   const loadingRef = useRef({ loadingMore, loadMore });
   loadingRef.current = { loadingMore, loadMore };
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
+      if (observerRef.current) { observerRef.current.disconnect(); observerRef.current = null; }
       if (!node || !hasMore) return;
       observerRef.current = new IntersectionObserver(
         (entries) => {
@@ -124,14 +163,8 @@ export function useInfiniteFeed(opts: {
     [hasMore]
   );
 
-  // cleanup observer on unmount (leak fix)
   useEffect(() => {
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
-    };
+    return () => { if (observerRef.current) { observerRef.current.disconnect(); observerRef.current = null; } };
   }, []);
 
   return {

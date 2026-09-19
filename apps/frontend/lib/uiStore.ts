@@ -16,6 +16,8 @@ interface UiState {
   genreFilter: string | null;
   minRating: string | null;
   whitelistOnly: boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   setFeed: (f: Feed) => void;
   toggleGroupMode: () => void;
   setSortMode: (s: SortMode) => void;
@@ -48,6 +50,8 @@ export const useUiStore = create<UiState>()(
       genreFilter: null,
       minRating: null,
       whitelistOnly: false,
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
       setFeed: (feed) => set({ feed }),
       toggleGroupMode: () => set((s) => ({ groupMode: !s.groupMode })),
       setSortMode: (sortMode) => set({ sortMode }),
@@ -71,6 +75,8 @@ export const useUiStore = create<UiState>()(
     {
       name: "alltab-ui",
       storage: createJSONStorage(() => localStorage),
+      // skipHydration true = hindari mismatch SSR (server default) vs client persisted value
+      // hydration dilakukan manual via onRehydrateStorage + _hasHydrated
       partialize: (s) => ({
         feed: s.feed,
         groupMode: s.groupMode,
@@ -83,6 +89,15 @@ export const useUiStore = create<UiState>()(
         minRating: s.minRating,
         whitelistOnly: s.whitelistOnly,
       }),
+      skipHydration: true,
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
+
+// rehydrate on client — diperlukan karena skipHydration: true
+if (typeof window !== "undefined") {
+  void useUiStore.persist.rehydrate();
+}

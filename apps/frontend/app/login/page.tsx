@@ -1,5 +1,5 @@
 "use client";
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeSlash, WarningCircle, ArrowRight } from "@phosphor-icons/react";
 
@@ -12,7 +12,7 @@ function sanitizeRedirect(raw: string | null): string {
   return raw;
 }
 
-export default function LoginPage() {
+function LoginInner() {
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -76,5 +76,13 @@ export default function LoginPage() {
         <p className="text-center text-text-muted text-xs mt-4 tracking-wide">secured access only</p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg flex items-center justify-center"><span className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /></div>}>
+      <LoginInner />
+    </Suspense>
   );
 }

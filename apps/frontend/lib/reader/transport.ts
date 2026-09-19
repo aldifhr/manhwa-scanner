@@ -41,9 +41,12 @@ function cacheForPath(path: string, init?: RequestInit): RequestCache | undefine
   // Mutasi tidak pernah cache
   const m = (init?.method ?? "GET").toUpperCase();
   if (m !== "GET" && m !== "HEAD") return "no-store";
-  if (PUBLIC_RE.test(path)) return undefined; // default → hormati Cache-Control backend (private SWR)
+  // Fix nav-refresh bug: PUBLIC yang sebelumnya `undefined` (hormati HTTP cache)
+  // bikin client navigation dapat stale 30s dari browser cache.
+  // Sekarang semua GET pakai no-store, biar TanStack Query yang jadi source of truth.
+  if (PUBLIC_RE.test(path)) return "no-store";
   if (PRIVATE_RE.test(path)) return "no-store";
-  return undefined;
+  return "no-store";
 }
 
 export async function readerFetch<T>(

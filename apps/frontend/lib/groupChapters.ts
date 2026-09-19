@@ -76,12 +76,13 @@ export interface GroupedSeries {
 /** Group flat RSS rows. Group key is normalized titleKey (dash/space/case) so the SAME title
  *  from multiple sources (ikiru/shinigami/voratoon) merges into ONE card
  *  with merged chapters. Cover priority: shinigami > ikiru > voratoon (non-expired). */
-export function groupChapters(items: FlatChapter[]): GroupedSeries[] {
+export function groupChapters(items: FlatChapter[] | null | undefined): GroupedSeries[] {
+  const safeItems = Array.isArray(items) ? items : [];
   const map = new Map<string, GroupedSeries>();
   const coverSource = new Map<string, string>();
   // dedup: normalized group key + source + chapter (chapter may be undefined, fall back to chapterLabel/number)
   const seenChapters = new Map<string, Set<string>>();
-  for (const it of items) {
+  for (const it of safeItems) {
     const tk = (it.titleKey ?? "") as string;
     const gk = normalizeTitleKey(tk); // dedup across dash/space/case/uuid
     if (!gk) continue;

@@ -364,7 +364,8 @@ export function ChapterChips({
   readUrls?: Set<string>;
   onToggleRead?: (url: string) => void;
 }) {
-  if (chapters.every((c) => getChapterLabel(c) === "?")) {
+  const safeCh = Array.isArray(chapters) ? chapters : [];
+  if (safeCh.length > 0 && safeCh.every((c) => getChapterLabel(c) === "?")) {
     return (
       <div className="flex gap-1.5 flex-wrap mt-1.5">
         <a
@@ -380,9 +381,9 @@ export function ChapterChips({
   }
   // ponytail: collapse 44 pills -> neat grid, dedup source label, show 12 by default
   const [expanded, setExpanded] = useState(false);
-  const allSameSource = chapters.length > 0 && chapters.every((c) => c.source === chapters[0].source);
-  const visible = expanded ? chapters : chapters.slice(0, 12);
-  const hiddenCount = chapters.length - visible.length;
+  const allSameSource = safeCh.length > 0 && safeCh.every((c) => c.source === safeCh[0].source);
+  const visible = expanded ? safeCh : safeCh.slice(0, 12);
+  const hiddenCount = safeCh.length - visible.length;
   return (
     <div className="mt-1.5 space-y-1.5">
       <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
@@ -457,7 +458,7 @@ export function ChapterChips({
           +{hiddenCount} more
         </button>
       )}
-      {expanded && chapters.length > 12 && (
+      {expanded && safeCh.length > 12 && (
         <button
           onClick={() => setExpanded(false)}
           className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-white/8 text-white/60 hover:text-white hover:bg-white/10 transition-colors"

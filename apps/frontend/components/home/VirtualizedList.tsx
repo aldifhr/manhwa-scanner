@@ -21,7 +21,7 @@ interface VirtualizedListProps<T> {
 }
 
 export default function VirtualizedList<T>({
-  items,
+  items: itemsProp,
   gap = 12,
   estimateSize = 150,
   overscan = 5,
@@ -31,6 +31,7 @@ export default function VirtualizedList<T>({
   renderItem,
   initialScrollOffset,
 }: VirtualizedListProps<T>) {
+  const items = (Array.isArray(itemsProp) ? itemsProp : []) as T[];
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
   const [cols, setCols] = useState(2);
@@ -73,10 +74,11 @@ export default function VirtualizedList<T>({
   }, []);
 
   const rows = useMemo(() => {
-    if (effectiveChunk <= 1) return items.map((it) => [it]);
+    const safe = Array.isArray(items) ? items : [];
+    if (effectiveChunk <= 1) return safe.map((it) => [it]);
     const out: T[][] = [];
-    for (let i = 0; i < items.length; i += effectiveChunk) {
-      out.push(items.slice(i, i + effectiveChunk));
+    for (let i = 0; i < safe.length; i += effectiveChunk) {
+      out.push(safe.slice(i, i + effectiveChunk));
     }
     return out;
   }, [items, effectiveChunk]);
@@ -114,17 +116,18 @@ export default function VirtualizedList<T>({
   }, [virtualizer]);
 
   // When items prepend (new chapters at top), restore anchor. Append (infinite load older) should not jump.
-  const prevLenRef = useRef(items.length);
+  const prevLenRef = useRef((items ?? []).length);
   const prevFirstKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    const firstKey = items.length > 0 && titleKeyOf ? titleKeyOf(items[0]) : items[0] != null ? String((items[0] as unknown as Record<string, unknown>).titleKey ?? "") : null;
-    const lenDiff = items.length - prevLenRef.current;
+    const safe = Array.isArray(items) ? items : [];
+    const firstKey = safe.length > 0 && titleKeyOf ? titleKeyOf(safe[0]) : safe[0] != null ? String((safe[0] as unknown as Record<string, unknown>).titleKey ?? "") : null;
+    const lenDiff = safe.length - prevLenRef.current;
     const isPrepend = firstKey !== null && prevFirstKeyRef.current !== null && firstKey !== prevFirstKeyRef.current;
     if (lenDiff > 0 && isPrepend && anchorIndexRef.current !== null) {
       const anchor = anchorIndexRef.current + lenDiff;
       virtualizer.scrollToIndex(anchor, { align: "start" });
     }
-    prevLenRef.current = items.length;
+    prevLenRef.current = safe.length;
     prevFirstKeyRef.current = firstKey;
   }, [items, titleKeyOf, virtualizer]);
 
@@ -132,8 +135,9 @@ export default function VirtualizedList<T>({
 
   // Deep-link & snapshot restore — guard initial restore with ref (runs once)
   useEffect(() => {
+    const safe = Array.isArray(items) ? items : [];
     if (scrollToTitleKey && titleKeyOf) {
-      const idx = items.findIndex(
+      const idx = safe.findIndex(
         (it) => titleKeyOf(it).toLowerCase() === scrollToTitleKey.toLowerCase()
       );
       if (idx !== -1) {

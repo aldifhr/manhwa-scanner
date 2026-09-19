@@ -49,15 +49,18 @@ export function resolveSeriesUrl(c: FlatChapter): string {
 }
 
 export function compareFlatByNewest(a: FlatChapter, b: FlatChapter): number {
-  const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
-  const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+  const ta = (a as any)?.createdAt ? Date.parse((a as any).createdAt) : 0;
+  const tb = (b as any)?.createdAt ? Date.parse((b as any).createdAt) : 0;
   if (tb !== ta) return tb - ta;
-  if (a.titleKey !== b.titleKey) return a.titleKey.localeCompare(b.titleKey);
-  return (a.chapterUrl || a.url || "").localeCompare(
-    b.chapterUrl || b.url || ""
+  const aKey = (a as any)?.titleKey ?? "";
+  const bKey = (b as any)?.titleKey ?? "";
+  if (aKey !== bKey) return String(aKey).localeCompare(String(bKey));
+  return String((a as any)?.chapterUrl || (a as any)?.url || "").localeCompare(
+    String((b as any)?.chapterUrl || (b as any)?.url || "")
   );
 }
 
 export function chapterKey(c: FlatChapter): string {
-  return `${c.titleKey}:${c.source}:${c.chapterUrl || c.url || c.chapter}`;
+  if (!c) return "";
+  return `${(c as any).titleKey ?? ""}:${(c as any).source ?? ""}:${(c as any).chapterUrl || (c as any).url || (c as any).chapter || ""}`;
 }

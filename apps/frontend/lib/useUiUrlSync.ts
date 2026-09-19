@@ -10,26 +10,33 @@ export function useUiUrlSync() {
   const params = useSearchParams();
   const hydrated = useRef(false);
 
-  // URL → store on mount
+  // URL → store on mount + setiap params berubah (back/forward, soft nav)
   useEffect(() => {
-    if (hydrated.current) return;
     const s = params;
     if (!s) return;
     const source = s.get("source");
     const q = s.get("q");
     const type = s.get("type");
-    const country = s.get("country");
     const feed = s.get("feed") as "all" | "nowl" | "wl" | null;
     const group = s.get("group");
     const store = useUiStore.getState();
+    // first mount: set semua, next nav: sync ulang biar tidak stuck
     if (source !== null) store.setSourceFilter(source || null);
+    else if (hydrated.current) store.setSourceFilter(null);
     if (q !== null) store.setSearchQuery(q);
+    else if (hydrated.current) store.setSearchQuery("");
     if (type !== null) store.setTypeFilter(type || null);
+    else if (hydrated.current) store.setTypeFilter(null);
     if (feed && ["all", "nowl", "wl"].includes(feed)) store.setFeed(feed as "all" | "nowl" | "wl");
-    if (group !== null && group === "1" && !store.groupMode) store.toggleGroupMode();
+    else if (hydrated.current && feed === null) store.setFeed("all");
+    if (group !== null) {
+      const want = group === "1";
+      if (want !== store.groupMode) store.toggleGroupMode();
+    } else if (hydrated.current && store.groupMode) {
+      store.toggleGroupMode();
+    }
     hydrated.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [params]);
 
   // store → URL (debounced q)
   const sourceFilter = useUiStore((s) => s.sourceFilter);

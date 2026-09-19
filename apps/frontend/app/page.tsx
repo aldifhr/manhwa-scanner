@@ -150,7 +150,8 @@ function HomeGroupedCard({
   }, [series.cover]);
   const { trackChapter } = useContinueReading();
   const { readItems, toggleRead } = useReadItems();
-  const firstCh = series.chapters[0];
+  const sCh: GroupedSeries["chapters"] = Array.isArray((series as GroupedSeries)?.chapters) ? (series as GroupedSeries).chapters : [];
+  const firstCh = sCh[0] as GroupedSeries["chapters"][number] | undefined;
   const firstSource = firstCh?.source ?? null;
   const sLower = (firstSource || "").toLowerCase();
   const pillCls =
@@ -165,8 +166,8 @@ function HomeGroupedCard({
   return (
     <div className="group relative flex gap-4 rounded-2xl border border-white/10 bg-[#111111] p-3 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] sm:gap-5 sm:p-4">
       {/* Cover — visual anchor */}
-      <a
-        href={safeUrl(series.seriesUrl || series.chapters[0]?.seriesUrl) || "#"}
+        <a
+        href={safeUrl(series.seriesUrl || sCh[0]?.seriesUrl) || "#"}
         target="_blank"
         rel="noopener noreferrer"
         className="relative block h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-black focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-32"
@@ -215,7 +216,7 @@ function HomeGroupedCard({
             <img src={flag} alt={origin} className="mt-0.5 h-4 w-4 shrink-0" loading="lazy" />
           )}
           <a
-            href={safeUrl(series.seriesUrl || series.chapters[0]?.seriesUrl) || "#"}
+            href={safeUrl(series.seriesUrl || sCh[0]?.seriesUrl) || "#"}
             target="_blank"
             rel="noopener noreferrer"
             className="block min-h-0 min-w-0 rounded focus-visible:ring-2 focus-visible:ring-white"
@@ -238,7 +239,7 @@ function HomeGroupedCard({
 
         {/* Chapter pills — kotak rounded dikit */}
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
-          {series.chapters.slice(0, 4).map((ch) => {
+          {sCh.slice(0, 4).map((ch) => {
             const label = getChapterLabel(
               ch as unknown as {
                 chapterLabel?: string | null;
@@ -287,7 +288,7 @@ function HomeGroupedCard({
               </a>
             );
           })}
-          {series.chapters.every(
+          {sCh.every(
             (c) =>
               getChapterLabel(
                 c as unknown as {
@@ -298,9 +299,9 @@ function HomeGroupedCard({
                   chapterUrl?: string | null;
                 }
               ) === "?"
-          ) && (
+          ) && sCh.length > 0 && (
               <a
-                href={safeUrl(series.seriesUrl || series.chapters[0]?.seriesUrl) || "#"}
+                href={safeUrl(series.seriesUrl || sCh[0]?.seriesUrl) || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex min-h-0 min-w-0 items-center justify-center rounded-md bg-white/10 px-2 py-1 text-[11px] leading-none text-white/80 transition-colors hover:bg-white/20"
@@ -606,9 +607,10 @@ export default function HomePage() {
           estimateSize={184}
           renderItem={(series) => {
             const s = series as GroupedSeries;
+            const sCh2 = Array.isArray((s as any)?.chapters) ? (s as any).chapters : [];
             const isWL =
               s.isWhitelisted ||
-              s.chapters.some((c: { titleKey: string; source: string }) =>
+              sCh2.some((c: { titleKey: string; source: string }) =>
                 optimisticWhitelist.has(
                   `${c.titleKey || s.titleKey}:${c.source}`
                 )
@@ -629,9 +631,10 @@ export default function HomePage() {
       ) : (
         <div className="flex flex-col gap-3">
           {grouped.map((series, i) => {
+            const sChMap = Array.isArray((series as any)?.chapters) ? (series as any).chapters : [];
             const isWL =
               series.isWhitelisted ||
-              series.chapters.some((c: { titleKey: string; source: string }) =>
+              sChMap.some((c: { titleKey: string; source: string }) =>
                 optimisticWhitelist.has(
                   `${c.titleKey || series.titleKey}:${c.source}`
                 )
