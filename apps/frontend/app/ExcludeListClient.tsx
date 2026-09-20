@@ -217,7 +217,7 @@ export function ExcludeListClient() {
         type: "error",
       });
     } finally {
-      setBulkLoading(false);
+      setBusyKey(null);
     }
   };
 
@@ -267,10 +267,10 @@ export function ExcludeListClient() {
             variant="danger"
             size="sm"
             onClick={handleBulk}
-            disabled={bulkLoading}
+            disabled={busyKey === "bulk"}
           >
             <Plus size={14} />
-            {bulkLoading ? "Excluding..." : "Exclude all"}
+            {busyKey === "bulk" ? "Excluding..." : "Exclude all"}
           </Button>
         </div>
       </div>
