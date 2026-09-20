@@ -145,7 +145,6 @@ export function ExcludeListClient() {
           },
         },
       });
-      //
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
@@ -171,7 +170,6 @@ export function ExcludeListClient() {
     setBulkLoading(true);
     try {
       const res = await Reader.bulkExcludeBySource(bulkSource);
-      //
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });

@@ -39,7 +39,6 @@ export const Reader = {
       page_size: String(pageSize),
       merge: merge ? "true" : "false",
     });
-    //
     return paginatedGet(
       "/api/v1/whitelist",
       p,
@@ -61,7 +60,6 @@ export const Reader = {
         page_size: String(pageSize),
       });
       if (search) p.set("search", search);
-      //
       return (await paginatedGet(
         "/api/v1/dispatch-history",
         p,

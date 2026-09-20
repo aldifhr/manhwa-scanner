@@ -267,7 +267,6 @@ export function CardActions({
   showRead?: boolean;
   showAdd?: boolean;
 }) {
-  //
   const showAddEff = showAdd;
   const showExcludeEff = !isWhitelisted;
   // Completed = tamat + exclude from RSS — from /recent, not whitelist
@@ -379,7 +378,6 @@ export function ChapterChips({
       </div>
     );
   }
-  //
   const [expanded, setExpanded] = useState(false);
   const allSameSource = safeCh.length > 0 && safeCh.every((c) => c.source === safeCh[0].source);
   const visible = expanded ? safeCh : safeCh.slice(0, 12);

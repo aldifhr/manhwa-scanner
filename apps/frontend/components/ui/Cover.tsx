@@ -64,7 +64,6 @@ export function Cover({
       fetchPriority="low"
       onError={() => {
         if (!hasRetried && titleKey) {
-          //
           setCoverSrc(
             `/api/v1/reader/cover?series=${encodeURIComponent(titleKey)}`
           );

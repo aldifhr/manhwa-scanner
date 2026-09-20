@@ -9,7 +9,7 @@ export interface FlatChapter {
   chapter: string;
   chapterLabel: string;
   chapterNumber: number;
-  url: string; //
+  url: string;
   chapterUrl: string;
   source: string;
   cover: string;

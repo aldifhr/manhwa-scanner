@@ -174,7 +174,6 @@ export default function VirtualizedList<T>({
     >
       {virtualItems.map((vi) => {
         const rowItems = rows[vi.index] ?? [];
-        //
         const first = rowItems[0] as unknown as Record<string, unknown> | undefined;
         const chapterRowKey =
           (first?.key as string) ||

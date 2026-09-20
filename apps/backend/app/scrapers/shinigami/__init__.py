@@ -83,9 +83,6 @@ def search_shinigami_api(query: str, per_page: int = 20):
 def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: int = 10, hours_cutoff: int = 24):
     """Fetch latest-updates across BOTH manga types (mirror + project).
 
-    Uses is_update=true filter but also fetches full catalog (without filter)
-    to avoid missing series due to API cache staleness.
-
     Mirip voratoon: stop kalau oldest di page udah lewat cutoff, biar gak miss kalau
     update >24 dalam 24 jam tapi juga gak boros fetch 10 page terus kalau cuma 1 page fresh.
     """
@@ -135,31 +132,6 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
                     seen_ids.add(mid)
                     all_items.append(it)
             # kalau di page ini udah gak ada yg fresh, page selanjutnya pasti lebih tua (sort latest) -> stop
-            if not has_fresh:
-                break
-            if len(items) < per_page:
-                break
-    
-    # Also fetch full catalog (without is_update) to catch missed series — juga early-stop
-    for mtype in ("mirror", "project"):
-        for p in range(1, 3):  # Limit pages to avoid rate limits
-            data = _get(f"/manga/list?type={mtype}&page={p}&page_size={per_page}&sort=latest&sort_order=desc")
-            if not data:
-                break
-            try:
-                items = ShinigamiLatestResponse.model_validate(data).model_dump().get("data", [])
-            except Exception:
-                break
-            if not items:
-                break
-            has_fresh = False
-            for it in items:
-                if _is_fresh(it):
-                    has_fresh = True
-                mid = it.get("manga_id")
-                if mid and mid not in seen_ids:
-                    seen_ids.add(mid)
-                    all_items.append(it)
             if not has_fresh:
                 break
             if len(items) < per_page:

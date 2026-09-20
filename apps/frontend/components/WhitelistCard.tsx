@@ -7,7 +7,6 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
 import type { WhitelistRouteItem } from "@/lib/types";
 
-//
 function slugFromTitle(title: string): string {
   return title
     .toLowerCase()
@@ -225,7 +224,6 @@ export function WhitelistCard({
       deletePayload as Record<string, unknown>
     )
       .then(() => {
-        //
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(false) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(true) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });

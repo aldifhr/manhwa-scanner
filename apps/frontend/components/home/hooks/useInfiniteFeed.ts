@@ -7,7 +7,6 @@ import { useToast } from "@/lib/useToast";
 import type { FlatChapter } from "@/lib/feed";
 import { compareFlatByNewest, chapterKey } from "@/lib/feed";
 
-//
 // pakai useQuery single-page + manual append untuk page 2+ (stabil, tidak sentuh data.pages.length internal)
 const PAGE_SIZE = 100;
 

@@ -129,7 +129,6 @@ function AllTabInner() {
   // "Sent to Discord" label
   const isSentAvailable =
     all.length > 0 && all.some((c) => c.isSent !== undefined);
-  //
   const { data: dispatchHistory } = useQuery({
     queryKey: queryKeys.dispatchHistory(),
     queryFn: () =>

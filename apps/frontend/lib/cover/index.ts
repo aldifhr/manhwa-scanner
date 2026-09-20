@@ -20,7 +20,6 @@ const DIRECT_HOSTS = new Set([
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",
-  //
 ]);
 export function isDirectAllowed(hostname: string): boolean {
   return DIRECT_HOSTS.has(hostname);
@@ -112,7 +111,6 @@ export function resolveCoverUrl(
   }
 
   // 4. Proxy prefix: normalize double-encode, direct hosts bypass proxy
-  //
   const PROXY_PREFIX = "/api/v1/reader/proxy?url=";
   const LEGACY_IMG_PREFIX = "/api/img?url=";
   for (const prefix of [PROXY_PREFIX, LEGACY_IMG_PREFIX, "/api/v1/img?url="]) {

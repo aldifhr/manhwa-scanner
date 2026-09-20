@@ -81,7 +81,6 @@ function isPublicPath(pathname: string, method: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  //
   if (pathname === "/login") {
     const token = request.cookies.get(COOKIE_NAME)?.value;
     if (token && hasValidToken(token)) {
@@ -112,7 +111,6 @@ export function proxy(request: NextRequest) {
     return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
-  //
   return applySecurityHeaders(NextResponse.next());
 }
 

@@ -88,7 +88,7 @@ export const rssCache = createTtlCache<unknown>({
 });
 
 export const whitelistCache = createTtlCache<unknown>({
-  ttl: 1_000, //
+  ttl: 1_000,
   max: 30,
   globalKey: "__whitelistCache",
 });
