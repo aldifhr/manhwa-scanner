@@ -462,6 +462,33 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
     except Exception as e:
         logger.warn("voratoon cover rc: list failed", err=str(e)[:120])
 
+    # --- also refresh excluded_titles voratoon presigned ---
+    try:
+        ex_rows_raw = sb.table("excluded_titles").select("title_key, cover, source").eq("source", "voratoon").limit(100).execute().data or []
+        try:
+            from app.cron.enrich.whitelist import _is_voratoon_expiring_soon as _is_exp_ex
+        except Exception:
+            _is_exp_ex = lambda c, **kw: "X-Amz-" in (c or "")
+        ex_rows_er = [r for r in ex_rows_raw if _is_exp_ex(r.get("cover") or "", hours=24)]
+        for er in ex_rows_er:
+            tk_ex = str(er.get("title_key") or "").strip()
+            if not tk_ex:
+                continue
+            try:
+                detail_ex = _fetch_vt(tk_ex)
+                data_ex = (detail_ex or {}).get("data", {}) if isinstance(detail_ex, dict) else {}
+                raw_ex = data_ex.get("coverImage") or data_ex.get("cover") or ""
+                new_ex = _scrub(raw_ex) if raw_ex else ""
+                if new_ex and new_ex != er.get("cover"):
+                    sb.table("excluded_titles").update({"cover": new_ex}).eq("title_key", tk_ex).eq("source", "voratoon").execute()
+                    updated += 1
+            except Exception as e:
+                logger.warn("voratoon cover ex: fetch failed", tk=tk_ex, err=str(e)[:120])
+                failed += 1
+            time.sleep(0.75)
+    except Exception as e:
+        logger.warn("voratoon cover ex: list failed", err=str(e)[:120])
+
     duration = round(time.time() - start, 1)
     stats = {"ok": True, "checked": checked, "updated": updated, "failed": failed, "duration": duration}
     logger.info("voratoon cover refresh done", **stats)
