@@ -160,7 +160,7 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                 headers_req["Referer"] = f"https://{settings.IKIRU_PUBLIC_URL.rstrip('/')}/"
                 headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
             r = await asyncio.to_thread(
-                lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=30, allow_redirects=False)
+                lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=8, allow_redirects=False)
             )
             if r.status_code == 403 and "hotlink" in (r.text.lower() if hasattr(r, "text") else ""):
                 for alt_ref in [f"https://{p.hostname}/", ""]:
@@ -170,7 +170,7 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                     else:
                         alt_headers.pop("Referer", None)
                     r2 = await asyncio.to_thread(
-                        lambda h=alt_headers: cffi_req.get(url, headers=h, impersonate="chrome", timeout=30, allow_redirects=False)
+                        lambda h=alt_headers: cffi_req.get(url, headers=h, impersonate="chrome", timeout=8, allow_redirects=False)
                     )
                     if r2.status_code == 200:
                         r = r2
@@ -183,7 +183,16 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                 if "86400" in cache_control:
                     headers_out["Expires"] = "Thu, 31 Dec 2026 23:59:59 GMT"
                 return FastResponse(content=content, status_code=200, media_type=ctype, headers=headers_out)
+            if r.status_code in (403, 404):
+                # Return a 1x1 transparent PNG so <img> doesn't error/flash
+                import base64
+                _PX1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+                return FastResponse(content=_PX1, status_code=200, media_type="image/png", headers={"Cache-Control": "public, max-age=3600", "X-Cache": "MISS"})
             return FastResponse(status_code=r.status_code)
+        except asyncio.TimeoutError:
+            import base64
+            _PX1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+            return FastResponse(content=_PX1, status_code=200, media_type="image/png", headers={"Cache-Control": "public, max-age=300", "X-Cache": "MISS"})
         except Exception:
             return FastResponse(status_code=502)
 
