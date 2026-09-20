@@ -4,7 +4,8 @@ from app.logger import get_logger
 from app.services.rating_utils import normalize_rating
 from app.utils.text import normalize_title_key, slugify_title_key
 from app.utils.cover_scrub import scrub_cover
-from app.cron.collectors.common import _cached_chapter_list, _cached_series_meta, MAX_CHAPTERS_PER_SERIES, _COLLECT_WORKERS, logger as _common_logger
+from app.cron.collectors.common import _cached_chapter_list, MAX_CHAPTERS_PER_SERIES, _COLLECT_WORKERS, logger as _common_logger
+from app.storage.series_meta import series_meta
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 from app.cron.collectors.common import _ikiru_re_touch_anchor, _is_ikiru_re_touch
 
@@ -21,7 +22,7 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
         return items
     _meta: dict = {}
     if fetch_meta:
-        _meta = _cached_series_meta("ikiru", series_slug)
+        _meta = series_meta.get("ikiru", series_slug)
     _meta_rating = normalize_rating(u.get("rating")) or normalize_rating(_meta.get("rating"))
     _meta_genres = u.get("genre") or _meta.get("genres") or []
     try:
@@ -61,7 +62,8 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
 def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = True, exclude_keys: set[str] | None = None) -> list[dict]:
     from app.scrapers import ikiru as _ikiru_scraper
     from concurrent.futures import ThreadPoolExecutor
-    from app.cron.collectors.common import _COLLECT_WORKERS, preload_series_meta_bulk
+    from app.cron.collectors.common import _COLLECT_WORKERS
+    from app.storage.series_meta import series_meta as _sm_preload
     from app.utils.text import slugify_title_key as _ntk
     from app.services.scanner_confidence import attach_confidence
     items: list[dict] = []
@@ -75,7 +77,7 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
     if fetch_meta:
         try:
             _keys = [(slugify_title_key(u.get("title", "")), "ikiru") for u in _series]
-            preload_series_meta_bulk(_keys)
+            _sm_preload.get_bulk(_keys)
         except Exception:
             pass
     with ThreadPoolExecutor(max_workers=_COLLECT_WORKERS) as _ex:
