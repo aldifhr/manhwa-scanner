@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { Warning } from "@phosphor-icons/react";
 
 export default function Error({
   error,
@@ -10,28 +10,37 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const router = useRouter();
-  const qc = useQueryClient();
-  function handleReset() {
-    // reset TanStack error cache + Router cache agar tidak stuck sampai hard refresh
-    qc.resetQueries();
-    router.refresh();
-    reset();
-  }
+  useEffect(() => {
+    console.error("Route error:", error);
+  }, [error]);
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-      <h2 className="text-xl font-semibold text-text mb-2">
-        Something went wrong
-      </h2>
-      <p className="text-text-muted max-w-md mb-6 text-sm">
-        {error.message || "An unexpected error occurred."}
-      </p>
-      <button
-        onClick={handleReset}
-        className="px-5 py-2 rounded-lg bg-accent text-black font-medium hover:bg-accent/80 transition-colors"
-      >
-        Try again
-      </button>
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="rounded-full bg-danger/10 p-4">
+        <Warning size={32} className="text-danger" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-text">
+          Something went wrong
+        </h2>
+        <p className="max-w-md text-sm text-text-muted">
+          {error.message || "An unexpected error occurred. Please try again."}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={reset}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
+        >
+          Try again
+        </button>
+        <button
+          onClick={() => (window.location.href = "/")}
+          className="rounded-lg bg-surface border border-border px-4 py-2 text-sm font-medium text-text hover:bg-surface-hover transition-colors"
+        >
+          Go home
+        </button>
+      </div>
     </div>
   );
 }
