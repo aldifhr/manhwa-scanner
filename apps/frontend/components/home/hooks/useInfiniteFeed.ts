@@ -52,7 +52,8 @@ export function useInfiniteFeed(opts: {
     },
     staleTime: staleTimes.rss,
     gcTime: gcTimes.rss,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1,
     placeholderData: keepPreviousData,
   });

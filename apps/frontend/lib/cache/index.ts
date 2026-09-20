@@ -81,26 +81,29 @@ export function createTtlCache<T = unknown>(opts: {
 
 // ── Pre-configured shared caches (import these, don't create new ones) ──
 export const rssCache = createTtlCache<unknown>({
-  ttl: 10_000,
-  staleTtl: 20_000,
+  ttl: 30_000,
+  staleTtl: 30_000,
   max: 50,
   globalKey: "__rssCache",
 });
 
 export const whitelistCache = createTtlCache<unknown>({
-  ttl: 1_000,
+  ttl: 30_000,
+  staleTtl: 10_000,
   max: 30,
   globalKey: "__whitelistCache",
 });
 
 export const statsCache = createTtlCache<unknown>({
-  ttl: 15_000,
+  ttl: 30_000,
+  staleTtl: 30_000,
   max: 20,
   globalKey: "__statsCache",
 });
 
 export const dashboardCache = createTtlCache<unknown>({
-  ttl: 10_000,
+  ttl: 60_000,
+  staleTtl: 60_000,
   max: 20,
   globalKey: "__dashboardCache",
 });
