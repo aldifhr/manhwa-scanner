@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/Select";
 import { CompactSearchInput } from "@/components/ui/SearchInput";
 import { useWhitelistFilters } from "@/components/home/hooks/useWhitelistFilters";
 import { WhitelistCard } from "@/components/WhitelistCard";
+import { useCustomLists, type ListName } from "@/hooks/useCustomLists";
 
 export function WhitelistGrid() {
   const { data, isLoading, error, refetch } = useQuery({
@@ -34,6 +35,8 @@ export function WhitelistGrid() {
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [sort, setSort] = useState<"title" | "rating" | "recent">("title");
+  const [listTab, setListTab] = useState<"all" | ListName>("all");
+  const { map: customMap, setList } = useCustomLists();
 
   const [catalogSearch, setCatalogSearch] = useState("");
   const debouncedCatalogSearch = useDebounced(catalogSearch, 400);
@@ -46,7 +49,12 @@ export function WhitelistGrid() {
   });
 
   const items = data ?? [];
-  const filtered = useWhitelistFilters(items, {
+  const filteredByList = listTab === "all" ? items : items.filter(it => {
+    const k = (it as any).titleKey || (it as any).title_key || it.id;
+    const v = customMap[k] || (it as any).status?.toLowerCase();
+    return v === listTab;
+  });
+  const filtered = useWhitelistFilters(filteredByList, {
     sourceFilter,
     typeFilter,
     debouncedSearch,
@@ -136,6 +144,23 @@ export function WhitelistGrid() {
 
       <div className="flex items-center justify-between gap-2">
         <CompactSearchInput value={searchTerm} onChange={setSearchTerm} />
+      </div>
+
+      {/* Custom Lists tabs */}
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+        {(["all", "reading", "plan", "completed", "dropped"] as const).map(tab => {
+          const label = tab === "all" ? "All" : tab === "plan" ? "Plan to Read" : tab.charAt(0).toUpperCase() + tab.slice(1);
+          const count = tab === "all" ? items.length : items.filter(it => {
+            const k = (it as any).titleKey || (it as any).title_key || it.id;
+            return (customMap[k] || (it as any).status?.toLowerCase()) === tab;
+          }).length;
+          const active = listTab === tab;
+          return (
+            <button key={tab} onClick={() => setListTab(tab)} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${active ? "bg-white text-black border-white" : "bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white"}`}>
+              {label} <span className={`ml-1 ${active ? "text-black/50" : "text-white/30"}`}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -254,13 +279,22 @@ export function WhitelistGrid() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filtered.map((item) => (
-            <WhitelistCard
-              key={`${item.id}:${item.source}`}
-              item={item}
-              onRefetch={refetch}
-            />
-          ))}
+          {filtered.map((item) => {
+            const k = (item as any).titleKey || (item as any).title_key || item.id;
+            const cur = customMap[k] as ListName | undefined;
+            return (
+              <div key={`${item.id}:${item.source}`} className="flex flex-col gap-1">
+                <WhitelistCard item={item} onRefetch={refetch} />
+                <select value={cur || ""} onChange={e => setList(k, (e.target.value as ListName) || null)} className="text-[11px] rounded-full bg-white/5 border border-white/10 text-white/70 px-2 py-1">
+                  <option value="">— List —</option>
+                  <option value="reading">Reading</option>
+                  <option value="plan">Plan to Read</option>
+                  <option value="completed">Completed</option>
+                  <option value="dropped">Dropped</option>
+                </select>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

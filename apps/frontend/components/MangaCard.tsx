@@ -7,6 +7,7 @@ import { timeAgo } from "@/lib/timeAgo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSourcesHealth, isHealthy } from "@/hooks/useSourcesHealth";
 
 interface Props {
   title: string;
@@ -78,6 +79,7 @@ function MangaCard({
     ])
   );
 
+  const health = useSourcesHealth();
   const showCover = cover && !imgErr;
   const proxiedCover = showCover ? rewriteCoverUrl(cover) : null;
 
@@ -147,11 +149,12 @@ function MangaCard({
               </span>
             </div>
           ) : null}
-          {/* Source badge(s) — top-right */}
+          {/* Source badge(s) — top-right with health dot */}
           {allSources.length > 0 && (
             <div className="absolute top-2 right-2 inline-flex items-center gap-1 z-10">
               {allSources.map((src) => {
                 const s = src.toLowerCase();
+                const down = !isHealthy(health[s]);
                 const color =
                   s === "voratoon"
                     ? "bg-orange-600/90 text-white"
@@ -163,8 +166,10 @@ function MangaCard({
                 return (
                   <span
                     key={src}
-                    className={`inline-flex items-center px-1.5 py-0.5 text-[9px] font-semibold rounded shadow-[0_2px_6px_rgba(0,0,0,0.4)] backdrop-blur-md border border-white/10 uppercase tracking-wide ${color}`}
+                    title={down ? `${src} • down` : `${src} • healthy`}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-semibold rounded shadow-[0_2px_6px_rgba(0,0,0,0.4)] backdrop-blur-md border border-white/10 uppercase tracking-wide ${down ? "ring-1 ring-red-400/60" : ""} ${color}`}
                   >
+                    <span className={`w-1.5 h-1.5 rounded-full ${down ? "bg-red-300 animate-pulse" : "bg-emerald-300"}`} />
                     {src}
                   </span>
                 );

@@ -37,6 +37,7 @@ const PUBLIC_PREFIX = [
   "/api/v1/reader/cover-img",
   "/api/v1/reader/activity",
   "/api/v1/public/stats",
+  "/api/v1/recommended",
   "/api/v1/rss",
   "/api/v1/rss/new",
   "/api/reader/rss",

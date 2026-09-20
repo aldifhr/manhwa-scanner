@@ -44,11 +44,20 @@ function SourcePill({ source }: { source: string }) {
   );
 }
 
-function ContinueReadingCard({ entry }: { entry: ContinueReadingEntry }) {
+function ContinueReadingCard({ entry, onRemove }: { entry: ContinueReadingEntry; onRemove?: () => void }) {
   const label = getChapterLabel({ chapterLabel: entry.lastChapter });
   const displayLabel = label === "?" ? entry.lastChapter : label;
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
+      {onRemove && (
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
+          aria-label="Remove"
+          className="absolute -right-1 -top-1 z-10 w-6 h-6 rounded-full bg-black/70 border border-white/15 text-white/70 hover:text-white hover:bg-black/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          ×
+        </button>
+      )}
       <a
         href={entry.chapterUrl}
         target="_blank"
@@ -81,7 +90,7 @@ function ContinueReadingCard({ entry }: { entry: ContinueReadingEntry }) {
 }
 
 export default function ContinueReadingStrip() {
-  const { entries, clearAll } = useContinueReading();
+  const { entries, clearAll, removeReading } = useContinueReading();
 
   const sortedEntries = [...entries.values()]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -112,7 +121,7 @@ export default function ContinueReadingStrip() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.04, duration: 0.25 }}
           >
-            <ContinueReadingCard entry={entry} />
+            <ContinueReadingCard entry={entry} onRemove={() => removeReading(entry.titleKey)} />
           </motion.div>
         ))}
       </div>

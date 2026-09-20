@@ -10,6 +10,7 @@ import { NavItem } from "@/components/Nav/NavItem";
 import { useAuth } from "@/components/Nav/useAuth";
 import { usePrefetch } from "@/components/Nav/usePrefetch";
 import NavbarStatus from "@/components/NavbarStatus";
+import { useNewCount, NotificationDot } from "@/components/Nav/NotificationDot";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -17,7 +18,14 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { logout } = useAuth();
   const prefetch = usePrefetch();
+  const { count: newCount, markSeen } = useNewCount();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => {
+    if (pathname === "/recent" && newCount > 0) {
+      const t = setTimeout(() => markSeen(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [pathname, newCount, markSeen]);
   useEffect(() => {
     const hasCsrf = !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
     if (hasCsrf) { setIsLoggedIn(true); return; }
@@ -61,16 +69,21 @@ export default function Navbar() {
             </Link>
 
             <div className="hidden md:flex items-center gap-1 ml-4">
-              {NAV.map(({ href, label, icon }) => (
-                  <NavItem
-                    key={href}
-                    href={href}
-                    label={label}
-                    icon={icon}
-                    active={isNavActive(href, pathname)}
-                    onPrefetch={prefetch}
-                  />
-                ))}
+              {NAV.map(({ href, label, icon }) => {
+                const isRecent = href === "/recent";
+                return (
+                  <span key={href} className="relative inline-flex">
+                    <NavItem
+                      href={href}
+                      label={label}
+                      icon={icon}
+                      active={isNavActive(href, pathname)}
+                      onPrefetch={prefetch}
+                    />
+                    {isRecent && <NotificationDot count={newCount} />}
+                  </span>
+                );
+              })}
             </div>
 
             <div className="flex-1" />
@@ -159,18 +172,27 @@ export default function Navbar() {
               </div>
 
               <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-                {NAV.map(({ href, label, icon }) => (
-                    <NavItem
-                      key={href}
-                      href={href}
-                      label={label}
-                      icon={icon}
-                      active={isNavActive(href, pathname)}
-                      variant="mobile"
-                      onPrefetch={prefetch}
-                      onClick={() => setOpen(false)}
-                    />
-                  ))}
+                {NAV.map(({ href, label, icon }) => {
+                  const isRecent = href === "/recent";
+                  return (
+                    <span key={href} className="relative block">
+                      <NavItem
+                        href={href}
+                        label={label}
+                        icon={icon}
+                        active={isNavActive(href, pathname)}
+                        variant="mobile"
+                        onPrefetch={prefetch}
+                        onClick={() => setOpen(false)}
+                      />
+                      {isRecent && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <NotificationDot count={newCount} />
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
               </div>
 
               <div className="p-3 border-t border-white/10 space-y-3 bg-black/20">

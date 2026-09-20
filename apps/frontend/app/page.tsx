@@ -18,7 +18,10 @@ import {
   CheckCircle,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
+import { RecommendedSection } from "@/components/home/RecommendedSection";
+import TrendingBar from "@/components/home/TrendingBar";
 import { useReadItems } from "@/components/home/useReadItems";
+import { useSourcesHealth, isHealthy } from "@/hooks/useSourcesHealth";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/PageShell";
@@ -84,6 +87,7 @@ function SourcePill({ source }: { source: string }) {
 
 function ContinueReadingCard({
   entry,
+  onRemove,
 }: {
   entry: ReturnType<typeof useContinueReading>["entries"] extends Map<
     string,
@@ -91,9 +95,24 @@ function ContinueReadingCard({
   >
   ? V
   : never;
+  onRemove?: () => void;
 }) {
   return (
     <div className="group shrink-0 w-36 sm:w-44 relative">
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          aria-label="Remove"
+          title="Remove"
+          className="absolute -right-1 -top-1 z-10 w-6 h-6 rounded-full bg-black/70 border border-white/15 text-white/70 hover:text-white hover:bg-black/90 flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        >
+          ×
+        </button>
+      )}
       <a
         href={safeUrl(entry.chapterUrl) || "#"}
         target="_blank"
@@ -148,12 +167,14 @@ function HomeGroupedCard({
     setHasRetried(false);
     setImgErrorFinal(false);
   }, [series.cover]);
+  const health = useSourcesHealth();
   const { trackChapter } = useContinueReading();
   const { readItems, toggleRead } = useReadItems();
   const sCh: GroupedSeries["chapters"] = Array.isArray((series as GroupedSeries)?.chapters) ? (series as GroupedSeries).chapters : [];
   const firstCh = sCh[0] as GroupedSeries["chapters"][number] | undefined;
   const firstSource = firstCh?.source ?? null;
   const sLower = (firstSource || "").toLowerCase();
+  const down = firstSource ? !isHealthy(health[sLower]) : false;
   const pillCls =
     sLower === "shinigami"
       ? "bg-red-500 text-white"
@@ -192,7 +213,8 @@ function HomeGroupedCard({
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
             {firstSource && (
-              <span className={`absolute left-2 top-2 rounded-md px-1.5 py-1 text-[9px] font-bold capitalize shadow-sm ${pillCls}`}>
+              <span className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-bold capitalize shadow-sm ${pillCls} ${down ? "ring-1 ring-red-300" : ""}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${down ? "bg-red-200 animate-pulse" : "bg-white/60"}`} />
                 {firstSource}
               </span>
             )}
@@ -252,6 +274,7 @@ function HomeGroupedCard({
             if (label === "?") return null;
             const href = safeUrl(ch.chapterUrl || ch.url || series.seriesUrl) || "#";
             const src = ch.source?.toLowerCase();
+            const chDown = src ? !isHealthy(health[src]) : false;
             const chipColor =
               src === "shinigami"
                 ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
@@ -266,6 +289,7 @@ function HomeGroupedCard({
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
+                title={chDown ? `${src} • down` : undefined}
                 onClick={() =>
                   trackChapter({
                     title: series.title,
@@ -282,8 +306,9 @@ function HomeGroupedCard({
                     origin: series.origin,
                   })
                 }
-                className={`inline-flex min-h-0 min-w-0 items-center justify-center rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${chipColor}`}
+                className={`inline-flex min-h-0 min-w-0 items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${chipColor} ${chDown ? "opacity-60 ring-1 ring-red-400/40" : ""}`}
               >
+                <span className={`w-1.5 h-1.5 rounded-full ${chDown ? "bg-red-400 animate-pulse" : "bg-emerald-400/60"}`} />
                 Ch. {label}
               </a>
             );
@@ -368,6 +393,7 @@ export default function HomePage() {
     placeholderData: keepPreviousData,
     retry: false,
     refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
   });
 
   const { optimisticWhitelist, optimisticExcluded, addingKey, handleAddGroup } = useFeedActions();
@@ -389,7 +415,7 @@ export default function HomePage() {
     enabled: isLoggedInForSnapshot,
   });
 
-  const { entries: continueReading, clearAll: clearContinueReading } =
+  const { entries: continueReading, clearAll: clearContinueReading, removeReading } =
     useContinueReading();
 
   const sortedContinueReading = useMemo(
@@ -406,26 +432,32 @@ export default function HomePage() {
   const rawResults = (data?.data?.results ?? []) as unknown[];
   const deferredResults = useDeferredValue(rawResults);
 
-  // Get latest timestamp from results
+  // Get latest timestamp from results — auto relative + live tick
   const latestTimestamp = useMemo(() => {
     if (deferredResults.length === 0) return null;
     const times = deferredResults
       .map((r: any) => r?.updated_time || r?.sent_at || r?.updatedAt)
       .filter(Boolean)
-      .map((t: string) => new Date(t).getTime());
+      .map((t: string) => new Date(t).getTime())
+      .filter((n) => Number.isFinite(n));
     return times.length > 0 ? Math.max(...times) : null;
   }, [deferredResults]);
-  const [lastUpdateLabel, setLastUpdateLabel] = useState("Manual");
-  const [lastUpdateLong, setLastUpdateLong] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (latestTimestamp) {
-      setLastUpdateLabel(new Date(latestTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      setLastUpdateLong(new Date(latestTimestamp).toLocaleString());
-    } else {
-      setLastUpdateLabel("Manual");
-      setLastUpdateLong(null);
-    }
-  }, [latestTimestamp]);
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const { lastUpdateLabel, lastUpdateLong } = useMemo(() => {
+    if (!latestTimestamp) return { lastUpdateLabel: "—", lastUpdateLong: null as string | null };
+    const diff = now - latestTimestamp;
+    let label: string;
+    if (diff < 45_000) label = "Just now";
+    else if (diff < 60_000) label = `${Math.floor(diff / 1000)}s ago`;
+    else if (diff < 3600_000) label = `${Math.floor(diff / 60000)}m ago`;
+    else if (diff < 86400_000) label = `${Math.floor(diff / 3600000)}h ago`;
+    else label = new Date(latestTimestamp).toLocaleDateString();
+    return { lastUpdateLabel: label, lastUpdateLong: new Date(latestTimestamp).toLocaleString() };
+  }, [latestTimestamp, now]);
 
   // grouped by titleKey — same seam as /recent AllTab (deferred + transition biar gak block main thread pas 1k row)
   const grouped = useMemo(() => {
@@ -470,6 +502,9 @@ export default function HomePage() {
         </p>
       </div>
 
+      <RecommendedSection />
+      <TrendingBar />
+
       {continueReading.size > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -494,7 +529,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04, duration: 0.25 }}
               >
-                <ContinueReadingCard key={entry.titleKey} entry={entry} />
+                <ContinueReadingCard entry={entry} onRemove={() => removeReading(entry.titleKey)} />
               </motion.div>
             ))}
           </div>
@@ -543,7 +578,11 @@ export default function HomePage() {
                   />
                 </div>
                 <div>
-                  <p suppressHydrationWarning className="text-base sm:text-lg font-bold tracking-[-0.02em] text-white tabular-nums">
+                  <p
+                    suppressHydrationWarning
+                    className="text-base sm:text-lg font-bold tracking-[-0.02em] text-white tabular-nums"
+                    title={label === "Last Update" ? (lastUpdateLong || undefined) : undefined}
+                  >
                     {value}
                   </p>
                   <p className="text-[10px] sm:text-xs text-white/45 tracking-wide">

@@ -1,13 +1,14 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import { backendUrl, TIMEOUT, catchError } from "@/lib/server-api";
+import { backendUrl, authHeaders, TIMEOUT, catchError } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
     const res = await fetch(`${backendUrl()}/api/v1/sources/health`, {
+      headers: authHeaders(request),
       signal: AbortSignal.timeout(TIMEOUT.DEFAULT),
       cache: "no-store",
     });
