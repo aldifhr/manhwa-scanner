@@ -24,7 +24,7 @@ export const queryKeys = {
       page ?? 1,
     ] as const,
   // Infinite variant without page — pagination driven by useInfiniteQuery pageParam + cache
-  // ponytail #8: key harus filter-aware (exclude/whitelist/source/type/limit) — jangan cuma ["rss"]
+  //"rss"]
   // ["rss", {page,limit,exclude,whitelist,source,type}] bentuk tuple ini setara, urutan fixed
   rssFeedInfinite: (
     exclude?: string,

@@ -1,5 +1,4 @@
 -- 064_audit_log.sql — audit trail for admin mutations (P1 HIGH)
--- ponytail: minimal table, no FK, no RLS, append-only
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,

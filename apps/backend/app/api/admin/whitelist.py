@@ -19,7 +19,6 @@ from app.services.audit import log_action, AuditAction
 logger = get_logger("api:whitelist")
 router = APIRouter()
 
-
 class WhitelistCreate(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
     title: str = Field(..., min_length=1, max_length=200)
@@ -34,7 +33,6 @@ class WhitelistCreate(BaseModel):
     url: Optional[str] = Field(default=None, max_length=500)
     seriesUrl: Optional[str] = Field(default=None, max_length=500)
     series_url: Optional[str] = Field(default=None, max_length=500)
-
 
 class WhitelistPatch(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
@@ -51,7 +49,6 @@ class WhitelistPatch(BaseModel):
     genres: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, max_length=5000)
 
-
 class WhitelistDeleteRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     title_key: Optional[str] = Field(default=None, max_length=200)
@@ -61,11 +58,9 @@ class WhitelistDeleteRequest(BaseModel):
     id: Optional[str] = Field(default=None, max_length=500)
     url: Optional[str] = Field(default=None, max_length=500)
 
-
 class WhitelistNormalizeRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     dry_run: Optional[bool] = None
-
 
 @router.get("/dispatch-history")
 async def dispatch_history(request: Request):
@@ -88,19 +83,16 @@ async def dispatch_history(request: Request):
         logger.warn("dispatch-history failed", err=str(e))
         return JSONResponse(content=safe_error(e), status_code=500)
 
-
 @router.get("/reader/dispatch-history")
 async def dispatch_history_reader(request: Request):
     """Alias for FE compatibility — /api/v1/reader/dispatch-history → /api/v1/dispatch-history."""
     return await dispatch_history(request)
-
 
 @router.get("/reader/whitelist")
 async def get_whitelist_reader(request: Request):
     """Backward-compat alias — public GET for anon dashboard, same as /whitelist."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    # ponytail: pisah per source (merge=false) default — user request
     page = request.query_params.get("page", "1")
     page_size = request.query_params.get("page_size", request.query_params.get("pageSize", "100"))
     _merge_raw = (request.query_params.get("merge") or "false").lower()
@@ -112,12 +104,10 @@ async def get_whitelist_reader(request: Request):
         return JSONResponse(content=data, headers={"Cache-Control": "private, no-store, must-revalidate", "Vary": "Cookie", "Pragma": "no-cache"})
     return data
 
-
 @router.get("/whitelist")
 async def whitelist_get(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    # ponytail: pisah per source (merge=false) default — user request
     try:
         source = request.query_params.get("source", "")
         title = request.query_params.get("title") or request.query_params.get("q", "")
@@ -132,12 +122,10 @@ async def whitelist_get(request: Request):
         logger.warn("whitelist failed", err=str(e))
         return JSONResponse(content=safe_error(e), status_code=500)
 
-
 @router.post("/reader/whitelist")
 async def whitelist_post_reader(request: Request):
     """Alias for FE compatibility — /api/v1/reader/whitelist → /api/v1/whitelist."""
     return await whitelist_post(request)
-
 
 @router.post("/whitelist")
 async def whitelist_post(request: Request):
@@ -179,7 +167,6 @@ async def whitelist_post(request: Request):
     except Exception:
         pass
     return JSONResponse(content=res)
-
 
 @router.delete("/whitelist")
 async def whitelist_delete(request: Request):
@@ -241,7 +228,6 @@ async def whitelist_delete(request: Request):
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
 
-
 @router.patch("/whitelist")
 async def whitelist_patch(request: Request):
     if not require_monitor_auth(request):
@@ -291,7 +277,6 @@ async def whitelist_patch(request: Request):
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
-
 
 @router.post("/reader/whitelist/normalize-urls")
 async def whitelist_normalize_urls(request: Request):

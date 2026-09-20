@@ -1,5 +1,4 @@
 -- 062_fix_voratoon_uuid_whitelist.sql — fix voratoon UUID title_key -> slug (cover null)
--- ponytail: voratoon whitelist had UUID title_key (bc135bac...) with null cover because series_meta keyed by slug
 
 -- backfill series_meta cover for UUID whitelist entries via title -> slug
 -- 1) Fix existing UUID whitelist rows to slug (so FE cover lookup via series_meta works)

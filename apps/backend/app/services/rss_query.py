@@ -9,7 +9,6 @@ from app.utils.origin import normalize_origin
 from app.utils.cover_scrub import scrub_cover
 from app.config import settings
 
-
 def normalize_type(raw) -> str | None:
     if not raw:
         return None
@@ -20,19 +19,15 @@ def normalize_type(raw) -> str | None:
         return "manhwa" if t.endswith("wa") else "manhua"
     return t or None
 
-
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
-
 
 def _slug_key(tk: str) -> str:
     t = normalize_title_key(tk).lower()
     return _SLUG_RE.sub("-", t).strip("-")
 
-
 def _canonical(tk: str) -> str:
     from app.storage.canonical import canonical_of as _co
     return _co(tk)
-
 
 def _is_sent(it: dict, tk: str, src: str, dh_sent: set[tuple[str, float]] | None) -> bool:
     if not dh_sent:
@@ -48,7 +43,6 @@ def _is_sent(it: dict, tk: str, src: str, dh_sent: set[tuple[str, float]] | None
         return False
     nk = normalize_title_key(tk)
     return (tk, cn) in dh_sent or (nk, cn) in dh_sent
-
 
 def chapter_label(ch: str) -> str:
     ch = (ch or "").strip()
@@ -70,11 +64,9 @@ def chapter_label(ch: str) -> str:
         return f"Chapter {num.group(1)}" + (f" - {rest}" if rest else "")
     return ch
 
-
 def chapter_number(ch: str) -> float | None:
     m = re.search(r"(\d+(?:\.\d+)?)", ch or "")
     return float(m.group(1)) if m else None
-
 
 def group_key(value: str) -> str:
     key = normalize_title_key(value or "")
@@ -83,7 +75,6 @@ def group_key(value: str) -> str:
             key = key[len(art):]
             break
     return key
-
 
 def build_filter(
     source_f: str = "",
@@ -117,7 +108,6 @@ def build_filter(
         return True
     return _passes
 
-
 def map_result(
     it: dict,
     wl_map: dict[tuple[str, str], dict],
@@ -127,9 +117,7 @@ def map_result(
 ) -> dict:
     """Map a recent_chapters row to RSS response. Uses it + wl + sm only.
 
-    ponytail: series_meta canonical single source for static fields — sm>it>wl priority, whitelist minimal (title_key,source,series_url,latest_sent) legacy fields only fallback
     """
-    # ponytail: single scrub, sm is sole static source; no per-slug refetch, no live HTTP fallback — add DB view/join if misses grow
     if sm_map is None:
         sm_map = {}
     tk = it.get("title_key", "")
@@ -196,7 +184,6 @@ def map_result(
 
     from app.services.rating_utils import normalize_rating as _nr  # 1-10 contract
 
-    # ponytail: canonical sm > it > wl — sm is single source, wl/it only legacy fallback; add DB view if richer joins needed
     _rating = _nr(sm.get("rating")) if sm.get("rating") not in (None, "") else (_nr(it.get("rating")) if it.get("rating") not in (None, "") else _nr(wl.get("rating")))
     _type = normalize_type(sm.get("type") or it.get("type") or wl.get("type") or None)
     _raw_origin = it.get("origin") or wl.get("origin") or sm.get("origin") or ""
@@ -227,7 +214,6 @@ def map_result(
         "isSent": _is_sent(it, tk, src, dh_sent),
         "createdAt": it.get("updated_time") or it.get("created_at"),
     }
-
 
 def group_results(results: list[dict]) -> list[dict]:
     """Group RSS results by (canonicalTitleKey, source) — per-source split.

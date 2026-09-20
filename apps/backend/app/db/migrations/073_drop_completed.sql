@@ -1,5 +1,4 @@
 -- 073_drop_completed.sql — revert 065_tamat_exclude: completed feature removed, exclude only
--- ponytail: 065 added reason+is_completed for TAMAT badge, now deleted (see 4f0ac76). Drop cols + indexes, strip prefix fallback.
 
 DROP INDEX IF EXISTS idx_excluded_titles_is_completed;
 DROP INDEX IF EXISTS idx_excluded_titles_reason;

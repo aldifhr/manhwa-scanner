@@ -14,7 +14,6 @@ _worker_thread: threading.Thread | None = None
 _retention_thread: threading.Thread | None = None
 _stop = threading.Event()
 
-
 def do_add(item: dict) -> None:
     """Process one add-to-whitelist job directly (no Redis)."""
     from app.storage import whitelist
@@ -27,7 +26,6 @@ def do_add(item: dict) -> None:
     )
     logger.info("add done", title=title, status=res.get("status"))
 
-
 def _process(payload: dict) -> bool:
     """Process one job. Returns True on success, False on failure."""
     try:
@@ -39,7 +37,6 @@ def _process(payload: dict) -> bool:
     except Exception as e:
         logger.error("task failed", kind=payload.get("kind"), exc=e)
         return False
-
 
 def run_cron_inline(action: str) -> None:
     """Run pipeline inline (used by cron worker when Redis is down)."""
@@ -140,7 +137,6 @@ def run_cron_inline(action: str) -> None:
         except Exception:
             pass
 
-
 def _recover_processing() -> None:
     """On startup, move any orphaned processing jobs back to main queue (crash recovery)."""
     try:
@@ -159,7 +155,6 @@ def _recover_processing() -> None:
     except Exception as e:
         logger.warn("processing recovery failed", err=str(e)[:120])
 
-
 def run_cron_worker() -> None:
     """Blocking worker for the cron queue (ROLE=cron process only). Crash-safe via processing list."""
     logger.info("cron worker started")
@@ -169,7 +164,6 @@ def run_cron_worker() -> None:
     while not _stop.is_set():
         try:
             r = _get_redis()
-            # ponytail: BRPOPLPUSH semantics — atomically move to processing so crash doesn't lose job
             # Use brpoplpush if available, fallback to blpop+lpush for mock compat
             try:
                 raw = r.brpoplpush(CRON_QUEUE_KEY, CRON_PROCESSING_KEY, timeout=5)
@@ -192,7 +186,6 @@ def run_cron_worker() -> None:
             continue
         _key, raw = result if isinstance(result, (list, tuple)) else (CRON_QUEUE_KEY, result)
         # dedup set cleanup — job left queue, remove from set so future enqueue allowed
-        # ponytail: SREM failure is non-fatal — entry stays in SET, will be cleaned by periodic orphan sweep
         try:
             _get_redis().srem(CRON_QUEUE_SET, raw)
         except Exception as e:
@@ -209,7 +202,6 @@ def run_cron_worker() -> None:
         try:
             run_cron_inline(item.get("action", "update"))
         finally:
-            # ponytail: lrem failure here means job stays in processing list — recovered on restart via _recover_processing
             try:
                 _get_redis().lrem(CRON_PROCESSING_KEY, 1, raw)
             except Exception as e:
@@ -218,7 +210,6 @@ def run_cron_worker() -> None:
         if _cleanup_counter >= 100:
             _cleanup_counter = 0
             _cleanup_orphaned_set_entries()
-
 
 def get_cron_status() -> dict:
     """Snapshot of the internal cron scheduler for the /cron monitor page."""
@@ -294,7 +285,6 @@ def get_cron_status() -> dict:
     status["per_source"] = src_status
     return status
 
-
 def worker_loop() -> None:
     """Blocking worker: pops jobs, processes them, retries on failure. Crash-safe via processing list."""
     _fail_streak = 0
@@ -357,7 +347,6 @@ def worker_loop() -> None:
                 except Exception as e:
                     logger.error("re-enqueue failed", exc=e)
 
-
 def start_worker() -> None:
     """Start the background worker thread (idempotent)."""
     global _worker_thread, _retention_thread
@@ -374,7 +363,6 @@ def start_worker() -> None:
     _worker_thread.start()
     logger.info("task worker started")
 
-
 def stop_worker(timeout: float = 5.0) -> None:
     """Signal worker + retention threads to stop and wait briefly."""
     _stop.set()
@@ -384,5 +372,4 @@ def stop_worker(timeout: float = 5.0) -> None:
                 _t.join(timeout=timeout / 2)
             except Exception:
                 pass
-
 

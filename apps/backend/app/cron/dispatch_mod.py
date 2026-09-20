@@ -27,14 +27,12 @@ from app.cron.enrich import _split_send_backfill, backfill_dispatch_history
 logger = get_logger("cron:dispatch")
 
 # Centralized FCFS — single source of truth (app/services/fcfs.py). Re-export for callers that import from dispatch_mod.
-# ponytail: claimed_titles alias removed → use claimed_fcfs_keys directly; keep _claimed_titles compat shim, delete shim when grep -r "_claimed_titles" ==0
 from app.services.fcfs import (  # noqa: F401
     claimed_fcfs_keys as _claimed_titles,
     fcfs_key,
     normalize_chapter as _norm_chapter,
     normalize_title,
 )
-
 
 def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_run: bool = False, force: bool = False, guild_rows: list[dict] | None = None) -> int:
     """Send Discord embeds for whitelisted chapters.
@@ -45,7 +43,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     force=True → skip the FCFS guard (used to bypass dedupe when an explicit
     re-send is required, e.g. manual backfill or operator-triggered resend).
     """
-    # ponytail: DISCORD_ENABLED=false -> skip sends entirely (local / no-bot mode)
     if not getattr(settings, "DISCORD_ENABLED", True):
         logger.info("dispatch: skipped (DISCORD_ENABLED=false)")
         return 0
@@ -85,7 +82,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         logger.info("dispatch: nothing to send")
         return 0
 
-    # ponytail: ceiling guard — drop chapters at/below whitelist.latest_sent_chapter even when legacy fcfs_key is NULL/mismatched
     try:
         from app.db import get_supabase as _gs_ceil
         from app.utils.text import slugify_title_key as _ntk_ceil
@@ -164,7 +160,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # transient claims and must not suppress sending.
     _all_urls = [it.get("url", "") for it in to_send if it.get("url")]
     _claimed_urls_set = set() if force else (dispatch_store._already_dispatched(_all_urls) if _all_urls else set())
-    # ponytail: legacy fallback — old fcfs_key = chapter#title_key (010) vs new title#chapter, also check title_key+chapter_title directly
     _legacy_pairs: set[tuple[str, str]] = set()
     try:
         from app.db import get_supabase as _gs_leg
@@ -185,7 +180,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _legacy_pairs = set()
 
     # Reject junk URLs that don't match known source patterns
-    # ponytail: voratoon migrated v1 -> v2, allow both for retry of old failed_dispatches rows (v1 URLs)
     _VALID_URL_PREFIXES = (
         f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_CHAPTER_PATH}",
         f"https://{settings.VORATOON_DOMAIN}{settings.VORATOON_SERIES_PATH}",
@@ -256,13 +250,12 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _origin_f = {o.strip().upper() for o in str(_gs_row.get("origin_filter") or "").split(",") if o.strip()}
         _excl_titles = {slugify_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
         seen_key_run: set[str] = set()
-        _consec_fail = 0  # ponytail: burst guard — stop flooding after 3 gateway fails
+        _consec_fail = 0
         for it in to_send:
             url = it.get("url", "")
             if not url or not _acq_map.get(url):
                 continue
             # per-guild origin filter
-            # ponytail: NULL origin = unknown metadata, don't block — include it
             _origin_f = _origin_f  # keep for excluded check below
             if _origin_f:
                 _item_origin = str(it.get("origin") or "").strip().upper()
@@ -327,7 +320,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     _consec_fail += 1
                     logger.warn("dispatch: send returned None", title=it.get("title", "")[:40], consecutive=_consec_fail, channel=ch)
                     dispatch_store.unclaim(url)
-                    # ponytail: 3 consecutive gateway fails → mark failed, stop flooding channel
                     if _consec_fail >= 3:
                         try:
                             dispatch_store.record_failed(
@@ -385,7 +377,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 time.sleep(0.8)
 
     # Post-loop: flush dispatch_history + update whitelist markers
-    # ponytail: dispatch_history_uq (title_key, source, chapter_title) is the race guard;
     # claim queue is FOR UPDATE SKIP LOCKED in app/services/claim.py — dispatch_claims is transient
     if _sent_urls and not dry_run:
         try:
@@ -415,7 +406,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                         cover=_cover_by_url.get(_u, ""), series_url=_it.get("series_url", "") or "",
                     )
                 except Exception as _e_dup:
-                    # ponytail: UNIQUE dispatch_history_uq race — another runner inserted same title+source+chapter
                     _msg = str(_e_dup).lower()
                     if "dispatch_history_uq" in _msg or "unique" in _msg or "duplicate" in _msg:
                         logger.info("dispatch: history duplicate skip (race)", url=_u[:60], err=str(_e_dup)[:120])
@@ -443,7 +433,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             pass
     return sent
 
-
 def _load_channels() -> list[str]:
     """Load target channels from guild_settings (simplified)."""
     try:
@@ -458,7 +447,6 @@ def _load_channels() -> list[str]:
         return [r["channel_id"] for r in (res.data or []) if r.get("channel_id")]
     except Exception:
         return []
-
 
 def load_guild_settings() -> list[dict]:
     """Full per-guild rows: channel_id, origin_filter, excluded_titles, label."""
@@ -480,10 +468,8 @@ def load_guild_settings() -> list[dict]:
     except Exception:
         return []
 
-
 _GUILD_NAME_CACHE: dict[str, tuple[float, str]] = {}
 _GUILD_NAME_TTL = 3600  # 1h
-
 
 def _guild_name(guild_id: str) -> str:
     """Fetch guild name via bot token (Discord API), 1h cache."""

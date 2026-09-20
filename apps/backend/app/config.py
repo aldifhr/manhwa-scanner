@@ -2,7 +2,6 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", frozen=True)
 
@@ -34,24 +33,23 @@ class Settings(BaseSettings):
     # ══════════════════════════════════════════════════════════════════════════════
     IKIRU_BASE_URL: str = "https://08.ikiru.wtf/"
     IKIRU_PUBLIC_URL: str = ""
-    IKIRU_SERIES_PATH: str = "/manga/"  # ponytail: ikiru path prefix
+    IKIRU_SERIES_PATH: str = "/manga/"
     IKIRU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}.{id}/"
 
     SHINIGAMI_API_URL: str = ""
     SHINIGAMI_API_BASE: str = "https://api.shngm.io"
     SHINIGAMI_PUBLIC_BASE: str = "https://11.shinigami.asia"
     SHINIGAMI_PUBLIC_URL: str = ""
-    SHINIGAMI_SERIES_PATH: str = "/series/"  # ponytail: shinigami path prefix
+    SHINIGAMI_SERIES_PATH: str = "/series/"
     SHINIGAMI_CHAPTER_PATH: str = "/chapter/"
 
     VORATOON_API_URL: str = "https://api.voratoon.com"
     VORATOON_DOMAIN: str = "v2.voratoon.com"
     VORATOON_COVER_BUCKET: str = "cvr.voratoon.id"
-    VORATOON_SERIES_PATH: str = "/series/"  # ponytail: voratoon path prefix
+    VORATOON_SERIES_PATH: str = "/series/"
     VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
 
     # Discord toggle — set false to run locally without bot / disable dispatch
-    # ponytail: .env DISCORD_ENABLED=false -> skip Discord sends, boot guard juga skip token check
     DISCORD_ENABLED: bool = True
 
     # Telegram (optional — chapter release notifications)
@@ -76,7 +74,6 @@ class Settings(BaseSettings):
     # Legacy API key (kept for rotation support)
     FASTCRON_API_KEY: str = ""  # Legacy — either secret works
     MONITOR_AUTH_TOKEN: str = ""
-    # Single shared password — replaces admin/member model (ponytail: one env, no roles)
     DASHBOARD_PASSWORD: str = ""
     # JWT session-cookie secret for /api/auth login.
     # MUST be set explicitly — never defaults to MONITOR_AUTH_TOKEN (which is
@@ -111,7 +108,6 @@ class Settings(BaseSettings):
     ]
 
     def get_proxy_hosts(self) -> list[str]:
-        # ponytail: static list is single source (urlparse loop removed), re-add dynamic derivation when IKIRU/SHINIGAMI URLs change to new host not in static
         return sorted(set(self.PROXY_ALLOWED_HOSTS))
 
     # Deploy env: "production" | "development"
@@ -122,7 +118,6 @@ class Settings(BaseSettings):
         # Canonical: IKIRU_PUBLIC_URL / SHINIGAMI_API_URL / SHINIGAMI_PUBLIC_URL
         # Aliases (deprecated): IKIRU_BASE_URL, SECONDARY_SOURCE_URL, SECONDARY_PUBLIC_BASE
         # Migration: 2026-09-09 → 2026-12-09 warn period, then remove alias branches + code refs.
-        # ponytail: keep sync minimal; do not add new aliases.
         import os as _os
 
         def _warn(old: str, canonical: str):
@@ -168,7 +163,6 @@ class Settings(BaseSettings):
     # "warn" mode natively. Documented for future migration to extra="forbid" in dev.
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
-
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
 VALID_SOURCES = ("ikiru", "shinigami", "voratoon")
 VALID_SOURCES_WITH_ALL = ("ikiru", "shinigami", "voratoon", "all")
@@ -178,9 +172,7 @@ CRON_ACTIONS = (
     "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover", "failed-retry",
 )
 
-
 settings = Settings()
-
 
 def _validate_settings(s: "Settings") -> None:
     """Refuse to boot if running in production without required secrets.
@@ -208,7 +200,6 @@ def _validate_settings(s: "Settings") -> None:
         missing.append("DISCORD_BOT_TOKEN")
     if not s.DASHBOARD_PASSWORD:
         missing.append("DASHBOARD_PASSWORD")
-    # ponytail: DISCORD_ENABLED=false -> allow boot without bot token (local dev / discord off)
     if not s.DISCORD_ENABLED:
         missing = [m for m in missing if m != "DISCORD_BOT_TOKEN"]
     if missing:
@@ -217,6 +208,5 @@ def _validate_settings(s: "Settings") -> None:
             + ", ".join(missing)
             + ". Set them in .env or set ENVIRONMENT=development to bypass."
         )
-
 
 _validate_settings(settings)

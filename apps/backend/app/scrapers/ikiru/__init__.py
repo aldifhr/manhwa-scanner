@@ -1,4 +1,4 @@
-"""Ikiru REST API client — ponytail: 534L ikiru API+HTML fallback (13 warn→debug + cb_ikiru_api), keep until API stabilizes. Ikiru REST API client — JSON API primary, HTML scrape fallback.
+"""Ikiru REST API client
 
 API endpoints used:
   - /list/latest     → latest updates feed (replaces HTML scrape)
@@ -33,7 +33,6 @@ _HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
-
 def _cf_get(url: str, timeout: float = TIMEOUT) -> object:
     """GET via curl_cffi with Chrome impersonation. Respects circuit breaker."""
     from app.utils.ssrf import assert_allowed_url
@@ -52,14 +51,12 @@ def _cf_get(url: str, timeout: float = TIMEOUT) -> object:
         cb_ikiru.record_failure()
         raise
 
-
 def _fetch_json(path: str, retries: int = 4):
     """GET JSON from Ikiru API with jittered backoff. Circuit-aware."""
     if not cb_ikiru.allow():
         logger.debug("ikiru circuit OPEN — skipping fetch", path=path)
         return None
 
-    # ponytail: ApiFailureDetector → cb_ikiru_api (shared 5/300), split per-source breaker when cooldown needs diverge
     if not cb_ikiru_api.allow():
         logger.debug("ikiru in HTML-only mode, skipping API", path=path)
         return None
@@ -111,7 +108,6 @@ def _fetch_json(path: str, retries: int = 4):
         cb_ikiru_api.record_failure()
     return None
 
-
 # ── Search ──
 
 def search_ikiru_api(query: str, per_page: int = 20):
@@ -119,7 +115,6 @@ def search_ikiru_api(query: str, per_page: int = 20):
     q = quote_plus(query.replace("/", " "))
     data = _fetch_json(f"/search/series?q={q}&per_page={per_page}")
     return data.get("items", []) if data else []
-
 
 # ── Latest updates: API primary, HTML fallback ──
 
@@ -192,7 +187,6 @@ def get_ikiru_latest_updates(max_pages: int = 3, hours_cutoff: int = 24):
         return _get_ikiru_latest_updates_html(max_pages, hours_cutoff)
 
     return all_items
-
 
 def _get_ikiru_latest_updates_html(max_pages: int = 2, hours_cutoff: int = 24):
     """Fallback: scrape the latest-update HTML feed."""
@@ -277,14 +271,12 @@ def _get_ikiru_latest_updates_html(max_pages: int = 2, hours_cutoff: int = 24):
 
     return all_items
 
-
 # ── Series metadata ──
 
 def get_ikiru_series(slug: str):
     """Fetch series metadata via API."""
     data = _fetch_json(f"/series/{slug}")
     return data.get("series") if data else None
-
 
 def get_ikiru_series_meta(slug: str) -> dict | None:
     """Fetch RICH metadata for an ikiru series via API.
@@ -383,7 +375,6 @@ def get_ikiru_series_meta(slug: str) -> dict | None:
         logger.debug("ikiru series meta failed", slug=slug, err=str(e)[:120])
         return None
 
-
 # ── Chapters: API primary, HTML fallback ──
 
 def get_ikiru_chapters(slug: str, per_page: int = 100):
@@ -416,7 +407,6 @@ def get_ikiru_chapters(slug: str, per_page: int = 100):
         # API genuinely failed (CF challenge, 5xx, circuit open) — worth a debug.
         logger.debug("ikiru chapters API failed, falling back to HTML", slug=slug)
     return get_ikiru_series_chapters_html(slug)
-
 
 def _normalize_api_chapters(items: list[dict], series_slug: str = "") -> list[dict]:
     """Normalize API chapter objects to our internal shape."""
@@ -455,7 +445,6 @@ def _normalize_api_chapters(items: list[dict], series_slug: str = "") -> list[di
             "title": ch.get("title") or f"Chapter {num}",
         })
     return out
-
 
 def get_ikiru_series_chapters_html(slug: str) -> list[dict]:
     """Fallback: Scrape the FULL chapter list from the manga HTML page."""
@@ -565,5 +554,4 @@ def get_ikiru_series_chapters_html(slug: str) -> list[dict]:
 
     out.sort(key=lambda c: c.get("updated_time") or "", reverse=True)
     return out
-
 

@@ -20,7 +20,7 @@ const DIRECT_HOSTS = new Set([
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",
-  // ponytail: ikirim + shinigami CDN lack CORS headers — must use proxy, not direct
+  //
 ]);
 export function isDirectAllowed(hostname: string): boolean {
   return DIRECT_HOSTS.has(hostname);
@@ -60,7 +60,7 @@ export function resolveCoverUrl(
     return putCover(cover, cover);
 
   // 2. Any cover-img form → rewrite to canonical proxy/cover (direct hosts stay as-is)
-  // ponytail: if already proxy?url=, don't re-wrap
+  //'t re-wrap
   const img = extractCoverImgInner(cover);
   if (img) {
     if (img.inner.includes("/api/v1/reader/proxy?url=")) return putCover(cover, img.inner);
@@ -112,7 +112,7 @@ export function resolveCoverUrl(
   }
 
   // 4. Proxy prefix: normalize double-encode, direct hosts bypass proxy
-  // ponytail: FE canonical is /api/v1/reader/proxy?url= (Next.js handler), BE canonical /api/img?url= also compat
+  //
   const PROXY_PREFIX = "/api/v1/reader/proxy?url=";
   const LEGACY_IMG_PREFIX = "/api/img?url=";
   for (const prefix of [PROXY_PREFIX, LEGACY_IMG_PREFIX, "/api/v1/img?url="]) {

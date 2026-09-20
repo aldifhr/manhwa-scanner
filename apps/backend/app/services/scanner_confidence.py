@@ -4,7 +4,6 @@ Validates 6 axes (title, chapter number, URL, source reachability, sequence,
 metadata consistency) and returns a 0-100 integer. Used by the /api/v1/confidence
 endpoint and as an opt-in post-process in collectors.
 
-ponytail: 6 boolean axes → weighted sum (no ML, no thresholds file). Add new axis
 only when a real false-negative justifies it; 6 is enough to catch broken scrapers.
 """
 from __future__ import annotations
@@ -39,7 +38,6 @@ _ORIGIN_TYPES = {
     "CN": {"manhua"},
     "JP": {"manga"},
 }
-
 
 def compute_confidence(source: str, chapter_data: dict) -> int:
     """Compute 0-100 confidence score for a single collector item.
@@ -76,7 +74,6 @@ def compute_confidence(source: str, chapter_data: dict) -> int:
 
     return min(100, max(0, score))
 
-
 def _score_title(chapter_data: dict) -> int:
     """Title key present, non-trivial length, not a UUID."""
     tk = (chapter_data.get("title_key") or "").strip()
@@ -88,7 +85,6 @@ def _score_title(chapter_data: dict) -> int:
     if re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", tk, re.I):
         return _W_TITLE // 4  # penalize heavily but don't zero
     return _W_TITLE
-
 
 def _score_chapter(chapter_data: dict) -> int:
     """Chapter number parses to positive float."""
@@ -107,7 +103,6 @@ def _score_chapter(chapter_data: dict) -> int:
     if val <= 0:
         return 0
     return _W_CHAPTER
-
 
 def _score_url(source: str, chapter_data: dict) -> int:
     """URL parses as http(s), host matches source's known hosts."""
@@ -130,7 +125,6 @@ def _score_url(source: str, chapter_data: dict) -> int:
             return _W_URL // 2  # partial credit: valid URL but unexpected host
     return _W_URL
 
-
 def _score_reachability(source: str) -> int:
     """Source is healthy per source_health table."""
     try:
@@ -147,7 +141,6 @@ def _score_reachability(source: str) -> int:
         return _W_REACH
     except Exception:
         return _W_REACH  # can't check → assume ok
-
 
 def _score_sequence(chapter_data: dict) -> int:
     """chapter_num > latest_sent_chapter (new chapter, not a re-send)."""
@@ -171,7 +164,6 @@ def _score_sequence(chapter_data: dict) -> int:
     if ch_val == ls_val:
         return _W_SEQUENCE // 2  # edge: same chapter (could be update/re-touch)
     return 0  # chapter < latest_sent → stale
-
 
 def _score_metadata(chapter_data: dict) -> int:
     """Metadata fields present and internally consistent."""
@@ -204,7 +196,6 @@ def _score_metadata(chapter_data: dict) -> int:
         score += 2
 
     return min(_W_META, score)
-
 
 def attach_confidence(items: list[dict], source: str) -> list[dict]:
     """Attach confidence score to each collector item in-place.

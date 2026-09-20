@@ -1,5 +1,4 @@
 -- 058_drop_whitelist_cover_rating_final.sql — fisik drop cover/rating final (052 minimal + 057 compat done)
--- ponytail: whitelist minimal, series_meta canonical, code no longer SELECTs whitelist.cover/rating
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='whitelist' AND column_name='cover') THEN

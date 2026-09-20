@@ -15,11 +15,9 @@ logger = get_logger("hono-server")
 
 from app.routers import register_routers
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: init resources. Shutdown: close connections gracefully."""
-    # ponytail: auto-migrate on boot — was manual psql, now 8L idempotent
     # P1 fix: migration failure → fail startup (not silent warn)
     # Advisory lock prevents concurrent migration across multiple instances
     # Windows dev: skip hard migration when DB unreachable and ENVIRONMENT=development (VPS production tetap fail hard)
@@ -120,7 +118,6 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-
 app = FastAPI(
     title="manhwa-backend",
     version="1.0.0",
@@ -165,11 +162,9 @@ app.middleware("http")(security_headers_middleware)
 app.middleware("http")(rate_limit_middleware)
 app.middleware("http")(access_log_middleware)
 
-
 from app.utils.request_auth import require_monitor_auth
 
 # CSRF/metrics/legacy now in app/middleware/* (extracted)
-
 
 # --- OpenAPI / routers / legacy — extracted ---
 from app.api.openapi import custom_openapi  # noqa: E402
@@ -200,19 +195,16 @@ async def metrics_root(request: Request):
 # /api/reader/whitelist are REAL endpoints (used by FE/discord), NOT aliases —
 # those stay.
 
-
 @app.get("/api/v1/openapi.json")
 async def api_openapi(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     return JSONResponse(content=custom_openapi(app))
 
-
 # --- Uniform JSON error responses (no HTML leaks to the FE) ---
 from fastapi import HTTPException as _HTTPException
 from fastapi.exceptions import RequestValidationError as _RequestValidationError
 from starlette.exceptions import HTTPException as _StarletteHTTPException
-
 
 @app.exception_handler(_HTTPException)
 @app.exception_handler(_StarletteHTTPException)
@@ -227,7 +219,6 @@ async def _http_exception_handler(request: Request, exc: _HTTPException):
         },
     )
 
-
 @app.exception_handler(_RequestValidationError)
 async def _validation_handler(request: Request, exc: _RequestValidationError):
     return JSONResponse(
@@ -235,14 +226,12 @@ async def _validation_handler(request: Request, exc: _RequestValidationError):
         content={"error": "validation_error", "message": "Invalid request parameters."},
     )
 
-
 @app.exception_handler(Exception)
 async def _unhandled_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"error": "internal_error", "message": "Internal server error."},
     )
-
 
 # --- Discord interaction endpoint (B2 fix) ---
 @app.post("/api/v1/interactive")
@@ -255,13 +244,11 @@ async def api_interactive(request: Request):
     timestamp = request.headers.get("x-signature-timestamp", "") or request.headers.get("X-Signature-Timestamp", "")
     body = await request.body()
 
-    # ponytail: v2 handles base64url PK (Portal shows base64, not hex) + hex signature
     if not _disc.verify_interaction_v2(body, signature, timestamp):
         return JSONResponse(content={"error": "invalid signature"}, status_code=401)
 
     status_code, response_body = handle_interaction(body)
     return JSONResponse(content=response_body, status_code=status_code)
-
 
 if __name__ == "__main__":
     import sys

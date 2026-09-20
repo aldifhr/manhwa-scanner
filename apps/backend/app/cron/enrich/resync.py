@@ -1,4 +1,4 @@
-"""Separate, low-frequency cron — ponytail: 424L resync (distinct from enrich 296L + enrich_whitelist 318L), unify when single enrich covers all. Separate, low-frequency cron that re-enriches recent_chapters metadata.
+"""Separate, low-frequency cron
 
 Why this exists (decoupled from the per-10-min chapter fetch):
 - The rss-fetch pipeline scrapes new chapters + inserts them. Running the
@@ -34,7 +34,6 @@ logger = get_logger("cron:enrich-resync")
 # Patience: not on the hot path, so a slow polite cadence is fine.
 _INTER_FETCH_DELAY = 0.5
 _WINDOW_HOURS = 24
-
 
 def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
     """Re-enrich recent_chapters rows in the 24h window.
@@ -222,7 +221,6 @@ def enrich_recent_chapters(limit: int = 200, miss_only: bool = False) -> dict:
     logger.info("enrich resync done", **stats)
     return stats
 
-
 def enrich_stale_series_meta(stale_days: int = 7, limit: int = 50) -> dict:
     """Weekly refresh: re-fetch series_meta rows older than stale_days.
 
@@ -332,7 +330,6 @@ def enrich_stale_series_meta(stale_days: int = 7, limit: int = 50) -> dict:
     logger.info("enrich stale done", **stats)
     return stats
 
-
 def enrich_voratoon_covers(limit: int = 50) -> dict:
     """24h voratoon cover refresh — private bucket presigned 6d expiry.
 
@@ -411,7 +408,6 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
         time.sleep(0.75)
 
     # --- also refresh recent_chapters voratoon presigned (non-whitelisted series like the reported 99-player) ---
-    # ponytail: 1 extra query, reuses same _fetch_vt + _scrub — no new abstraction
     try:
         _conn2 = _gc3()
         _cur2 = _conn2.cursor()
@@ -470,7 +466,6 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
     stats = {"ok": True, "checked": checked, "updated": updated, "failed": failed, "duration": duration}
     logger.info("voratoon cover refresh done", **stats)
     return stats
-
 
 if __name__ == "__main__":
     import os

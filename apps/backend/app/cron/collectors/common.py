@@ -10,7 +10,6 @@ from app.logger import get_logger
 
 logger = get_logger("cron:collect:common")
 
-
 def _origin_to_type(origin: str) -> str:
     o = (origin or "").upper()
     if o == "KR":
@@ -20,7 +19,6 @@ def _origin_to_type(origin: str) -> str:
     if o == "JP":
         return "manga"
     return ""
-
 
 MAX_CHAPTERS_PER_SERIES = 25
 
@@ -36,10 +34,8 @@ _SHINIGAMI_META_CACHE: dict[str, tuple[float, dict]] = {}
 _SHINIGAMI_META_CACHE_TTL = 21600.0  # 6h
 _SHINIGAMI_META_CACHE_MAX = 512
 
-# ponytail P1: series_meta sebagai SSoT lazy — tanpa TTL bisa stale selamanya.
 # Policy: <6h pakai cache/DB, >=6h refresh upstream, gagal → stale cache (cover/rating 6-24h wajar)
 _SERIES_META_TTL_S = 6 * 3600  # 6h (cover/rating/genre boleh 6-24h)
-
 
 def _is_series_meta_stale(updated_at: str | None) -> bool:
     if not updated_at:
@@ -61,7 +57,6 @@ _PARSE_TYPES_CACHE_MAX = 1024
 
 _COLLECT_WORKERS = 12
 _SOURCE_TIMEOUT = 120.0
-
 
 def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
     key = f"{source}:{sid}"
@@ -85,9 +80,7 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
                 _CHAPTER_CACHE.pop(_k, None)
     return data
 
-
 def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
-    """ponytail: 1 query for 150 series vs 150 queries — warm both caches"""
     if not keys:
         return
     # dedupe, group by source
@@ -124,7 +117,6 @@ def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
                 for r in rows:
                     tk = r.get("title_key")
                     if tk and (r.get("rating") not in (None, "", 0) or (r.get("description") or "").strip()):
-                        # ponytail P1: jangan warm stale row — biarkan _cached_series_meta refresh (6h TTL)
                         if _is_series_meta_stale(r.get("updated_at")):
                             continue
                         # use tk as sid key for cache (both sid and tk forms)
@@ -163,7 +155,6 @@ def _cached_series_meta(source: str, sid: str) -> dict:
         if _existing:
             _e = _existing[0]
             if (_e.get("rating") not in (None, "", 0)) or (_e.get("description") or "").strip():
-                # ponytail P1: DB TTL 6h — jika fresh (<6h) langsung pakai, jika stale coba refresh
                 if not _is_series_meta_stale(_e.get("updated_at")):
                     with _CHAPTER_CACHE_LOCK:
                         cache[sid] = (now, _e)
@@ -231,7 +222,6 @@ def _cached_series_meta(source: str, sid: str) -> dict:
                 cache.pop(_k, None)
     return meta
 
-
 def _ikiru_re_touch_anchor(chapters: list[dict]) -> tuple[float, "datetime | None"]:
     _max_num = 0.0
     for c in chapters:
@@ -256,7 +246,6 @@ def _ikiru_re_touch_anchor(chapters: list[dict]) -> tuple[float, "datetime | Non
             continue
     return _max_num, _max_time
 
-
 def _is_ikiru_re_touch(num, ts, max_num: float, max_time) -> bool:
     if max_time is None or num is None:
         return False
@@ -264,7 +253,6 @@ def _is_ikiru_re_touch(num, ts, max_num: float, max_time) -> bool:
         return num < max_num and ts > max_time
     except TypeError:
         return False
-
 
 def _parse_types(raw) -> list[str]:
     import ast

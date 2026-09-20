@@ -267,7 +267,7 @@ export function CardActions({
   showRead?: boolean;
   showAdd?: boolean;
 }) {
-  // ponytail: single password — no role gate, any authed user can Add WL/Exclude
+  //
   const showAddEff = showAdd;
   const showExcludeEff = !isWhitelisted;
   // Completed = tamat + exclude from RSS — from /recent, not whitelist
@@ -379,7 +379,7 @@ export function ChapterChips({
       </div>
     );
   }
-  // ponytail: collapse 44 pills -> neat grid, dedup source label, show 12 by default
+  //
   const [expanded, setExpanded] = useState(false);
   const allSameSource = safeCh.length > 0 && safeCh.every((c) => c.source === safeCh[0].source);
   const visible = expanded ? safeCh : safeCh.slice(0, 12);

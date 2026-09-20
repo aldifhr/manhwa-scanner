@@ -4,10 +4,8 @@ import time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-# ponytail: in-memory dict, global lock — single-process only, resets on restart
 # Memory bounded by unique IPs × 1 minute bucket; lazy cleanup at 50k entries.
 _counts: dict[tuple[str, int], int] = {}
-
 
 async def rate_limit_middleware(request: Request, call_next):
     ip = request.client.host if request.client else "?"

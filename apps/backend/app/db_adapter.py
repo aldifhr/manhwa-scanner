@@ -1,5 +1,4 @@
-"""ponytail: 663L PostgREST shim — intentional (67 call sites), not ROT
-Direct PostgreSQL access layer (replaces PostgREST/Supabase client).
+"""Direct PostgreSQL access layer (replaces PostgREST/Supabase client).
 
 Backend now connects to Supabase via the TRANSACTION POOLER (IPv4, reachable
 from the VPS) using psycopg2. The old `supabase` PostgREST client is removed.
@@ -35,8 +34,7 @@ _pool_lock = threading.Lock()
 # Bounded semaphore so we never exceed pool capacity; get_conn() blocks
 # (queues) instead of raising PoolError under burst load.
 _conn_sem = None
-# Telemetry counters (ponytail: explicit counters beat introspection for pool
-# health; add percentiles here if you ever need P99 wait timing).
+# Telemetry counters for pool health.
 _pool_acquires = 0
 _pool_releases = 0
 _pool_active = 0
@@ -309,7 +307,6 @@ class _Query:
         self._offset = n; return self
 
     def single(self):
-        # ponytail: bounded LIMIT 2 — 0=not found, 1=ok, 2=multiple.
         # Old code fetched ALL rows (catastrophic over-fetch). LIMIT 2
         # preserves Supabase .single() semantics while bounding cost.
         self._single = True

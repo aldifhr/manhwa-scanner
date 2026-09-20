@@ -1,5 +1,5 @@
 -- 054_drop_whitelist_deprecated_cols.sql — fisik drop whitelist static cols (8+ -> 9)
--- ponytail: whitelist minimal (title_key, source, series_url, latest_sent_chapter, title, created_at); static canonical di series_meta
+
 -- prereq: 052 backfill + COMMENT sudah, 053 v_series sudah
 
 DO $$ BEGIN

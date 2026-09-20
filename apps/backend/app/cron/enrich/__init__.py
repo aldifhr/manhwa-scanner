@@ -30,7 +30,6 @@ def _strip_html(s: str) -> str:
 
 logger = get_logger("cron:enrich")
 
-
 def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = False) -> list[dict]:
     """Attach metadata (cover/status/rating). Check whitelist cache first, fallback to API.
 
@@ -84,7 +83,6 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
             return slug, None
         try:
             s = ikiru.get_ikiru_series(slug)
-            # ponytail: API list endpoint returns empty rating — fall back to
             # get_ikiru_series_meta() which scrapes JSON-LD for aggregateRating
             if not s or not s.get("rating"):
                 meta = ikiru.get_ikiru_series_meta(slug)
@@ -226,7 +224,6 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
 
     return items
 
-
 def _split_send_backfill(items: list[dict]) -> tuple[list[dict], list[dict]]:
     """Strict-24h split: items with a real (non-backfill) updated_time within
     24h go to Discord; HTML-backlog items (flagged html_backlog, no real
@@ -281,7 +278,6 @@ def _split_send_backfill(items: list[dict]) -> tuple[list[dict], list[dict]]:
                 )
     return to_send, to_backfill
 
-
 def mark_history_only(urls: list[str], title_keys: list[str]) -> int:
     """Record backlog chapter URLs as already-seen in dispatch_claims."""
     if not urls:
@@ -305,7 +301,6 @@ def mark_history_only(urls: list[str], title_keys: list[str]) -> int:
     except Exception as e:
         logger.warn("mark_history_only failed", err=str(e))
         return 0
-
 
 def backfill_dispatch_history(items: list[dict], instance_id: str) -> int:
     """Silently record backlog chapter URLs as already-dispatched so they're

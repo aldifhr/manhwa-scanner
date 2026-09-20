@@ -1,4 +1,4 @@
-"""Whitelist service — CRUD + metadata joins — ponytail: 751L whitelist CRUD+enrich+dedup intentional, split when file >1000L or per-route churn diverges."""
+"""Whitelist service — CRUD + metadata joins"""
 from __future__ import annotations
 
 import re
@@ -26,7 +26,6 @@ __all__ = [
     "auto_cleanup_stale_whitelist",
 ]
 
-
 def _fetch_whitelist_rows(
     source: str = "",
     title: str = "",
@@ -35,7 +34,6 @@ def _fetch_whitelist_rows(
     merge: bool = True,
     cursor: str | None = None,
 ):
-    """ponytail: inlined from whitelist_repo.py (93L) — single caller, delete file when merged"""
     from app.db import get_supabase
     from app.storage import whitelist as wl_store
     try:
@@ -124,8 +122,6 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
     rc_map, meta_desc, meta_cover, meta_rating, meta_genres, meta_type, meta_origin, last_notified = _fetch_whitelist_enrichment(sb, rows, all_tks)
     mapped = [build_whitelist_mapped_row(r, rc_map, meta_desc, meta_cover, meta_rating, meta_genres, meta_type, meta_origin, last_notified) for r in rows]
 
-    # ponytail: dedup inlined (was whitelist_dedup.py 57L single caller), extract to dedup.py when reused by second caller
-
     _is_db_paginated = bool(_db_paginated_flag)
     if merge:
         deduped = dedup_whitelist(mapped, _canonical_of)
@@ -163,11 +159,9 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         },
     }
 
-
 def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | None = None) -> dict:
     """Add a whitelist entry with enrichment.
 
-    ponytail: whitelist is minimal (title_key, source, series_url, latest_sent_chapter); static fields (cover/rating/genres/description/type/origin) canonical in series_meta. This post does NOT upsert series_meta — series_meta_sync + _cached_series_meta bootstrap canonical via upsert, avoiding unnecessary overwrite from incomplete FE payloads.
     """
 
     title_key = body.get("title_key") or "" if body else ""
@@ -194,7 +188,6 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
     if not title_key:
         title_key = normalize_title_key(title)
 
-    # ponytail: canonical title_key = slug (lowercase, dash) via normalize_title_key
     # UUID / spaced lower cause merge false + delete mismatches — enforce slug here
     # for voratoon prefer seriesUrl slug (grand-duchesss-constitution) over title slug (grand-duchess-s-constitution) — rss uses seriesUrl slug
     if title_key and re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", title_key, re.I):
@@ -214,7 +207,6 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
     title_key = slugify_title_key(title_key) if title_key else ""
 
     entry = {"title": title, "title_key": title_key, "source": source}
-    # ponytail: whitelist minimal (052) — static fields go to series_meta, not whitelist
     _series_meta_extra: dict = {}
     if body:
         for f in ("cover", "rating", "origin", "genres", "description", "type"):
@@ -268,7 +260,6 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
         except Exception:
             pass
     return res
-
 
 def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title: str = "", url: str = "") -> dict:
     """Delete a whitelist entry (and its recent_chapters rows) by ANY key.
@@ -359,7 +350,6 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
     except Exception as _e:
         logger.warn("delete_whitelist: whitelist delete failed", err=str(_e)[:160])
 
-    # recent_chapters delete — ponytail: builder .or_ expects callables, was passing str → 'str not callable'; use raw q for OR
     try:
         from app.db import q as _q
         _conds = []
@@ -410,7 +400,6 @@ def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title:
         logger.warn("delete_whitelist: cache invalidate failed", err=str(_ie)[:120])
     return {"status": "ok", "deleted": total_deleted, "whitelist": deleted, "recent_chapters": rc_deleted}
 
-
 def patch_whitelist(title_key: str, source: str = "", updates: dict | None = None) -> dict:
     """Update mutable whitelist fields."""
     from app.db import get_supabase
@@ -418,7 +407,6 @@ def patch_whitelist(title_key: str, source: str = "", updates: dict | None = Non
     if not updates:
         return {"success": True, "updated": 0, "note": "no fields to update"}
 
-    # ponytail: DB enforces chk_tk_slug (^[a-z0-9-]+$); normalize title_key in updates if present
     if updates and "title_key" in updates and updates["title_key"]:
         updates = dict(updates)
         updates["title_key"] = slugify_title_key(str(updates["title_key"]))
@@ -439,7 +427,6 @@ def patch_whitelist(title_key: str, source: str = "", updates: dict | None = Non
             logger.warn("patch_whitelist: chk_tk_slug violation", err=msg[:300], title_key=title_key[:40])
             return {"success": False, "updated": 0, "error": "title_key must be slug [a-z0-9-]", "detail": msg[:300]}
         raise
-
 
 def normalize_whitelist_urls(dry_run: bool = False) -> dict:
     """Rewrite stale shinigami hosts in whitelist + recent_chapters to current base."""
@@ -516,7 +503,6 @@ def normalize_whitelist_urls(dry_run: bool = False) -> dict:
         "updated_whitelist": len(wl_updates),
         "updated_recent_chapters": len(rc_updates),
     }
-
 
 def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> dict:
     """Enrich a whitelist entry with description/cover/genres from source API.
@@ -609,7 +595,6 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
             pass
     return entry
 
-
 def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cover: dict, meta_rating: dict, meta_genres: dict, meta_type: dict, meta_origin: dict, last_notified: dict) -> dict:
     """Build a single whitelist response row with metadata joins.
 
@@ -623,7 +608,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     rc = rc_map.get((tk, s)) or rc_map.get(tk, {})
     _wl_raw = r.get("series_url") or ""
     _wl_series = _wl_raw if str(_wl_raw).startswith(("http://", "https://")) else (rc.get("series_url") or "")
-    # ponytail: fallback to whitelist url or construct from title_key when both missing (79 rows null)
     if not _wl_series:
         _u = str(r.get("url") or "").strip()
         if _u.startswith(("http://", "https://")):
@@ -640,7 +624,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
                 _wl_series = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{tk}"
             elif " " not in tk:
                 _wl_series = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{tk}"
-    # ponytail: fix voratoon slug with spaces/%20 (e.g. a painter who draws dungeons → a-painter-who-draws-dungeons)
     if s == "voratoon" and _wl_series and (" " in _wl_series or "%20" in _wl_series):
         import re as _re2
         from urllib.parse import unquote as _unq2
@@ -671,7 +654,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     _meta_cov = meta_cover.get(tk) or meta_cover.get(" ".join(tk.split("-"))) or ""
     if _meta_cov:
         _meta_cov = scrub_cover(_meta_cov)
-    # ponytail: rating/genres/type/origin canonical in series_meta/rc, whitelist minimal
     _rc_rating = rc.get("rating")
     _rc_genres = rc.get("genres")
     _rc_type = rc.get("type")
@@ -692,7 +674,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
         "seriesUrl": _wl_series,
         "createdAt": r.get("created_at") or None,
     }
-
 
 def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
     """Fetch rc/meta/dh maps for get_whitelist — isolated for testability."""
@@ -781,12 +762,10 @@ def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:
     been notified (no dispatch_history row at all)."""
     return wl_store.auto_cleanup_stale_whitelist(days=days, dry_run=dry_run)
 
-
 def _canonical_of(tk: str) -> str:
     from app.storage.canonical import canonical_of as _co
     return _co(tk)
 
-# ponytail: inlined from whitelist_dedup.py (57L) — single caller, no reuse, delete file when merged
 def dedup_whitelist(mapped: list[dict], canonical_of) -> list[dict]:
     if not mapped:
         return []

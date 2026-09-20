@@ -1,4 +1,4 @@
-"""Ponytail guard for pipeline aliases — fails if NameError regresses."""
+""""""
 def test_pipeline_aliases():
     import app.cron.pipeline as pl
     assert hasattr(pl, "collect_recent_chapters")

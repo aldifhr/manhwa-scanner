@@ -1,5 +1,5 @@
 -- 052_drop_whitelist_cover_rating.sql — whitelist minimal (drop cover/rating)
--- ponytail: whitelist minimal (title_key, source, series_url, latest_sent_chapter); static fields canonical in series_meta
+
 -- Backfill series_meta from whitelist where cover/rating not null, then deprecate columns (no DROP yet, just COMMENT)
 
 -- Backfill series_meta from whitelist (only rows with static data)
@@ -30,7 +30,7 @@ ON CONFLICT (title_key, source) DO UPDATE SET
   origin      = COALESCE(EXCLUDED.origin, series_meta.origin),
   updated_at  = now();
 
--- ponytail: don't DROP COLUMN yet (back-compat), just COMMENT deprecated — code no longer SELECTs them, drop in 053 after 1 week stable
+'t DROP COLUMN yet (back-compat), just COMMENT deprecated — code no longer SELECTs them, drop in 053 after 1 week stable
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='whitelist' AND column_name='cover') THEN
     COMMENT ON COLUMN whitelist.cover IS 'deprecated: canonical is series_meta.cover; kept for back-compat, rss prioritizes sm>it>wl (052)';

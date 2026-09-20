@@ -23,13 +23,11 @@ _RSS_TTL = 30.0
 
 _rss_new_cache: dict[str, tuple[float, dict]] = {}
 
-
 def _rss_cache_get(key: str):
     entry = _RSS_CACHE.get(key)
     if entry and (_time.monotonic() - entry[0]) < _RSS_TTL:
         return entry[1]
     return None
-
 
 def _rss_cache_put(key: str, val: dict):
     _RSS_CACHE[key] = (_time.monotonic(), val)
@@ -37,7 +35,6 @@ def _rss_cache_put(key: str, val: dict):
         oldest = sorted(_RSS_CACHE.items(), key=lambda kv: kv[1][0])[:50]
         for k, _ in oldest:
             _RSS_CACHE.pop(k, None)
-
 
 def invalidate_rss_cache(key_prefix: str | None = None):
     """Invalidate RSS cache — per-key if prefix given, else all.
@@ -52,7 +49,6 @@ def invalidate_rss_cache(key_prefix: str | None = None):
         for k in list(_RSS_CACHE.keys()):
             if k.startswith(key_prefix):
                 _RSS_CACHE.pop(k, None)
-
 
 @router.get("/rss")
 async def rss(request: Request):
@@ -71,14 +67,11 @@ async def rss(request: Request):
         pass
     return await _rss_impl(request)
 
-
 @router.get("/reader/rss")
 async def rss_reader(request: Request):
     """Alias for FE compatibility — /api/v1/reader/rss → /api/v1/rss."""
     return await _rss_impl(request)
 
-
-# ponytail: public endpoint hardening — whitelist query params + limit cap 100 to prevent Python-side group/filter blowup on varied q=?
 _ALLOWED_RSS_PARAMS = {
     "page", "limit", "group", "format", "type", "country", "origin",
     "source", "sources", "origins",
@@ -114,7 +107,6 @@ async def _rss_impl(request: Request):
     if limit > 100 or limit < 1:
         return JSONResponse(content={"success": False, "error": "limit must be between 1 and 100"}, status_code=400)
     group = (request.query_params.get("group", "true") or "true").lower() != "false"
-    # ponytail: dual-read for backward compat — new FE sends format/country, old FE sends type/origin
     source_f = request.query_params.get("source", "")
     type_f = request.query_params.get("format", "") or request.query_params.get("type", "")
     origin_f = request.query_params.get("country", "") or request.query_params.get("origin", "")
@@ -150,7 +142,6 @@ async def _rss_impl(request: Request):
         hours = 24  # RSS shows last 24h by design — fresh discovery feed
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        # ponytail: fetch_limit 1000 — per-source voratoon/shinigami/ikiru all represented in All
         # (voratoon 70 + shinigami 121 in 24h = 191, 1000 covers all + margin for filtering)
         if group:
             _fetch_limit = 2000
@@ -215,7 +206,6 @@ async def _rss_impl(request: Request):
             _seen: dict[tuple[str, float, str], dict] = {}
             _deduped: list[dict] = []
             for r in results:
-                # ponytail: canonicalTitleKey missing in map_result (hanya titleKey), fallback ke titleKey biar gak dedup false (semua "" + 65 -> 1)
                 ctk = r.get("canonicalTitleKey") or r.get("titleKey") or r.get("title") or ""
                 # normalisasi biar "Chronicles Of The Lazy Sovereign " vs "Chronicles of the Lazy Sovereign" gak beda
                 try:
@@ -287,7 +277,6 @@ async def _rss_impl(request: Request):
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
 
-
 @router.get("/rss/new")
 async def rss_new(request: Request):
     """Lightweight new-items counter."""
@@ -335,7 +324,6 @@ async def rss_new(request: Request):
         return resp
     except Exception as e:
         return JSONResponse(content=safe_error(e), status_code=500)
-
 
 @router.get("/rss/health")
 async def rss_health(request: Request):

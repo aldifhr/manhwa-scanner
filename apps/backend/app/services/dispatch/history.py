@@ -21,7 +21,6 @@ logger = get_logger("services:dispatch_history")
 _DH_CACHE: list = [0.0, None, None]  # [ts, key, payload]
 _DH_TTL = 15.0
 
-
 def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -> dict:
     """Flat list of all dispatched (notified) chapters from dispatch_history,
     joined with recent_chapters for cover/origin/status. One row per chapter."""
@@ -72,12 +71,10 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
     _dup_keys: dict[str, str] = {}
     _dup_set: set[int] = set()
 
-
     def invalidate_dh_cache():
         """Reset the dispatch-history cache after whitelist mutation."""
         global _DH_CACHE
         _DH_CACHE = [0.0, None, None]
-
 
     raw_urls = [r["chapter_url"] for r in rows if r.get("chapter_url")]
     urls = [normalize_shinigami_url(u) or u for u in raw_urls]
@@ -189,7 +186,6 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
             or r.get("chapter_title")
             or "Untitled"
         )
-        # ponytail: dispatch row chapter_title is source of truth — rc is series-level (limit 1) so rc.get(chapter) would clone latest chapter to all rows (e.g. Dungeon Architect 52 x17)
         chapter = (r.get("chapter_title") or rc.get("chapter") or "")
         title = html.unescape(title).replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
         _desc = (_desc or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
@@ -229,7 +225,6 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
     _DH_CACHE[1] = _dh_key
     _DH_CACHE[2] = payload
     return payload
-
 
 def _canonical_of(tk: str) -> str:
     from app.storage.canonical import canonical_of as _co

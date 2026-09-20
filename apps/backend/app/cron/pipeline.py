@@ -21,13 +21,10 @@ logger = get_logger("cron:dual-pass")
 # alias used throughout (run_pipeline + callers reference health_store)
 health_store = health
 
-
-# ponytail: re-export shim for external callers (grep 0 → delete) — internal uses collect.* prefix
 collect_recent_chapters = collect.collect_recent_chapters  # noqa: shim
 filter_whitelisted = collect.filter_whitelisted  # noqa: shim
 enrich = enrich_mod.enrich  # noqa: shim
 dispatch = dispatch_mod.dispatch  # noqa: shim
-
 
 def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True, dry_run: bool = False, action: str = "update") -> dict:
     """Full dual-pass run. Returns stats dict.
@@ -139,7 +136,6 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 logger.warn("unclaim_stale failed", err=str(e)[:160])
             whitelist = wl_store.load_whitelist()
             # ALWAYS filter whitelisted — both paths (claimed + recent) need it
-            # ponytail: whitelist filter was skipped when deep-queue claim path had items,
             # causing non-whitelisted chapters to dispatch to Discord
             if _use_claimed:
                 to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
@@ -171,7 +167,6 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             retry_stats = {}
 
         duration = round(time.time() - start, 1)
-        # ponytail P1: partial failure detection — jangan report "ok" jika satu source Cloudflare (silent missing)
         _status = "ok"
         if _health_map:
             _vals = list(_health_map.values())
@@ -203,11 +198,9 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         health.write_cron_status("error", duration=round(time.time() - start, 1))
         return {"sent": 0, "skipped": 0, "failed": 1, "error": "internal error", "dispatched": do_dispatch}
 
-
 # Imports kept at bottom to avoid circular import at module load:
 # pipeline imports collect/enrich/dispatch_mod, which don't import pipeline.
 from app.storage import recent_chapters  # noqa: E402
-
 
 # Health-probe cache (PERF-01 #1): probing is on the dispatch critical path.
 # Two serial HTTP probes with 15s timeouts = up to 30s stall when upstream is
@@ -218,7 +211,6 @@ _HEALTH_PROBE_CACHE_TTL = 120.0  # seconds
 
 # Whitelist cache: REMOVED — load_whitelist() already has @ttl_cache(ttl=600) in whitelist.py
 # This was a double-cache. Call wl_store.load_whitelist() directly.
-
 
 def _probe_source_health(force: bool = False) -> dict:
     """Lightweight per-source health probe for dispatch-mode cron runs.

@@ -2,7 +2,7 @@
 import { withCsrf } from "@/lib/csrf";
 import { parseErrorMessage } from "@/lib/fetchError";
 
-// ponytail P2: single-flight 401 refresh + retry — jangan biarkan A/B/C/D semua 401 lalu refresh sukses tapi tetap error
+//
 let _handling401 = false;
 let _refreshPromise: Promise<boolean> | null = null;
 async function handle401() {
@@ -56,7 +56,7 @@ export async function readerFetch<T>(
 ): Promise<T> {
   const cache = cacheForPath(path, init);
   const baseInit: RequestInit = cache ? { cache } : {};
-  // ponytail P2: default timeout 15s (API) — scraper via backend 30s, FE 10-15s cukup; AbortSignal.timeout jika caller tidak provide signal
+  //
   const hasSignal = !!(init?.signal || (baseInit as RequestInit).signal);
   const timeoutSignal = hasSignal ? undefined : AbortSignal.timeout(15_000);
   const baseWithTimeout: RequestInit = timeoutSignal ? { ...baseInit, signal: timeoutSignal } : baseInit;
@@ -64,11 +64,11 @@ export async function readerFetch<T>(
   const csrfInit = mergedInit
     ? (withCsrf(mergedInit as RequestInit) as RequestInit)
     : undefined;
-  // ponytail P2: abort propagation — caller yang punya filter/navigation harus pass signal ke paginatedGet/readerFetch
+  //
   let res = await fetchImpl(path, { ...(csrfInit as RequestInit), credentials: "include" });
   if (res.status === 204) return { success: true, data: { results: [] } } as T;
   if (res.status === 401) {
-    // ponytail P1 #2: retry hanya untuk GET/HEAD idempoten — POST/PUT/PATCH body bisa non-reusable (stream) & retry bisa double-mutate
+    //
     const m2 = (mergedInit?.method ?? "GET").toUpperCase();
     const isIdempotentRetry = m2 === "GET" || m2 === "HEAD";
     if (!isIdempotentRetry) {
@@ -99,7 +99,7 @@ export async function readerFetch<T>(
   return res.json() as Promise<T>;
 }
 
-// ponytail: dedup concurrent identical paginatedGet (A: React Query cache alone still
+//
 // triggers N parallel fetches if N components mount before first resolves; inflight collapses to 1)
 const _inflightPaginated = new Map<string, Promise<unknown[]>>();
 
@@ -144,7 +144,7 @@ export async function paginatedGet<T>(
           fetchImpl
         );
       });
-      // ponytail P1 #1: trade-off — infinite feed toleran partial (page 3 gagal tetap tampil 1/2/4 + retry per-page),
+      //
       // tapi bulk whitelist/history butuh komplit. Sekarang bulk sudah single-shot hardCap 1000 (whitelist/dispatch),
       // jadi pagination >cap hanya untuk legacy RSS bulk (deprecated). Tetap strict untuk bulk: failedPages→throw.
       const batched: unknown[] = [];
@@ -161,7 +161,7 @@ export async function paginatedGet<T>(
           else if ((r.reason as Error)?.name === "AbortError") throw r.reason;
           else {
             failedPages++;
-            // ponytail P2 #5: observability — jangan cuma console.warn (wire ke Sentry/Datadog di prod)
+            //
             const msg = `[paginatedGet] ${basePath} page failed (${failedPages})`;
             console.warn(msg, r.reason);
             try { console.error(msg, { basePath, failedPages, reason: String(r.reason) }); } catch {}

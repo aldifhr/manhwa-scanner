@@ -67,7 +67,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: none; /* ponytail: was 'x proximity' — caused sticky/unresponsive scroll on mobile */
+  scroll-snap-type: none; /*'x proximity' — caused sticky/unresponsive scroll on mobile */
   touch-action: pan-x pan-y;
   overscroll-behavior-x: contain;
   -ms-overflow-style: none;

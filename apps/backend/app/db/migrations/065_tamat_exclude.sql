@@ -1,5 +1,5 @@
 -- 065_tamat_exclude.sql — tamat flag di /recent + exclude dari RSS
--- ponytail: recent = feed 24h, exclude = RSS filter. Tamat = exclude + label completed
+
 -- Recent items belom tentu di whitelist, jadi simpan di excluded_titles (filter existing) + reason=completed buat badge TAMAT
 
 -- reason: 'excluded' (manual hide) vs 'completed' (tamat)

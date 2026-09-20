@@ -10,7 +10,6 @@ from app.logger import get_logger
 
 logger = get_logger("enrich")
 
-
 def _is_voratoon_expiring_soon(cover: str, hours: int = 24) -> bool:
     """Check if presigned voratoon cover expires within hours."""
     from app.config import settings as _cfg
@@ -30,7 +29,6 @@ def _is_voratoon_expiring_soon(cover: str, hours: int = 24) -> bool:
         return _time.time() > expiry - hours * 3600
     except Exception:
         return False
-
 
 def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None = None) -> dict | None:
     """Fetch metadata from source API. Returns dict of updates or None."""
@@ -171,7 +169,6 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
 
     return updates if updates else None
 
-
 _ENRICH_LAST_RUN: float = 0
 _ENRICH_THROTTLE_S = 300  # 5m — faster metadata for new series
 
@@ -196,7 +193,6 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
     """
     import time as _t
     global _ENRICH_LAST_RUN
-    # ponytail: throttle 1h — if last run was <1h ago and all were skipped, skip DB entirely
     if not force and _t.time() - _ENRICH_LAST_RUN < _ENRICH_THROTTLE_S:
         # quick check via cache? still need SELECT to know, so just skip if within throttle and previous was all-skip
         # we keep simple: if throttled, return 0 immediately (next 5m tick will still check)
@@ -218,7 +214,6 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
     refresh_cutoff = (now - timedelta(days=refresh_days)).isoformat()
     voratoon_cutoff = (now - timedelta(days=5)).isoformat()
 
-    # ponytail: cover canonical is series_meta since 052 — whitelist select no cover, need series_meta map for expiry check
     _sm_cover_map: dict[tuple[str, str], str] = {}
     try:
         _vor_tks = [(r["title_key"], r.get("source", "")) for r in rows if r.get("source") == "voratoon"]
@@ -277,7 +272,6 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
         if is_expiring:
             refreshed += 1
         elif force:
-            # ponytail: admin force refresh — bypass all skip logic
             refreshed += 1
         elif all_present:
             # Complete — only refresh if older than the refresh window.
@@ -316,7 +310,6 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
             logger.warn("enrich failed", title_key=tk, err=str(e)[:120])
 
     # --- refresh voratoon covers di excluded_titles & chapter_bookmarks (expire 6 hari, sama) ---
-    # ponytail: excluded_titles.cover is bloat — canonical is series_meta.cover;
     # should JOIN series_meta instead of scanning cover. Minimal: keep LIKE but
     # with source filter (eq source='voratoon') + idx_excluded_titles_source
     # (042_db_audit_fix.sql fix 6) to speed scan; do not DROP column yet.
@@ -337,7 +330,6 @@ def enrich_all_whitelist(max_age_hours: int = 24, refresh_days: int = 7, force: 
                 except Exception:
                     pass
         # chapter_bookmarks: per-chapter bookmark cover juga presigned
-        # ponytail: minimal keep LIKE but source-filtered (source='voratoon')
         try:
             from app.db import q as _q2
             from app.config import settings as _cfg

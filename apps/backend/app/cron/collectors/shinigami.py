@@ -9,7 +9,6 @@ from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 
 logger = get_logger("cron:collect:shinigami")
 
-
 def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool = True) -> list[dict]:
     from datetime import datetime, timezone, timedelta
 
@@ -17,7 +16,6 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
     from app.utils.text import slugify_title_key as _ntk
     from app.services.scanner_confidence import attach_confidence
 
-    # ponytail: RSS_LOOKBACK_HOURS guard — shinigami embedded `chapters` contains
     # 3 most recent chapters regardless of age (e.g. ch 25 today + ch 24 from 7 days
     # ago). Without cutoff, old chapters flood recent_chapters + Discord.
     # Mirrors ikiru collector's 24h filter.

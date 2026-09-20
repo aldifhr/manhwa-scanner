@@ -1,4 +1,3 @@
-# ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type/origin); whitelist is minimal (title_key, source, series_url, latest_sent_chapter) — extra static columns here are legacy compat, rss_service prioritizes sm_map > it > wl, do not add new static writes here; series_meta_sync populates canonical via upsert. DB FK fk_series_whitelist (042_db_audit_fix.sql) enforces series_meta(title_key,source) -> whitelist(title_key,source) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED — single source, no orphan meta.
 """Whitelist storage (parity with lib/services/storage/whitelist.ts)."""
 from typing import Optional
 import re as _re
@@ -18,7 +17,6 @@ from app.config import VALID_SOURCES, VALID_SOURCES_WITH_ALL
 _VALID_SOURCES = VALID_SOURCES
 _VALID_SOURCES_WITH_ALL = VALID_SOURCES_WITH_ALL
 
-
 class WhitelistRow(BaseModel):
     """Validated + normalized whitelist row.
 
@@ -34,7 +32,7 @@ class WhitelistRow(BaseModel):
     wrong types, and nested sources[] assumptions that never matched
     the real flat schema.
 
-    ponytail: static fields (cover/rating/genres/description/type/origin/status) are NOT canonical here — canonical is series_meta; whitelist keeps title_key, source, series_url, latest_sent_chapter (+title for display). Extra fields tolerated via extra="ignore" for back-compat, rss falls back sm>it>wl.
+"ignore" for back-compat, rss falls back sm>it>wl.
     """
 
     model_config = {"extra": "ignore"}  # tolerate legacy columns
@@ -61,7 +59,6 @@ class WhitelistRow(BaseModel):
         if not v:
             return ""
         raw = str(v).strip()
-        # ponytail: canonical title_key = slug (lowercase, dash) via normalize_title_key
         # UUID vs slug vs spaced lower caused merge false / delete mismatches — UUID is legacy
         if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", raw, _re.I):
             logger.warn("WhitelistRow: UUID title_key not canonical, expected slug", title_key=raw[:16])
@@ -95,7 +92,6 @@ class WhitelistRow(BaseModel):
 
     def to_db(self) -> dict:
         """Serialize for upsert (only whitelist minimal cols)."""
-        # ponytail: whitelist minimal since 061 — static fields (cover/rating/genres/description/type/origin/status) canonical in series_meta
         d = self.model_dump(exclude_none=True, exclude={"cover", "rating", "genres", "description", "status", "origin", "type", "permalink"})
         # also drop empty list default for genres if somehow included
         d.pop("genres", None)
@@ -117,7 +113,6 @@ class WhitelistRow(BaseModel):
 
 # Cache decorator applied to load_whitelist() below.
 
-
 def _norm_row(r: dict) -> dict:
     out = dict(r)
     su = out.get("series_url")
@@ -128,7 +123,6 @@ def _norm_row(r: dict) -> dict:
         if isinstance(v, str) and "shinigami.asia" in v:
             out[fld] = normalize_shinigami_url(v) or v
     return out
-
 
 @ttl_cache(ttl=600.0, maxsize=1)
 def load_whitelist(force: bool = False) -> list[dict]:
@@ -153,7 +147,6 @@ def load_whitelist(force: bool = False) -> list[dict]:
         logger.error("Failed to load whitelist", exc=e)
         return []
 
-
 def add_whitelist_entries(rows: list[dict]) -> dict:
     """Upsert whitelist rows via direct adapter (NOT the sync_whitelist RPC).
 
@@ -165,7 +158,6 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
     """
     if not rows:
         return {"status": "ok", "whitelist": []}
-    # ponytail: UUID title_key (voratoon) -> slug via title or series_url
     for _r in rows:
         _tk = str(_r.get("title_key") or "").strip()
         if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _tk, _re.I):
@@ -193,14 +185,12 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
         return {"status": "ok", "whitelist": payload}
     except Exception as e:
         msg = str(e)
-        # ponytail: DB enforces chk_tk_slug (title_key ~ '^[a-z0-9-]+$'); WhitelistRow already slugifies via slugify_title_key (d89812b)
         # but direct callers / stale payloads can still violate — surface clearly so caller can fix input instead of silent error.
         if "chk_tk_slug" in msg:
             logger.warn("add_whitelist_entries: chk_tk_slug violation, title_key must be slug [a-z0-9-]", err=msg[:300])
         else:
             logger.error("add_whitelist_entries failed", exc=e)
         return {"status": "error", "whitelist": [], "error": msg[:300] if "chk_tk_slug" in msg else str(e)[:300]}
-
 
 def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:
     """Remove whitelist entries that were added >`days` ago AND have NEVER
@@ -234,7 +224,6 @@ def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:
         stale = q(sql, [cutoff])
         if not stale:
             return {"status": "ok", "removed": 0, "total": 0}
-
 
         if not dry_run and stale:
             # L3 FIX: Use VALUES clause instead of unnest for composite key DELETE

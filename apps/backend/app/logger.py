@@ -1,6 +1,5 @@
 """Logger — JSON lines with correlation, severity gate, file sinks, DB journal.
 
-ponytail: 186L → 110L. Single queue worker instead of Thread per warn/error.
 Ceiling: queue unbounded in-memory (burst 1k logs ok). Upgrade: BoundedQueue+drop when OOM.
 """
 from __future__ import annotations
@@ -40,7 +39,6 @@ def _clean(s) -> str:
     txt = re.sub(r"Bearer\s+[A-Za-z0-9_\-]{20,}", "Bearer ***", txt, flags=re.IGNORECASE)
     return txt
 
-# ponytail: single queue worker replaces Thread per warn/error (was 1 thread per log → 1k threads/min at burst), restore thread-per-log when queue latency >500ms or burst >2k/min
 _q: queue.Queue = queue.Queue()
 def _worker():
     while True:

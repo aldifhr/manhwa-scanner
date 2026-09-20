@@ -22,17 +22,13 @@ from functools import wraps
 from threading import Lock
 from typing import Any, Callable
 
-
 _REGISTRY: list[Callable] = []
 
-
 def _make_key(args: tuple, kwargs: dict) -> str:
-    # ponytail: stdlib hash replaces hashlib+json (stable enough for cache key), switch to sha256 when collision observed
     try:
         return str(hash((str(args), str(sorted(kwargs.items())))))
     except Exception:
         return str(hash(repr((args, tuple(sorted(kwargs.items()))))))
-
 
 def ttl_cache(ttl: float = 30.0, maxsize: int = 200):
     """Decorator factory: TTL in-memory cache.
@@ -88,7 +84,6 @@ def ttl_cache(ttl: float = 30.0, maxsize: int = 200):
         _REGISTRY.append(wrapper)
         return wrapper
     return decorator
-
 
 def invalidate_all_caches() -> None:
     """Invalidate every ttl_cache-decorated function via registry (no dir() scan)."""

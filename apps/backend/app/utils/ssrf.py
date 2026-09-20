@@ -5,7 +5,6 @@ import ipaddress
 import re
 from urllib.parse import urlparse
 
-# ponytail P1: SSRF candidate — outbound fetches dari cover/series_url/user input
 # harus dibatasi ke allowed domains, jangan 127.0.0.1 / 169.254.169.254 / localhost
 ALLOWED_HOSTS = {
     "ikiru.wtf", "08.ikiru.wtf", "07.ikiru.wtf",

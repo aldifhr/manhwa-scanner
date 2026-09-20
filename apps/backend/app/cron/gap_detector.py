@@ -1,4 +1,4 @@
-"""Chapter gap detector + auto-backfill — ponytail: 419L gap/backfill (distinct from collect 407L scraper), keep separate until unified pipeline covers gap+scrape.
+"""Chapter gap detector + auto-backfill
 
 Compares each whitelist series' latest_sent_chapter (what Discord got) against
 the newest chapter_num seen in recent_chapters (what the scraper found). A jump
@@ -26,9 +26,8 @@ logger = get_logger("gap-detector")
 GAP_THRESHOLD = 1.0     # newest_scraped - latest_sent must exceed this
 COOLDOWN_MIN = 240      # at most one gap alert every 4h
 _last_alert: float = 0.0
-_last_backfill_ts: float = 0.0  # ponytail: throttle backfill when repeatedly nothing fixed
+_last_backfill_ts: float = 0.0
 _last_gaps_hash: str = ""
-
 
 def _shinigami_chapters(manga_id: str) -> list[dict]:
     # Prefer the pooled httpx client with retry+circuit-breaker (parity with
@@ -51,7 +50,6 @@ def _shinigami_chapters(manga_id: str) -> list[dict]:
         logger.warn("gap backfill: shinigami urllib fallback failed", err=str(e)[:120])
         return []
 
-
 def _ikiru_chapters(slug: str) -> list[dict]:
     try:
         from app.scrapers.ikiru import get_ikiru_chapters
@@ -59,7 +57,6 @@ def _ikiru_chapters(slug: str) -> list[dict]:
     except Exception as e:
         logger.warn("gap backfill: ikiru fetch failed", err=str(e)[:120])
         return []
-
 
 def detect_gaps() -> list[dict]:
     """Return [{title_key, source, sent, scraped}] where scraped - sent > threshold.
@@ -92,7 +89,6 @@ def detect_gaps() -> list[dict]:
     except Exception as e:
         logger.warn("gap detection failed", err=str(e)[:160])
         return []
-
 
 def _backfill_and_dispatch(gaps: list[dict]) -> dict:
     """For each gapped series: fetch its chapter list from the source API,
@@ -135,7 +131,6 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                 tk_norm = tk.replace(" ", "-")
                 lo, hi = g["sent"], g["scraped"]
 
-                # ponytail: check if rows already exist in recent_chapters gap range
                 cur.execute(
                     """SELECT title_key, title, chapter, chapter_num, source, cover,
                               series_url, origin, updated_time, description, chapter_url
@@ -384,7 +379,6 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
     else:
         logger.debug("gap auto-backfill: nothing fixed", inserted=inserted, dispatched=dispatched, details=str(details)[:500])
     return {"inserted": inserted, "dispatched": dispatched, "fixed": fixed, "details": details}
-
 
 def maybe_alert_gaps() -> int:
     """Run detection; alert admin channel (with cooldown), then AUTO-BACKFILL

@@ -1,4 +1,4 @@
-"""Source collection orchestrator — ponytail: 407L collect (distinct from gap_detector 419L), merge when unified pipeline covers scrape+gap. Source collection orchestrator — delegates per-source to collectors/*."""
+"""Source collection orchestrator"""
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
@@ -16,7 +16,6 @@ import time as _time
 
 logger = get_logger("cron:collect")
 health_store = health
-
 
 def collect_recent_chapters(
     with_whitelisted_ikiru: bool = False,
@@ -175,7 +174,6 @@ def collect_recent_chapters(
                         except Exception:
                             pass
             finally:
-                # ponytail P1: jangan wait worker stuck — shutdown non-blocking, worker tetap jalan di background tapi collect return cepat
                 try:
                     _executor.shutdown(wait=False, cancel_futures=True)
                 except TypeError:
@@ -233,7 +231,6 @@ def collect_recent_chapters(
 
     return items, _hm
 
-
 def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
     allowed: set[str] = set()
     for w in whitelist:
@@ -247,7 +244,6 @@ def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
             result.append(it)
     return result
 
-
 def _ikiru_slug_from_source(src: dict) -> str | None:
     v = src.get("url") or ""
     if v:
@@ -260,7 +256,6 @@ def _ikiru_slug_from_source(src: dict) -> str | None:
         if part and "chapter-" not in part:
             return part.split("/")[0]
     return None
-
 
 def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
     import random
@@ -342,7 +337,6 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
                 continue
             items.append({"title": (wtitle or wk.replace("_", " ").title()).replace("’", "'"), "title_key": wk, "chapter": str(num), "chapter_num": float(num) if str(num).replace(".", "", 1).isdigit() else 0, "url": ch_url, "source": "shinigami", "cover": None, "series_url": series_url, "chapter_url": ch_url, "origin": "", "updated_time": ch.get("release_date") or ch.get("created_at") or "", "release_date": ch.get("release_date") or ""})
     return items
-
 
 def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
     slugs: list[str] = []

@@ -15,7 +15,6 @@ MESSAGE_COMPONENT = 3
 CHANNEL_MESSAGE_WITH_SOURCE = 4
 DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
 
-
 def _extract_options(data: dict) -> dict:
     opts = {}
     for o in data.get("options", []) or []:
@@ -25,13 +24,11 @@ def _extract_options(data: dict) -> dict:
             opts[o["name"]] = _extract_options(o)
     return opts
 
-
 def _respond(response_type: int, data: dict | None = None) -> dict:
     resp = {"type": response_type}
     if data is not None:
         resp["data"] = data
     return resp
-
 
 def handle_interaction(raw_body: bytes) -> tuple[int, dict]:
     """Returns (http_status, json_body)."""
@@ -76,7 +73,6 @@ def handle_interaction(raw_body: bytes) -> tuple[int, dict]:
 
     return 400, {"error": "unsupported_interaction"}
 
-
 def _route_add(payload: dict, data: dict):
     opts = _extract_options(data)
     title = opts.get("title", "")
@@ -89,7 +85,6 @@ def _route_add(payload: dict, data: dict):
         DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
         {"content": f"⏳ Adding **{title}**..."},
     )
-
 
 def _route_search(data: dict):
     opts = _extract_options(data)
@@ -107,7 +102,6 @@ def _route_search(data: dict):
         lines.append(f"• {t}")
     return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "\n".join(lines)})
 
-
 def _route_stats(data: dict):
     from app.storage import whitelist
 
@@ -116,7 +110,6 @@ def _route_stats(data: dict):
         CHANNEL_MESSAGE_WITH_SOURCE,
         {"content": f"📊 Whitelist: **{len(rows)}** manga tracked"},
     )
-
 
 def _route_setchannel(payload: dict, data: dict):
     opts = _extract_options(data)
@@ -163,7 +156,6 @@ def _route_setchannel(payload: dict, data: dict):
             {"content": f"❌ Failed to set channel: {e}"[:1900]},
         )
 
-
 def _route_setfilter(payload: dict, data: dict):
     """Per-guild origin filter: /setfilter origins:KR,CN — empty = all."""
     opts = _extract_options(data)
@@ -178,7 +170,6 @@ def _route_setfilter(payload: dict, data: dict):
         )
     if not guild_id:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "❌ Missing guild"})
-    # ponytail: 2.5s DB guard — was blocking → 3s Discord timeout → `The application didn't respond`
     try:
         from app.db import get_supabase
 
@@ -199,7 +190,6 @@ def _route_setfilter(payload: dict, data: dict):
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "⏳ Filter save is slow — try again in 5s (DB timeout)."})
     except Exception as e:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": f"❌ Failed: {e}"})
-
 
 def _route_list_component(custom_id: str):
     parts = custom_id.split(":")

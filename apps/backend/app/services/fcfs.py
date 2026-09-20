@@ -20,12 +20,10 @@ logger = get_logger("services:fcfs")
 
 # --- normalize ---------------------------------------------------------------
 
-
 def normalize_title(title: str) -> str:
     """Canonical title for FCFS — match whitelist slugify_title_key."""
     from app.utils.text import slugify_title_key as _slugify
     return _slugify(str(title or ""))
-
 
 def normalize_chapter(ch_str: str | int | float | None) -> str:
     """Canonical chapter token: 12.50 → 12.5, 160-2 → 160.2, 012 → 12."""
@@ -44,11 +42,9 @@ def normalize_chapter(ch_str: str | int | float | None) -> str:
         return str(whole)
     return f"{whole}.{frac}"
 
-
 def fcfs_key(title: str, chapter: str | int | float | None) -> str:
     """Stable cross-source dedupe key: normalized title + normalized chapter."""
     return f"{normalize_title(title)}#{normalize_chapter(chapter)}"
-
 
 def parse_chapter_number(ch: str | int | float | None) -> float | None:
     """Numeric value for sorting/filtering (float), or None if unparseable."""
@@ -59,9 +55,7 @@ def parse_chapter_number(ch: str | int | float | None) -> float | None:
     m = re.search(r"(\d+(?:\.\d+)?)", str(ch).strip())
     return float(m.group(1)) if m else None
 
-
 # --- DB helpers --------------------------------------------------------------
-
 
 def claimed_fcfs_keys(fcfs_keys: list[str]) -> set[str]:
     """Return subset of fcfs_keys already in dispatch_history or live claims.
@@ -86,8 +80,3 @@ def claimed_fcfs_keys(fcfs_keys: list[str]) -> set[str]:
         logger.warn("fcfs claimed check dispatch_claims failed", err=str(e)[:120])
     return claimed
 
-
-# ponytail: claimed_titles removed — use claimed_fcfs_keys; kept as shim in dispatch_mod via alias, delete shim when grep -r "claimed_titles" ==0
-
-
-# ponytail: _parse_chapter_num alias removed — import parse_chapter_number directly, delete alias shim when grep -r "_parse_chapter_num" ==0

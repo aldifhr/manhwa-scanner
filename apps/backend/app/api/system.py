@@ -14,19 +14,16 @@ logger = get_logger("api:system")
 router = APIRouter()
 
 # Cron concurrency guard: per-action lock + DB advisory lock (cross-process).
-# ponytail: 11 Locks → defaultdict factory (unbounded actions leak), cap to LRU/bounded dict when action cardinality >20
 import collections
 _cron_locks: dict[str, threading.Lock] = collections.defaultdict(threading.Lock)  # type: ignore[assignment]
 # preload known actions so introspection still works
 for _k in CRON_ACTIONS:
     _cron_locks[_k]  # touch
 
-
 def get_cron_lock(action: str) -> threading.Lock:
     """Expose the per-action cron lock so other modules (e.g. dispatches'
     retry-all) can reuse the SAME lock and avoid double-running update."""
     return _cron_locks.get(action, _cron_locks["update"])
-
 
 import hashlib as _hl
 
@@ -37,12 +34,10 @@ def _advisory_key(action: str) -> int:
 
 _CRON_ADVISORY_KEY = 424242  # legacy fallback (not used directly, kept for compat)
 
-
 # Lightweight in-memory cron job registry so callers can poll run status
 # instead of inferring it from the cronStatus timestamp. Last N jobs kept.
 _cron_jobs: list[dict] = []
 _CRON_JOBS_MAX = 20
-
 
 def _record_job(action: str, status: str, stats: dict | None = None):
     _cron_jobs.insert(0, {
@@ -53,9 +48,6 @@ def _record_job(action: str, status: str, stats: dict | None = None):
     })
     while len(_cron_jobs) > _CRON_JOBS_MAX:
         _cron_jobs.pop()
-
-
-
 
 @router.get("/cron")
 @router.post("/cron")
@@ -104,7 +96,6 @@ async def cron_trigger(request: Request):
             status_code=503,
         )
     return JSONResponse(content={"success": True, "data": {"status": "enqueued", "action": action}}, status_code=202)
-
 
 @router.get("/metrics")
 async def metrics(request: Request):

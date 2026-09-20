@@ -25,11 +25,10 @@ from app.storage.recent_chapters_sql import (
     prune_older_than,
 )
 
-
 def claim_recent_chapters_for_dispatch(
     whitelist: list[dict] | None = None, hours: int = 24, limit: int = 500
 ) -> list[dict]:
-    """Delegates to services/claim.py (ponytail: 679L → 450L storage)."""
+    """Delegates to services/claim.py."""
     from app.services.claim import claim_recent_chapters_for_dispatch as _impl
 
     return _impl(whitelist=whitelist, hours=hours, limit=limit)

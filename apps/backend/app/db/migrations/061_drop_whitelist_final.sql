@@ -1,5 +1,4 @@
 -- 061_drop_whitelist_final.sql — whitelist DROP fisik final (cover/rating/genres/desc/type/origin/status)
--- ponytail: 059 add back compat done, code 052-059 now series_meta canonical, SELECT whitelist minimal
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='whitelist' AND column_name='cover') THEN

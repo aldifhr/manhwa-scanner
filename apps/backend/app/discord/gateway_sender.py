@@ -52,7 +52,6 @@ async def main():
 asyncio.run(main())
 """
 
-
 def send_via_gateway(
     channel_id: str,
     content: Optional[str] = None,
@@ -72,7 +71,6 @@ def send_via_gateway(
         "VIRTUAL_ENV": os.path.dirname(venv_bin),
         "PATH": venv_bin + ":" + os.environ.get("PATH", ""),
     }
-    # ponytail: retry with exponential backoff to avoid 1/sec subprocess burst on REST ban
     for attempt in range(3):
         try:
             proc = subprocess.run(
@@ -97,6 +95,4 @@ def send_via_gateway(
         if attempt < 2:
             time.sleep(1 * (2 ** attempt))  # 1s, 2s (4s cooldown after 3rd fail avoided — caller sleeps 0.8s)
     return False
-
-
 

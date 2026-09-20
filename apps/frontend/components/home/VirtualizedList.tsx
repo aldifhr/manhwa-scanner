@@ -174,7 +174,7 @@ export default function VirtualizedList<T>({
     >
       {virtualItems.map((vi) => {
         const rowItems = rows[vi.index] ?? [];
-        // ponytail: stable row key — prefer chapter key (c.key/chapterKey) for flat mode, fallback to titleKey for grouped — no index
+        //
         const first = rowItems[0] as unknown as Record<string, unknown> | undefined;
         const chapterRowKey =
           (first?.key as string) ||

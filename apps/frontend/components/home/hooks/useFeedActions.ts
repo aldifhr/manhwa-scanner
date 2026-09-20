@@ -100,7 +100,7 @@ export function useFeedActions() {
     onSuccess: ({ result, optKey, item }) => {
       // already_exists should also become optimistic Added (bandel fix for Full-time Hunter UUID vs slug)
       setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
-      // ponytail #7: invalidasi bersamaan — jangan cuma whitelist, RSS & home juga stale
+      //
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
@@ -229,7 +229,7 @@ export function useFeedActions() {
     onMutate: (series) => setAddingKey(series.titleKey),
     onSuccess: ({ results, optKeys }, series) => {
       setOptimisticWhitelist((prev) => new Set([...prev, ...optKeys]));
-      // ponytail #7: bulk add invalidasi RSS per-page cache juga (buildRssParams filter-aware)
+      //
       queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
@@ -322,7 +322,7 @@ export function useFeedActions() {
         setOptimisticExcluded((prev) => new Set(prev).add(key));
         toast("Excluded from feed", "success");
       }
-      // ponytail #7 & #8: exclude mengubah RSS filtered cache per (source,type,whitelist) key
+      //
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
@@ -354,7 +354,7 @@ export function useFeedActions() {
         bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
       }
       const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
-      // ponytail: sync guard — prevent concurrent duplicate exclude for same series
+      //
       for (const k of distinctKeys) if (pendingKeys.current.has(k)) throw new Error("Duplicate request");
       for (const k of distinctKeys) pendingKeys.current.add(k);
       const excl = excludedRef.current;
@@ -400,7 +400,7 @@ export function useFeedActions() {
         setOptimisticExcluded((prev) => new Set([...prev, ...keys]));
         toast("Excluded from feed", "success");
       }
-      // ponytail #7 & #8: group exclude juga invalidate RSS per-filter key
+      //
       queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });

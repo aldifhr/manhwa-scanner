@@ -19,11 +19,10 @@ _FAILED_RETRY_INTERVAL_S = 3600
 _DASHBOARD_INTERVAL_S = 600
 _RETENTION_INTERVAL_S = 86400
 _ALERT_INTERVAL_S = 600
-_VSERIES_REFRESH_INTERVAL_S = 3600  # ponytail: v_series MATERIALIZED REFRESH hourly (was 7d via enrich-refresh)
+_VSERIES_REFRESH_INTERVAL_S = 3600
 
 _SCHED_THREAD: threading.Thread | None = None
 _stop = threading.Event()
-
 
 def _scheduler_loop() -> None:
     from app.tasks.queue import enqueue_cron, CRON_QUEUE_KEY, CRON_PROCESSING_KEY, _get_redis
@@ -179,7 +178,6 @@ def _scheduler_loop() -> None:
             logger.error("scheduler loop crashed, restarting in 30s", exc=e)
             _stop.wait(30)
             last_source = _time.monotonic()
-
 
 def start_cron_scheduler() -> None:
     global _SCHED_THREAD

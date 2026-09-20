@@ -81,7 +81,7 @@ function isPublicPath(pathname: string, method: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ponytail: already authed -> /login bounces to redirect or /
+  //
   if (pathname === "/login") {
     const token = request.cookies.get(COOKIE_NAME)?.value;
     if (token && hasValidToken(token)) {
@@ -112,7 +112,7 @@ export function proxy(request: NextRequest) {
     return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
-  // ponytail: single password model — no role gate, any valid JWT passes
+  //
   return applySecurityHeaders(NextResponse.next());
 }
 

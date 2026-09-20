@@ -18,7 +18,6 @@ logger = get_logger("storage:recent-chapters-sql")
 _wl_lock = threading.Lock()
 _existing_rc_lock = threading.Lock()
 
-
 def prune_older_than(hours: int = 24) -> int:
     """Delete rows whose updated_time is older than `hours`.
 
@@ -27,7 +26,6 @@ def prune_older_than(hours: int = 24) -> int:
     accumulates. Returns the number of deleted rows.
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-    # ponytail: try DROP PARTITION (060) first (0.01s), fallback DELETE (0.5s) when not partitioned or <50k rows
     try:
         from app.db import q as _q
         # 060 helper: tries DROP PARTITION, returns 0 if not partitioned
@@ -49,7 +47,6 @@ def prune_older_than(hours: int = 24) -> int:
         logger.error("prune_older_than failed", exc=e)
         return 0
 
-
 def prune_dispatch_history_older_than(hours: int = 24) -> int:
     """Delete dispatch_history rows older than `hours`.
 
@@ -69,14 +66,12 @@ def prune_dispatch_history_older_than(hours: int = 24) -> int:
         logger.error("prune_dispatch_history_older_than failed", exc=e)
         return 0
 
-
 def _norm_chapter_num(v) -> str | None:
     """Canonical string form of a chapter number (46 vs 46.0 -> '46')."""
     try:
         return ("%.10g" % float(v))
     except (ValueError, TypeError):
         return None
-
 
 def _composite_key(r: dict) -> tuple[str, str, str] | None:
     """(title_key, source, chapter_num) — the WITHIN-source unique key.
@@ -93,10 +88,8 @@ def _composite_key(r: dict) -> tuple[str, str, str] | None:
         return (tk, src, "oneshot")
     return (tk, src, cn)
 
-
 _EXISTING_RC_CACHE: dict[str, tuple[set[str], set[tuple[str, str, str]], float]] = {}
 _EXISTING_RC_TTL = 60.0
-
 
 def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, str]]]:
     """Existing recent_chapters rows for this batch.
@@ -112,7 +105,6 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
     tks = sorted({(r.get("title_key") or "") for r in rows if r.get("title_key")})
     if not tks:
         return existing_urls, existing_ch
-    # ponytail: SHA-256 of full sorted set — old key was tks[:5]+len (collision: [A,B,C,D,E,F] vs [A,B,C,D,E,X])
     _key = hashlib.sha256("\x00".join(tks).encode()).hexdigest()
     with _existing_rc_lock:
         _cached = _EXISTING_RC_CACHE.get(_key)
@@ -153,11 +145,9 @@ def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, s
         pass
     return existing_urls, existing_ch
 
-
 _wl_origins: dict[tuple[str, str], str] = {}
 _WL_ORIGIN_TTL = 600.0
 _WL_ORIGIN_TS = 0.0
-
 
 def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
     """Cached origin map keyed by (title_key, source).
@@ -188,14 +178,12 @@ def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
             logger.warn("series_meta origin refresh failed — using stale cache", err=str(_e)[:160])
         return _wl_origins
 
-
 def invalidate_whitelist_origin_cache() -> None:
     """Call after whitelist add/remove so next batch_insert uses fresh origins."""
     global _wl_origins, _WL_ORIGIN_TS
     with _wl_lock:
         _wl_origins = {}
         _WL_ORIGIN_TS = 0.0
-
 
 def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
     """Batch insert chapters. Returns {inserted, failed, deduped} counts."""
@@ -330,8 +318,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
             # updated_time).
             CHUNK = 50
             # inserted/failed already init at top — reuse
-            # ponytail: ON CONFLICT chapter_url (stable unique), rc_composite is race guard via 057 ensure, not CONFLICT target until backfill stable
-            # ponytail: track failed chunks — was silent loss (warn+continue reported ok). Now surface partial_success so cron doesn't lie.
             for i in range(0, len(new_rows), CHUNK):
                 chunk_rows = new_rows[i : i + CHUNK]
                 try:
@@ -373,7 +359,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                     for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type", "release_date"):
                         v = r.get(k)
                         if v not in (None, "", []):
-                            # ponytail: also refresh rating/genres/type on touch so A launch miss gets fixed next cron (was only cover/origin)
                             _t[k] = v
                     _touch_rows.append(_t)
                 # db_adapter requires every row in a batch to share the same
@@ -469,7 +454,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         logger.error("batchInsertRecentChapters failed", exc=e, exc_info=True, constraint="chapter_url", first_keys=list(cleaned[0].keys()) if cleaned else [])
         failed = len(cleaned) if 'cleaned' in locals() else 0
     finally:
-        # ponytail: surface partial failure — caller (pipeline) must not report ok when chunks lost
         if failed:
             logger.error("batchInsert partial_success", inserted=inserted, failed=failed, total=len(rows))
     return {"inserted": inserted, "failed": failed, "deduped": len(rows) - len(to_upsert) if 'to_upsert' in locals() else 0}
@@ -479,7 +463,6 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         _gr().setex("rss:invalidate", 30, "1")
     except Exception:
         pass
-
 
 def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:
     """Trending series = those releasing the MOST chapters within `hours`.
@@ -507,7 +490,7 @@ def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:
             LEFT JOIN whitelist w
                 ON w.title_key = rc.title_key AND w.source = rc.source
             WHERE rc.updated_time >= %s
-            GROUP BY rc.title_key, rc.source  # ponytail: MAX() aggregates, single row per series (was leaking duplicate trending rows)
+            GROUP BY rc.title_key, rc.source
             ORDER BY chapter_count DESC, last_update DESC
             LIMIT %s
         """
@@ -536,14 +519,12 @@ def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:
         logger.error("get_trending failed", exc=e)
         return []
 
-
 def get_recent_chapters(hours: int = 24) -> list[dict]:
     """Load ALL chapters found within the last `hours` (used by dispatch /
     dashboard callers that need the full set). For web pagination use
     get_recent_chapters_paginated() instead."""
     rows = _fetch_recent_rows(hours=hours, limit=1500, offset=0)
     return [_row_to_item(r) for r in rows]
-
 
 def get_recent_chapters_paginated(
     page: int = 1, limit: int = 24, hours: int = 24, source: str | None = None
@@ -560,7 +541,6 @@ def get_recent_chapters_paginated(
     offset = max(0, (page - 1) * limit)
     rows = _fetch_recent_rows(hours=hours, limit=limit, offset=offset, source=source)
     return [_row_to_item(r) for r in rows], total, total_pages
-
 
 def _count_recent_rows(hours: int = 24, source: str | None = None) -> int:
     try:
@@ -579,7 +559,6 @@ def _count_recent_rows(hours: int = 24, source: str | None = None) -> int:
     except Exception as e:
         logger.error("count recent_chapters failed", exc=e)
         return 0
-
 
 def _fetch_recent_rows(
     hours: int = 24, limit: int = 1500, offset: int = 0, source: str | None = None
@@ -607,7 +586,6 @@ def _fetch_recent_rows(
     except Exception as e:
         logger.error("fetch recent_chapters failed", exc=e)
         return []
-
 
 def _row_to_item(r: dict) -> dict:
     item = {

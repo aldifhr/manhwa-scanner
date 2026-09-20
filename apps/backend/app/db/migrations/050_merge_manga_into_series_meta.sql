@@ -1,4 +1,4 @@
--- ponytail: merge manga_metadata (legacy shinigami UUID) into series_meta (unified title_key)
+
 -- keep manga_metadata as VIEW for backward compat (old cron still SELECT manga_metadata)
 -- backfill: INSERT missing rows from manga_metadata → series_meta
 

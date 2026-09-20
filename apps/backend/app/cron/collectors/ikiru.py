@@ -10,7 +10,6 @@ from app.cron.collectors.common import _ikiru_re_touch_anchor, _is_ikiru_re_touc
 
 logger = get_logger("cron:collect:ikiru")
 
-
 def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fetch_meta: bool = True) -> list[dict]:
     items: list[dict] = []
     series_title = u.get("title", "")
@@ -59,7 +58,6 @@ def _ikiru_process_series(u: dict, latest_sent: dict[tuple[str, str], float], fe
         items.append({"title": series_title, "title_key": slugify_title_key(series_title or ""), "chapter": ch_str, "chapter_num": _parse_chapter_num(ch_str), "url": chapter_url, "source": "ikiru", "cover": series_cover, "series_url": series_url, "chapter_url": chapter_url, "origin": origin, "updated_time": _ut, "rating": _meta_rating, "genres": _meta_genres, "description": _meta.get("description", ""), "type": (u.get("type") or [""])[0].lower() if isinstance(u.get("type"), list) else (u.get("type") or "").lower()})
     return items
 
-
 def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = True, exclude_keys: set[str] | None = None) -> list[dict]:
     from app.scrapers import ikiru as _ikiru_scraper
     from concurrent.futures import ThreadPoolExecutor
@@ -74,7 +72,6 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
         _series = [u for u in _series if _ntk(u.get("title", "")) not in exclude_keys]
         if not _series:
             return items
-    # ponytail: bulk preload 1 query vs 150
     if fetch_meta:
         try:
             _keys = [(slugify_title_key(u.get("title", "")), "ikiru") for u in _series]

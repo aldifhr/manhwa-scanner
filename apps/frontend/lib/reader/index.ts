@@ -39,7 +39,7 @@ export const Reader = {
       page_size: String(pageSize),
       merge: merge ? "true" : "false",
     });
-    // ponytail: BE supports page_size up to 10000 for whitelist → use bulk 1000 in one shot (B: jangan dipaksa 100)
+    //
     return paginatedGet(
       "/api/v1/whitelist",
       p,
@@ -49,7 +49,7 @@ export const Reader = {
       1000
     ) as unknown as Promise<import("@/lib/types").WhitelistRouteItem[]>;
   },
-  /** @deprecated ponytail P1: history skala 10k→100k, jangan fetch bulk 1000 — pakai getDispatchHistoryPage + useInfiniteQuery page-based */
+  /** @deprecated
   getDispatchHistory: async (
     page = 1,
     pageSize = 1000,
@@ -61,7 +61,7 @@ export const Reader = {
         page_size: String(pageSize),
       });
       if (search) p.set("search", search);
-      // ponytail: dispatch-history supports page_size 1000 → single request, not 10×100, tapi UI harus page-based
+      //
       return (await paginatedGet(
         "/api/v1/dispatch-history",
         p,
@@ -124,7 +124,7 @@ export const Reader = {
         d?.totalPages ?? (d as { total_pages?: number })?.total_pages ?? 1,
     };
   },
-  /** @deprecated ponytail #9: hindari bulk fetch — pakai getRssFlatPage per-page dengan React Query (page cache) */
+  /** @deprecated
   getRssFlat: (
     page = 1,
     limit = 100,

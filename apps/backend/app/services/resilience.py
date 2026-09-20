@@ -17,12 +17,10 @@ from app.logger import get_logger
 
 logger = get_logger("services:resilience")
 
-
 class CircuitState(str, Enum):
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
-
 
 def retry_with_backoff(
     max_retries: int = 3,
@@ -66,7 +64,6 @@ def retry_with_backoff(
 
     return decorator
 
-
 class CircuitBreaker:
     """Simple circuit breaker.
 
@@ -91,7 +88,6 @@ class CircuitBreaker:
         self._successes = 0
         self._opened_at = 0.0
         self._lock = threading.RLock()
-        # ponytail P1: half-open must allow exactly one probe — not 4 workers
         self._half_open_probe_in_flight = False
 
     @property
@@ -112,7 +108,6 @@ class CircuitBreaker:
             if s == CircuitState.OPEN:
                 return False
             if s == CircuitState.HALF_OPEN:
-                # ponytail P1: exactly one probe in half-open (atomic)
                 if self._half_open_probe_in_flight:
                     return False
                 self._half_open_probe_in_flight = True
@@ -161,7 +156,6 @@ class CircuitBreaker:
 
         return wrapper
 
-
 # Shared circuit breakers (module-level singletons)
 cb_discord = CircuitBreaker("discord", failure_threshold=5, recovery_timeout=60)
 cb_db = CircuitBreaker("db", failure_threshold=3, recovery_timeout=30)
@@ -175,9 +169,7 @@ cb_shinigami = CircuitBreaker("shinigami", failure_threshold=3, recovery_timeout
 # stable but rate-limits (429) under burst, so a moderate threshold.
 cb_voratoon = CircuitBreaker("voratoon", failure_threshold=5, recovery_timeout=120)
 # ApiFailureDetector merged here — ikiru API → HTML fallback (threshold 5, cooldown 300)
-# ponytail: reuse CircuitBreaker (shared threshold 5/cooldown 300), per-scraper tuning if 429 profile diverges — split cb_ikiru_api config when shinigami/voratoon needs different window
 cb_ikiru_api = CircuitBreaker("ikiru_api", failure_threshold=5, recovery_timeout=300)
 
-
-def with_circuit_breaker(cb: CircuitBreaker):  # ponytail: alias — was 19L dup of CircuitBreaker.__call__, use @cb directly; keep alias for compat
+def with_circuit_breaker(cb: CircuitBreaker):
     return cb

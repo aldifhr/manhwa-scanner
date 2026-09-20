@@ -1,11 +1,10 @@
-"""Dispatch storage — ponytail: 407L claim primitives (distinct from dispatch_mod 337L send), keep split until single dispatch owns both. Dispatch storage: claim + history (parity with lib/services/storage/dispatch.ts)."""
+"""Dispatch storage"""
 from __future__ import annotations
 
 from app.db import get_supabase
 from app.logger import get_logger
 
 logger = get_logger("storage:dispatch")
-
 
 def _already_dispatched(urls: list[str]) -> set[str]:
     """Check dispatch_history for already-sent chapter URLs (parity batchCheckDispatchedChapters)."""
@@ -23,7 +22,6 @@ def _already_dispatched(urls: list[str]) -> set[str]:
     except Exception as e:
         logger.error("check dispatch_history failed", exc=e)
         return set()
-
 
 def _claimed_urls(urls: list[str]) -> set[str]:
     """URLs already claimed in dispatch_claims (non-expired)."""
@@ -47,13 +45,11 @@ def _claimed_urls(urls: list[str]) -> set[str]:
         logger.error("check dispatch_claims failed", exc=e)
         return set()
 
-
 def _claimed_fcfs_keys(fcfs_keys: list[str]) -> set[str]:
     """Delegate to centralized FCFS service (app/services/fcfs.py)."""
     from app.services.fcfs import claimed_fcfs_keys as _cf
 
     return _cf(fcfs_keys)
-
 
 def mark_claimed(urls: list[str], title_keys: list[str], expires_hours: int = 24) -> None:
     """Mark chapter URLs as claimed in dispatch_claims (with TTL).
@@ -79,7 +75,6 @@ def mark_claimed(urls: list[str], title_keys: list[str], expires_hours: int = 24
         if "does not exist" in str(e):
             return
         logger.error("mark_claimed failed", exc=e)
-
 
 def record_failed(
     chapter_url: str,
@@ -115,7 +110,6 @@ def record_failed(
     except Exception as e:
         logger.error("record_failed failed", exc=e)
 
-
 def unclaim(chapter_url: str) -> None:
     """Remove a chapter_url from dispatch_history + dispatch_claims so it can be re-sent."""
     if not chapter_url:
@@ -130,7 +124,6 @@ def unclaim(chapter_url: str) -> None:
         if "does not exist" in str(e):
             return
         logger.error("unclaim dispatch_claims failed", exc=e)
-
 
 def unclaim_stale(cutoff_iso: str) -> int:
     """Delete dispatch_claims rows created before `cutoff_iso` (ISO timestamp).
@@ -160,7 +153,6 @@ def unclaim_stale(cutoff_iso: str) -> int:
             return 0
         logger.error("unclaim_stale failed", exc=e)
         return 0
-
 
 def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str], instance_id: str, chapter_titles: list[str] | None = None, fcfs_keys: list[str] | None = None) -> list[bool]:
     """Atomic claim guard — returns which urls THIS run is allowed to send.
@@ -232,7 +224,7 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
     result: list[bool] = []
     new_claims: list[dict] = []
     claimed_fk: set[str] = set()  # fcfs_keys this batch already granted
-    expires = (now + timedelta(hours=1)).isoformat()  # ponytail: 2h→1h queue depth fresher
+    expires = (now + timedelta(hours=1)).isoformat()
     for i, (u, tk, src) in enumerate(zip(urls, title_keys, sources)):
         if not u:
             result.append(False)
@@ -330,7 +322,6 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
                 pass
     return result
 
-
 def complete_dispatch_claim(
     chapter_url: str, duplicate_url: str | None, instance_id: str, title_key: str = "", source: str = "", fcfs_key: str | None = None, chapter_title: str = "", cover: str = "", series_url: str = ""
 ) -> None:
@@ -368,7 +359,6 @@ def complete_dispatch_claim(
         sb = get_supabase()
         # C2 FIX: Use upsert on_conflict=fcfs_key instead of DELETE+INSERT
         # to prevent duplicate rows when two concurrent runs target same fcfs_key
-        # ponytail: 010 created non-unique idx, 022 unique not applied if old exists → ON CONFLICT fcfs_key fails with InvalidColumnReference
         # fallback to chapter_url upsert then plain insert
         try:
             if fcfs_key:
@@ -387,7 +377,6 @@ def complete_dispatch_claim(
                     logger.error("complete_dispatch_claim history failed (fallback)", exc=_e2, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
                     raise
             elif "dispatch_history_uq" in str(_e) or ("duplicate" in str(_e).lower() and "dispatch_history" in str(_e).lower()):
-                # ponytail: DB audit fix 4 race — concurrent runner already inserted same (title_key, source, chapter_title)
                 logger.info("complete_dispatch_claim duplicate skip (dispatch_history_uq)", chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
             else:
                 logger.error("complete_dispatch_claim history failed", exc=_e, chapter_url=chapter_url[:60], fcfs_key=fcfs_key)
@@ -406,7 +395,6 @@ def complete_dispatch_claim(
     except Exception as e:
         logger.error("complete_dispatch_claim unclaim failed", exc=e)
 
-
 def clean_orphan_dispatch_claims() -> int:
     """Reaper: delete dispatch_claims orphans where chapter_url no longer in recent_chapters (pruned 24h).
     Prevents claim table bloat → queue depth stale pending forever. Run daily via cron."""
@@ -421,7 +409,6 @@ def clean_orphan_dispatch_claims() -> int:
     except Exception as e:
         logger.error("clean_orphan_dispatch_claims failed", exc=e)
         return 0
-
 
 # Re-export retry logic (lives in dispatch_retry.py)
 from app.services.dispatch_retry import retry_failed_dispatches, MAX_RETRY_ATTEMPTS, RETRY_COOLDOWN_S

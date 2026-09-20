@@ -9,11 +9,8 @@ from app.logger import get_logger
 
 logger = get_logger("utils:auth")
 
-
 def _dashboard_passwords() -> list[str]:
-    # ponytail: DASHBOARD_PASSWORD only — MONITOR_AUTH_TOKEN removed as fallback (P1)
     return [c for c in (settings.DASHBOARD_PASSWORD,) if c]
-
 
 def token_matches(provided: str, *, role: str = "both") -> bool:
     if not provided or not isinstance(provided, str):
@@ -31,14 +28,11 @@ def token_matches(provided: str, *, role: str = "both") -> bool:
         return False
     return any(hmac.compare_digest(provided, str(c)) for c in candidates)
 
-
 def cron_token_matches(provided: str) -> bool:
     return token_matches(provided, role="cron")
 
-
 def monitor_token_matches(provided: str) -> bool:
     return token_matches(provided, role="monitor")
-
 
 def check_monitor_auth(authorization: str = "", token_param: str = "", cookie: str = "") -> bool:
     if getattr(settings, "AUTH_DISABLED", False):
@@ -68,11 +62,8 @@ def check_monitor_auth(authorization: str = "", token_param: str = "", cookie: s
             return False
     return False
 
-
 def require_role(allowed: set[str], authorization: str = "", token_param: str = "", cookie: str = "") -> bool:  # noqa: ARG001
-    # ponytail: roles removed — any authenticated caller passes
     return check_monitor_auth(authorization, token_param, cookie)
-
 
 def check_cron_auth(token_param: str = "", authorization: str = "") -> bool:
     if getattr(settings, "AUTH_DISABLED", False):

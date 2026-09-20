@@ -6,7 +6,6 @@ import re
 
 from app.config import settings
 
-
 def normalize_title_key(title: str) -> str:
     """Canonical normalized title key: lowercase, alnum+space, collapsed.
 
@@ -19,10 +18,6 @@ def normalize_title_key(title: str) -> str:
     t = re.sub(r"[^a-z0-9]+", " ", t)
     return re.sub(r"\s+", " ", t).strip()
 
-
-# ponytail: normalize_title_loose alias removed — use normalize_title_key directly, restore alias when grep -r "normalize_title_loose" finds legacy caller needing loose (non-collapsed) semantics
-
-
 def slugify_title_key(title: str) -> str:
     """URL/path-safe title key: dashes instead of spaces.
 
@@ -33,7 +28,6 @@ def slugify_title_key(title: str) -> str:
     """
     return normalize_title_key(title).replace(" ", "-")
 
-
 def deslugify_title_key(slug: str) -> str:
     """Reverse slugify_title_key: dashes -> spaces (URL path -> DB title_key).
 
@@ -43,7 +37,6 @@ def deslugify_title_key(slug: str) -> str:
     if not slug:
         return ""
     return slug.replace("-", " ").strip()
-
 
 def ikiru_slug(title: str) -> str:
     """Canonical ikiru manga slug for a series title.
@@ -65,9 +58,7 @@ def ikiru_slug(title: str) -> str:
     t = re.sub(r"[^a-z0-9]+", "-", t)
     return re.sub(r"-+", "-", t).strip("-")
 
-
 _SHINIGAMI_HOST_RE = re.compile(r"https?://([^/]+)\.shinigami\.asia")
-
 
 def normalize_shinigami_url(url: str | None) -> str | None:
     """Rewrite stale shinigami hostnames to current SECONDARY_PUBLIC_BASE.

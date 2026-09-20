@@ -64,7 +64,7 @@ export function Cover({
       fetchPriority="low"
       onError={() => {
         if (!hasRetried && titleKey) {
-          // ponytail: voratoon presigned 403 → fallback ke authed /api/v1/reader/cover?series= (BE scrub + proxy)
+          //
           setCoverSrc(
             `/api/v1/reader/cover?series=${encodeURIComponent(titleKey)}`
           );

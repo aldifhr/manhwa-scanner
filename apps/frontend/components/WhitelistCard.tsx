@@ -7,7 +7,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
 import type { WhitelistRouteItem } from "@/lib/types";
 
-// ponytail: whitelistUrl 70L single-caller, inlined — was separate file for one use
+//
 function slugFromTitle(title: string): string {
   return title
     .toLowerCase()
@@ -225,7 +225,7 @@ export function WhitelistCard({
       deletePayload as Record<string, unknown>
     )
       .then(() => {
-        // ponytail #7: whitelist mutation → invalidate semua consumer (RSS per-page cache harus bust)
+        //
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(false) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(true) });
         queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });

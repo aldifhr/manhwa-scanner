@@ -18,20 +18,17 @@ _HEADERS = {"User-Agent": "DiscordBot (https://github.com/aldifhr/be-ag-py, 1.0)
 # Shared httpx client for Discord API (avoids socket churn)
 _discord_client: httpx.Client | None = None
 
-
 def _get_discord_client() -> httpx.Client:
     global _discord_client
     if _discord_client is None:
         _discord_client = httpx.Client(timeout=10, headers=_HEADERS)
     return _discord_client
 
-
 def close_discord_client() -> None:
     global _discord_client
     if _discord_client is not None:
         _discord_client.close()
         _discord_client = None
-
 
 def verify_interaction(raw_body: bytes, signature: str, timestamp: str) -> bool:
     """Verify Ed25519 signature from Discord."""
@@ -53,7 +50,6 @@ def verify_interaction(raw_body: bytes, signature: str, timestamp: str) -> bool:
         logger.error("verify_interaction error", exc=e)
         return False
 
-
 def _decode_discord_public_key(pk: str) -> bytes:
     """Decode Discord public key — handles both hex and base64url formats."""
     try:
@@ -73,7 +69,6 @@ def _decode_discord_public_key(pk: str) -> bytes:
         pass
     raise ValueError(f"Unable to decode Discord public key (len={len(pk)})")
 
-
 def verify_interaction_v2(raw_body: bytes, signature: str, timestamp: str) -> bool:
     """Verify Ed25519 signature from Discord — handles base64url PK format."""
     if not settings.DISCORD_PUBLIC_KEY:
@@ -92,13 +87,12 @@ def verify_interaction_v2(raw_body: bytes, signature: str, timestamp: str) -> bo
         logger.error("verify_interaction error", exc=e)
         return False
 
-
 def _discord_request(method: str, url: str, *, json_data: dict | None = None, files: dict | None = None, max_retries: int = 3) -> httpx.Response | None:
     """Send a Discord API request with 429 + Retry-After handling.
 
     D1 FIX: Reads Retry-After header on 429, uses exponential backoff with jitter.
     Circuit-aware: fast-fails when discord CB is OPEN.
-    ponytail P1: unknown delivery — Discord menerima tapi timeout sebelum response → retry duplicate
+
     → jangan retry timeout (httpx.TimeoutException) — return None (unknown) biar caller tidak double-send
     """
     if not cb_discord.allow():
@@ -135,7 +129,6 @@ def _discord_request(method: str, url: str, *, json_data: dict | None = None, fi
                 cb_discord.record_failure()
             return r
         except Exception as e:
-            # ponytail P1: timeout/connection after server accepted → unknown delivery → jangan retry (avoid duplicate)
             msg = str(e).lower()
             is_timeout = isinstance(e, httpx.TimeoutException) or "timeout" in msg or "timed out" in msg or "readtimeout" in msg
             cb_discord.record_failure()
@@ -150,20 +143,18 @@ def _discord_request(method: str, url: str, *, json_data: dict | None = None, fi
     cb_discord.record_failure()
     return None
 
-
 def send_channel_message(channel_id: str, content: str | None = None, embeds: list | None = None):
     """Send a message to a channel via bot token.
 
     Primary path: Discord REST API. If that fails (e.g. VPS IP banned at
     the REST layer — Cloudflare 1010 / Discord 40333), fall back to the
     gateway websocket sender.
-    ponytail P1: REST→gateway duplicate risk — jika REST timeout unknown, jangan fallback (sudah maybe delivered)
+
     """
     try:
         r = _discord_request("POST", f"https://discord.com/api/v10/channels/{channel_id}/messages", json_data=_build_payload(content, embeds))
         if r is not None and r.status_code < 400:
             return r.json()
-        # ponytail: hanya fallback pada 403/banned, bukan timeout/5xx unknown
         if r is not None and r.status_code not in (403, 404):
             # 429 sudah di-handle di _discord_request, 5xx sudah return r (bukan None) → jangan gateway
             if r.status_code >= 500 or r.status_code == 429:
@@ -186,7 +177,6 @@ def send_channel_message(channel_id: str, content: str | None = None, embeds: li
         logger.error("send_channel_message gateway fallback failed", channel=channel_id, err=str(e)[:160])
     return None
 
-
 def _build_payload(content, embeds):
     payload: dict = {}
     if content is not None:
@@ -194,8 +184,6 @@ def _build_payload(content, embeds):
     if embeds:
         payload["embeds"] = embeds
     return payload
-
-
 
 def send_channel_message_with_attachments(
     channel_id: str,

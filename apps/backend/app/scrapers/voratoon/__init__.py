@@ -16,7 +16,6 @@ from app.services.resilience import cb_voratoon
 logger = get_logger("scraper:voratoon")
 
 def _base_url() -> str:
-    # ponytail P1 SSRF: validate base URL once
     from app.utils.ssrf import assert_allowed_url
     _b = settings.VORATOON_API_URL.rstrip("/")
     assert_allowed_url(_b)
@@ -25,23 +24,19 @@ TIMEOUT = 30.0
 _CLIENTS: dict[int, httpx.Client] = {}
 _CLIENTS_LOCK = threading.Lock()
 
-
 def _client() -> httpx.Client:
     key = threading.get_ident()
     with _CLIENTS_LOCK:
         return _CLIENTS.setdefault(key, httpx.Client(timeout=TIMEOUT))
 
-
 def _get(url: str, **kwargs):
     return _client().get(url, **kwargs)
-
 
 def _parse_chapter_number(index: int | None) -> float:
     try:
         return float(index) if index is not None else 0.0
     except (TypeError, ValueError):
         return 0.0
-
 
 def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dict]:
     """Fetch series list filtered by format (manhwa/manhua)."""
@@ -71,7 +66,6 @@ def fetch_series(page: int = 1, take: int = 50, fmt: str = "manhwa") -> list[dic
         logger.error("voratoon series failed", exc=e)
         raise RuntimeError("Voratoon series fetch failed") from e
 
-
 def fetch_series_detail(slug: str) -> dict | None:
     """Fetch single series detail with 5 latest chapters."""
     url = f"{_base_url()}/series/{slug}"
@@ -96,7 +90,6 @@ def fetch_series_detail(slug: str) -> dict | None:
         cb_voratoon.record_failure()
         logger.error("voratoon detail failed", exc=e)
         raise RuntimeError("Voratoon detail fetch failed") from e
-
 
 def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
     """Fetch chapters for a series.
@@ -129,7 +122,6 @@ def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
         logger.error("voratoon chapters failed", exc=e)
         raise RuntimeError("Voratoon chapters fetch failed") from e
 
-
 def _build_synopsis_cache() -> dict[str, str]:
     """Build a slug→synopsis cache from the series list (both formats)."""
     cache: dict[str, str] = {}
@@ -149,7 +141,6 @@ def _build_synopsis_cache() -> dict[str, str]:
                 break
             page += 1
     return cache
-
 
 def get_voratoon_synopsis(slug: str, title: str = "") -> str:
     """Get synopsis for a voratoon series — tries multiple lookup strategies."""
@@ -179,7 +170,6 @@ def get_voratoon_synopsis(slug: str, title: str = "") -> str:
                     return s_synopsis
 
     return ""
-
 
 def collect_voratoon() -> list[dict]:
     """Collect recent chapters from Voratoon (manhwa + manhua).
@@ -289,7 +279,6 @@ def collect_voratoon() -> list[dict]:
     logger.info("voratoon collect done", chapters=len(results))
     return results
 
-
 def _emit_series(results: list[dict], s: dict) -> None:
     """Emit up to takeChapter recent chapters for one voratoon series dict."""
     data = s.get("data", {})
@@ -297,7 +286,6 @@ def _emit_series(results: list[dict], s: dict) -> None:
     title = data.get("title", "")
     if not slug:
         return
-    # ponytail: filter JP — skip manga/JP origin (these are Japanese, not KR/CN)
     _fmt = str(data.get("format") or "").lower()
     _orig_raw = str(data.get("origin") or data.get("country") or "").upper()
     if _fmt == "manga" or _fmt == "jp" or _orig_raw == "JP":
@@ -328,7 +316,7 @@ def _emit_series(results: list[dict], s: dict) -> None:
             "rating": float(rating) if rating else 0.0,
             "genres": genres,
             "type": fmt if fmt in ("manhwa", "manhua", "manga") else "manga" if fmt == "mangatoon" else "",
-            "origin": "CN" if fmt == "manhua" else "KR" if fmt == "manhwa" else "", # ponytail: unknown fmt → "" not KR (was leaking voratoon CN→KR)
+            "origin": "CN" if fmt == "manhua" else "KR" if fmt == "manhwa" else "",
             "updated_time": _created,
             "release_date": _created,
             "created_at": datetime.now(timezone.utc).isoformat(),

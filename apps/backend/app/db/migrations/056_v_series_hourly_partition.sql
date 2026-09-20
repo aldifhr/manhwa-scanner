@@ -1,5 +1,4 @@
 -- 056_v_series_hourly_partition.sql — 10 final
--- ponytail: v_series hourly CONCURRENTLY refresh (was 7d), recent_chapters PARTITION prep
 
 -- Ensure v_series is MATERIALIZED (if still VIEW from 053, convert)
 DO $$ BEGIN

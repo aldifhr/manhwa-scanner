@@ -13,7 +13,6 @@ Why this exists (decoupled from the per-minute chapter collect):
 
 It is idempotent: re-running only refreshes rows, never duplicates.
 
-ponytail: series_meta is canonical single source for static fields (cover/rating/genres/description/type/origin); whitelist + recent_chapters are consumers. Sync populates canonical via bulk upsert on (title_key,source) from both whitelist and recent_chapters distinct keys — no view, rss prioritizes sm>it>wl. Do not add per-row static writes elsewhere.
 """
 from __future__ import annotations
 
@@ -31,7 +30,6 @@ logger = get_logger("cron:series-meta-sync")
 _INTER_FETCH_DELAY = 1.0
 _MAX_PER_RUN = 2000  # safety cap; distinct series is ~85 so we never hit this
 
-
 def _fetch_meta(source: str, sid: str) -> dict:
     """Fetch one series' meta via the scraper (same path collect used)."""
     if source == "ikiru":
@@ -41,7 +39,6 @@ def _fetch_meta(source: str, sid: str) -> dict:
         from app.scrapers import shinigami as _sh
         return _sh.get_shinigami_series_meta(sid) or {}
     return {}
-
 
 def _slug_for(source: str, title_key: str) -> str | None:
     """Resolve the source-specific id/slug for a (title_key, source) pair.
@@ -68,7 +65,6 @@ def _slug_for(source: str, title_key: str) -> str | None:
     except Exception:
         pass
     return None
-
 
 def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
     """Fetch + upsert series_meta for every distinct (title_key, source).
@@ -109,7 +105,6 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
             slug = tk
         slug_map[key] = slug
 
-    # ponytail: also seed from whitelist so new subs without chapters yet still bootstrap series_meta
     try:
         wl_rows = sb.table("whitelist").select("title_key, source, series_url").limit(5000).execute().data or []
         for r in wl_rows:
@@ -142,7 +137,6 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
         except Exception:
             meta = {}
         if meta:
-            # ponytail: series_meta canonical single source; whitelist does not store static fields — sync is sole writer
             payloads.append(
                 {
                     "title_key": tk,
@@ -177,7 +171,6 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
                     failed += 1
             updated = updated - failed if updated else 0
 
-    # ponytail: refresh MATERIALIZED VIEW CONCURRENTLY if materialized — no-op if still plain VIEW; CONCURRENTLY needs UNIQUE INDEX on (title_key, source)
     try:
         from app.db import q as _q
         _q("REFRESH MATERIALIZED VIEW CONCURRENTLY v_series")
@@ -194,7 +187,6 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
     }
     logger.info("series_meta sync done", **stats)
     return stats
-
 
 if __name__ == "__main__":
     import os

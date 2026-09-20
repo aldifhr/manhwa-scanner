@@ -3,7 +3,6 @@ ALTER TABLE dispatch_history ADD COLUMN IF NOT EXISTS fcfs_key text;
 CREATE INDEX IF NOT EXISTS idx_dispatch_history_fcfs_key
   ON dispatch_history (fcfs_key);
 
--- ponytail: fresh DB (Windows) belum punya chapter_title sampai 011, jadi guard biar gak fail di fresh install (VPS prod sudah punya kolom, tetap backfill)
 DO $$
 BEGIN
   IF EXISTS (

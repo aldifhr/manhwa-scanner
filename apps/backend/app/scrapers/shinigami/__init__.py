@@ -39,7 +39,6 @@ _HEADERS = {
 # _get() call. httpx.Client is thread-safe (internal connection pool).
 _CLIENT = httpx.Client(timeout=TIMEOUT, headers=_HEADERS, verify=True)
 
-
 def _get(path: str, retries: int = 4):
     from app.utils.ssrf import assert_allowed_url
     assert_allowed_url(f"{API}{path}")
@@ -72,7 +71,6 @@ def _get(path: str, retries: int = 4):
         logger.debug("Shinigami fetch failed", path=path, err=str(e))
     return None
 
-
 def search_shinigami_api(query: str, per_page: int = 20):
     q = query.replace("/", " ")
     data = _get(f"/manga/list?q={q}&page=1&page_size={per_page}")
@@ -82,14 +80,12 @@ def search_shinigami_api(query: str, per_page: int = 20):
         return data
     return []
 
-
 def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: int = 10, hours_cutoff: int = 24):
     """Fetch latest-updates across BOTH manga types (mirror + project).
 
     Uses is_update=true filter but also fetches full catalog (without filter)
     to avoid missing series due to API cache staleness.
 
-    Ponytail: paginasi sampai mentok fresh 24 jam (early-stop), bukan single page.
     Mirip voratoon: stop kalau oldest di page udah lewat cutoff, biar gak miss kalau
     update >24 dalam 24 jam tapi juga gak boros fetch 10 page terus kalau cuma 1 page fresh.
     """
@@ -171,7 +167,6 @@ def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: 
     
     return all_items
 
-
 def get_shinigami_series(manga_id: str):
     data = _get(f"/manga/detail/{manga_id}")
     if not data:
@@ -183,14 +178,12 @@ def get_shinigami_series(manga_id: str):
         logger.warn("Shinigami detail schema invalid", manga_id=manga_id, err=str(exc)[:200])
         raise RuntimeError("Shinigami detail schema invalid") from exc
 
-
 def _country_to_type(country_id: str | None) -> str | None:
     """Map shinigami country_id to content type: KR->manhwa, CN->manhua, JP->manga."""
     if not country_id:
         return None
     mapping = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
     return mapping.get(country_id.upper())
-
 
 def get_shinigami_series_meta(manga_id: str) -> dict | None:
     """Normalize shinigami series detail into a flat metadata dict for
@@ -232,7 +225,6 @@ def get_shinigami_series_meta(manga_id: str) -> dict | None:
         "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_SERIES_PATH}{manga_id}",
     }
 
-
 def get_shinigami_chapters(manga_id: str, per_page: int = 100) -> list[dict]:
     """Fetch chapter list for a shinigami manga. Returns list of
     dicts with chapter_number and chapter_id. Alias of the
@@ -240,7 +232,6 @@ def get_shinigami_chapters(manga_id: str, per_page: int = 100) -> list[dict]:
     backfill scripts)."""
     all_ch: list[dict] = []
     seen_ids: set[str] = set()
-    # ponytail: shinigami API page_size max 100, but may return fewer under CF pressure.
     # Paginate until no rows or gap >50 chapters (safety bound).
     for page in range(1, 6):  # max 5 pages = 500 chapters
         data = _get(f"/chapter/{manga_id}/list?page={page}&page_size={per_page}&sort_by=chapter_number&sort_order=desc")

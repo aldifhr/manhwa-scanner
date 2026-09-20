@@ -19,14 +19,11 @@ _counters: dict[str, int] = defaultdict(int)
 # M1 FIX: Bound the number of counter names to prevent unbounded growth
 MAX_COUNTERS = 200
 
-
 def inc(name: str, by: int = 1) -> None:
     with _lock:
         _counters[name] += by
-        # ponytail: sorted prune → clear (same bound, O(1) not O(n log n)), restore LRU prune when counter loss matters
         if len(_counters) > MAX_COUNTERS:
             _counters.clear()
-
 
 def snapshot() -> dict:
     with _lock:

@@ -8,7 +8,6 @@ logger = get_logger("storage:health")
 
 APP_START_TS = _time.time()
 
-
 def save_source_health_map(health_map: dict) -> None:
     """Batch upsert source health rows.
 
@@ -66,7 +65,6 @@ def save_source_health_map(health_map: dict) -> None:
     except Exception as e:
         logger.error("saveSourceHealthMap upsert error", exc=e)
 
-
 def load_source_health_map(keys: list[str]) -> dict:
     try:
         res = (
@@ -83,7 +81,6 @@ def load_source_health_map(keys: list[str]) -> dict:
     except Exception as e:
         logger.error("loadSourceHealthMap failed", exc=e)
         return {}
-
 
 def write_cron_status(status: str, chapters_sent: int = 0, matched: int = 0, duration: float | None = None) -> None:
     try:
@@ -103,7 +100,6 @@ def write_cron_status(status: str, chapters_sent: int = 0, matched: int = 0, dur
     except Exception as e:
         logger.error("writeCronStatus failed", exc=e)
 
-
 def write_dashboard_snapshot(payload: dict) -> None:
     """Persist the computed dashboard payload as a singleton row.
 
@@ -112,7 +108,6 @@ def write_dashboard_snapshot(payload: dict) -> None:
     reads this 1 row (~20ms) instead of recomputing 5 parallel
     Supabase queries (~3s). Event-driven: only cron writes.
 
-    ponytail: Redis primary (600s TTL), Supabase backup.
     """
     from datetime import datetime, timezone
 
@@ -147,7 +142,6 @@ def write_dashboard_snapshot(payload: dict) -> None:
         else:
             logger.error("write_dashboard_snapshot supabase backup failed", exc=e)
 
-
 def read_dashboard_snapshot() -> dict | None:
     """Read the persisted singleton snapshot row, or None if absent/stale.
 
@@ -155,7 +149,6 @@ def read_dashboard_snapshot() -> dict | None:
     down or failed) and returns None so the caller falls back to live DB
     queries instead of serving outdated dashboard data.
 
-    ponytail: Redis primary, Supabase backup.
     """
     from datetime import datetime, timezone
     from app.config import settings as _rds

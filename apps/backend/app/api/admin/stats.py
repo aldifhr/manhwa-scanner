@@ -1,4 +1,4 @@
-"""Auto-split from dashboard.py — ponytail: 498L stats snapshot (distinct from analytics 392L), merge when stats+analytics share same aggregation. Auto-split from dashboard.py — stats routes."""
+"""Auto-split from dashboard.py"""
 import time
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request
@@ -20,10 +20,8 @@ router = APIRouter()
 _SNAP_CACHE: list = [0.0, None]
 _SNAP_TTL = 15.0
 
-
 @router.get("/sources/health")
 async def sources_health(request: Request):
-    # ponytail: public GET for navbar Operation Stale dot — cacheable but not shared
     _now = time.monotonic()
     if _SRC_HEALTH_CACHE[0] is not None and (_now - _SRC_HEALTH_CACHE[0]) < _SRC_HEALTH_TTL:
         return JSONResponse(content=_SRC_HEALTH_CACHE[1], headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
@@ -54,10 +52,8 @@ async def sources_health(request: Request):
     _SRC_HEALTH_CACHE[1] = payload
     return JSONResponse(content=payload, headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
 
-
 @router.get("/dashboard-snapshot")
 async def dashboard_snapshot(request: Request):
-    # ponytail: public GET for anon dashboard — allow stale-while-revalidate, private karena bisa berisi queue info
     # 15s in-memory cache — frontend polls every 30-60s, so this absorbs
     # duplicate bursts and cuts Supabase query volume by ~60%.
     now = time.monotonic()
@@ -82,7 +78,6 @@ async def dashboard_snapshot(request: Request):
         if _SNAP_CACHE[1] is not None:
             return JSONResponse(content=_SNAP_CACHE[1], headers={"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"})
         raise
-
 
 async def _build_snapshot() -> dict:
     from app.storage import whitelist as wl_store
@@ -503,7 +498,6 @@ async def _build_snapshot() -> dict:
     _SNAP_CACHE[0] = time.monotonic()
     _SNAP_CACHE[1] = payload
     return payload
-
 
 def build_snapshot_sync() -> dict:
     """Run the (async) snapshot builder from a sync context (cron).

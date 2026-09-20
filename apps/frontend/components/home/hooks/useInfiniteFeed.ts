@@ -7,7 +7,7 @@ import { useToast } from "@/lib/useToast";
 import type { FlatChapter } from "@/lib/feed";
 import { compareFlatByNewest, chapterKey } from "@/lib/feed";
 
-// ponytail: public /rss hard cap 100 — tanpa useInfiniteQuery (sering crash .length di Turbopack)
+//
 // pakai useQuery single-page + manual append untuk page 2+ (stabil, tidak sentuh data.pages.length internal)
 const PAGE_SIZE = 100;
 

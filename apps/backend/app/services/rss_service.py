@@ -9,7 +9,6 @@ from app.services.rss_query import build_filter, map_result
 
 logger = get_logger("services:rss_service")
 
-
 def _fetch_rss_data_sync(
     *,
     cutoff: str,
@@ -31,7 +30,6 @@ def _fetch_rss_data_sync(
     fetch_limit: int = 1000,
 ):
     """Sync core — all psycopg2 calls block; run via to_thread from async wrapper."""
-    # ponytail: 5 scans → now 4 scoped queries (rc filtered in DB, wl/sm/dh IN rc_tks ≤300); full scan kept as fallback until IN coverage proven. Next step: single SQL JOIN via v_series view + NOT EXISTS excluded when rows grow.
     from app.db import get_supabase
 
     sb = get_supabase()
@@ -71,7 +69,7 @@ def _fetch_rss_data_sync(
                 _params.append(origin_f.upper())
             if exclude_origin:
                 for _o in [e.strip().upper() for e in exclude_origin.split(",") if e.strip()]:
-                    _where.append("(rc.origin != %s OR rc.origin IS NULL)")  # ponytail: NULL origin not excluded — upgrade to `(rc.origin != %s OR rc.origin IS NULL)` if DB strips NULLs (build_filter uses "" so shown)
+                    _where.append("(rc.origin != %s OR rc.origin IS NULL)")
                     _params.append(_o)
             if type_f:
                 _where.append("rc.type = %s")
@@ -98,7 +96,6 @@ def _fetch_rss_data_sync(
         except Exception as _e:
             logger.warn("exclude_notified SQL failed, falling back to unfiltered", err=str(_e)[:160])
 
-    # ponytail: was 5 full-table scans (wl+sm+dh+excluded) → Python filter; now scoped to rc title_keys (≤fetch_limit=300) to bound DB→Python rows
     _rc_tks = list({str(r.get("title_key") or "") for r in rc_rows if r.get("title_key")})
     wl_rows = []
     try:
@@ -201,11 +198,9 @@ def _fetch_rss_data_sync(
             pass
     return results, wl_map, sm_map, dh_sent
 
-
 async def fetch_rss_data(*args, **kwargs):
     """Async wrapper — offloads sync psycopg2 to thread pool so event loop not blocked.
 
-    ponytail: Option A (to_thread) minimal change; Option B asyncpg migration later when scraper-heavy load grows.
     Keeps same signature as sync core for drop-in await compatibility (rss.py await fetch_rss_data).
     """
     return await asyncio.to_thread(lambda: _fetch_rss_data_sync(*args, **kwargs))

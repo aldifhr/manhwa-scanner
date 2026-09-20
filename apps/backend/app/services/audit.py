@@ -3,7 +3,6 @@
 Table: audit_log (064_audit_log.sql)
 Actions: WHITELIST_ADD, WHITELIST_UPDATE, WHITELIST_DELETE, DISPATCH, CRON_TRIGGER, QUEUE_RETRY, QUEUE_CLEAR, etc.
 
-ponytail: single insert helper, no read model yet — add GET /audit-log when UI needs forensic view.
 """
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ from typing import Any
 from app.logger import get_logger
 
 logger = get_logger("services:audit")
-
 
 class AuditAction:
     WHITELIST_ADD = "WHITELIST_ADD"
@@ -32,7 +30,6 @@ class AuditAction:
     SETTINGS_UPDATE = "SETTINGS_UPDATE"
     CONTINUE_READING_PUT = "CONTINUE_READING_PUT"
     CONTINUE_READING_MARK_READ = "CONTINUE_READING_MARK_READ"
-
 
 def _extract_request_meta(request) -> dict[str, str]:
     """Extract actor/ip/user_agent from Request without raising."""
@@ -53,7 +50,6 @@ def _extract_request_meta(request) -> dict[str, str]:
         return {"ip": ip[:45], "user_agent": ua, "actor": actor[:100]}
     except Exception:
         return {"ip": "", "user_agent": "", "actor": "unknown"}
-
 
 def log_action(
     action: str,
@@ -117,7 +113,6 @@ def log_action(
                     logger.warn("audit insert failed", action=action, err=str(e2)[:200])
     except Exception as e:
         logger.warn("audit log_action failed", action=action, err=str(e)[:200])
-
 
 def log_action_sync(*args, **kwargs) -> None:
     """Alias for sync callers that cannot await."""

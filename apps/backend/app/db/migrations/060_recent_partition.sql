@@ -1,5 +1,4 @@
 -- 060_recent_partition.sql — recent 24h PARTITION BY RANGE(updated_time) fisik
--- ponytail: 97 rows now, prune DELETE 0.5s -> DROP PARTITION 0.01s when >50k; minimal: create p2025+ template, keep DELETE fallback
 
 -- 1) Create new partitioned table (if not already partitioned)
 DO $$ BEGIN

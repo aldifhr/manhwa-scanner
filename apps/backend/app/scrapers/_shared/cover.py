@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit, urlunsplit
 
-
 # AWS presign param names we strip (case-insensitive).
 # Includes the full set MinIO/S3 can emit, not just the signature-bearing
 # ones — e.g. X-Amz-Content-Sha256=UNSIGNED-PAYLOAD, x-amz-checksum-mode,
@@ -33,7 +32,6 @@ _AMZ_PARAMS = (
     "x-id",
 )
 
-
 def scrub_cover(url: str | None) -> str:
     """Return a safe cover URL for the client.
 
@@ -42,7 +40,7 @@ def scrub_cover(url: str | None) -> str:
       (presigned params intact) through /api/v1/reader/proxy?url=<encoded>.
     - ikiru/shinigami covers are PUBLIC, so we strip the AWS presign noise and
       return the bare host/path (client can fetch directly or via proxy).
-    ponytail: contract — voratoon returns proxy?url= (presigned intact), others bare; frontend lib/cover expects this split.
+
     """
     if not url or not isinstance(url, str):
         return url or ""
@@ -50,7 +48,6 @@ def scrub_cover(url: str | None) -> str:
         return url
     from urllib.parse import quote
 
-    # Voratoon: private bucket -> serve presigned URL directly via proxy?url= (ponytail: matches frontend isDirectAllowed + X-Amz- proxy rule)
     # S3 presigned URLs are CORS-open and short-lived (6 days), so serving them
     # direct avoids an extra hop and 403 (signature mismatch when re-encoded).
     from app.config import settings as _cfg
@@ -71,7 +68,6 @@ def scrub_cover(url: str | None) -> str:
     except Exception:
         # On any parse failure, fall back to returning the original URL.
         return url
-
 
 _cover_ref_cache: dict[str, tuple[float, str]] = {}
 _cover_ref_ttl = 60.0  # cache IO to avoid N+1 when called in loops
@@ -124,7 +120,6 @@ def cover_ref(title_key: str | None) -> str:
         pass
     _cover_ref_cache[tk] = (_t.monotonic(), "")
     return ""
-
 
 def batch_cover_ref(title_keys: list[str]) -> dict[str, str]:
     """Batch cover lookup — WHERE title_key IN (...) once, not N queries."""

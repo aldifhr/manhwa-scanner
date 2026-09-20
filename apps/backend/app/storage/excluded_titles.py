@@ -5,7 +5,6 @@ feed and SKIPPED by the cron collector so it is never scraped/dispatched.
 
 Keyed by composite (title_key, source); source='all' blocks every source.
 
-ponytail: cover/series_url here are bloat — canonical is series_meta.cover
 (title_key, source) (see 042_db_audit_fix.sql fix 6). JOIN series_meta at
 read time (rss_service sm>it>wl) instead of duplicating. Kept for
 back-compat list_excluded_titles fast path; idx_excluded_titles_source
@@ -24,15 +23,12 @@ from app.utils.text import slugify_title_key
 
 logger = get_logger("storage:excluded-titles")
 
-# ponytail: single source from config, hardcode drifts when new source added
 from app.config import settings as _cfg
 _VALID_SOURCES = ("all", "ikiru", "shinigami", "voratoon")
-
 
 def _norm_source(src: str) -> str:
     s = (src or "all").strip().lower()
     return s if s in _VALID_SOURCES else "all"
-
 
 # In-memory cache: load_excluded_keys is called in hot paths (rss, collect).
 # DB round-trip ~0.3s; cache 30s. Exclude changes are rare (manual button),
@@ -41,7 +37,6 @@ _CACHE: set[tuple[str, str]] | None = None
 _CACHE_TS: float = 0.0
 _CACHE_TTL = 30.0
 _LOCK = Lock()
-
 
 def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
     """Return set of (title_key, source) pairs that are excluded.
@@ -79,7 +74,6 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
             # First call + DB error → empty set (don't mask outage with stale data)
             return _CACHE if _CACHE is not None else set()
 
-
 def add_excluded_title(
     title_key: str,
     title: Optional[str] = None,
@@ -115,7 +109,6 @@ def add_excluded_title(
         logger.error("add_excluded_title failed", exc=e)
         return {"status": "error", "error": "internal error"}
 
-
 def remove_excluded_title(title_key: str, source: str = "all") -> dict:
     """Delete an excluded-title row."""
     tk = title_key.strip()  # Use as-is to match DB (spaces, not dashes)
@@ -137,7 +130,6 @@ def remove_excluded_title(title_key: str, source: str = "all") -> dict:
     except Exception as e:
         logger.error("remove_excluded_title failed", exc=e)
         return {"status": "error", "error": "internal error"}
-
 
 def list_excluded_titles() -> list[dict]:
     """Return all excluded-title rows (for the dashboard list)."""
@@ -165,7 +157,6 @@ def list_excluded_titles() -> list[dict]:
                 pass
         logger.error("list_excluded_titles failed", exc=e)
         return []
-
 
 def exclude_all_by_source(source: str) -> dict:
     """Exclude every title currently present in `recent_chapters` for `source`.

@@ -1,5 +1,4 @@
 -- 062_replace_07_with_08.sql — 08.ikiru.wtf 301 -> 08.ikiru.wtf
--- ponytail: 07 cover 301 to 08, REPLACE to avoid redirect hop per image load
 
 UPDATE recent_chapters SET cover = REPLACE(cover, '08.ikiru.wtf', '08.ikiru.wtf') WHERE cover LIKE '%08.ikiru.wtf%';
 UPDATE series_meta SET cover = REPLACE(cover, '08.ikiru.wtf', '08.ikiru.wtf') WHERE cover LIKE '%08.ikiru.wtf%';

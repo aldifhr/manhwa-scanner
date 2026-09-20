@@ -3,7 +3,6 @@ from app.services.rating_utils import normalize_rating
 from app.utils.text import slugify_title_key
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 
-
 def _collect_voratoon_source(latest_sent: dict) -> list[dict]:
     from app.scrapers import voratoon as _voratoon_scraper
     from app.services.scanner_confidence import attach_confidence
@@ -13,7 +12,7 @@ def _collect_voratoon_source(latest_sent: dict) -> list[dict]:
         series_slug = u.get("title_key") or ""
         series_url = u.get("series_url") or ""
         series_cover = u.get("cover") or ""
-        origin = u.get("origin") or "" # ponytail: don't default CN manhua to KR (was leaking CN→KR filter)
+        origin = u.get("origin") or ""
         if not series_slug:
             continue
         ch_str = u.get("chapter") or ""
