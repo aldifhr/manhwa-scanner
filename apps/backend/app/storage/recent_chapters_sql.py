@@ -18,53 +18,7 @@ logger = get_logger("storage:recent-chapters-sql")
 _wl_lock = threading.Lock()
 _existing_rc_lock = threading.Lock()
 
-def prune_older_than(hours: int = 24) -> int:
-    """Delete rows whose updated_time is older than `hours`.
-
-    Keeps the feed strictly within the rolling window (user requirement:
-    "24 jam doang"). Called at the start of every cron run so backlog never
-    accumulates. Returns the number of deleted rows.
-    """
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-    try:
-        from app.db import q as _q
-        # 060 helper: tries DROP PARTITION, returns 0 if not partitioned
-        _dropped = _q("SELECT prune_recent_partition(%s::timestamptz)", [cutoff])
-        if _dropped and _dropped[0].get("prune_recent_partition", 0) > 0:
-            n = int(_dropped[0]["prune_recent_partition"])
-            logger.info("pruned recent_chapters via DROP PARTITION", hours=hours, dropped=n)
-            return n
-    except Exception as _e:
-        logger.debug("prune_recent_partition failed — falling back to DELETE", err=str(_e)[:160])
-    try:
-        sb = get_supabase()
-        res = sb.table("recent_chapters").delete().lt("updated_time", cutoff).execute()
-        n = len(res.data or [])
-        if n:
-            logger.info("pruned recent_chapters older than window", hours=hours, deleted=n)
-        return n
-    except Exception as e:
-        logger.error("prune_older_than failed", exc=e)
-        return 0
-
-def prune_dispatch_history_older_than(hours: int = 24) -> int:
-    """Delete dispatch_history rows older than `hours`.
-
-    Keeps dispatch history strictly within the rolling window.
-    Called at the start of every cron run so backlog never accumulates.
-    Returns the number of deleted rows.
-    """
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-    try:
-        sb = get_supabase()
-        res = sb.table("dispatch_history").delete().lt("sent_at", cutoff).execute()
-        n = len(res.data or [])
-        if n:
-            logger.info("pruned dispatch_history older than window", hours=hours, deleted=n)
-        return n
-    except Exception as e:
-        logger.error("prune_dispatch_history_older_than failed", exc=e)
-        return 0
+from app.storage.recent_chapters_window import prune_older_than, prune_dispatch_history_older_than
 
 def _norm_chapter_num(v) -> str | None:
     """Canonical string form of a chapter number (46 vs 46.0 -> '46')."""
