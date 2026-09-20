@@ -112,6 +112,16 @@ async def catalog_item(title_key: str, request: Request):
         _src = wl_row.get("source") or "ikiru"
         _url = wl_row.get("series_url") or wl_row.get("url") or f"{settings.IKIRU_BASE_URL.rstrip(chr(47))}/manga/{slug}/"
         sources = [{"source": _src, "url": _url}]
+    if not meta and not wl_row and sources:
+        # Fallback: series not in whitelist but exists in recent_chapters
+        _rc_title = ""
+        try:
+            _rc_res = sb.table("recent_chapters").select("title").eq("title_key", title_key).limit(1).execute()
+            if _rc_res.data:
+                _rc_title = _rc_res.data[0].get("title") or ""
+        except Exception:
+            pass
+        meta = {"title_key": title_key, "title": _rc_title or title_key, "cover": "", "source": sources[0].get("source", ""), "series_url": sources[0].get("url", "")}
     if meta or wl_row:
         _resp = {"success": True, "data": {"titleKey": title_key, "title": (meta or {}).get("title") or (wl_row or {}).get("title") or title_key, "cover": scrub_cover((meta or {}).get("cover") or (wl_row or {}).get("cover") or ""), "sources": sources, "metadata": {"status": (meta or {}).get("status") or (wl_row or {}).get("status") or "", "rating": (meta or {}).get("rating") or (wl_row or {}).get("rating") or "", "genres": (meta or {}).get("genres") or (wl_row or {}).get("genres") or [], "description": (meta or {}).get("description") or "", "origin": (meta or {}).get("origin") or (wl_row or {}).get("origin") or ""}, "latestChapter": None}}
         _CATALOG_CACHE[_cache_key] = (_qtime.time(), _resp)
