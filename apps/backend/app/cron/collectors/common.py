@@ -37,6 +37,45 @@ _SHINIGAMI_META_CACHE_MAX = 512
 # Policy: <6h pakai cache/DB, >=6h refresh upstream, gagal → stale cache (cover/rating 6-24h wajar)
 _SERIES_META_TTL_S = 6 * 3600  # 6h (cover/rating/genre boleh 6-24h)
 
+# Redis mirror for cross-worker cache (fallback to in-memory when REDIS_URL empty or redis down)
+def _redis() -> object | None:
+    try:
+        from app.config import settings as _s
+        if not getattr(_s, "REDIS_URL", ""):
+            return None
+        import redis  # type: ignore
+        return redis.Redis.from_url(_s.REDIS_URL, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
+    except Exception:
+        return None
+
+def _redis_get_meta(source: str, sid: str) -> dict | None:
+    try:
+        _r = _redis()
+        if not _r:
+            return None
+        raw = _r.get(f"series_meta:{source}:{sid}")
+        if not raw:
+            return None
+        import json as _js
+        data = _js.loads(raw) if isinstance(raw, str) else raw
+        # check TTL via stored updated_at
+        if _is_series_meta_stale(data.get("updated_at")):
+            return None
+        return data
+    except Exception:
+        return None
+
+def _redis_set_meta(source: str, sid: str, meta: dict) -> None:
+    try:
+        _r = _redis()
+        if not _r:
+            return
+        import json as _js
+        # store with 6h TTL (same as in-memory)
+        _r.setex(f"series_meta:{source}:{sid}", int(_SERIES_META_TTL_S), _js.dumps(meta))
+    except Exception:
+        pass
+
 def _is_series_meta_stale(updated_at: str | None) -> bool:
     if not updated_at:
         return True
@@ -122,6 +161,7 @@ def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
                         # use tk as sid key for cache (both sid and tk forms)
                         with _CHAPTER_CACHE_LOCK:
                             cache[tk] = (now, r)
+                        _redis_set_meta(src, tk, r)
         except Exception:
             pass
 
@@ -138,6 +178,12 @@ def _cached_series_meta(source: str, sid: str) -> dict:
         c = cache.get(sid)
         if c and (now - c[0]) < ttl:
             return c[1]
+    # Redis cross-worker check (before hitting DB)
+    _rm = _redis_get_meta(source, sid)
+    if _rm is not None:
+        with _CHAPTER_CACHE_LOCK:
+            cache[sid] = (now, _rm)
+        return _rm
     _key = sid
     _stale_db_row: dict | None = None
     try:
@@ -158,6 +204,7 @@ def _cached_series_meta(source: str, sid: str) -> dict:
                 if not _is_series_meta_stale(_e.get("updated_at")):
                     with _CHAPTER_CACHE_LOCK:
                         cache[sid] = (now, _e)
+                    _redis_set_meta(source, sid, _e)
                     return _e
                 # stale → simpan untuk fallback jika refresh gagal
                 _stale_db_row = _e
@@ -196,6 +243,7 @@ def _cached_series_meta(source: str, sid: str) -> dict:
                 if len(cache) > mx:
                     for _k in list(cache)[: len(cache) - mx]:
                         cache.pop(_k, None)
+            _redis_set_meta(source, sid, meta)
             return meta
         except Exception:
             pass
@@ -205,6 +253,7 @@ def _cached_series_meta(source: str, sid: str) -> dict:
             if len(cache) > mx:
                 for _k in list(cache)[: len(cache) - mx]:
                     cache.pop(_k, None)
+        _redis_set_meta(source, sid, meta)
         return meta
     # Refresh gagal atau tidak ada upstream meta → fallback stale DB jika ada
     if _stale_db_row is not None:
@@ -213,6 +262,7 @@ def _cached_series_meta(source: str, sid: str) -> dict:
             if len(cache) > mx:
                 for _k in list(cache)[: len(cache) - mx]:
                     cache.pop(_k, None)
+        _redis_set_meta(source, sid, _stale_db_row)
         return _stale_db_row
     # Tidak ada DB dan upstream gagal → cache empty
     with _CHAPTER_CACHE_LOCK:
