@@ -15,24 +15,15 @@ from app.utils.origin import normalize_origin
 
 logger = get_logger("storage:recent-chapters-sql")
 
-_wl_lock = threading.Lock()
-_existing_rc_lock = threading.Lock()
-
 from app.storage.recent_chapters_window import prune_older_than, prune_dispatch_history_older_than
-
-def _norm_chapter_num(v) -> str | None:
-    """Canonical string form of a chapter number (46 vs 46.0 -> '46')."""
-    try:
-        return ("%.10g" % float(v))
-    except (ValueError, TypeError):
-        return None
+from app.storage.recent_chapters_caches import (
+    _load_existing_rc,
+    _get_wl_origins,
+    invalidate_whitelist_origin_cache,
+    _norm_chapter_num,
+)
 
 def _composite_key(r: dict) -> tuple[str, str, str] | None:
-    """(title_key, source, chapter_num) — the WITHIN-source unique key.
-
-    For unnumbered chapters (one-shots), returns (title_key, source, 'oneshot')
-    so duplicates from same title+source are still deduped.
-    """
     tk = r.get("title_key") or ""
     src = r.get("source") or ""
     cn = _norm_chapter_num(r.get("chapter_num"))
@@ -41,103 +32,6 @@ def _composite_key(r: dict) -> tuple[str, str, str] | None:
     if cn is None:
         return (tk, src, "oneshot")
     return (tk, src, cn)
-
-_EXISTING_RC_CACHE: dict[str, tuple[set[str], set[tuple[str, str, str]], float]] = {}
-_EXISTING_RC_TTL = 60.0
-
-def _load_existing_rc(rows: list[dict]) -> tuple[set[str], set[tuple[str, str, str]]]:
-    """Existing recent_chapters rows for this batch.
-
-    Returns (chapter_urls already present, composite (title_key, source,
-    chapter_num) keys already present) so callers can (a) skip re-inserting
-    rows whose URL already exists and (b) skip URL-rotated re-touches of a
-    chapter that already exists under a different URL.
-    """
-    import time as _t
-    existing_urls: set[str] = set()
-    existing_ch: set[tuple[str, str, str]] = set()
-    tks = sorted({(r.get("title_key") or "") for r in rows if r.get("title_key")})
-    if not tks:
-        return existing_urls, existing_ch
-    _key = hashlib.sha256("\x00".join(tks).encode()).hexdigest()
-    with _existing_rc_lock:
-        _cached = _EXISTING_RC_CACHE.get(_key)
-        if _cached and (_t.time() - _cached[2]) < _EXISTING_RC_TTL:
-            return _cached[0], _cached[1]
-    _cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()  # feed window 24h (decoupled from _RECENT_CHAPTERS_RETENTION_DAYS 7d safety net)
-    try:
-        for i in range(0, len(tks), 100):
-            chunk = tks[i:i + 100]
-            res = (
-                get_supabase()
-                .table("recent_chapters")
-                .select("chapter_url, title_key, source, chapter_num")
-                .in_("title_key", chunk)
-                .gte("updated_time", _cutoff)
-                .execute()
-            )
-            for er in (res.data or []):
-                u = er.get("chapter_url") or ""
-                if u:
-                    existing_urls.add(u)  # type: ignore
-                _tk = er.get("title_key") or ""
-                _src = er.get("source") or ""
-                _cn = _norm_chapter_num(er.get("chapter_num"))
-                if _tk and _src and _cn:
-                    existing_ch.add((_tk, _src, _cn))  # type: ignore
-    except Exception as e:
-        logger.error("batchInsertRecentChapters existing lookup failed", exc=e, exc_info=True)
-        raise  # fail-closed: jangan return empty set, biar caller retry
-    # cache store
-    try:
-        import time as _t2
-        with _existing_rc_lock:
-            _EXISTING_RC_CACHE[_key] = (existing_urls, existing_ch, _t2.time())
-            if len(_EXISTING_RC_CACHE) > 64:
-                _EXISTING_RC_CACHE.pop(next(iter(_EXISTING_RC_CACHE)))
-    except Exception:
-        pass
-    return existing_urls, existing_ch
-
-_wl_origins: dict[tuple[str, str], str] = {}
-_WL_ORIGIN_TTL = 600.0
-_WL_ORIGIN_TS = 0.0
-
-def _get_wl_origins(force: bool = False) -> dict[tuple[str, str], str]:
-    """Cached origin map keyed by (title_key, source).
-
-    Reads from series_meta (canonical for static fields including origin),
-    joined against whitelist so only whitelisted titles are returned.
-    """
-    import time as _t
-    global _wl_origins, _WL_ORIGIN_TS
-    with _wl_lock:
-        if not force and _wl_origins and (_t.time() - _WL_ORIGIN_TS) < _WL_ORIGIN_TTL:
-            return _wl_origins
-        try:
-            from app.db import get_supabase as _gsb_wl
-            _sb_wl = _gsb_wl()
-            # Whitelist no longer has origin — read from series_meta (canonical)
-            _wl_rows = _sb_wl.table("series_meta").select("title_key,source,origin").neq("origin", "").execute().data or []
-            _new_origins = {}
-            for _wl in _wl_rows:
-                _tk_wl = str(_wl.get("title_key") or "").strip()
-                _src_wl = str(_wl.get("source") or "").strip()
-                _orig_wl = str(_wl.get("origin") or "").strip().upper()
-                if _tk_wl and _src_wl and _orig_wl:
-                    _new_origins[(_tk_wl, _src_wl)] = _orig_wl
-            _wl_origins = _new_origins
-            _WL_ORIGIN_TS = _t.time()
-        except Exception as _e:
-            logger.warn("series_meta origin refresh failed — using stale cache", err=str(_e)[:160])
-        return _wl_origins
-
-def invalidate_whitelist_origin_cache() -> None:
-    """Call after whitelist add/remove so next batch_insert uses fresh origins."""
-    global _wl_origins, _WL_ORIGIN_TS
-    with _wl_lock:
-        _wl_origins = {}
-        _WL_ORIGIN_TS = 0.0
 
 def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
     """Batch insert chapters. Returns {inserted, failed, deduped} counts."""
