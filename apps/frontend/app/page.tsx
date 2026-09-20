@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeHtml, rewriteCoverUrl, getChapterLabel, safeUrl } from "@/lib/utils";
 import { Reader } from "@/lib/reader";
 import { readerFetch } from "@/lib/reader/transport";
@@ -159,6 +159,14 @@ function HomeGroupedCard({
   const origin = normalizeOrigin(series.origin);
   const t = ((series as any).format ?? series.type ?? "").toString().toLowerCase().trim();
   const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
+  const qc = useQueryClient();
+  const health = useSourcesHealth();
+  const prefetch = () => {
+    const k = series.titleKey;
+    if (!k) return;
+    qc.prefetchQuery({ queryKey: ["catalog-item", k], queryFn: async () => (await fetch(`/api/v1/catalog/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+    qc.prefetchQuery({ queryKey: ["catalog-chapters", k], queryFn: async () => (await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+  };
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
   const [hasRetried, setHasRetried] = useState(false);
   const [imgErrorFinal, setImgErrorFinal] = useState(false);
@@ -167,7 +175,6 @@ function HomeGroupedCard({
     setHasRetried(false);
     setImgErrorFinal(false);
   }, [series.cover]);
-  const health = useSourcesHealth();
   const { trackChapter } = useContinueReading();
   const { readItems, toggleRead } = useReadItems();
   const sCh: GroupedSeries["chapters"] = Array.isArray((series as GroupedSeries)?.chapters) ? (series as GroupedSeries).chapters : [];
@@ -185,7 +192,11 @@ function HomeGroupedCard({
           : "bg-white/90 text-black";
 
   return (
-    <div className="group relative flex gap-4 rounded-2xl border border-white/10 bg-[#111111] p-3 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] sm:gap-5 sm:p-4">
+    <div
+      onMouseEnter={prefetch}
+      onFocusCapture={prefetch}
+      className="group relative flex gap-4 rounded-2xl border border-white/10 bg-[#111111] p-3 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] sm:gap-5 sm:p-4"
+    >
       {/* Cover — visual anchor */}
         <a
         href={safeUrl(series.seriesUrl || sCh[0]?.seriesUrl) || "#"}

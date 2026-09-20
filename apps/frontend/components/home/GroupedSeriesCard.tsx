@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { safeUrl, getChapterLabel } from "@/lib/utils";
 import { decodeHtml } from "@/lib/utils";
 import { ContextMenu } from "@/components/ui/ContextMenu";
@@ -67,6 +68,13 @@ function GroupedSeriesCard({
   onMarkRead?: () => void;
   isSentToDiscord?: boolean;
 }) {
+  const qc = useQueryClient();
+  const prefetch = () => {
+    const k = series.titleKey;
+    if (!k) return;
+    qc.prefetchQuery({ queryKey: ["catalog-item", k], queryFn: async () => (await fetch(`/api/v1/catalog/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+    qc.prefetchQuery({ queryKey: ["catalog-chapters", k], queryFn: async () => (await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+  };
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress((pos) => setMenu(pos));
   const seriesHref = safeUrl(series.seriesUrl) || "#";
@@ -78,7 +86,7 @@ function GroupedSeriesCard({
 
   const first = series.chapters[0];
   return (
-    <>
+    <div onMouseEnter={prefetch} onFocusCapture={prefetch}>
       <SeriesShell
         cover={series.cover}
         title={series.title}
@@ -186,7 +194,7 @@ function GroupedSeriesCard({
           ]}
         />
       )}
-    </>
+    </div>
   );
 }
 

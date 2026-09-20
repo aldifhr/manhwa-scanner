@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSourcesHealth, isHealthy } from "@/hooks/useSourcesHealth";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   title: string;
@@ -80,6 +81,29 @@ function MangaCard({
   );
 
   const health = useSourcesHealth();
+  const qc = useQueryClient();
+  const prefetchDetail = () => {
+    const key = titleKey || id;
+    if (!key) return;
+    qc.prefetchQuery({
+      queryKey: ["catalog-item", key],
+      queryFn: async () => {
+        const r = await fetch(`/api/v1/catalog/${encodeURIComponent(key)}`, { credentials: "include" });
+        if (!r.ok) throw new Error("prefetch");
+        return r.json();
+      },
+      staleTime: 60_000,
+    });
+    qc.prefetchQuery({
+      queryKey: ["catalog-chapters", key],
+      queryFn: async () => {
+        const r = await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(key)}`, { credentials: "include" });
+        if (!r.ok) throw new Error("prefetch");
+        return r.json();
+      },
+      staleTime: 60_000,
+    });
+  };
   const showCover = cover && !imgErr;
   const proxiedCover = showCover ? rewriteCoverUrl(cover) : null;
 
@@ -99,12 +123,26 @@ function MangaCard({
         onClick={(e) => {
           if (!detailUrl && !titleKey) e.preventDefault();
         }}
+        onMouseEnter={prefetchDetail}
+        onFocus={prefetchDetail}
         className="relative flex flex-col h-full"
       >
         {/* Cover */}
         <div className="aspect-3/4 relative overflow-hidden bg-surface-hover">
           {showCover ? (
             <>
+              {/* Blurhash shimmer placeholder */}
+              <div
+                className="absolute inset-0 transition-opacity duration-500"
+                style={{
+                  opacity: imgLoaded ? 0 : 1,
+                  background: `linear-gradient(135deg, #27272a 0%, #3f3f46 50%, #27272a 100%)`,
+                  filter: imgLoaded ? "blur(0px)" : "blur(12px)",
+                }}
+                aria-hidden
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent animate-pulse" />
+              </div>
               <img
                 src={proxiedCover || cover}
                 alt={decodedTitle}

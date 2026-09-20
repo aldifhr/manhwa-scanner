@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { safeUrl, getChapterLabel } from "@/lib/utils";
 import { decodeHtml } from "@/lib/utils";
 import { ContextMenu } from "@/components/ui/ContextMenu";
@@ -67,6 +68,13 @@ function AllCard({
   const seriesHref = safeUrl(item.seriesUrl || item.url) || "#";
   const chapterHref = safeUrl(item.chapterUrl || item.url) || "#";
   const { onTouchStart, onTouchEnd, onTouchMove, wasLongPressed } = useLongPress((pos) => setMenu(pos));
+  const qc = useQueryClient();
+  const prefetch = () => {
+    const k = item.titleKey;
+    if (!k) return;
+    qc.prefetchQuery({ queryKey: ["catalog-item", k], queryFn: async () => (await fetch(`/api/v1/catalog/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+    qc.prefetchQuery({ queryKey: ["catalog-chapters", k], queryFn: async () => (await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+  };
   const { trackChapter } = useContinueReading();
   const origin = normalizeOrigin(item.origin);
   const t = ((item as any).format ?? item.type ?? "").toString().toLowerCase().trim();
@@ -101,7 +109,7 @@ function AllCard({
           : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
 
   return (
-    <>
+    <div onMouseEnter={prefetch} onFocusCapture={prefetch}>
       <SeriesShell
         cover={item.cover}
         title={item.title}
@@ -188,7 +196,7 @@ function AllCard({
           ]}
         />
       )}
-    </>
+    </div>
   );
 }
 
