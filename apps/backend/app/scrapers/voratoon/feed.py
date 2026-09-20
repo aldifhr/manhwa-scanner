@@ -69,6 +69,9 @@ def _emit_series(results: list[dict], s: dict, cutoff: datetime | None = None) -
         if not ch_index:
             continue
         _created = ch.get("createdAt") or ch.get("updatedAt") or ""
+        if not _created:
+            # No timestamp from API — use current UTC time as release_date
+            _created = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         if cutoff is not None and _created:
             try:
                 _ts = datetime.fromisoformat(_created.replace("Z", "+00:00"))
