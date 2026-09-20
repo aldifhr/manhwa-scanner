@@ -25,7 +25,7 @@ type ToastType = "success" | "error" | "info";
 
 /* ── Constants ── */
 
-const DEFAULT_DURATION = 3000;
+const DEFAULT_DURATION = 4000;
 
 /* ── Context ── */
 
