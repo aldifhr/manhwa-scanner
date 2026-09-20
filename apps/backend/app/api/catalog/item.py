@@ -129,6 +129,20 @@ async def catalog_item(title_key: str, request: Request):
             _CATALOG_CACHE.popitem(last=False)
         return JSONResponse(content=_resp)
 
+    # Fallback: UUID whitelist-id → resolve to title_key then fetch
+    import re as _re
+    if _re.match(r"^[0-9a-fA-F-]{36}$", title_key):
+        try:
+            row = sb.table("whitelist").select("title_key, title").eq("id", title_key).limit(1).execute()
+            if row.data:
+                actual_tk = row.data[0].get("title_key")
+                if actual_tk and actual_tk != title_key:
+                    title_key = actual_tk
+                    tk_norm = normalize_title_key(title_key)
+                    slug = slugify_title_key(title_key)
+        except Exception:
+            pass
+
     # Fallback: Shinigami detail by manga_id (UUID) — for Popular today
     import re as _re
     if _re.match(r"^[0-9a-fA-F-]{36}$", title_key):
@@ -157,8 +171,8 @@ async def catalog_item(title_key: str, request: Request):
 
     # Fallback: Voratoon by slug
     try:
-        import httpx as _httpx
-        with _httpx.Client(timeout=8.0) as _c:
+        import httpx as _httpx2
+        with _httpx2.Client(timeout=8.0) as _c:
             r = _c.get(f"{settings.VORATOON_API_URL.rstrip('/')}/series/{title_key}", headers={"Accept": "application/json"})
             if r.status_code == 200:
                 j = r.json()
