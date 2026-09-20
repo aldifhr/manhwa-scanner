@@ -32,6 +32,16 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
     for row in rows:
         if not row.get("chapter_url"):
             continue
+        # Validate release_date — skip rows with missing/invalid timestamp
+        _rd = row.get("release_date")
+        if not _rd or not isinstance(_rd, str) or not _rd.strip():
+            logger.warn("batch_insert: skip row with invalid release_date", title_key=row.get("title_key"), source=row.get("source"), chapter=row.get("chapter"))
+            continue
+        try:
+            datetime.fromisoformat(_rd.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            logger.warn("batch_insert: skip row with unparseable release_date", title_key=row.get("title_key"), source=row.get("source"), release_date=_rd[:80])
+            continue
         _raw_origin = row.get("origin") or row.get("type") or ""
         _src = row.get("source") or ""
         _norm = normalize_origin(_raw_origin)
@@ -155,6 +165,14 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
             if touch_rows:
                 _touch_rows = []
                 for r in touch_rows:
+                    # Validate release_date before touch
+                    _rd_touch = r.get("release_date")
+                    if not _rd_touch or not isinstance(_rd_touch, str) or not _rd_touch.strip():
+                        continue
+                    try:
+                        datetime.fromisoformat(_rd_touch.replace("Z", "+00:00"))
+                    except (ValueError, TypeError):
+                        continue
                     _t = {"chapter_url": r["chapter_url"],"scan_status": "updated","scan_reason": "metadata refreshed","confidence_score": 100}
                     for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type", "release_date"):
                         v = r.get(k)
