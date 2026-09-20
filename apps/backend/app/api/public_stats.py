@@ -65,12 +65,6 @@ def _stats() -> dict:
                GROUP BY 1 ORDER BY 2 DESC"""
         )
         out["chapters_by_source_24h"] = {r["source"]: r["c"] for r in cur.fetchall()}
-        # per-origin breakdown
-        cur.execute(
-            """SELECT COALESCE(NULLIF(origin,''),'other') AS o, COUNT(*) AS c
-               FROM whitelist GROUP BY 1 ORDER BY 2 DESC"""
-        )
-        out["by_origin"] = {r["o"]: r["c"] for r in cur.fetchall()}
         return out
     finally:
         put_conn(conn)
