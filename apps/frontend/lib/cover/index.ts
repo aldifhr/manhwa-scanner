@@ -122,7 +122,10 @@ export function resolveCoverUrl(
           raw = decodeURIComponent(inner);
       } catch {}
       try {
-        if (isDirectAllowed(new URL(raw).hostname) && !raw.includes("X-Amz-")) return putCover(cover, raw);
+        const rawHost = new URL(raw).hostname;
+        // Voratoon presigned X-Amz- URLs — return direct, bypass proxy to avoid 504
+        if (rawHost === "cvr.voratoon.id" && raw.includes("X-Amz-")) return putCover(cover, raw);
+        if (isDirectAllowed(rawHost) && !raw.includes("X-Amz-")) return putCover(cover, raw);
       } catch {}
       return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
     }
