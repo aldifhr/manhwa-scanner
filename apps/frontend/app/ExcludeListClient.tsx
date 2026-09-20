@@ -45,8 +45,6 @@ export function ExcludeListClient() {
   const [sourceFilter, setSourceFilter] = useState("All");
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [bulkSource, setBulkSource] = useState("ikiru");
-  const [bulkLoading, setBulkLoading] = useState(false);
 
   const items: ExcludedTitleItem[] = data ?? [];
 
@@ -161,15 +159,15 @@ export function ExcludeListClient() {
   };
 
   const handleBulk = async () => {
-    if (!bulkSource) return;
-    const ok = window.confirm(`Exclude ALL ${bulkSource} titles from recent (up to 2000)? This will hide them from RSS.`);
+    const src = sourceFilter !== "All" ? sourceFilter : "ikiru";
+    const ok = window.confirm(`Exclude ALL ${src} titles from recent (up to 2000)? This will hide them from RSS.`);
     if (!ok) return;
     const before =
       queryClient.getQueryData<ExcludedTitleItem[]>(queryKeys.excludedTitles) ??
       items;
-    setBulkLoading(true);
+    setBusyKey("bulk");
     try {
-      const res = await Reader.bulkExcludeBySource(bulkSource);
+      const res = await Reader.bulkExcludeBySource(src);
       queryClient.invalidateQueries({ queryKey: queryKeys.excludedTitles });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
       queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
@@ -185,7 +183,7 @@ export function ExcludeListClient() {
           (x) => !beforeSet.has(`${x.titleKey || x.id}:${x.source || "all"}`)
         );
       } catch {}
-      toast(`Excluded ${res.excluded} titles from ${bulkSource}`, {
+      toast(`Excluded ${res.excluded} titles from ${src}`, {
         type: "success",
         action:
           added.length > 0
@@ -265,15 +263,6 @@ export function ExcludeListClient() {
         />
 
         <div className="flex items-center gap-1.5 ml-auto">
-          <Select
-            ariaLabel="Bulk exclude source"
-            value={bulkSource}
-            onChange={(e) => setBulkSource(e.target.value)}
-            options={[
-              { value: "ikiru", label: "ikiru" },
-              { value: "shinigami", label: "shinigami" },
-            ]}
-          />
           <Button
             variant="danger"
             size="sm"
