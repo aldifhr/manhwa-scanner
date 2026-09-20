@@ -4,7 +4,7 @@ from app.logger import get_logger
 from app.services.rating_utils import normalize_rating
 from app.utils.text import slugify_title_key
 from app.scrapers.shinigami import _country_to_type as _country_to_type_fn
-from app.cron.collectors.common import _cached_series_meta
+from app.storage.series_meta import series_meta
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 
 logger = get_logger("cron:collect:shinigami")
@@ -43,7 +43,7 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
         description = (m.get("description") or "").strip()
         _meta_item: dict = {}
         if fetch_meta:
-            _meta_item = _cached_series_meta("shinigami", tk)
+            _meta_item = series_meta.get("shinigami", tk)
         if not rating and isinstance(_meta_item, dict):
             rating = normalize_rating(_meta_item.get("rating")) or 0.0
         if not description and isinstance(_meta_item, dict):
