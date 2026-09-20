@@ -85,23 +85,26 @@ function MangaCard({
   const prefetchDetail = () => {
     const key = titleKey || id;
     if (!key) return;
+    if (qc.getQueryData(["catalog-item", key])) return;
     qc.prefetchQuery({
       queryKey: ["catalog-item", key],
       queryFn: async () => {
         const r = await fetch(`/api/v1/catalog/${encodeURIComponent(key)}`, { credentials: "include" });
-        if (!r.ok) throw new Error("prefetch");
-        return r.json();
+        if (!r.ok) return null;
+        return r.json().catch(() => null);
       },
       staleTime: 60_000,
+      retry: false,
     });
     qc.prefetchQuery({
       queryKey: ["catalog-chapters", key],
       queryFn: async () => {
         const r = await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(key)}`, { credentials: "include" });
-        if (!r.ok) throw new Error("prefetch");
-        return r.json();
+        if (!r.ok) return null;
+        return r.json().catch(() => null);
       },
       staleTime: 60_000,
+      retry: false,
     });
   };
   const showCover = cover && !imgErr;

@@ -1,6 +1,7 @@
 "use client";
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { MagnifyingGlass, ArrowsInSimple, ArrowsOutSimple } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/lib/uiStore";
 
 interface Props {
   localSearch: string;
@@ -19,6 +20,9 @@ export default function AllTabToolbar({
   groupMode,
   toggleGroupMode,
 }: Props) {
+  const density = useUiStore((s) => s.density);
+  const toggleDensity = useUiStore((s) => s.toggleDensity);
+  const isCompact = density === "compact";
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="relative flex-1 min-w-37.5">
@@ -55,6 +59,13 @@ export default function AllTabToolbar({
         )}
       >
         ⛓ Group
+      </button>
+      <button
+        onClick={toggleDensity}
+        title={isCompact ? "Comfortable view" : "Compact view"}
+        className="inline-flex items-center gap-1 text-sm rounded-lg px-3 py-2.5 border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+      >
+        {isCompact ? <ArrowsOutSimple size={14} /> : <ArrowsInSimple size={14} />} {isCompact ? "Comfy" : "Compact"}
       </button>
     </div>
   );

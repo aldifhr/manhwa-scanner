@@ -16,11 +16,14 @@ import {
   MagnifyingGlass,
   Plus,
   CheckCircle,
+  ArrowsInSimple,
+  ArrowsOutSimple,
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
 import { RecommendedSection } from "@/components/home/RecommendedSection";
 import TrendingBar from "@/components/home/TrendingBar";
 import { useReadItems } from "@/components/home/useReadItems";
+import { useUiStore } from "@/lib/uiStore";
 import { useSourcesHealth, isHealthy } from "@/hooks/useSourcesHealth";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -161,6 +164,8 @@ function HomeGroupedCard({
   const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
   const qc = useQueryClient();
   const health = useSourcesHealth();
+  const densityHC = useUiStore((s) => s.density);
+  const isCompactHC = densityHC === "compact";
   const prefetch = () => {
     const k = series.titleKey;
     if (!k) return;
@@ -195,14 +200,14 @@ function HomeGroupedCard({
     <div
       onMouseEnter={prefetch}
       onFocusCapture={prefetch}
-      className="group relative flex gap-4 rounded-2xl border border-white/10 bg-[#111111] p-3 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] sm:gap-5 sm:p-4"
+      className={`group relative flex rounded-2xl border border-white/10 bg-[#111111] transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#161616] hover:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.95)] ${isCompactHC ? "gap-3 p-2.5 sm:gap-4 sm:p-3" : "gap-4 p-3 sm:gap-5 sm:p-4"}`}
     >
       {/* Cover — visual anchor */}
         <a
         href={safeUrl(series.seriesUrl || sCh[0]?.seriesUrl) || "#"}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative block h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-black focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-32"
+        className={`relative block shrink-0 overflow-hidden rounded-xl bg-black focus-visible:ring-2 focus-visible:ring-white ${isCompactHC ? "h-36 w-24 sm:h-40 sm:w-28" : "h-40 w-28 sm:h-44 sm:w-32"}`}
       >
         {coverSrc && !imgErrorFinal ? (
           <>
@@ -408,6 +413,9 @@ export default function HomePage() {
   });
 
   const { optimisticWhitelist, optimisticExcluded, addingKey, handleAddGroup } = useFeedActions();
+  const density = useUiStore((s) => s.density);
+  const toggleDensity = useUiStore((s) => s.toggleDensity);
+  const isCompact = density === "compact";
 
   const [isLoggedInForSnapshot, setIsLoggedInForSnapshot] = useState(false);
   useEffect(() => {
@@ -617,12 +625,21 @@ export default function HomePage() {
         >
           Latest Updates
         </h2>
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/15 transition-colors"
-        >
-          <ArrowClockwise size={12} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => useUiStore.getState().toggleDensity()}
+            title={isCompact ? "Comfortable view" : "Compact view"}
+            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/15 transition-colors"
+          >
+            {isCompact ? <ArrowsOutSimple size={12} /> : <ArrowsInSimple size={12} />} {isCompact ? "Comfy" : "Compact"}
+          </button>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/15 transition-colors"
+          >
+            <ArrowClockwise size={12} /> Refresh
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -657,8 +674,8 @@ export default function HomePage() {
       ) : grouped.length > 14 ? (
         <VirtualizedList
           items={grouped}
-          gap={12}
-          estimateSize={184}
+          gap={isCompact ? 8 : 12}
+          estimateSize={isCompact ? 160 : 184}
           renderItem={(series) => {
             const s = series as GroupedSeries;
             const sCh2 = Array.isArray((s as any)?.chapters) ? (s as any).chapters : [];
@@ -683,7 +700,7 @@ export default function HomePage() {
           }}
         />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className={`flex flex-col ${isCompact ? "gap-2" : "gap-3"}`}>
           {grouped.map((series, i) => {
             const sChMap = Array.isArray((series as any)?.chapters) ? (series as any).chapters : [];
             const isWL =

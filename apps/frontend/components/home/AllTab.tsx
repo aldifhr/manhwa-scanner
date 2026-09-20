@@ -44,6 +44,7 @@ import { useUiUrlSync } from "@/lib/useUiUrlSync";
 import { useDebounced } from "@/lib/useDebounced";
 import { usePacerThrottledScroll } from "@/lib/usePacerThrottles";
 import { PageShell } from "@/components/PageShell";
+import { useSourcesHealth } from "@/hooks/useSourcesHealth";
 import { normalizeTitleKey } from "@/lib/groupChapters";
 import { normalizeType } from "@/lib/feed";
 import { usePinnedSet } from "./hooks/usePinnedSet";
@@ -76,6 +77,8 @@ function AllTabInner() {
   const genreFilter = useUiStore((s) => s.genreFilter);
   const minRating = useUiStore((s) => s.minRating);
   const whitelistOnly = useUiStore((s) => s.whitelistOnly);
+  const density = useUiStore((s) => s.density);
+  const isCompact = density === "compact";
   const setFeed = useUiStore((s) => s.setFeed);
   const toggleGroupMode = useUiStore((s) => s.toggleGroupMode);
   const setSortMode = useUiStore((s) => s.setSortMode);
@@ -515,8 +518,8 @@ function AllTabInner() {
       ) : groupMode ? (
         <VirtualizedList
           items={grouped}
-          gap={12}
-          estimateSize={186}
+          gap={isCompact ? 8 : 12}
+          estimateSize={isCompact ? 160 : 186}
           overscan={6}
           initialScrollOffset={initialScrollOffset}
           scrollToTitleKey={deepLinkSeries}
@@ -587,8 +590,8 @@ function AllTabInner() {
         <VirtualizedList
           items={flatDisplay}
           initialScrollOffset={initialScrollOffset}
-          gap={12}
-          estimateSize={180}
+          gap={isCompact ? 8 : 12}
+          estimateSize={isCompact ? 155 : 180}
           scrollToTitleKey={deepLinkSeries}
           titleKeyOf={(c) => c.titleKey}
           renderItem={(item, i) => {

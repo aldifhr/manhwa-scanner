@@ -71,9 +71,9 @@ function GroupedSeriesCard({
   const qc = useQueryClient();
   const prefetch = () => {
     const k = series.titleKey;
-    if (!k) return;
-    qc.prefetchQuery({ queryKey: ["catalog-item", k], queryFn: async () => (await fetch(`/api/v1/catalog/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
-    qc.prefetchQuery({ queryKey: ["catalog-chapters", k], queryFn: async () => (await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
+    if (!k || qc.getQueryData(["catalog-item", k])) return;
+    qc.prefetchQuery({ queryKey: ["catalog-item", k], queryFn: async () => { const r = await fetch(`/api/v1/catalog/${encodeURIComponent(k)}`, { credentials: "include" }); if (!r.ok) return null; return r.json().catch(() => null); }, staleTime: 60_000, retry: false });
+    qc.prefetchQuery({ queryKey: ["catalog-chapters", k], queryFn: async () => { const r = await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(k)}`, { credentials: "include" }); if (!r.ok) return null; return r.json().catch(() => null); }, staleTime: 60_000, retry: false });
   };
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const { onTouchStart, onTouchEnd, onTouchMove } = useLongPress((pos) => setMenu(pos));

@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 type Feed = "all" | "nowl" | "wl";
 type SortMode = "newest" | "title";
 type ContentView = "all" | "fav";
+type Density = "compact" | "comfortable";
 
 interface UiState {
   feed: Feed;
@@ -16,6 +17,7 @@ interface UiState {
   genreFilter: string | null;
   minRating: string | null;
   whitelistOnly: boolean;
+  density: Density;
   _hasHydrated: boolean;
   setHasHydrated: (v: boolean) => void;
   setFeed: (f: Feed) => void;
@@ -28,6 +30,8 @@ interface UiState {
   setGenreFilter: (g: string | null) => void;
   setMinRating: (r: string | null) => void;
   setWhitelistOnly: (v: boolean) => void;
+  setDensity: (d: Density) => void;
+  toggleDensity: () => void;
   resetFilters: () => void;
 }
 
@@ -38,7 +42,7 @@ interface UiState {
  * middleware falls back to in-memory (see zustand's createJSONStorage).
  */
 export const useUiStore = create<UiState>()(
-  persist(
+    persist(
     (set) => ({
       feed: "all",
       groupMode: false,
@@ -50,6 +54,7 @@ export const useUiStore = create<UiState>()(
       genreFilter: null,
       minRating: null,
       whitelistOnly: false,
+      density: "comfortable" as Density,
       _hasHydrated: false,
       setHasHydrated: (v) => set({ _hasHydrated: v }),
       setFeed: (feed) => set({ feed }),
@@ -62,6 +67,8 @@ export const useUiStore = create<UiState>()(
       setGenreFilter: (genreFilter) => set({ genreFilter }),
       setMinRating: (minRating) => set({ minRating }),
       setWhitelistOnly: (whitelistOnly) => set({ whitelistOnly }),
+      setDensity: (density) => set({ density }),
+      toggleDensity: () => set((s) => ({ density: s.density === "compact" ? "comfortable" : "compact" })),
       resetFilters: () =>
         set({
           sourceFilter: null,
@@ -88,6 +95,7 @@ export const useUiStore = create<UiState>()(
         genreFilter: s.genreFilter,
         minRating: s.minRating,
         whitelistOnly: s.whitelistOnly,
+        density: s.density,
       }),
       skipHydration: true,
       onRehydrateStorage: () => (state) => {
