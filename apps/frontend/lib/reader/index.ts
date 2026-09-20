@@ -49,7 +49,7 @@ export const Reader = {
       1000
     ) as unknown as Promise<import("@/lib/types").WhitelistRouteItem[]>;
   },
-  /** @deprecated
+  /** @deprecated */
   getDispatchHistory: async (
     page = 1,
     pageSize = 1000,
@@ -124,7 +124,7 @@ export const Reader = {
         d?.totalPages ?? (d as { total_pages?: number })?.total_pages ?? 1,
     };
   },
-  /** @deprecated
+  /** @deprecated */
   getRssFlat: (
     page = 1,
     limit = 100,

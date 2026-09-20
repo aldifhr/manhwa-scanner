@@ -56,6 +56,32 @@ def _collect_shinigami_source(latest_sent: dict, disabled: set, fetch_meta: bool
             genres = []
         series_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{m.get('manga_id', '')}"
         chaps = m.get("chapters") or []
+        # bulk fix: /manga/list embedded only 3 chapters — if oldest embedded still <24h, there may be >3 within 24h (e.g. Tensei 7, God Killer 6). Fetch full list via /chapter/{id}/list
+        if len(chaps) == 3:
+            try:
+                _oldest_ts = chaps[-1].get("created_at") or chaps[-1].get("release_date") or ""
+                _oldest_dt = datetime.fromisoformat(str(_oldest_ts).replace("Z", "+00:00"))
+                if _oldest_dt.tzinfo is None:
+                    _oldest_dt = _oldest_dt.replace(tzinfo=timezone.utc)
+                if _oldest_dt >= _cutoff:
+                    _mid = m.get("manga_id") or ""
+                    if _mid:
+                        try:
+                            _full = _shinigami_scraper.get_shinigami_chapters(_mid, per_page=100)
+                            if _full:
+                                chaps = [
+                                    {
+                                        "chapter_id": c.get("chapter_id") or c.get("id") or "",
+                                        "chapter_number": c.get("chapter_number") or c.get("number") or "",
+                                        "created_at": c.get("release_date") or c.get("created_at") or "",
+                                        "release_date": c.get("release_date") or c.get("created_at") or "",
+                                    }
+                                    for c in _full
+                                ]
+                        except Exception as _fe:
+                            logger.debug("shinigami bulk fetch fallback to embedded", manga_id=_mid, err=str(_fe)[:120])
+            except Exception:
+                pass
         for ch in chaps:
             ch_id = ch.get("chapter_id") or ""
             if not ch_id:
