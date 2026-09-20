@@ -5,6 +5,10 @@ import re
 import time as _time_mod
 import threading
 
+from app.logger import get_logger
+
+logger = get_logger("cron:collect:common")
+
 def _origin_to_type(origin: str) -> str:
     o = (origin or "").upper()
     if o == "KR":
