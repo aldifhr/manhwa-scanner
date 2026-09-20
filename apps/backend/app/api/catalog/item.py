@@ -75,6 +75,17 @@ async def catalog_item(title_key: str, request: Request):
     tk_norm = normalize_title_key(title_key)
     slug = slugify_title_key(title_key)
     sb = get_supabase()
+    # UUID whitelist-id resolution — convert to title_key for all lookups
+    import re as _re_uuid2
+    if _re_uuid2.match(r"^[0-9a-fA-F-]{36}$", title_key):
+        try:
+            uuid_row = sb.table("whitelist").select("title_key").eq("id", title_key).limit(1).execute()
+            if uuid_row.data:
+                title_key = uuid_row.data[0].get("title_key") or title_key
+                tk_norm = normalize_title_key(title_key)
+                slug = slugify_title_key(title_key)
+        except Exception:
+            pass
     meta = None
     try:
         mres = sb.table("whitelist").select("*").in_("title_key", [title_key, tk_norm, slug]).limit(5).execute()
@@ -139,23 +150,8 @@ async def catalog_item(title_key: str, request: Request):
             _CATALOG_CACHE.popitem(last=False)
         return JSONResponse(content=_resp)
 
-    # Fallback: UUID whitelist-id → resolve to title_key then fetch
-    import re as _re
-    if _re.match(r"^[0-9a-fA-F-]{36}$", title_key):
-        try:
-            row = sb.table("whitelist").select("title_key, title").eq("id", title_key).limit(1).execute()
-            if row.data:
-                actual_tk = row.data[0].get("title_key")
-                if actual_tk and actual_tk != title_key:
-                    title_key = actual_tk
-                    tk_norm = normalize_title_key(title_key)
-                    slug = slugify_title_key(title_key)
-        except Exception:
-            pass
-
     # Fallback: Shinigami detail by manga_id (UUID) — for Popular today
-    import re as _re
-    if _re.match(r"^[0-9a-fA-F-]{36}$", title_key):
+    if _re_uuid2.match(r"^[0-9a-fA-F-]{36}$", title_key):
         try:
             from curl_cffi import requests as _cffi
             r = _cffi.get(f"{settings.SHINIGAMI_API_BASE.rstrip('/')}/v1/manga/detail/{title_key}", impersonate="chrome", timeout=10)
