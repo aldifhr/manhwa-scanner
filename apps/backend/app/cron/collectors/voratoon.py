@@ -4,10 +4,10 @@ from app.utils.text import slugify_title_key
 from app.services.fcfs import parse_chapter_number as _parse_chapter_num
 
 def _collect_voratoon_source(latest_sent: dict) -> list[dict]:
-    from app.scrapers import voratoon as _voratoon_scraper
+    from app.scrapers.voratoon.feed import VoratoonFeed
     from app.services.scanner_confidence import attach_confidence
     items: list[dict] = []
-    for u in _voratoon_scraper.collect_voratoon():
+    for u in VoratoonFeed(window_hours=24).collect():
         series_title = u.get("title", "")
         series_slug = u.get("title_key") or ""
         series_url = u.get("series_url") or ""
