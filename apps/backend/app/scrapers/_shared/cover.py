@@ -52,6 +52,9 @@ def scrub_cover(url: str | None) -> str:
     # direct avoids an extra hop and 403 (signature mismatch when re-encoded).
     from app.config import settings as _cfg
     if _cfg.VORATOON_COVER_BUCKET in url:
+        # Return presigned URL directly — FE will bypass proxy for X-Amz- URLs
+        if "X-Amz-" in url or "x-amz-" in url.lower():
+            return url
         from urllib.parse import quote
         return "/api/v1/reader/proxy?url=" + quote(url, safe="")
 
