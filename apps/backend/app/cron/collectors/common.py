@@ -5,11 +5,6 @@ import re
 import time as _time_mod
 import threading
 
-from app.config import settings
-from app.logger import get_logger
-
-logger = get_logger("cron:collect:common")
-
 def _origin_to_type(origin: str) -> str:
     o = (origin or "").upper()
     if o == "KR":
@@ -25,14 +20,6 @@ MAX_CHAPTERS_PER_SERIES = 25
 _CHAPTER_CACHE: dict[str, tuple[float, list]] = {}
 _CHAPTER_CACHE_TTL = 300.0
 _CHAPTER_CACHE_MAX = 512
-
-_IKIRU_META_CACHE: dict[str, tuple[float, dict]] = {}
-_IKIRU_META_CACHE_TTL = 21600.0  # 6h — sama dengan DB TTL di bawah
-_IKIRU_META_CACHE_MAX = 512
-
-_SHINIGAMI_META_CACHE: dict[str, tuple[float, dict]] = {}
-_SHINIGAMI_META_CACHE_TTL = 21600.0  # 6h
-_SHINIGAMI_META_CACHE_MAX = 512
 
 _CHAPTER_CACHE_LOCK = threading.Lock()
 
