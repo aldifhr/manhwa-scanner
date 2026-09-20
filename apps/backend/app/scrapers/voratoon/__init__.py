@@ -259,7 +259,7 @@ def collect_voratoon() -> list[dict]:
                             break
                     except (ValueError, TypeError):
                         continue
-                _emit_series(_out, s)
+                _emit_series(_out, s, cutoff)
             if not page_has_recent:
                 break
             meta = payload.get("meta") or {}
@@ -276,10 +276,21 @@ def collect_voratoon() -> list[dict]:
         for _combo_results in _ex.map(lambda c: _fetch_combo(*c), _combos):
             results.extend(_combo_results)
 
+    # dedup across 6 combos (same slug appears in manhwa & manhwa type==project) + filter already 24h
+    _seen: set[tuple[str, str]] = set()
+    _deduped: list[dict] = []
+    for r in results:
+        _k = (str(r.get("title_key") or "").lower(), str(r.get("chapter") or ""))
+        if _k in _seen:
+            continue
+        _seen.add(_k)
+        _deduped.append(r)
+    results = _deduped
+
     logger.info("voratoon collect done", chapters=len(results))
     return results
 
-def _emit_series(results: list[dict], s: dict) -> None:
+def _emit_series(results: list[dict], s: dict, cutoff: datetime | None = None) -> None:
     """Emit up to takeChapter recent chapters for one voratoon series dict."""
     data = s.get("data", {})
     slug = data.get("slug", "")
@@ -303,6 +314,15 @@ def _emit_series(results: list[dict], s: dict) -> None:
         if not ch_index:
             continue
         _created = ch.get("createdAt") or ch.get("updatedAt") or ""
+        if cutoff is not None and _created:
+            try:
+                _ts = datetime.fromisoformat(_created.replace("Z", "+00:00"))
+                if _ts.tzinfo is None:
+                    _ts = _ts.replace(tzinfo=timezone.utc)
+                if _ts < cutoff:
+                    continue
+            except (ValueError, TypeError):
+                pass
         results.append({
             "title": title,
             "title_key": slug.lower(),
