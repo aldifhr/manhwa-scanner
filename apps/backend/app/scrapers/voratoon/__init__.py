@@ -72,24 +72,44 @@ def fetch_series_detail(slug: str) -> dict | None:
     params = {"includeMeta": "true", "takeChapter": 5}
     if not cb_voratoon.allow():
         raise RuntimeError("circuit voratoon OPEN — fast fail")
-    try:
-        r = _get(url, params=params, timeout=TIMEOUT)
-        r.raise_for_status()
-        data = r.json().get("data")
-        if not isinstance(data, dict):
-            raise RuntimeError("Voratoon detail schema invalid")
-        cb_voratoon.record_success()
-        return data
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 404:
-            return None
-        cb_voratoon.record_failure()
-        logger.error("voratoon detail failed", exc=e)
-        raise RuntimeError("Voratoon detail fetch failed") from e
-    except Exception as e:
-        cb_voratoon.record_failure()
-        logger.error("voratoon detail failed", exc=e)
-        raise RuntimeError("Voratoon detail fetch failed") from e
+    for _attempt in range(3):
+        try:
+            r = _get(url, params=params, timeout=TIMEOUT)
+            if r.status_code == 429:
+                _wait = float(r.headers.get("retry-after", 2 ** _attempt)) if r.headers.get("retry-after") else (2 ** _attempt + random.uniform(0, 1))
+                logger.debug("voratoon detail 429 retry", slug=slug, attempt=_attempt, wait=round(_wait, 2))
+                time.sleep(_wait)
+                continue
+            r.raise_for_status()
+            data = r.json().get("data")
+            if not isinstance(data, dict):
+                raise RuntimeError("Voratoon detail schema invalid")
+            cb_voratoon.record_success()
+            return data
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.debug("voratoon detail 404", slug=slug, status=404)
+                return None
+            if e.response.status_code == 429 and _attempt < 2:
+                _wait = float(e.response.headers.get("retry-after", 2 ** _attempt)) if e.response.headers.get("retry-after") else (2 ** _attempt + random.uniform(0, 1))
+                logger.debug("voratoon detail 429 HTTPStatus retry", slug=slug, attempt=_attempt, wait=round(_wait, 2))
+                time.sleep(_wait)
+                continue
+            cb_voratoon.record_failure()
+            logger.error("voratoon detail failed", slug=slug, status=e.response.status_code if e.response else 0, url=url, exc=e)
+            raise RuntimeError("Voratoon detail fetch failed") from e
+        except Exception as e:
+            if "429" in str(e).lower() and _attempt < 2:
+                _wait = 2 ** _attempt + random.uniform(0, 1)
+                logger.debug("voratoon detail 429 exception retry", slug=slug, attempt=_attempt, wait=round(_wait, 2))
+                time.sleep(_wait)
+                continue
+            cb_voratoon.record_failure()
+            logger.error("voratoon detail failed", slug=slug, url=url, exc=e)
+            raise RuntimeError("Voratoon detail fetch failed") from e
+    cb_voratoon.record_failure()
+    logger.error("voratoon detail failed after retries", slug=slug, url=url)
+    raise RuntimeError("Voratoon detail fetch failed after retries")
 
 def fetch_chapters(slug: str, page: int = 1, take: int = 100) -> list[dict]:
     """Fetch chapters for a series.

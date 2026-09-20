@@ -320,27 +320,44 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
             # inserted/failed already init at top — reuse
             for i in range(0, len(new_rows), CHUNK):
                 chunk_rows = new_rows[i : i + CHUNK]
-                try:
-                    get_supabase().table("recent_chapters").upsert(
-                        chunk_rows, on_conflict="chapter_url"
-                    ).execute()
-                    inserted += len(chunk_rows)
-                except Exception as e:
-                    msg = str(e).lower()
-                    if "rc_composite" in msg or "idx_recent_chapters_composite_unique" in msg or "composite_unique" in msg:
-                        logger.info("batchInsert race rc_composite benign, skip", chunk=f"{i//CHUNK}")
-                        continue
-                    failed += len(chunk_rows)
-                    # harden: log constraint + first row keys so pool closed / constraint errors are diagnosable without replay
-                    logger.error(
-                        "batchInsertRecentChapters chunk failed — data loss",
-                        exc=e,
-                        exc_info=True,
-                        range=f"{i}-{i+len(chunk_rows)}",
-                        constraint="title_key,source,chapter_num",
-                        first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
-                        first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
-                    )
+                _retry = 0
+                while _retry < 2:
+                    try:
+                        from app.db_adapter import get_pool_stats as _gps
+                        _ps_before = _gps()
+                        logger.debug("batchInsert chunk start", chunk=f"{i//CHUNK}", rows=len(chunk_rows), pool=_ps_before, retry=_retry)
+                        get_supabase().table("recent_chapters").upsert(
+                            chunk_rows, on_conflict="chapter_url"
+                        ).execute()
+                        inserted += len(chunk_rows)
+                        logger.debug("batchInsert chunk ok", chunk=f"{i//CHUNK}", inserted=inserted)
+                        break
+                    except Exception as e:
+                        from app.db_adapter import get_pool_stats as _gps2
+                        _ps_after = _gps2()
+                        msg = str(e).lower()
+                        if "rc_composite" in msg or "idx_recent_chapters_composite_unique" in msg or "composite_unique" in msg:
+                            logger.info("batchInsert race rc_composite benign, skip", chunk=f"{i//CHUNK}", pool=_ps_after)
+                            break
+                        if ("already closed" in msg or "pool closed" in msg) and _retry == 0:
+                            logger.debug("batchInsert pool closed retry", chunk=f"{i//CHUNK}", pool=_ps_after)
+                            import time as _t
+                            _t.sleep(0.5)
+                            _retry += 1
+                            continue
+                        failed += len(chunk_rows)
+                        # harden: log constraint + first row keys so pool closed / constraint errors are diagnosable without replay
+                        logger.error(
+                            "batchInsertRecentChapters chunk failed — data loss",
+                            exc=e,
+                            exc_info=True,
+                            range=f"{i}-{i+len(chunk_rows)}",
+                            constraint="title_key,source,chapter_num",
+                            first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
+                            first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
+                            pool=_ps_after,
+                        )
+                        break
             # touch + backfill still run even on partial failure — don't lose metadata refresh
             # Existing rows: refresh NON-time metadata only — never
             # updated_time — so an ikiru re-touch (renewed <time>) can't keep
@@ -375,21 +392,37 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                     for i in range(0, len(rows), CHUNK)
                 ]
                 for chunk_rows in _uniform_chunks:
-                    try:
-                        get_supabase().table("recent_chapters").upsert(
-                            chunk_rows, on_conflict="chapter_url"
-                        ).execute()
-                    except Exception as e:
-                        failed += len(chunk_rows)
-                        logger.error(
-                            "batchInsertRecentChapters touch chunk failed — data loss",
-                            exc=e,
-                            exc_info=True,
-                            range=f"{len(chunk_rows)} rows",
-                            constraint="chapter_url",
-                            first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
-                            first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
-                        )
+                    _t_retry = 0
+                    while _t_retry < 2:
+                        try:
+                            get_supabase().table("recent_chapters").upsert(
+                                chunk_rows, on_conflict="chapter_url"
+                            ).execute()
+                            break
+                        except Exception as e:
+                            msg = str(e).lower()
+                            if ("already closed" in msg or "pool closed" in msg) and _t_retry == 0:
+                                try:
+                                    from app.db_adapter import get_pool_stats as _gps3
+                                    _ps_touch = _gps3()
+                                except Exception:
+                                    _ps_touch = {}
+                                logger.debug("batchInsert touch pool closed retry", pool=_ps_touch)
+                                import time as _t
+                                _t.sleep(0.5)
+                                _t_retry += 1
+                                continue
+                            failed += len(chunk_rows)
+                            logger.error(
+                                "batchInsertRecentChapters touch chunk failed — data loss",
+                                exc=e,
+                                exc_info=True,
+                                range=f"{len(chunk_rows)} rows",
+                                constraint="chapter_url",
+                                first_keys=list(chunk_rows[0].keys()) if chunk_rows else [],
+                                first_url=str(chunk_rows[0].get("chapter_url") or "")[:120] if chunk_rows else "",
+                            )
+                            break
             if len(to_upsert) < len(cleaned):
                 logger.info("batchInsertRecentChapters dedup", before=len(rows), after=len(to_upsert))
             if len(new_rows) < len(to_upsert):
