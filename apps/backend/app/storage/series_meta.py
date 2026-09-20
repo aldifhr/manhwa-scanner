@@ -188,25 +188,13 @@ class SeriesMeta:
     def get_bulk(self, keys: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
         result: dict[tuple[str, str], dict] = {}
         for sid, source in keys:
-            # keys are (sid, source) or (title_key, source) — support both orderings
-            # Plan says keys as list[tuple[str,str]]; common uses (tk, src)
-            # We support either but canonical is (sid, source) via caller
-            # For compatibility, detect if first element looks like source
-            if sid in ("ikiru", "shinigami") and source not in ("ikiru", "shinigami"):
-                # swapped: (source, sid)
-                source, sid = sid, source
-            # Actually plan bulk test uses [("t1","ikiru"),...] which is (sid, source)
-            # Common preload uses (tk, src) same order
             result[(sid, source)] = self.get(source, sid)
-        # also handle alternate key order for caller convenience: if caller passes (source,sid) style?
         return result
 
     def invalidate(self, source: str, sid: str) -> None:
         cache_key = f"{source}:{sid}"
         with self._lock:
             self._cache.pop(cache_key, None)
-            # also pop alternate key form sid alone if exists (legacy)
-            self._cache.pop(sid, None)
         try:
             _r = _redis()
             if _r:

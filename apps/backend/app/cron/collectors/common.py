@@ -119,158 +119,16 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
                 _CHAPTER_CACHE.pop(_k, None)
     return data
 
-def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> None:
-    if not keys:
-        return
-    # dedupe, group by source
-    from collections import defaultdict
-    by_src: dict[str, set[str]] = defaultdict(set)
-    for tk, src in keys:
-        if src in ("ikiru", "shinigami") and tk:
-            by_src[src].add(tk)
-    for src, tks in by_src.items():
-        cache, ttl, mx = (
-            (_IKIRU_META_CACHE, _IKIRU_META_CACHE_TTL, _IKIRU_META_CACHE_MAX)
-            if src == "ikiru"
-            else (_SHINIGAMI_META_CACHE, _SHINIGAMI_META_CACHE_TTL, _SHINIGAMI_META_CACHE_MAX)
-        )
-        # filter not cached
-        now = _time_mod.monotonic()
-        need = [tk for tk in tks if not (cache.get(tk) and (now - cache[tk][0]) < ttl)]
-        if not need:
-            continue
-        try:
-            from app.db import get_supabase as _gsb2
-            # chunk 100 (PostgREST IN limit)
-            for i in range(0, len(need), 100):
-                chunk = need[i:i+100]
-                rows = (
-                    _gsb2().table("series_meta")
-                    .select("title_key, source, rating, genres, description, cover, type, origin, updated_at")
-                    .in_("title_key", chunk)
-                    .eq("source", src)
-                    .execute()
-                    .data
-                    or []
-                )
-                for r in rows:
-                    tk = r.get("title_key")
-                    if tk and (r.get("rating") not in (None, "", 0) or (r.get("description") or "").strip()):
-                        if _is_series_meta_stale(r.get("updated_at")):
-                            continue
-                        # use tk as sid key for cache (both sid and tk forms)
-                        with _CHAPTER_CACHE_LOCK:
-                            cache[tk] = (now, r)
-                        _redis_set_meta(src, tk, r)
-        except Exception:
-            pass
+def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> dict[tuple[str, str], dict] | None:
+    from app.storage.series_meta import series_meta
+
+    return series_meta.get_bulk(keys)
+
 
 def _cached_series_meta(source: str, sid: str) -> dict:
-    if source not in ("ikiru", "shinigami"):
-        return {}
-    cache, ttl, mx = (
-        (_IKIRU_META_CACHE, _IKIRU_META_CACHE_TTL, _IKIRU_META_CACHE_MAX)
-        if source == "ikiru"
-        else (_SHINIGAMI_META_CACHE, _SHINIGAMI_META_CACHE_TTL, _SHINIGAMI_META_CACHE_MAX)
-    )
-    now = _time_mod.monotonic()
-    with _CHAPTER_CACHE_LOCK:
-        c = cache.get(sid)
-        if c and (now - c[0]) < ttl:
-            return c[1]
-    # Redis cross-worker check (before hitting DB)
-    _rm = _redis_get_meta(source, sid)
-    if _rm is not None:
-        with _CHAPTER_CACHE_LOCK:
-            cache[sid] = (now, _rm)
-        return _rm
-    _key = sid
-    _stale_db_row: dict | None = None
-    try:
-        from app.db import get_supabase as _gsb
-        _existing = (
-            _gsb().table("series_meta")
-            .select("title_key, source, rating, genres, description, cover, type, origin, updated_at")
-            .eq("title_key", _key)
-            .eq("source", source)
-            .limit(1)
-            .execute()
-            .data
-            or []
-        )
-        if _existing:
-            _e = _existing[0]
-            if (_e.get("rating") not in (None, "", 0)) or (_e.get("description") or "").strip():
-                if not _is_series_meta_stale(_e.get("updated_at")):
-                    with _CHAPTER_CACHE_LOCK:
-                        cache[sid] = (now, _e)
-                    _redis_set_meta(source, sid, _e)
-                    return _e
-                # stale → simpan untuk fallback jika refresh gagal
-                _stale_db_row = _e
-    except Exception:
-        pass
-    meta: dict = {}
-    try:
-        if source == "ikiru":
-            from app.scrapers import ikiru as _ik
-            meta = _ik.get_ikiru_series_meta(sid) or {}
-        elif source == "shinigami":
-            from app.scrapers import shinigami as _sh
-            meta = _sh.get_shinigami_series_meta(sid) or {}
-    except Exception:
-        pass
-    if meta:
-        try:
-            _sb = _gsb()
-            _row = {
-                "title_key": _key,
-                "source": source,
-                "rating": meta.get("rating"),
-                "genres": meta.get("genres") or [],
-                "description": meta.get("description") or "",
-                "cover": meta.get("cover"),
-                "type": meta.get("type"),
-                "origin": meta.get("origin") or "",
-                "updated_at": "now()",
-            }
-            _sb.table("series_meta").upsert(_row, on_conflict="title_key,source").execute()
-            # Invalidate memory cache so next read gets fresh data
-            cache.pop(sid, None)
-            # Cache fresh upstream result (reset TTL)
-            with _CHAPTER_CACHE_LOCK:
-                cache[sid] = (now, meta)
-                if len(cache) > mx:
-                    for _k in list(cache)[: len(cache) - mx]:
-                        cache.pop(_k, None)
-            _redis_set_meta(source, sid, meta)
-            return meta
-        except Exception:
-            pass
-        # Upsert gagal → fallback ke upstream meta tanpa DB persistance
-        with _CHAPTER_CACHE_LOCK:
-            cache[sid] = (now, meta)
-            if len(cache) > mx:
-                for _k in list(cache)[: len(cache) - mx]:
-                    cache.pop(_k, None)
-        _redis_set_meta(source, sid, meta)
-        return meta
-    # Refresh gagal atau tidak ada upstream meta → fallback stale DB jika ada
-    if _stale_db_row is not None:
-        with _CHAPTER_CACHE_LOCK:
-            cache[sid] = (now, _stale_db_row)
-            if len(cache) > mx:
-                for _k in list(cache)[: len(cache) - mx]:
-                    cache.pop(_k, None)
-        _redis_set_meta(source, sid, _stale_db_row)
-        return _stale_db_row
-    # Tidak ada DB dan upstream gagal → cache empty
-    with _CHAPTER_CACHE_LOCK:
-        cache[sid] = (now, meta)
-        if len(cache) > mx:
-            for _k in list(cache)[: len(cache) - mx]:
-                cache.pop(_k, None)
-    return meta
+    from app.storage.series_meta import series_meta
+
+    return series_meta.get(source, sid)
 
 def _ikiru_re_touch_anchor(chapters: list[dict]) -> tuple[float, "datetime | None"]:
     _max_num = 0.0
