@@ -447,7 +447,7 @@ export default function HomePage() {
   const latestTimestamp = useMemo(() => {
     if (deferredResults.length === 0) return null;
     const times = deferredResults
-      .map((r: any) => r?.updated_time || r?.sent_at || r?.updatedAt)
+      .map((r: any) => r?.updated_time || r?.sent_at || r?.updatedAt || r?.createdAt || r?.created_at || r?.updatedTime)
       .filter(Boolean)
       .map((t: string) => new Date(t).getTime())
       .filter((n) => Number.isFinite(n));
@@ -459,7 +459,11 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, []);
   const { lastUpdateLabel, lastUpdateLong } = useMemo(() => {
-    if (!latestTimestamp) return { lastUpdateLabel: "—", lastUpdateLong: null as string | null };
+    if (!latestTimestamp) {
+      // ada data tapi timestamp ga kebaca → jangan strip, anggap Just now
+      if (deferredResults.length > 0) return { lastUpdateLabel: "Just now", lastUpdateLong: new Date().toLocaleString() };
+      return { lastUpdateLabel: "—", lastUpdateLong: null as string | null };
+    }
     const diff = now - latestTimestamp;
     let label: string;
     if (diff < 45_000) label = "Just now";
