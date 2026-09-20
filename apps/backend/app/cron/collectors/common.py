@@ -34,60 +34,14 @@ _SHINIGAMI_META_CACHE: dict[str, tuple[float, dict]] = {}
 _SHINIGAMI_META_CACHE_TTL = 21600.0  # 6h
 _SHINIGAMI_META_CACHE_MAX = 512
 
-# Policy: <6h pakai cache/DB, >=6h refresh upstream, gagal → stale cache (cover/rating 6-24h wajar)
-_SERIES_META_TTL_S = 6 * 3600  # 6h (cover/rating/genre boleh 6-24h)
-
-# Redis mirror for cross-worker cache (fallback to in-memory when REDIS_URL empty or redis down)
-def _redis() -> object | None:
-    try:
-        from app.config import settings as _s
-        if not getattr(_s, "REDIS_URL", ""):
-            return None
-        import redis  # type: ignore
-        return redis.Redis.from_url(_s.REDIS_URL, decode_responses=True, socket_connect_timeout=0.2, socket_timeout=0.2)
-    except Exception:
-        return None
-
-def _redis_get_meta(source: str, sid: str) -> dict | None:
-    try:
-        _r = _redis()
-        if not _r:
-            return None
-        raw = _r.get(f"series_meta:{source}:{sid}")
-        if not raw:
-            return None
-        import json as _js
-        data = _js.loads(raw) if isinstance(raw, str) else raw
-        # check TTL via stored updated_at
-        if _is_series_meta_stale(data.get("updated_at")):
-            return None
-        return data
-    except Exception:
-        return None
-
-def _redis_set_meta(source: str, sid: str, meta: dict) -> None:
-    try:
-        _r = _redis()
-        if not _r:
-            return
-        import json as _js
-        # store with 6h TTL (same as in-memory)
-        _r.setex(f"series_meta:{source}:{sid}", int(_SERIES_META_TTL_S), _js.dumps(meta))
-    except Exception:
-        pass
-
-def _is_series_meta_stale(updated_at: str | None) -> bool:
-    if not updated_at:
-        return True
-    try:
-        from datetime import datetime, timezone
-        dt = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        age = (datetime.now(timezone.utc) - dt).total_seconds()
-        return age >= _SERIES_META_TTL_S
-    except Exception:
-        return True
+# Single source of truth for TTL + stale + Redis — canonical in storage.series_meta (DRY)
+from app.storage.series_meta import (
+    _SERIES_META_TTL_S,
+    _is_series_meta_stale,
+    _redis,
+    _redis_get_meta,
+    _redis_set_meta,
+)
 
 _CHAPTER_CACHE_LOCK = threading.Lock()
 
@@ -119,7 +73,9 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
                 _CHAPTER_CACHE.pop(_k, None)
     return data
 
-def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> dict[tuple[str, str], dict] | None:
+def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
+    if not keys:
+        return {}
     from app.storage.series_meta import series_meta
 
     return series_meta.get_bulk(keys)
