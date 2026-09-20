@@ -21,7 +21,7 @@ import {
 } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
 import { RecommendedSection } from "@/components/home/RecommendedSection";
-import TrendingBar from "@/components/home/TrendingBar";
+
 import { useReadItems } from "@/components/home/useReadItems";
 import { useUiStore } from "@/lib/uiStore";
 import { useSourcesHealth, isHealthy } from "@/hooks/useSourcesHealth";
@@ -526,7 +526,6 @@ export default function HomePage() {
       </div>
 
       <RecommendedSection />
-      <TrendingBar />
 
       {continueReading.size > 0 && (
         <div className="mb-8">
