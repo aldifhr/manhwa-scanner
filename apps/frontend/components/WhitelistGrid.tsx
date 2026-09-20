@@ -40,6 +40,7 @@ export function WhitelistGrid() {
 
   const [catalogSearch, setCatalogSearch] = useState("");
   const debouncedCatalogSearch = useDebounced(catalogSearch, 400);
+  const [ctxMenu, setCtxMenu] = useState<{ k: string; x: number; y: number } | null>(null);
   const { data: catalogResults } = useQuery({
     queryKey: queryKeys.catalogSearch(debouncedCatalogSearch),
     queryFn: () => Reader.searchCatalog(debouncedCatalogSearch),
@@ -278,24 +279,42 @@ export function WhitelistGrid() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filtered.map((item) => {
-            const k = (item as any).titleKey || (item as any).title_key || item.id;
-            const cur = customMap[k] as ListName | undefined;
-            return (
-              <div key={`${item.id}:${item.source}`} className="flex flex-col gap-1">
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {filtered.map((item) => {
+              const k = (item as any).titleKey || (item as any).title_key || item.id;
+              const cur = customMap[k] as ListName | undefined;
+              return (
+              <div
+                key={`${item.id}:${item.source}`}
+                className="group/card relative flex flex-col"
+                onContextMenu={e => { e.preventDefault(); setCtxMenu({ k, x: e.clientX, y: e.clientY }); }}
+              >
                 <WhitelistCard item={item} onRefetch={refetch} />
-                <select value={cur || ""} onChange={e => setList(k, (e.target.value as ListName) || null)} className="text-[11px] rounded-full bg-white/5 border border-white/10 text-white/70 px-2 py-1">
-                  <option value="">— List —</option>
-                  <option value="reading">Reading</option>
-                  <option value="plan">Plan to Read</option>
-                  <option value="completed">Completed</option>
-                  <option value="dropped">Dropped</option>
-                </select>
               </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {ctxMenu && (
+            <div className="fixed inset-0 z-[100] bg-transparent" onClick={() => setCtxMenu(null)} onContextMenu={e => { e.preventDefault(); setCtxMenu(null); }}>
+              <div
+                className="absolute bg-zinc-800 border border-zinc-700 rounded-lg shadow-2xl py-1 text-[11px] w-fit min-w-28 overflow-hidden flex flex-col"
+                style={{ left: Math.min(ctxMenu.x, typeof window !== "undefined" ? window.innerWidth - 140 : ctxMenu.x), top: Math.min(ctxMenu.y, typeof window !== "undefined" ? window.innerHeight - 150 : ctxMenu.y) }}
+                onClick={e => e.stopPropagation()}
+              >
+                {(["reading", "plan", "completed", "dropped"] as ListName[]).map(v => {
+                  const label = v === "plan" ? "Plan to Read" : v.charAt(0).toUpperCase() + v.slice(1);
+                  const active = customMap[ctxMenu.k] === v;
+                  return (
+                    <button key={v} onClick={() => { setList(ctxMenu.k, v); setCtxMenu(null); }} className={`w-fit min-w-full text-left px-2.5 py-1 cursor-pointer border-0 bg-transparent leading-none whitespace-nowrap ${active ? "text-white" : "text-zinc-200"}`}>
+                      {active ? "✓ " : ""}{label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
