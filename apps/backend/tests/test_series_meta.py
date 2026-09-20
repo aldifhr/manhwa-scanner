@@ -90,11 +90,7 @@ def test_get_bulk_and_invalidate():
                 assert ("t2","shinigami") in result
                 assert result[("t1","ikiru")].get("rating") == 8.5
                 assert result[("t2","shinigami")].get("rating") == 8.5
-                # verify re-export via common.py also works
-                from app.cron.collectors.common import _cached_series_meta, preload_series_meta_bulk
-                # check that common re-exports delegate (smoke)
-                assert callable(_cached_series_meta)
-                assert callable(preload_series_meta_bulk)
+                # common.py re-exports removed — series_meta is canonical
                 sm.invalidate("ikiru","t1")
                 assert "ikiru:t1" not in sm._cache
                 assert "t1" not in sm._cache

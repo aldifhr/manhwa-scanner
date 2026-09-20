@@ -34,15 +34,6 @@ _SHINIGAMI_META_CACHE: dict[str, tuple[float, dict]] = {}
 _SHINIGAMI_META_CACHE_TTL = 21600.0  # 6h
 _SHINIGAMI_META_CACHE_MAX = 512
 
-# Single source of truth for TTL + stale + Redis — canonical in storage.series_meta (DRY)
-from app.storage.series_meta import (
-    _SERIES_META_TTL_S,
-    _is_series_meta_stale,
-    _redis,
-    _redis_get_meta,
-    _redis_set_meta,
-)
-
 _CHAPTER_CACHE_LOCK = threading.Lock()
 
 _PARSE_TYPES_CACHE: dict[str, list[str]] = {}
@@ -72,19 +63,6 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
             for _k in list(_CHAPTER_CACHE)[:len(_CHAPTER_CACHE) - _CHAPTER_CACHE_MAX]:
                 _CHAPTER_CACHE.pop(_k, None)
     return data
-
-def preload_series_meta_bulk(keys: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
-    if not keys:
-        return {}
-    from app.storage.series_meta import series_meta
-
-    return series_meta.get_bulk(keys)
-
-
-def _cached_series_meta(source: str, sid: str) -> dict:
-    from app.storage.series_meta import series_meta
-
-    return series_meta.get(source, sid)
 
 def _ikiru_re_touch_anchor(chapters: list[dict]) -> tuple[float, "datetime | None"]:
     _max_num = 0.0
