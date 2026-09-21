@@ -50,7 +50,16 @@ def _proxy_cover(cover: str | None) -> str | None:
         _inner = _pqs(_up(cover).query).get("url", [""])[0]
         if _inner:
             cover = _uq(_inner)
-    # Direct URLs (ikiru, shinigami, voratoon assets) — wrap in public cover-img proxy
+    # Shinigami/Ikiru public CDN — return direct URL so Discord fetches
+    # without the extra cover-img hop (which can timeout on Discord's end).
+    from urllib.parse import urlparse
+    try:
+        host = (urlparse(cover).hostname or "").lower()
+        if host in ("assets.shngm.id", "ikiru.wtf", "imgkc1.my.id", "minio.imgkc1.my.id"):
+            return cover
+    except Exception:
+        pass
+    # Direct URLs (voratoon assets) — wrap in public cover-img proxy
     # so Discord can fetch without auth and bypass hotlink protection
     return f"{public_base}/api/v1/reader/cover-img?url={_urlquote(cover, safe='')}"
 
