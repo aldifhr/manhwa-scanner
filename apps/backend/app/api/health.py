@@ -96,25 +96,38 @@ def refresh_all_voratoon_covers(force: bool = False, limit: int = 200) -> dict:
     ]
 
     for table, select_cols in tables:
+        rows: list[dict] = []
         try:
             rows = sb.table(table).select(select_cols).eq("source", "voratoon").limit(limit).execute().data or []
-            for r in rows:
-                cover = r.get("cover")
-                if not force and not _is_voratoon_expiring(cover):
-                    continue
-                slug = r.get("title_key")
-                if not slug:
-                    continue
-                scanned += 1
-                new_cover = _refresh_voratoon_cover(slug)
-                if new_cover:
-                    try:
-                        sb.table(table).update({"cover": new_cover}).eq("title_key", slug).eq("source", "voratoon").execute()
-                        updated += 1
-                    except Exception:
-                        pass
         except Exception as e:
-            logger.warn(f"voratoon scan failed: {table}", err=str(e)[:120])
+            # Live whitelist may lack cover column (migration not applied) — fallback to title_key/source only
+            if "cover" in str(e) and "does not exist" in str(e):
+                try:
+                    rows = sb.table(table).select("title_key, source").eq("source", "voratoon").limit(limit).execute().data or []
+                    # cover missing → treat as expiring if force, else skip
+                    if not force:
+                        continue
+                except Exception as e2:
+                    logger.warn(f"voratoon scan failed: {table}", err=str(e2)[:120])
+                    continue
+            else:
+                logger.warn(f"voratoon scan failed: {table}", err=str(e)[:120])
+                continue
+        for r in rows:
+            cover = r.get("cover")
+            if not force and not _is_voratoon_expiring(cover):
+                continue
+            slug = r.get("title_key")
+            if not slug:
+                continue
+            scanned += 1
+            new_cover = _refresh_voratoon_cover(slug)
+            if new_cover:
+                try:
+                    sb.table(table).update({"cover": new_cover}).eq("title_key", slug).eq("source", "voratoon").execute()
+                    updated += 1
+                except Exception:
+                    pass
 
     return {"scanned": scanned, "updated": updated}
 
