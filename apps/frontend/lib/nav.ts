@@ -3,7 +3,7 @@ import {
   Compass,
   Books,
   EyeSlash,
-  Clock,
+  Bell,
   ChartBar,
 } from "@phosphor-icons/react";
 
@@ -13,7 +13,7 @@ export const NAV = [
   { href: "/recent", label: "Recent", icon: Compass },
   { href: "/whitelist", label: "Whitelist", icon: Books } as const,
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash } as const,
-  { href: "/dispatch-history", label: "History", icon: Clock } as const,
+  { href: "/notifications", label: "Notifications", icon: Bell } as const,
 ] as const;
 
 /** Sidebar / nav active-state helper (single source of truth).

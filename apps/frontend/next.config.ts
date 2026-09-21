@@ -23,6 +23,13 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  async redirects() {
+    return [
+      { source: "/dispatch-history", destination: "/notifications", permanent: true },
+      { source: "/dispatch-history/:path*", destination: "/notifications", permanent: true },
+      { source: "/history", destination: "/notifications", permanent: true },
+    ];
+  },
   async rewrites() {
     return [
       // Vercel → scanner proxy for API that lives on VPS (not on Vercel)
