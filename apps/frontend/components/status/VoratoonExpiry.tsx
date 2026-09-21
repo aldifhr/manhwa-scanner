@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
+import { useToast } from "@/lib/useToast";
 
 function parseVoratoonExpiry(cover: string): Date | null {
   try {
@@ -33,6 +34,7 @@ function countdown(exp: Date | null): string {
 
 export default function VoratoonExpiry() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const { data, isLoading } = useQuery({
     queryKey: ["voratoon-expiry"],
     queryFn: async () => {
@@ -60,6 +62,7 @@ export default function VoratoonExpiry() {
     onSuccess: (res: any) => {
       const msg = res?.success ? `Refreshed ${res?.data?.refreshed ?? 0} covers` : res?.error || "Done";
       setFeedback(msg);
+      toast(msg, "success");
       setTimeout(() => setFeedback(null), 3000);
       qc.invalidateQueries({ queryKey: ["voratoon-expiry"] });
       qc.invalidateQueries({ queryKey: ["sources-health"] });
@@ -67,7 +70,9 @@ export default function VoratoonExpiry() {
     onError: (e: any) => {
       const m = e instanceof Error ? e.message : String(e);
       const isAuth = m.includes("401") || m.toLowerCase().includes("unauthorized");
-      setFeedback(isAuth ? "Login required (401)" : m.slice(0, 80));
+      const msg = isAuth ? "Login required (401)" : m.slice(0, 80) || "Refresh failed";
+      setFeedback(msg);
+      toast(msg, "error");
       setTimeout(() => setFeedback(null), 4000);
     },
   });
