@@ -184,7 +184,7 @@ export default function NotificationsClient() {
             <input value={search} onChange={(e) => { setSearch(e.target.value); setPageChapters(1); }} placeholder="Search title..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
           <div className="flex gap-1">
-            {(["all", "ikiru", "shinigami", "voratoon"] as const).map((s) => (
+            {(["all", "shinigami", "voratoon"] as const).map((s) => (
               <button key={s} onClick={() => setSource(s)} className={`px-2.5 py-1.5 text-xs rounded-lg border ${source === s ? "bg-accent-dim border-accent/30 text-accent" : "bg-surface border-border text-text-secondary"}`}>{s}</button>
             ))}
           </div>
