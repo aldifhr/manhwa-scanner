@@ -35,12 +35,12 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         # Validate release_date — skip rows with missing/invalid timestamp
         _rd = row.get("release_date")
         if not _rd or not isinstance(_rd, str) or not _rd.strip():
-            logger.warn("batch_insert: skip row with invalid release_date", title_key=row.get("title_key"), source=row.get("source"), chapter=row.get("chapter"))
+            logger.debug("batch_insert: skip row with invalid release_date", title_key=row.get("title_key"), source=row.get("source"), chapter=row.get("chapter"))
             continue
         try:
             datetime.fromisoformat(_rd.replace("Z", "+00:00"))
         except (ValueError, TypeError):
-            logger.warn("batch_insert: skip row with unparseable release_date", title_key=row.get("title_key"), source=row.get("source"), release_date=_rd[:80])
+            logger.debug("batch_insert: skip row with unparseable release_date", title_key=row.get("title_key"), source=row.get("source"), release_date=_rd[:80])
             continue
         _raw_origin = row.get("origin") or row.get("type") or ""
         _src = row.get("source") or ""
