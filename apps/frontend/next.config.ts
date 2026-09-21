@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
       { source: "/api/v1/reader/cover", destination: "https://scanner.aldifhr.fun/api/v1/reader/cover" },
       { source: "/api/v1/reader/proxy", destination: "https://scanner.aldifhr.fun/api/v1/reader/proxy" },
       { source: "/api/v1/reader/cover-img", destination: "https://scanner.aldifhr.fun/api/v1/reader/cover-img" },
+      { source: "/api/v1/reader/refresh-cover", destination: "https://scanner.aldifhr.fun/api/v1/reader/refresh-cover" },
       { source: "/api/v1/reader/proxy", destination: "https://scanner.aldifhr.fun/api/v1/reader/proxy" },
       { source: "/api/v1/reader/cover", destination: "https://scanner.aldifhr.fun/api/v1/reader/cover" },
       { source: "/api/v1/recommended", destination: "https://scanner.aldifhr.fun/api/v1/recommended" },

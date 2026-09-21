@@ -260,7 +260,72 @@ async def reader_cover(request: Request):
     return FastResponse(content=svg.encode(), status_code=200, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
 
-@router.get("/reader/cover-img")
+@router.get("/reader/refresh-cover")
+async def reader_refresh_cover(request: Request):
+    """Return fresh cover URL for a series — used by FE to refresh expired presigned URLs."""
+    series = (request.query_params.get("series", "") or "").strip()
+    source = (request.query_params.get("source", "") or "").strip().lower()
+    if not series or len(series) > 80:
+        return JSONResponse(content={"success": False, "error": "invalid series"}, status_code=400)
+
+    from app.db import get_supabase, q
+    from app.utils.cover_scrub import scrub_cover
+    from app.config import settings as _cfg
+
+    sb = get_supabase()
+    _spaced = series.replace("-", " ")
+    candidates = list({series, _spaced, re.sub(r"\s+", "-", series), series.lower(), _spaced.lower()})
+
+    # Find stored cover URL
+    stored_cover = None
+    try:
+        for tbl in ("series_meta", "whitelist"):
+            try:
+                res = sb.table(tbl).select("cover").in_("title_key", candidates).limit(3).execute()
+                for r in (res.data or []):
+                    c = r.get("cover")
+                    if c:
+                        stored_cover = c
+                        break
+                if stored_cover:
+                    break
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    if not stored_cover:
+        return JSONResponse(content={"success": False, "error": "no cover found"}, status_code=404)
+
+    # If voratoon presigned URL, fetch fresh one from API
+    if "cvr.voratoon.id" in str(stored_cover) and "X-Amz-" in str(stored_cover):
+        try:
+            # Extract slug from stored cover URL
+            from urllib.parse import urlparse
+            parsed = urlparse(str(stored_cover))
+            path_parts = parsed.path.split("/")
+            if len(path_parts) >= 4 and path_parts[1] == "prod" and path_parts[2] == "series":
+                slug = path_parts[3]
+                from app.scrapers.voratoon import fetch_series_detail
+                detail = await asyncio.to_thread(fetch_series_detail, slug)
+                if detail:
+                    inner = detail.get("data", detail)
+                    fresh_cover_url = inner.get("coverImage") or ""
+                    if fresh_cover_url:
+                        fresh_scrubbed = scrub_cover(fresh_cover_url)
+                        if fresh_scrubbed:
+                            # Update stored cover
+                            try:
+                                from datetime import datetime, timezone
+                                sb.table("series_meta").update({"cover": fresh_scrubbed, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("title_key", series).eq("source", "voratoon").execute()
+                            except Exception:
+                                pass
+                            return JSONResponse(content={"success": True, "cover": fresh_scrubbed})
+        except Exception as e:
+            logger.warn("refresh-cover voratoon failed", series=series, err=str(e)[:120])
+
+    # For non-voratoon or if refresh fails, return existing cover
+    return JSONResponse(content={"success": True, "cover": stored_cover})
 async def reader_cover_public(request: Request):
     from urllib.parse import unquote, urlparse
 

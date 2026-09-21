@@ -41,6 +41,26 @@ export function Cover({
     setImgLoaded(false);
   }, [src]);
 
+  const handleError = async () => {
+    if (!hasRetried && titleKey) {
+      // Try refresh-cover first — fetches fresh presigned URL from source API
+      try {
+        const r = await fetch(`/api/v1/reader/refresh-cover?series=${encodeURIComponent(titleKey)}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.success && d.cover) {
+            setCoverSrc(rewriteCoverUrl(d.cover) || d.cover);
+            setHasRetried(true);
+            return;
+          }
+        }
+      } catch {}
+      // Fallback to cover endpoint
+      setCoverSrc(`/api/v1/reader/cover?series=${encodeURIComponent(titleKey)}`);
+      setHasRetried(true);
+    } else setImgError(true);
+  };
+
   if (!src || imgError) {
     return (
       <div
@@ -62,14 +82,7 @@ export function Cover({
       loading="lazy"
       decoding="async"
       fetchPriority="low"
-      onError={() => {
-        if (!hasRetried && titleKey) {
-          setCoverSrc(
-            `/api/v1/reader/cover?series=${encodeURIComponent(titleKey)}`
-          );
-          setHasRetried(true);
-        } else setImgError(true);
-      }}
+      onError={handleError}
       onLoad={() => setImgLoaded(true)}
       className={cn(
         sizeClass[size],
