@@ -61,7 +61,14 @@ def _proxy_cover(cover: str | None) -> str | None:
         pass
     # Direct URLs (voratoon assets) — wrap in public cover-img proxy
     # so Discord can fetch without auth and bypass hotlink protection
-    return f"{public_base}/api/v1/reader/cover-img?url={_urlquote(cover, safe='')}"
+    # Fix double-encode: RSS cover already %2F-encoded (X-Amz-Credential), _urlquote with safe='' would %→%25. Normalize first.
+    from urllib.parse import unquote as _uq2
+    try:
+        # Normalize once to avoid %2F → %252F
+        _norm = _uq2(cover)
+        return f"{public_base}/api/v1/reader/cover-img?url={_urlquote(_norm, safe='')}"
+    except Exception:
+        return f"{public_base}/api/v1/reader/cover-img?url={_urlquote(cover, safe='')}"
 
 
 SOURCE_COLORS = {
