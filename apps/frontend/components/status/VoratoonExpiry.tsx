@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
 
@@ -53,11 +54,21 @@ export default function VoratoonExpiry() {
     refetchInterval: 60000,
   });
 
+  const [feedback, setFeedback] = useState<string | null>(null);
   const mut = useMutation({
-    mutationFn: async () => readerFetch("/api/v1/health/refresh-voratoon", { method: "POST" }),
-    onSuccess: () => {
+    mutationFn: async () => readerFetch<{ success: boolean; data?: any; error?: string }>("/api/v1/health/refresh-voratoon", { method: "POST" }),
+    onSuccess: (res: any) => {
+      const msg = res?.success ? `Refreshed ${res?.data?.refreshed ?? 0} covers` : res?.error || "Done";
+      setFeedback(msg);
+      setTimeout(() => setFeedback(null), 3000);
       qc.invalidateQueries({ queryKey: ["voratoon-expiry"] });
       qc.invalidateQueries({ queryKey: ["sources-health"] });
+    },
+    onError: (e: any) => {
+      const m = e instanceof Error ? e.message : String(e);
+      const isAuth = m.includes("401") || m.toLowerCase().includes("unauthorized");
+      setFeedback(isAuth ? "Login required (401)" : m.slice(0, 80));
+      setTimeout(() => setFeedback(null), 4000);
     },
   });
 
@@ -75,6 +86,7 @@ export default function VoratoonExpiry() {
           {mut.isPending ? "Refreshing…" : "Refresh cover"}
         </button>
       </div>
+      {feedback && <div className={`text-xs px-3 py-1.5 rounded-lg border mb-3 ${feedback.includes("401") || feedback.toLowerCase().includes("login") ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : feedback.toLowerCase().includes("refreshed") ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-red-500/10 border-red-500/20 text-red-300"}`}>{feedback}</div>}
       {isLoading ? (
         <div className="skeleton h-16 rounded-lg" />
       ) : items.length === 0 ? (
