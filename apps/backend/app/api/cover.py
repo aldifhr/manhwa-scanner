@@ -208,7 +208,26 @@ async def reader_cover(request: Request):
     from app.utils.cover_scrub import scrub_cover
 
     sb = get_supabase()
+    from app.utils.text import normalize_title_key, slugify_title_key
+    try:
+        from app.storage.canonical import canonical_of
+    except Exception:
+        def canonical_of(x):  # fallback
+            return x
     _spaced = series.replace("-", " ")
+    # Normalized/slug/canonical variants to match RSS/canonical storage (space vs dash)
+    try:
+        _norm = normalize_title_key(series)
+        _slug = slugify_title_key(series)
+        _canon = canonical_of(series) or _norm
+        _canon_norm = normalize_title_key(_canon)
+        _canon_slug = slugify_title_key(_canon)
+    except Exception:
+        _norm = _spaced.lower()
+        _slug = re.sub(r"\s+", "-", series).lower()
+        _canon = _norm
+        _canon_norm = _norm
+        _canon_slug = _slug
     candidates = {
         series,
         _spaced,
@@ -216,7 +235,16 @@ async def reader_cover(request: Request):
         series.lower(),
         _spaced.lower(),
         re.sub(r"\s+", "-", series).lower(),
+        _norm,
+        _slug,
+        _canon,
+        _canon_norm,
+        _canon_slug,
+        _norm.lower(),
+        _slug.lower(),
     }
+    # prune empty and keep within 20
+    candidates = {c for c in candidates if c}
 
     def _rank(u: str) -> int:
         u = (u or "").lower()
@@ -232,6 +260,12 @@ async def reader_cover(request: Request):
         all_covers += [r["cover"] for r in (wl.data or []) if r.get("cover")]
         rc = sb.table("recent_chapters").select("cover").in_("title_key", list(candidates)).limit(10).execute()
         all_covers += [r["cover"] for r in (rc.data or []) if r.get("cover")]
+        # series_meta fallback — RSS uses it as cover source, cover endpoint was missing it
+        try:
+            sm = sb.table("series_meta").select("cover").in_("title_key", list(candidates)).limit(5).execute()
+            all_covers += [r["cover"] for r in (sm.data or []) if r.get("cover")]
+        except Exception:
+            pass
         if _like and len(all_covers) < 2 and len(_like) >= 6:
             try:
                 rc2 = sb.table("recent_chapters").select("cover, title_key").ilike("title_key", _like).limit(20).execute()
@@ -243,6 +277,11 @@ async def reader_cover(request: Request):
                 all_covers += [r["cover"] for r in (wl2.data or []) if r.get("cover")]
             except Exception:
                 pass
+            try:
+                sm2 = sb.table("series_meta").select("cover, title_key").ilike("title_key", _like).limit(10).execute()
+                all_covers += [r["cover"] for r in (sm2.data or []) if r.get("cover")]
+            except Exception:
+                pass
     except Exception:
         pass
     seen: set[str] = set()
@@ -251,8 +290,28 @@ async def reader_cover(request: Request):
         if c not in seen:
             seen.add(c)
             ranked.append(c)
+
+    def _unwrap_cover(raw: str) -> str:
+        raw = (raw or "").strip()
+        # Live RSS stores voratoon cover as /api/v1/reader/proxy?url=https...cvr...X-Amz...
+        # which is not http -> would be skipped. Unwrap to presigned URL.
+        for prefix in ("/api/v1/reader/proxy?url=", "/api/v1/reader/cover-img?url=", "/api/img?url=", "/api/v1/img?url="):
+            if raw.startswith(prefix):
+                try:
+                    from urllib.parse import unquote
+
+                    inner = raw.split("url=", 1)[1]
+                    inner = unquote(inner)
+                    if "%" in inner and not inner.startswith("http"):
+                        inner = unquote(inner)
+                    return inner
+                except Exception:
+                    return raw
+        return raw
+
     for raw in ranked:
-        cover_url = scrub_cover(raw)
+        unwrapped = _unwrap_cover(raw)
+        cover_url = scrub_cover(unwrapped)
         if not cover_url or not cover_url.startswith("http"):
             continue
         return await _fetch_image(cover_url, cache_control="public, max-age=3600")
