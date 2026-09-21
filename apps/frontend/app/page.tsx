@@ -504,6 +504,38 @@ export default function HomePage() {
   const totalSent = snapshot?.overview?.totalChaptersSent ?? 0;
   const totalTracked = snapshot?.overview?.totalMangaTracked ?? 0;
 
+  // Timeline grouping Today/Yesterday
+  const groupedByDay = useMemo(() => {
+    const map = new Map<string, GroupedSeries[]>();
+    for (const g of grouped) {
+      const raw = (g as any).latestUpdated || (g as any).updated_time || (g.chapters?.[0] as any)?.sentAt || "";
+      const d = raw ? new Date(raw) : new Date();
+      const key = isNaN(d.getTime()) ? "Today" : (() => {
+        const now = new Date();
+        const diff = Math.floor((new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86400000);
+        if (diff === 0) return "Today";
+        if (diff === 1) return "Yesterday";
+        if (diff < 7) return `${diff}d ago`;
+        return d.toLocaleDateString();
+      })();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(g);
+    }
+    // order Today first
+    const order = ["Today", "Yesterday"];
+    const sortedKeys = Array.from(map.keys()).sort((a, b) => {
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
+      if (ai !== -1 || bi !== -1) {
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      }
+      return 0;
+    });
+    return sortedKeys.map((k) => ({ label: k, items: map.get(k)! }));
+  }, [grouped]);
+
   return (
     <PageShell>
       <div className="mb-8">
@@ -693,35 +725,36 @@ export default function HomePage() {
           }}
         />
       ) : (
-        <div className={`flex flex-col ${isCompact ? "gap-2" : "gap-3"}`}>
-          {grouped.map((series, i) => {
-            const sChMap = Array.isArray((series as any)?.chapters) ? (series as any).chapters : [];
-            const isWL =
-              series.isWhitelisted ||
-              sChMap.some((c: { titleKey: string; source: string }) =>
-                optimisticWhitelist.has(
-                  `${c.titleKey || series.titleKey}:${c.source}`
-                )
-              ) ||
-              optimisticWhitelist.has(series.titleKey);
-            const adding = addingKey === series.titleKey;
-            const isBM = false;
-            return (
-              <motion.div
-                key={series.titleKey}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i, 12) * 0.04, duration: 0.3 }}
-              >
-                <HomeGroupedCard
-                  series={series}
-                  isWhitelisted={isWL}
-                  adding={adding}
-                  onAdd={() => handleAddGroup(series)}
-                />
-              </motion.div>
-            );
-          })}
+        <div className={`flex flex-col ${isCompact ? "gap-4" : "gap-6"}`}>
+          {groupedByDay.map((group) => (
+            <div key={group.label} className="space-y-2">
+              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wide flex items-center gap-2 sticky top-14 bg-background/80 backdrop-blur py-1 z-10">
+                {group.label} <span className="text-white/20">· {group.items.length}</span>
+              </h3>
+              <div className={`flex flex-col ${isCompact ? "gap-2" : "gap-3"}`}>
+                {group.items.map((series, i) => {
+                  const sChMap = Array.isArray((series as any)?.chapters) ? (series as any).chapters : [];
+                  const isWL =
+                    series.isWhitelisted ||
+                    sChMap.some((c: { titleKey: string; source: string }) =>
+                      optimisticWhitelist.has(`${c.titleKey || series.titleKey}:${c.source}`)
+                    ) ||
+                    optimisticWhitelist.has(series.titleKey);
+                  const adding = addingKey === series.titleKey;
+                  return (
+                    <motion.div
+                      key={series.titleKey}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i, 12) * 0.04, duration: 0.3 }}
+                    >
+                      <HomeGroupedCard series={series} isWhitelisted={isWL} adding={adding} onAdd={() => handleAddGroup(series)} />
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </PageShell>

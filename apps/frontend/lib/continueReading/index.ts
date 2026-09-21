@@ -83,7 +83,31 @@ export function createInMemoryStore(
   };
 }
 
-// — sync removed — localStorage only, no BE
+// — sync via BE continue_reading table per device (session_hash) —
+async function fetchFromApi(): Promise<Map<string, ContinueReadingEntry> | null> {
+  try {
+    const res = await fetch("/api/v1/continue-reading", { credentials: "include" });
+    if (!res.ok) return null;
+    const j: any = await res.json().catch(() => null);
+    const entries = j?.data?.entries;
+    if (!entries || typeof entries !== "object") return null;
+    const m = new Map<string, ContinueReadingEntry>();
+    for (const [k, v] of Object.entries(entries as Record<string, ContinueReadingEntry>)) if ((v as any)?.titleKey) m.set(k, v as ContinueReadingEntry);
+    return m;
+  } catch {
+    return null;
+  }
+}
+async function saveToApi(entries: Map<string, ContinueReadingEntry>): Promise<void> {
+  try {
+    await fetch("/api/v1/continue-reading", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entries: Object.fromEntries(entries) }),
+    });
+  } catch {}
+}
 
 // — builder helpers —
 export function buildEntryFromChapter(ch: {
@@ -128,11 +152,27 @@ export function useContinueReading(
     () => new Map()
   );
   useEffect(() => {
-    const loaded = store.load();
-    if (loaded.size > 0) setEntries(loaded);
+    let cancelled = false;
+    (async () => {
+      const local = store.load();
+      const remote = await fetchFromApi();
+      if (cancelled) return;
+      if (remote && remote.size > 0) {
+        // merge: remote wins if newer
+        const merged = new Map(local);
+        for (const [k, v] of remote) {
+          const lv = merged.get(k);
+          if (!lv || new Date(v.updatedAt) > new Date(lv.updatedAt)) merged.set(k, v);
+        }
+        if (merged.size > 0) setEntries(merged);
+        else if (local.size > 0) setEntries(local);
+      } else if (local.size > 0) setEntries(local);
+    })();
+    return () => { cancelled = true; };
   }, [store]);
   useEffect(() => {
     store.save(entries);
+    if (entries.size > 0) saveToApi(entries);
   }, [entries, store]);
   const trackReading = useCallback((entry: ContinueReadingEntry) => {
     if (!entry?.titleKey || !entry?.chapterUrl) return;
@@ -167,9 +207,16 @@ export function useContinueReading(
       next.delete(titleKey);
       return next;
     });
+    fetch("/api/v1/continue-reading", {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titleKey }),
+    }).catch(() => {});
   }, []);
   const clearAll = useCallback(() => {
     setEntries(new Map());
+    fetch("/api/v1/continue-reading", { method: "DELETE", credentials: "include" }).catch(() => {});
   }, []);
   return { entries, trackReading, trackChapter, removeReading, clearAll };
 }
