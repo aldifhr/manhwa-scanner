@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { decodeHtml, rewriteCoverUrl, getChapterLabel, safeUrl } from "@/lib/utils";
 import { Reader } from "@/lib/reader";
 import { readerFetch } from "@/lib/reader/transport";
@@ -162,16 +162,10 @@ function HomeGroupedCard({
   const origin = normalizeOrigin(series.origin);
   const t = ((series as any).format ?? series.type ?? "").toString().toLowerCase().trim();
   const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
-  const qc = useQueryClient();
   const health = useSourcesHealth();
   const densityHC = useUiStore((s) => s.density);
   const isCompactHC = densityHC === "compact";
-  const prefetch = () => {
-    const k = series.titleKey;
-    if (!k) return;
-    qc.prefetchQuery({ queryKey: ["catalog-item", k], queryFn: async () => (await fetch(`/api/v1/catalog/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
-    qc.prefetchQuery({ queryKey: ["catalog-chapters", k], queryFn: async () => (await fetch(`/api/v1/catalog/chapters/${encodeURIComponent(k)}`, { credentials: "include" })).json(), staleTime: 60_000 });
-  };
+  const prefetch = () => {};
   const [coverSrc, setCoverSrc] = useState(() => rewriteCoverUrl(series.cover));
   const [hasRetried, setHasRetried] = useState(false);
   const [imgErrorFinal, setImgErrorFinal] = useState(false);
