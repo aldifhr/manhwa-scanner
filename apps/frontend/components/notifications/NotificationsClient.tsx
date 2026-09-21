@@ -166,7 +166,7 @@ export default function NotificationsClient() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${tab === t ? "bg-accent text-white shadow" : "text-text-muted hover:text-text"}`}
+            className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${tab === t ? "bg-accent text-accent-foreground shadow" : "text-text-muted hover:text-text"}`}
           >
             {t === "all" && <Bell size={14} />}
             {t === "chapters" && <BookOpen size={14} />}
