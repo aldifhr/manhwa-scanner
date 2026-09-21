@@ -20,6 +20,7 @@ import {
   LinkSimple,
   ClockCounterClockwise,
 } from "@phosphor-icons/react";
+import DispatchChart from "./DispatchChart";
 
 type Tab = "all" | "chapters" | "log";
 
@@ -159,6 +160,7 @@ export default function NotificationsClient() {
         </span>
       </div>
       <p className="text-xs text-text-muted mb-4">All activity — chapters sent & system logs.</p>
+      <DispatchChart />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-surface border border-border rounded-xl p-1 w-fit">
