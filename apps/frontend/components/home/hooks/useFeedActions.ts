@@ -4,7 +4,6 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
-import { usePacerRateLimitedWL } from "@/lib/usePacerThrottles";
 import type { FlatChapter } from "@/lib/feed";
 import type { GroupedSeries } from "@/lib/groupChapters";
 
@@ -419,18 +418,8 @@ export function useFeedActions() {
     },
   });
 
-  const addCb = useCallback((item: FlatChapter) => addMutation.mutate(item), [addMutation]);
-  const addGroupCb = useCallback((series: GroupedSeries) => addGroupMutation.mutate(series), [addGroupMutation]);
-  const rateLimitedAdd = usePacerRateLimitedWL(addCb);
-  const rateLimitedAddGroup = usePacerRateLimitedWL(addGroupCb);
-  const handleAdd = useCallback(
-    (item: FlatChapter) => rateLimitedAdd(item),
-    [rateLimitedAdd]
-  );
-  const handleAddGroup = useCallback(
-    (series: GroupedSeries) => rateLimitedAddGroup(series),
-    [rateLimitedAddGroup]
-  );
+  const handleAdd = useCallback((item: FlatChapter) => addMutation.mutate(item), [addMutation]);
+  const handleAddGroup = useCallback((series: GroupedSeries) => addGroupMutation.mutate(series), [addGroupMutation]);
   const handleExclude = useCallback(
     (item: FlatChapter) => excludeMutation.mutate(item),
     [excludeMutation]

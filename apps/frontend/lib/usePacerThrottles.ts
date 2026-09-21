@@ -30,22 +30,4 @@ export function usePacerThrottledScroll(fn: () => void, wait = 250) {
   }, [wait]);
 }
 
-export function usePacerRateLimitedWL<T extends unknown[]>(
-  fn: (...args: T) => unknown
-) {
-  const calls = useRef<number[]>([]);
-  const fnRef = useRef(fn);
-  useEffect(() => {
-    fnRef.current = fn;
-  }, [fn]);
-  return useCallback(
-    async (...args: T) => {
-      const now = Date.now();
-      calls.current = calls.current.filter((t) => now - t < 10_000);
-      if (calls.current.length >= 5) return;
-      calls.current.push(now);
-      return fnRef.current(...args);
-    },
-    []
-  );
-}
+
