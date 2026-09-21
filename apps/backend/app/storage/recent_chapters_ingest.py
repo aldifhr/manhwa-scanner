@@ -29,18 +29,31 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
     allowed = {"chapter_url","title_key","title","chapter","chapter_num","source","cover","series_url","updated_time","release_date","origin","description","type","genres","rating"}
     _wl_origins_local = _get_wl_origins()
     cleaned = []
+    _skipped_invalid: dict[str, int] = {}
     for row in rows:
         if not row.get("chapter_url"):
             continue
-        # Validate release_date — skip rows with missing/invalid timestamp
+        # Validate release_date — fallback to updated_time if invalid, else aggregate skip
         _rd = row.get("release_date")
-        if not _rd or not isinstance(_rd, str) or not _rd.strip():
-            logger.debug("batch_insert: skip row with invalid release_date", title_key=row.get("title_key"), source=row.get("source"), chapter=row.get("chapter"))
-            continue
-        try:
-            datetime.fromisoformat(_rd.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            logger.debug("batch_insert: skip row with unparseable release_date", title_key=row.get("title_key"), source=row.get("source"), release_date=_rd[:80])
+        _valid = False
+        if isinstance(_rd, str) and _rd.strip():
+            try:
+                datetime.fromisoformat(_rd.replace("Z", "+00:00"))
+                _valid = True
+            except (ValueError, TypeError):
+                _valid = False
+        if not _valid:
+            _ut = row.get("updated_time")
+            if isinstance(_ut, str) and _ut.strip():
+                try:
+                    datetime.fromisoformat(_ut.replace("Z", "+00:00"))
+                    row["release_date"] = _ut
+                    _valid = True
+                except (ValueError, TypeError):
+                    pass
+        if not _valid:
+            _src = row.get("source") or "unknown"
+            _skipped_invalid[_src] = _skipped_invalid.get(_src, 0) + 1
             continue
         _raw_origin = row.get("origin") or row.get("type") or ""
         _src = row.get("source") or ""
@@ -72,6 +85,8 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                     _r[_k] = 0.0
         _r["chapter_url"] = row["chapter_url"]
         cleaned.append(_r)
+    if _skipped_invalid:
+        logger.info("batch_insert: skipped invalid release_date aggregated", skipped=_skipped_invalid, total_skipped=sum(_skipped_invalid.values()), total_rows=len(rows))
     to_upsert: list[dict] = []
     try:
         _need_cover = [r for r in cleaned if not r.get("cover")]
@@ -164,14 +179,28 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                         break
             if touch_rows:
                 _touch_rows = []
+                _skipped_touch: dict[str, int] = {}
                 for r in touch_rows:
-                    # Validate release_date before touch
                     _rd_touch = r.get("release_date")
-                    if not _rd_touch or not isinstance(_rd_touch, str) or not _rd_touch.strip():
-                        continue
-                    try:
-                        datetime.fromisoformat(_rd_touch.replace("Z", "+00:00"))
-                    except (ValueError, TypeError):
+                    _valid_touch = False
+                    if isinstance(_rd_touch, str) and _rd_touch.strip():
+                        try:
+                            datetime.fromisoformat(_rd_touch.replace("Z", "+00:00"))
+                            _valid_touch = True
+                        except (ValueError, TypeError):
+                            pass
+                    if not _valid_touch:
+                        _ut_touch = r.get("updated_time")
+                        if isinstance(_ut_touch, str) and _ut_touch.strip():
+                            try:
+                                datetime.fromisoformat(_ut_touch.replace("Z", "+00:00"))
+                                r["release_date"] = _ut_touch
+                                _valid_touch = True
+                            except (ValueError, TypeError):
+                                pass
+                    if not _valid_touch:
+                        _src_t = r.get("source") or "unknown"
+                        _skipped_touch[_src_t] = _skipped_touch.get(_src_t, 0) + 1
                         continue
                     _t = {"chapter_url": r["chapter_url"],"scan_status": "updated","scan_reason": "metadata refreshed","confidence_score": 100}
                     for k in ("title_key", "title", "chapter", "chapter_num", "source", "cover", "series_url", "origin", "description", "rating", "genres", "type", "release_date"):
@@ -179,6 +208,8 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                         if v not in (None, "", []):
                             _t[k] = v
                     _touch_rows.append(_t)
+                if _skipped_touch:
+                    logger.info("batch_insert touch: skipped invalid release_date aggregated", skipped=_skipped_touch)
                 _sig_groups: dict[frozenset, list[dict]] = {}
                 for r in _touch_rows:
                     _sig_groups.setdefault(frozenset(r.keys()), []).append(r)
