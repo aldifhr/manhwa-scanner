@@ -48,7 +48,24 @@ async def cron_health(request: Request):
     try:
         from app.storage import health as health_store
         hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
+        sources = []
+        # Add disabled sources first
+        for src in settings.SOURCE_KEYS:
+            if src not in settings.active_sources:
+                sources.append({
+                    "name": src,
+                    "status": "disabled",
+                    "lastScrape": "",
+                    "lastSuccess": "",
+                    "errorRate24h": 0.0,
+                    "consecutiveFailures": 0,
+                    "lastError": "disabled via DISABLED_SOURCES",
+                    "responseTimeMs": 0,
+                    "disabledUntil": None,
+                })
         for src, row in (hm or {}).items():
+            if src not in settings.active_sources:
+                continue
             ok_24h = int(row.get("successes_today") or 0) + int(row.get("failures_today") or 0)
             err_rate = round(100.0 * int(row.get("failures_today") or 0) / ok_24h, 1) if ok_24h else 0.0
             sources.append({

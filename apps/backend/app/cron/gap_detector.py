@@ -37,7 +37,7 @@ def _shinigami_chapters(manga_id: str) -> list[dict]:
         data = get_shinigami_chapters(manga_id, per_page=100)
         if data:
             return data
-    except Exception as e:
+    except (Exception, ImportError) as e:
         logger.warn("gap backfill: shinigami scraper fetch failed", err=str(e)[:120])
     try:
         req = urllib.request.Request(
@@ -46,7 +46,7 @@ def _shinigami_chapters(manga_id: str) -> list[dict]:
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             return json.loads(r.read()).get("data", [])
-    except Exception as e:
+    except (Exception, ImportError) as e:
         logger.warn("gap backfill: shinigami urllib fallback failed", err=str(e)[:120])
         return []
 
@@ -54,7 +54,7 @@ def _ikiru_chapters(slug: str) -> list[dict]:
     try:
         from app.scrapers.ikiru import get_ikiru_chapters
         return get_ikiru_chapters(slug) or []
-    except Exception as e:
+    except (Exception, ImportError) as e:
         logger.warn("gap backfill: ikiru fetch failed", err=str(e)[:120])
         return []
 
@@ -86,7 +86,7 @@ def detect_gaps() -> list[dict]:
                     'scraped': scraped,
                 })
         return out
-    except Exception as e:
+    except (Exception, ImportError) as e:
         logger.warn("gap detection failed", err=str(e)[:160])
         return []
 
@@ -356,7 +356,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                     pass
                 continue
         conn.commit()
-    except Exception as e:
+    except (Exception, ImportError) as e:
         logger.warn("gap auto-backfill failed", err=str(e)[:200])
         if conn is not None:
             try:
@@ -442,7 +442,7 @@ def maybe_alert_gaps() -> int:
             from app.discord import client as discord_client
             discord_client.send_channel_message(cid, content=summary)
             logger.warn("gap alert sent", count=len(gaps))
-        except Exception as e:
+        except (Exception, ImportError) as e:
             logger.warn("gap alert send failed", err=str(e)[:160])
         # Telegram mirror
         try:

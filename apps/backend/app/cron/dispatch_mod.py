@@ -82,40 +82,11 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         logger.info("dispatch: nothing to send")
         return 0
 
-    try:
-        from app.db import get_supabase as _gs_ceil
-        from app.utils.text import slugify_title_key as _ntk_ceil
-        _wl_c = _gs_ceil().table("whitelist").select("title_key,source,latest_sent_chapter").execute().data or []
-        _ceil_map: dict[tuple[str, str], float] = {}
-        for _w in _wl_c:
-            _tkc = _ntk_ceil(str(_w.get("title_key") or ""))
-            _srcc = str(_w.get("source") or "")
-            try:
-                _lsv = float(_w.get("latest_sent_chapter") or 0)
-            except (ValueError, TypeError):
-                _lsv = 0
-            if _tkc and _lsv:
-                _ceil_map[(_tkc, _srcc)] = max(_ceil_map.get((_tkc, _srcc), 0), _lsv)
-        _filtered: list[dict] = []
-        for _it in to_send:
-            try:
-                _cn = float(str(_it.get("chapter") or _it.get("chapter_num") or 0) or 0)
-            except (ValueError, TypeError):
-                _cn = 0
-            if _cn:
-                _tk_it = _ntk_ceil(str(_it.get("title_key") or ""))
-                _src_it = str(_it.get("source") or "")
-                _ceil_v = _ceil_map.get((_tk_it, _src_it), 0)
-                if _ceil_v and _cn <= _ceil_v:
-                    continue
-            _filtered.append(_it)
-        if len(_filtered) < len(to_send):
-            logger.info("dispatch: ceiling filtered", removed=len(to_send) - len(_filtered))
-            to_send = _filtered
-            if not to_send:
-                return 0
-    except Exception as _e:
-        logger.warn("dispatch ceiling check failed", err=str(_e)[:120])
+    # CEILING FILTER REMOVED — was incorrectly skipping chapters after backfill.
+    # whitelist.latest_sent_chapter is updated by backfill, so ALL chapters ≤
+    # latest_sent_chapter get filtered. FCFS dedup against dispatch_history is the
+    # correct guard — only actually-sent chapters are recorded there.
+    # See: dispatch_history is the single source of truth for "actually notified".
 
     # FCFS dedupe: skip chapters ALREADY NOTIFIED (in dispatch_history).
     # NOTE: we intentionally do NOT consult dispatch_claims here. The deep-queue
@@ -256,10 +227,19 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             if not url or not _acq_map.get(url):
                 continue
             # per-guild origin filter
-            _origin_f = _origin_f  # keep for excluded check below
             if _origin_f:
                 _item_origin = str(it.get("origin") or "").strip().upper()
-                if _item_origin and _item_origin not in _origin_f:
+                # Fallback: derive origin from type if API didn't provide it
+                if not _item_origin:
+                    _type = str(it.get("type") or "").lower()
+                    if _type == "manhwa":
+                        _item_origin = "KR"
+                    elif _type == "manhua":
+                        _item_origin = "CN"
+                    elif _type == "manga":
+                        _item_origin = "JP"
+                # If filter is set and item has no origin OR origin not in filter, skip
+                if not _item_origin or _item_origin not in _origin_f:
                     continue
             # per-guild excluded titles
             if _excl_titles and slugify_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:

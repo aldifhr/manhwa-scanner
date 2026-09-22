@@ -89,7 +89,7 @@ def _route_add(payload: dict, data: dict):
 def _route_search(data: dict):
     opts = _extract_options(data)
     q = opts.get("query", "")
-    from app.scrapers import ikiru, shinigami
+    from app.scrapers import shinigami
 
     results = ikiru.search_ikiru_api(q, 5) + shinigami.search_shinigami_api(q, 5)
     if not results:

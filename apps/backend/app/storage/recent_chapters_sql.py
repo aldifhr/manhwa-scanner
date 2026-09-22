@@ -181,6 +181,8 @@ def _row_to_item(r: dict) -> dict:
         # rating/genre in Discord. DB stores them; the embed builder consumes them.
         "rating": r.get("rating") or "",
         "genres": r.get("genres") or [],
+        "origin": r.get("origin") or "",
+        "type": r.get("type") or "",  # <-- ADDED for origin derivation fallback
     }
     su = item.get("series_url")
     if su:

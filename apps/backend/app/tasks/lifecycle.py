@@ -22,7 +22,7 @@ def do_add(item: dict) -> None:
     url = item["url"]
     tk = normalize_title_key(title)
     res = whitelist.add_whitelist_entries(
-        [{"title": title, "title_key": tk, "source": "ikiru", "url": url, "series_url": url}]
+        [{"title": title, "title_key": tk, "source": "komiku", "url": url, "series_url": url}]
     )
     logger.info("add done", title=title, status=res.get("status"))
 
@@ -53,12 +53,6 @@ def run_cron_inline(action: str) -> None:
         else:
             stats = enrich_stale_series_meta(stale_days=7, limit=50)
         logger.info("cron enrich done", action=action, stats=stats)
-        return
-
-    if action == "voratoon-cover":
-        from app.cron.enrich.resync import enrich_voratoon_covers
-        stats = enrich_voratoon_covers(limit=50)
-        logger.info("cron voratoon-cover done", **stats)
         return
 
     if action == "failed-retry":

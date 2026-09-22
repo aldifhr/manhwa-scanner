@@ -97,7 +97,7 @@ function AllCard({
       ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
       : src === "ikiru"
         ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
-        : src === "voratoon"
+        : src === "komiku"
           ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
           : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
 

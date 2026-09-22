@@ -3,7 +3,6 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
-import VoratoonExpiry from "@/components/status/VoratoonExpiry";
 
 const badge = (s: string) => {
   const v = s?.toLowerCase();
@@ -53,8 +52,8 @@ export default function StatusPage() {
   // merge health + cron per_source for disabled/nextScrape
   const list = (() => {
     const base = sources.length ? sources : (cron as any)?.sources ?? [];
-    // ensure 3 sources always shown
-    const want = ["ikiru", "shinigami", "voratoon"];
+    // ensure sources always shown
+    const want = ["shinigami", "komiku"];
     const map = new Map<string, any>();
     for (const s of base) {
       const key = (s.name || s.source || "").toLowerCase();
@@ -83,13 +82,13 @@ export default function StatusPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Status</h1>
         <span className="text-xs text-white/40">
-          3 sources • queue {queueDepth} {isProcessing ? "• processing" : ""} • refresh 15s
+          2 sources • queue {queueDepth} {isProcessing ? "• processing" : ""} • refresh 15s
         </span>
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="skeleton h-32 rounded-xl" />
           ))}
         </div>
@@ -98,7 +97,7 @@ export default function StatusPage() {
       ) : list.length === 0 ? (
         <div className="text-center py-12 text-white/50">No health data</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {list.map((s: any) => (
             <div key={s.name || s.source} className="bg-surface border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -118,8 +117,6 @@ export default function StatusPage() {
           ))}
         </div>
       )}
-
-      <VoratoonExpiry />
     </PageShell>
   );
 }

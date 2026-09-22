@@ -33,8 +33,14 @@ _MAX_PER_RUN = 2000  # safety cap; distinct series is ~85 so we never hit this
 def _fetch_meta(source: str, sid: str) -> dict:
     """Fetch one series' meta via the scraper (same path collect used)."""
     if source == "ikiru":
-        from app.scrapers import ikiru as _ik
-        return _ik.get_ikiru_series_meta(sid) or {}
+        try:
+            from app.scrapers import ikiru as _ik
+        except ImportError:
+            return {}
+        try:
+            from app.scrapers import ikiru as _ik
+        except ImportError:
+            return {}
     if source == "shinigami":
         from app.scrapers import shinigami as _sh
         return _sh.get_shinigami_series_meta(sid) or {}

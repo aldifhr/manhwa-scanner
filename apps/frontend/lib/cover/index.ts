@@ -15,8 +15,7 @@ function putCover(key: string, val: string | null): string | null {
 }
 
 const DIRECT_HOSTS = new Set([
-  "cvr.voratoon.id",
-  "cdn.voratoon.com",
+  "content.komiku.me",
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",
@@ -59,11 +58,9 @@ export function resolveCoverUrl(
     return putCover(cover, cover);
 
   // 2. Any cover-img form → rewrite to canonical proxy/cover (direct hosts stay as-is)
-  //'t re-wrap
   const img = extractCoverImgInner(cover);
   if (img) {
     if (img.inner.includes("/api/v1/reader/proxy?url=")) return putCover(cover, img.inner);
-    if (img.inner.includes("cvr.voratoon.id")) return putCover(cover, cover);
     return putCover(
       cover,
       `${canonicalForCoverImg(img.param)}?${img.param}=${encodeURIComponent(img.inner)}`
@@ -74,7 +71,6 @@ export function resolveCoverUrl(
   if (cover.startsWith(COVER_IMG_PREFIX)) {
     const inner = decodeURIComponent(cover.slice(COVER_IMG_PREFIX.length));
     if (inner.includes("/api/v1/reader/proxy?url=")) return putCover(cover, inner);
-    if (inner.includes("cvr.voratoon.id")) return putCover(cover, cover);
     return putCover(
       cover,
       `/api/v1/reader/proxy?url=${encodeURIComponent(inner)}`
@@ -123,8 +119,6 @@ export function resolveCoverUrl(
       } catch {}
       try {
         const rawHost = new URL(raw).hostname;
-        // Voratoon presigned X-Amz- URLs — return direct, bypass proxy to avoid 504
-        if (rawHost === "cvr.voratoon.id" && raw.includes("X-Amz-")) return putCover(cover, raw);
         if (isDirectAllowed(rawHost) && !raw.includes("X-Amz-")) return putCover(cover, raw);
       } catch {}
       return putCover(cover, `${PROXY_PREFIX}${encodeURIComponent(raw)}`);
@@ -149,8 +143,6 @@ export function resolveCoverUrl(
   try {
     host = new URL(rawUrl).hostname;
   } catch {}
-  // Voratoon private bucket presigned X-Amz- — return direct, no proxy (avoids Vercel 504)
-  if (host === "cvr.voratoon.id" && rawUrl.includes("X-Amz-")) return putCover(cover, rawUrl);
   if (isDirectAllowed(host)) return putCover(cover, rawUrl);
   return putCover(cover, toProxy(rawUrl));
 }

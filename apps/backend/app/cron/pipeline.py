@@ -65,7 +65,6 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
         if not do_dispatch:
             # Full telemetry from the actual scrape
             items, _health_map = collect.collect_recent_chapters(
-                with_whitelisted_ikiru=True,
                 with_whitelisted_shinigami=True,
                 source=source,
                 fetch_meta=False,  # metadata enrichment runs in scheduled enrich job

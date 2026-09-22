@@ -435,7 +435,7 @@ export const Reader = {
   },
 
   refreshVoratoonHealth: async () => {
-    await readerFetch("/api/v1/health/refresh-voratoon", { method: "POST" });
+    await readerFetch("/api/v1/health/refresh-komiku", { method: "POST" });
   },
 
   testErrorLog: async () => {

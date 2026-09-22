@@ -60,11 +60,17 @@ class Settings(BaseSettings):
     SECONDARY_SOURCE_URL: str = "https://api.shngm.io"
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
-    # 3 sources (ikiru, shinigami, voratoon) are active
-    SOURCE_KEYS: list[str] = ["ikiru", "shinigami", "voratoon"]
+    # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
+    SOURCE_KEYS: list[str] = ["shinigami", "komiku"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     # e.g. DISABLED_SOURCES=ikiru focuses collection on shinigami only.
     DISABLED_SOURCES: str = ""
+
+    @property
+    def active_sources(self) -> list[str]:
+        """Return SOURCE_KEYS minus DISABLED_SOURCES."""
+        disabled = {s.strip().lower() for s in self.DISABLED_SOURCES.split(",") if s.strip()}
+        return [s for s in self.SOURCE_KEYS if s not in disabled]
 
     # Scraper
     RSS_LOOKBACK_HOURS: int = 24
@@ -98,13 +104,13 @@ class Settings(BaseSettings):
     # NO arbitrary ports — explicit host:port pairs to prevent SSRF.
     PROXY_ALLOWED_HOSTS: list[str] = [
         "08.ikiru.wtf:443",
-        "08.ikiru.wtf:443",
         "ikiru.wtf:443",
         "g.shinigami.asia:443",
         "shinigami.asia:443",
         "assets.shngm.id:443",
         f"{VORATOON_COVER_BUCKET}:443",
         "cdn.voratoon.com:443",
+        "content.komiku.me:443",
     ]
 
     def get_proxy_hosts(self) -> list[str]:
@@ -164,11 +170,11 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-VALID_SOURCES = ("ikiru", "shinigami", "voratoon")
-VALID_SOURCES_WITH_ALL = ("ikiru", "shinigami", "voratoon", "all")
+VALID_SOURCES = ("shinigami", "komiku")
+VALID_SOURCES_WITH_ALL = ("shinigami", "komiku", "all")
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
-    "rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon",
+    "rss-fetch:shinigami", "rss-fetch:komiku",
     "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover", "failed-retry",
 )
 

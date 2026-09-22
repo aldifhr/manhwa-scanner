@@ -1,123 +1,76 @@
 """Cover image proxy — single seam for /reader/cover, /reader/cover-img, /reader/proxy, /img."""
+
+from __future__ import annotations
+
 import asyncio
+import base64
 import re
 import time as _time
-import hashlib as _hashlib
-import os as _os
+from asyncio import Lock
+from collections import OrderedDict
+from typing import TYPE_CHECKING
+from urllib.parse import quote, urlparse, urlsplit, urlunsplit, parse_qsl, urlencode, unquote
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response as FastResponse
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response as FastResponse
 
 from app.config import settings
 from app.logger import get_logger
-from app.utils.request_auth import require_monitor_auth, safe_error
+from app.utils.cover_scrub import scrub_cover
+
+if TYPE_CHECKING:
+    pass
 
 logger = get_logger("api:cover")
 router = APIRouter()
 
-# --- Image proxy shared ---
-import httpx
+_COVER_CACHE: "OrderedDict[str, tuple[float, bytes]]" = OrderedDict()
+_COVER_CACHE_TTL = 86400
+_COVER_CACHE_MAX = 200
 
-_RE_RESPONSE_SIZE_CAP = 10 * 1024 * 1024
-
-_image_cache_dir_env = _os.environ.get("IMAGE_CACHE_DIR")
-if not _image_cache_dir_env:
-    _image_cache_dir_env = _os.path.join(_os.sep, "tmp", "be_ag_cache")
-    _os.makedirs(_image_cache_dir_env, exist_ok=True)
-_IMAGE_CACHE_DIR: str = _image_cache_dir_env
-_IMAGE_CACHE_MAX = 2000
-_URL_FETCH_LOCKS: dict[str, asyncio.Lock] = {}
-_URL_LOCKS_GUARD = asyncio.Lock()
-_URL_FETCH_LOCKS_LAST_USED: dict[str, float] = {}
-_URL_FETCH_LOCKS_MAX = 1000
+_url_locks: dict[str, Lock] = {}
+_url_locks_lock = Lock()
 
 
-async def _url_lock(url: str):
-    async with _URL_LOCKS_GUARD:
-        if url not in _URL_FETCH_LOCKS:
-            if len(_URL_FETCH_LOCKS) >= _URL_FETCH_LOCKS_MAX:
-                _evict_oldest_locks()
-            _URL_FETCH_LOCKS[url] = asyncio.Lock()
-        _URL_FETCH_LOCKS_LAST_USED[url] = _time.time()
-    return _URL_FETCH_LOCKS[url]
+async def _url_lock(url: str) -> Lock:
+    async with _url_locks_lock:
+        if url not in _url_locks:
+            _url_locks[url] = Lock()
+        return _url_locks[url]
 
 
-def _evict_oldest_locks():
-    if len(_URL_FETCH_LOCKS) < _URL_FETCH_LOCKS_MAX:
-        return
-    sorted_urls = sorted(_URL_FETCH_LOCKS_LAST_USED.items(), key=lambda x: x[1])
-    to_evict = sorted_urls[: len(sorted_urls) // 4]
-    for url, _ in to_evict:
-        _URL_FETCH_LOCKS.pop(url, None)
-        _URL_FETCH_LOCKS_LAST_USED.pop(url, None)
-
-
-def _cache_path(url: str) -> str:
-    _os.makedirs(_IMAGE_CACHE_DIR, exist_ok=True)
-    key = _hashlib.sha256(url.encode()).hexdigest()[:32]
-    return _os.path.join(_IMAGE_CACHE_DIR, key)
-
-
-def _cache_get(url: str, max_age: int = 3600) -> bytes | None:
-    p = _cache_path(url)
-    try:
-        if _os.path.exists(p):
-            if (_time.time() - _os.path.getmtime(p)) > max_age:
-                return None
-            _os.utime(p, None)
-            with open(p, "rb") as f:
-                return f.read()
-    except Exception as e:
-        logger.warn("cover cache get failed", url=url[:80], err=str(e)[:160])
-        return None
+def _cache_get(url: str):
+    entry = _COVER_CACHE.get(url)
+    if entry and (_time.monotonic() - entry[0]) < _COVER_CACHE_TTL:
+        return entry[1]
     return None
 
 
-def _cache_put(url: str, data: bytes) -> None:
-    try:
-        if _os.path.isdir(_IMAGE_CACHE_DIR):
-            try:
-                entries = [_os.path.join(_IMAGE_CACHE_DIR, f) for f in _os.listdir(_IMAGE_CACHE_DIR)]
-                _now = _time.time()
-                _seven_days = 7 * 24 * 3600
-                for p in list(entries):
-                    try:
-                        if (_now - _os.path.getmtime(p)) > _seven_days:
-                            _os.remove(p)
-                            entries.remove(p)
-                    except Exception:
-                        pass
-                if len(entries) >= _IMAGE_CACHE_MAX:
-                    entries.sort(key=lambda e: _os.path.getmtime(e))
-                    for old in entries[: len(entries) - _IMAGE_CACHE_MAX + 1]:
-                        try:
-                            _os.remove(old)
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-        with open(_cache_path(url), "wb") as f:
-            f.write(data)
-    except Exception as e:
-        logger.warn("cover cache put failed", url=url[:80], err=str(e)[:160])
+def _cache_put(url: str, val: bytes):
+    _COVER_CACHE[url] = (_time.monotonic(), val)
+    while len(_COVER_CACHE) > _COVER_CACHE_MAX:
+        _COVER_CACHE.popitem(last=False)
 
 
-def _detect_ctype(data: bytes) -> str:
-    if data[:4] == b"\x89PNG":
-        return "image/png"
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp"
-    if data[:3] == b"\xff\xd8\xff":
+def _detect_ctype(content: bytes) -> str:
+    if content[:3] == b"\xff\xd8\xff":
         return "image/jpeg"
-    if data[:4] == b"GIF8":
+    if content[:4] == b"\x89PNG":
+        return "image/png"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "image/webp"
+    if content[:4] == b" GIF":
         return "image/gif"
     return "image/jpeg"
 
 
-async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -> "FastResponse":
-    from urllib.parse import urlparse
+# 1x1 transparent PNG
+_PX1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 
+_RESPONSE_SIZE_CAP = 5 * 1024 * 1024  # 5MB
+
+
+async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -> "FastResponse":
     p = urlparse(url)
     try:
         allowed = settings.get_proxy_hosts()
@@ -129,6 +82,8 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             "shinigami.asia:443",
             "assets.shngm.id:443",
             f"{settings.VORATOON_COVER_BUCKET}:443",
+            "cdn.voratoon.com:443",
+            "content.komiku.me:443",
         ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
@@ -159,6 +114,8 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             if "ikiru.wtf" in url:
                 headers_req["Referer"] = f"https://{settings.IKIRU_PUBLIC_URL.rstrip('/')}/"
                 headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
+            if "komiku" in url:
+                headers_req["Referer"] = "https://01.komiku.asia/"
             r = await asyncio.to_thread(
                 lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=8, allow_redirects=False)
             )
@@ -176,7 +133,7 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                         r = r2
                         break
             if r.status_code == 200:
-                content = r.content[:_RE_RESPONSE_SIZE_CAP]
+                content = r.content[:_RESPONSE_SIZE_CAP]
                 _cache_put(url, content)
                 ctype = r.headers.get("content-type") or _detect_ctype(content)
                 headers_out = {"Cache-Control": cache_control, "X-Cache": "MISS"}
@@ -185,13 +142,9 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                 return FastResponse(content=content, status_code=200, media_type=ctype, headers=headers_out)
             if r.status_code in (403, 404):
                 # Return a 1x1 transparent PNG so <img> doesn't error/flash
-                import base64
-                _PX1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
                 return FastResponse(content=_PX1, status_code=200, media_type="image/png", headers={"Cache-Control": "public, max-age=3600", "X-Cache": "MISS"})
             return FastResponse(status_code=r.status_code)
         except asyncio.TimeoutError:
-            import base64
-            _PX1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
             return FastResponse(content=_PX1, status_code=200, media_type="image/png", headers={"Cache-Control": "public, max-age=300", "X-Cache": "MISS"})
         except Exception:
             return FastResponse(status_code=502)
@@ -205,17 +158,14 @@ async def reader_cover(request: Request):
     if not re.match(r"^[a-zA-Z0-9\-_ ]+$", series):
         return FastResponse(status_code=400)
     from app.db import get_supabase
-    from app.utils.cover_scrub import scrub_cover
-
     sb = get_supabase()
     from app.utils.text import normalize_title_key, slugify_title_key
     try:
         from app.storage.canonical import canonical_of
     except Exception:
-        def canonical_of(x):  # fallback
+        def canonical_of(x):
             return x
     _spaced = series.replace("-", " ")
-    # Normalized/slug/canonical variants to match RSS/canonical storage (space vs dash)
     try:
         _norm = normalize_title_key(series)
         _slug = slugify_title_key(series)
@@ -234,89 +184,77 @@ async def reader_cover(request: Request):
         re.sub(r"\s+", "-", series),
         series.lower(),
         _spaced.lower(),
-        re.sub(r"\s+", "-", series).lower(),
         _norm,
         _slug,
         _canon,
         _canon_norm,
         _canon_slug,
-        _norm.lower(),
-        _slug.lower(),
     }
-    # prune empty and keep within 20
-    candidates = {c for c in candidates if c}
-
-    def _rank(u: str) -> int:
-        u = (u or "").lower()
-        if "assets.shngm.id" in u:
-            return 0
-        return 1
-
-    _words = [w for w in _spaced.lower().split() if len(w) > 2][:4]
-    _like = "%" + " ".join(_words[:3]) + "%" if _words else None
-    all_covers: list[str] = []
     try:
-        wl = sb.table("whitelist").select("cover").in_("title_key", list(candidates)).limit(5).execute()
-        all_covers += [r["cover"] for r in (wl.data or []) if r.get("cover")]
-        rc = sb.table("recent_chapters").select("cover").in_("title_key", list(candidates)).limit(10).execute()
-        all_covers += [r["cover"] for r in (rc.data or []) if r.get("cover")]
-        # series_meta fallback — RSS uses it as cover source, cover endpoint was missing it
-        try:
-            sm = sb.table("series_meta").select("cover").in_("title_key", list(candidates)).limit(5).execute()
-            all_covers += [r["cover"] for r in (sm.data or []) if r.get("cover")]
-        except Exception:
-            pass
-        if _like and len(all_covers) < 2 and len(_like) >= 6:
-            try:
-                rc2 = sb.table("recent_chapters").select("cover, title_key").ilike("title_key", _like).limit(20).execute()
-                all_covers += [r["cover"] for r in (rc2.data or []) if r.get("cover")]
-            except Exception:
-                pass
-            try:
-                wl2 = sb.table("whitelist").select("cover, title_key").ilike("title_key", _like).limit(10).execute()
-                all_covers += [r["cover"] for r in (wl2.data or []) if r.get("cover")]
-            except Exception:
-                pass
-            try:
-                sm2 = sb.table("series_meta").select("cover, title_key").ilike("title_key", _like).limit(10).execute()
-                all_covers += [r["cover"] for r in (sm2.data or []) if r.get("cover")]
-            except Exception:
-                pass
+        res = sb.table("recent_chapters").select("cover,title").in_("title_key", list(candidates)).limit(10).execute()
+        for r in (res.data or []):
+            c = r.get("cover")
+            if c and isinstance(c, str) and c.startswith("http"):
+                return await _fetch_image(c)
     except Exception:
         pass
-    seen: set[str] = set()
-    ranked: list[str] = []
-    for c in sorted(all_covers, key=_rank):
-        if c not in seen:
-            seen.add(c)
-            ranked.append(c)
+    try:
+        res2 = sb.table("series_meta").select("cover,title").in_("title_key", list(candidates)).limit(10).execute()
+        for r in (res2.data or []):
+            c = r.get("cover")
+            if c and isinstance(c, str) and c.startswith("http"):
+                return await _fetch_image(c)
+    except Exception:
+        pass
+    return FastResponse(status_code=404)
 
-    def _unwrap_cover(raw: str) -> str:
-        raw = (raw or "").strip()
-        # Live RSS stores voratoon cover as /api/v1/reader/proxy?url=https...cvr...X-Amz...
-        # which is not http -> would be skipped. Unwrap to presigned URL.
-        for prefix in ("/api/v1/reader/proxy?url=", "/api/v1/reader/cover-img?url=", "/api/img?url=", "/api/v1/img?url="):
-            if raw.startswith(prefix):
-                try:
-                    from urllib.parse import unquote
 
-                    inner = raw.split("url=", 1)[1]
-                    inner = unquote(inner)
-                    if "%" in inner and not inner.startswith("http"):
-                        inner = unquote(inner)
-                    return inner
-                except Exception:
-                    return raw
-        return raw
+@router.get("/reader/proxy")
+async def reader_proxy(request: Request):
+    raw_query = request.url.query or ""
+    if raw_query.startswith("url="):
+        url = raw_query[4:]
+    else:
+        url = request.query_params.get("url", "")
+    url = (url or "").strip()
+    if not url:
+        return FastResponse(status_code=400)
+    _guard = 0
+    while re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
+        try:
+            url = unquote(url)
+        except Exception:
+            break
+        _guard += 1
+    try:
+        urlparse(url)
+    except ValueError:
+        return FastResponse(status_code=400)
+    return await _fetch_image(url)
 
-    for raw in ranked:
-        unwrapped = _unwrap_cover(raw)
-        cover_url = scrub_cover(unwrapped)
-        if not cover_url or not cover_url.startswith("http"):
-            continue
-        return await _fetch_image(cover_url, cache_control="public, max-age=3600")
-    svg = '<svg width="200" height="280" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#111"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#444" font-size="12" font-family="sans-serif">No cover</text></svg>'
-    return FastResponse(content=svg.encode(), status_code=200, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
+@router.get("/reader/cover-img")
+async def reader_cover_img(request: Request):
+    return await reader_proxy(request)
+
+
+@router.get("/img")
+async def img(request: Request):
+    url = (request.query_params.get("url") or "").strip()
+    if not url:
+        return FastResponse(status_code=400)
+    _guard = 0
+    while re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
+        try:
+            url = unquote(url)
+        except Exception:
+            break
+        _guard += 1
+    try:
+        urlparse(url)
+    except ValueError:
+        return FastResponse(status_code=400)
+    return await _fetch_image(url)
 
 
 @router.get("/reader/refresh-cover")
@@ -328,8 +266,8 @@ async def reader_refresh_cover(request: Request):
         return JSONResponse(content={"success": False, "error": "invalid series"}, status_code=400)
 
     from app.db import get_supabase, q
-    from app.utils.cover_scrub import scrub_cover
     from app.config import settings as _cfg
+    from fastapi.responses import JSONResponse
 
     sb = get_supabase()
     _spaced = series.replace("-", " ")
@@ -338,7 +276,7 @@ async def reader_refresh_cover(request: Request):
     # Find stored cover URL
     stored_cover = None
     try:
-        for tbl in ("series_meta", "whitelist"):
+        for tbl in ("recent_chapters", "series_meta", "whitelist"):
             try:
                 res = sb.table(tbl).select("cover").in_("title_key", candidates).limit(3).execute()
                 for r in (res.data or []):
@@ -359,7 +297,6 @@ async def reader_refresh_cover(request: Request):
     # If voratoon presigned URL, fetch fresh one from API
     if "cvr.voratoon.id" in str(stored_cover) and "X-Amz-" in str(stored_cover):
         try:
-            # Extract slug from stored cover URL
             from urllib.parse import urlparse
             parsed = urlparse(str(stored_cover))
             path_parts = parsed.path.split("/")
@@ -373,7 +310,6 @@ async def reader_refresh_cover(request: Request):
                     if fresh_cover_url:
                         fresh_scrubbed = scrub_cover(fresh_cover_url)
                         if fresh_scrubbed:
-                            # Update stored cover
                             try:
                                 from datetime import datetime, timezone
                                 sb.table("series_meta").update({"cover": fresh_scrubbed, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("title_key", series).eq("source", "voratoon").execute()
@@ -383,77 +319,8 @@ async def reader_refresh_cover(request: Request):
         except Exception as e:
             logger.warn("refresh-cover voratoon failed", series=series, err=str(e)[:120])
 
-    # For non-voratoon or if refresh fails, return existing cover
+    # Komiku covers are stable URLs — return as-is
+    if "content.komiku.me" in str(stored_cover):
+        return JSONResponse(content={"success": True, "cover": stored_cover})
+
     return JSONResponse(content={"success": True, "cover": stored_cover})
-async def reader_cover_public(request: Request):
-    from urllib.parse import unquote, urlparse
-
-    raw_query = request.url.query or ""
-    if raw_query.startswith("url="):
-        url = raw_query[4:]
-    else:
-        url = request.query_params.get("url", "")
-    url = (url or "").strip()
-    if not url:
-        return FastResponse(status_code=400)
-    _guard = 0
-    while re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
-        try:
-            url = unquote(url)
-        except Exception:
-            break
-        _guard += 1
-    try:
-        urlparse(url)
-    except ValueError:
-        return FastResponse(status_code=400)
-    return await _fetch_image(url)
-
-
-@router.get("/reader/proxy")
-async def reader_proxy(request: Request):
-    raw_query = request.url.query or ""
-    if raw_query.startswith("url="):
-        url = raw_query[4:]
-    else:
-        url = request.query_params.get("url", "")
-    url = (url or "").strip()
-    if not url:
-        return FastResponse(status_code=400)
-    from urllib.parse import unquote
-
-    _guard = 0
-    while re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
-        try:
-            url = unquote(url)
-        except Exception:
-            break
-        _guard += 1
-    from urllib.parse import urlparse
-
-    try:
-        urlparse(url)
-    except ValueError:
-        return FastResponse(status_code=400)
-    return await _fetch_image(url)
-
-
-@router.get("/img")
-async def img(request: Request):
-    from urllib.parse import unquote, urlparse
-
-    url = (request.query_params.get("url") or "").strip()
-    if not url:
-        return FastResponse(status_code=400)
-    _guard = 0
-    while re.search(r"%[0-9A-Fa-f]{2}", url) and not url.lower().startswith(("http://", "https://")) and _guard < 5:
-        try:
-            url = unquote(url)
-        except Exception:
-            break
-        _guard += 1
-    try:
-        urlparse(url)
-    except ValueError:
-        return FastResponse(status_code=400)
-    return await _fetch_image(url)

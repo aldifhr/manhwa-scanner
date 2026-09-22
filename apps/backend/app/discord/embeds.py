@@ -59,8 +59,12 @@ def _proxy_cover(cover: str | None) -> str | None:
             return cover
     except Exception:
         pass
-    # Direct URLs (voratoon assets) — wrap in public cover-img proxy
-    # so Discord can fetch without auth and bypass hotlink protection
+    # Voratoon presigned S3 — return direct URL so Discord fetches from S3
+    # directly. Proxying through /cover-img times out from this VPS.
+    from app.config import settings as _cfg
+    if _cfg.VORATOON_COVER_BUCKET in cover:
+        return cover
+    # Direct URLs — wrap in public cover-img proxy
     # Fix double-encode: RSS cover already %2F-encoded (X-Amz-Credential), _urlquote with safe='' would %→%25. Normalize first.
     from urllib.parse import unquote as _uq2
     try:

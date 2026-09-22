@@ -40,7 +40,7 @@
 
 ## 5. Rate Limiting (Inbound)
 
-- `app/middleware/rate_limit.py:17` `5/min` untuk `/auth`, `1000/min` general, wired `app/main.py:133` — single-process in-memory.
+
 - No MinIO (`app/config.py:64`, `app/utils/minio_presign.py` stub, `PROXY_ALLOWED_HOSTS` tanpa `minio`). Cover langsung `ikiru/shinigami/assets.shngm.id` via `/api/reader/proxy`.
 - `MinIO` dihapus (`app/config.py:64`, `app/utils/minio_presign.py` stub, `PROXY_ALLOWED_HOSTS` tanpa `minio`). Cover langsung `ikiru/shinigami/assets.shngm.id` via `/api/reader/proxy`.
 

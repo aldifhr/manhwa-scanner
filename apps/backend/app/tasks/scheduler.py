@@ -7,14 +7,12 @@ import time as _time
 
 logger = logging.getLogger("tasks.scheduler")
 
-_RSS_SOURCES = ("ikiru", "shinigami", "voratoon")
+_RSS_SOURCES = ("shinigami", "komiku")
 _SOURCE_INTERVAL_S = 300
-_IKIRU_INTERVAL_S = 300
 _DISPATCH_INTERVAL_S = 120
 _ENRICH_INTERVAL_S = 1200
 _ENRICH_MISSING_INTERVAL_S = 1200
 _ENRICH_REFRESH_INTERVAL_S = 604800
-_VORATOON_COVER_INTERVAL_S = 86400
 _FAILED_RETRY_INTERVAL_S = 3600
 _DASHBOARD_INTERVAL_S = 600
 _RETENTION_INTERVAL_S = 86400
@@ -30,7 +28,6 @@ def _scheduler_loop() -> None:
     last_enrich = 0.0
     last_enrich_missing = 0.0
     last_enrich_refresh = 0.0
-    last_voratoon_cover = 0.0
     last_vseries = 0.0
     last_dispatch = 0.0
     last_failed_retry = 0.0
@@ -42,8 +39,7 @@ def _scheduler_loop() -> None:
                 dispatch_interval=_DISPATCH_INTERVAL_S,
                 enrich_interval=_ENRICH_INTERVAL_S,
                 enrich_missing_interval=_ENRICH_MISSING_INTERVAL_S,
-                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S,
-                voratoon_cover_interval=_VORATOON_COVER_INTERVAL_S)
+                enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S)
     for i, src in enumerate(_RSS_SOURCES):
         try:
             enqueue_cron(f"rss-fetch:{src}", source=src)
@@ -57,7 +53,6 @@ def _scheduler_loop() -> None:
     except Exception:
         pass
     last_source = _time.monotonic()
-    last_ikiru = _time.monotonic()
     while True:
         try:
             # Reload disabled sources from env each cycle
@@ -75,7 +70,7 @@ def _scheduler_loop() -> None:
                     logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
             if _now - last_source >= _SOURCE_INTERVAL_S:
                 if not _stop.is_set():
-                    for src in ("shinigami", "voratoon"):
+                    for src in ("shinigami", "komiku"):
                         if src in _disabled_set:
                             continue
                         try:
@@ -84,18 +79,8 @@ def _scheduler_loop() -> None:
                         except Exception as e:
                             logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
                         _stop.wait(20)
-                logger.info("scheduler rss-fetch batch done", sources=("shinigami", "voratoon"))
+                logger.info("scheduler rss-fetch batch done", sources=("shinigami", "komiku"))
                 last_source = _now
-            if _now - last_ikiru >= _IKIRU_INTERVAL_S:
-                try:
-                    if "ikiru" in _disabled_set:
-                        logger.debug("scheduler: ikiru disabled, skipping")
-                    else:
-                        logger.info("scheduler enqueue rss-fetch", source="ikiru")
-                        enqueue_cron("rss-fetch:ikiru", source="ikiru")
-                    last_ikiru = _now
-                except Exception as e:
-                    logger.warn("scheduler enqueue failed", src="ikiru", err=str(e)[:120])
             if _now - last_enrich >= _ENRICH_INTERVAL_S:
                 try:
                     enqueue_cron("enrich", title="enrichment")
@@ -113,12 +98,6 @@ def _scheduler_loop() -> None:
                 try:
                     enqueue_cron("enrich-refresh")
                     last_enrich_refresh = _now
-                except Exception:
-                    pass
-            if _now - last_voratoon_cover >= _VORATOON_COVER_INTERVAL_S:
-                try:
-                    enqueue_cron("voratoon-cover")
-                    last_voratoon_cover = _now
                 except Exception:
                     pass
             if _now - last_vseries >= _VSERIES_REFRESH_INTERVAL_S:
@@ -166,11 +145,11 @@ def _scheduler_loop() -> None:
             try:
                 from app.metrics_prometheus import DB_POOL_SIZE, CIRCUIT_BREAKER_STATE, REDIS_QUEUE_DEPTH
                 from app.db_adapter import get_pool_stats
-                from app.services.resilience import cb_db, cb_ikiru, cb_shinigami, cb_voratoon
+                from app.services.resilience import cb_db, cb_shinigami
                 ps = get_pool_stats()
                 DB_POOL_SIZE.labels(state="active").set(ps.get("active", 0))
                 DB_POOL_SIZE.labels(state="idle").set(ps.get("idle", 0))
-                for name, cb in [("db", cb_db), ("ikiru", cb_ikiru), ("shinigami", cb_shinigami), ("voratoon", cb_voratoon)]:
+                for name, cb in [("db", cb_db), ("shinigami", cb_shinigami)]:
                     CIRCUIT_BREAKER_STATE.labels(service=name).set({"closed": 0, "half_open": 1, "open": 2}.get(cb.state, 0))
             except Exception:
                 pass

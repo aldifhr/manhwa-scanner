@@ -402,6 +402,12 @@ def enrich_voratoon_covers(limit: int = 50) -> dict:
                 except Exception:
                     pass
                 updated += 1
+        except RuntimeError as e:
+            if "circuit" in str(e).lower():
+                logger.debug("voratoon cover: circuit OPEN (expected)", tk=tk)
+            else:
+                logger.warn("voratoon cover: fetch failed", tk=tk, err=str(e)[:120])
+            failed += 1
         except Exception as e:
             logger.warn("voratoon cover: fetch failed", tk=tk, err=str(e)[:120])
             failed += 1
