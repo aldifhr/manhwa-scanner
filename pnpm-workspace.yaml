@@ -6,6 +6,7 @@ allowBuilds:
   tree-sitter: true
   tree-sitter-javascript: true
   tree-sitter-typescript: true
+  workerd: true
 
 overrides:
   postcss: ^8.5.13
