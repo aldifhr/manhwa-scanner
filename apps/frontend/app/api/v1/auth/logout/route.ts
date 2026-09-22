@@ -4,9 +4,8 @@ import { NextResponse } from "next/server";
 import { COOKIE_NAME } from "@/lib/auth";
 
 async function handleLogout(_request: Request) {
-  // NOTE: tidak call backend /auth?action=logout — backend tidak punya handler logout
-  // dan call tersebut cuma buang kuota rate_limit 5/min untuk /auth. JWT stateless,
-  // clear cookie di FE sudah cukup. Jika backend nanti punya blocklist, aktifkan lagi.
+  // Backend tidak punya handler logout. JWT stateless,
+  // clear cookie di FE sudah cukup.
 
   const response = NextResponse.json({ success: true });
   const clearOpts = {

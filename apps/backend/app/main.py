@@ -152,14 +152,25 @@ app.add_middleware(
     max_age=600,
 )
 
+# Boot config validation — fail fast on missing critical settings
+try:
+    from app.boot_config import validate_settings
+    validate_settings()
+except RuntimeError as e:
+    import sys as _sys
+    print(f"FATAL: {e}", file=_sys.stderr)
+    _sys.exit(1)
+
+# Graceful shutdown — finish current job, close connections
+from app.services.graceful_shutdown import install_signal_handlers, register_shutdown_handler
+install_signal_handlers()
+
 # Extracted middlewares (was inline 150L in god-file)
 from app.middleware.correlation import correlation_middleware
 from app.middleware.security import security_headers_middleware
-from app.middleware.rate_limit import rate_limit_middleware
 from app.middleware.access_log import access_log_middleware
 app.middleware("http")(correlation_middleware)
 app.middleware("http")(security_headers_middleware)
-app.middleware("http")(rate_limit_middleware)
 app.middleware("http")(access_log_middleware)
 
 from app.utils.request_auth import require_monitor_auth
@@ -210,7 +221,7 @@ from starlette.exceptions import HTTPException as _StarletteHTTPException
 @app.exception_handler(_StarletteHTTPException)
 async def _http_exception_handler(request: Request, exc: _HTTPException):
     _CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden",
-              404: "not_found", 429: "rate_limited", 500: "internal_error"}
+              404: "not_found", 500: "internal_error"}
     return JSONResponse(
         status_code=exc.status_code,
         content={

@@ -42,13 +42,7 @@ Frontend sends `x-csrf-token` via `withCsrf()` in `lib/csrf.ts` + `reader/transp
 
 ## Rate limiting
 
-`app/middleware/rate_limit.py:12` `rate_limit_middleware` (in-memory, per-IP per-minute, wired in `app/main.py:133`):
-
-- `POST /api/v1/auth` (login/refresh) → **5/min per IP** (`429 rate_limited`)
-- all other routes → **1000/min per IP**
-- eviction of stale buckets at 50k entries to bound memory
-
-Still gated by auth + CORS allowlist (`app/main.py`).
+None — auth is via `CRON_SECRET` / `MONITOR_AUTH_TOKEN`, not rate limiting.
 
 ## P0 security findings (from BUG.md)
 
@@ -80,4 +74,3 @@ Was `db_adapter.py:get_conn` `autocommit=True` releasing `FOR UPDATE SKIP LOCKED
 1. ~~Patch BUG-2/4/6~~ — done (see above)
 2. Keep `DASHBOARD_PASSWORD` documented in `.env.example` as `change-me` for production
 3. Consider `SameSite=Lax` + `Origin` check if cross-subdomain `scanner↔komik` no longer needs `None`
-4. Rate limiting on `/api/v1/auth` is now **5/min** via `rate_limit_middleware` — monitor `429` metrics

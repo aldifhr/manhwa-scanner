@@ -143,6 +143,59 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
     except Exception:
         pass
 
+    # Pre-fetch fresh Voratoon presigned URLs (expire in 6 days, history retains 90d)
+    # Cache in Redis with 5d TTL to avoid repeated API calls.
+    _vt_refresh_map: dict[str, str] = {}
+    _vt_slugs: dict[str, str] = {}
+    _vt_cached: dict[str, str] = {}
+    for r in rows:
+        _tk_vt = r.get("title_key") or ""
+        _cover_vt = r.get("cover") or ""
+        if r.get("source") == "voratoon" and "cvr.voratoon.id" in str(_cover_vt) and _tk_vt:
+            try:
+                from urllib.parse import urlparse as _up
+                _parts = _up(str(_cover_vt)).path.split("/")
+                if len(_parts) >= 4 and _parts[1] == "prod" and _parts[2] == "series":
+                    _vt_slugs[_tk_vt] = _parts[3]
+            except Exception:
+                pass
+    # Check Redis cache first
+    if _vt_slugs:
+        try:
+            import redis as _redis_mod
+            from app.storage.series_meta import _redis
+            _r = _redis()
+            if _r is not None:
+                for _tk_vt, _slug in _vt_slugs.items():
+                    _cached = _r.get(f"vt:cover:{_tk_vt}")
+                    if _cached:
+                        _vt_cached[_tk_vt] = _cached
+        except Exception:
+            pass
+    # Fetch uncached slugs from API
+    _vt_to_fetch = {k: v for k, v in _vt_slugs.items() if k not in _vt_cached}
+    if _vt_to_fetch:
+        from app.scrapers.voratoon import fetch_series_detail
+        for _tk_vt, _slug in _vt_to_fetch.items():
+            try:
+                _detail = fetch_series_detail(_slug)
+                if _detail:
+                    _inner = _detail.get("data", _detail)
+                    _fresh = _inner.get("coverImage") or ""
+                    if _fresh:
+                        _vt_refresh_map[_tk_vt] = _fresh
+                        # Store in Redis with 5d TTL
+                        try:
+                            from app.storage.series_meta import _redis
+                            _r = _redis()
+                            if _r is not None:
+                                _r.setex(f"vt:cover:{_tk_vt}", 432000, _fresh)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+    _vt_refresh_map.update(_vt_cached)
+
     results = []
     for idx, r in enumerate(rows):
         _raw = r.get("chapter_url") or ""
@@ -169,6 +222,7 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
         if not wl:
             tk_norm = normalize_title_key((r.get("chapter_title") or r.get("title_key") or ""))
             wl = wl_map.get(f"title:{tk_norm}", {})
+
         # BUG4: metadata from recent_chapters (has genres/description/rating/origin)
         # falls back to whitelist, then series_meta, then dispatch row.
         _tk = r.get("title_key") or ""
@@ -190,7 +244,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
         title = html.unescape(title).replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
         _desc = (_desc or "").replace("\uFFFD", "\u2019").replace("\u0092", "\u2019")
         # BUG5: scrub cover (voratoon presigned -> proxy-in)
-        _cover = scrub_cover(r.get("cover") or rc.get("cover") or "")
+        # For Voratoon rows, refresh expired presigned URLs (expire in 6 days, history retains 90d).
+        _cover = _vt_refresh_map.get(_tk) if "cvr.voratoon.id" in str(r.get("cover") or "") and _tk in _vt_refresh_map else scrub_cover(r.get("cover") or rc.get("cover") or "")
         results.append({
             "title": title,
             "cover": _cover,

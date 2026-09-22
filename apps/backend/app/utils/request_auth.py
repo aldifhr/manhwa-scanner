@@ -12,6 +12,27 @@ def require_monitor_auth(request: Request) -> bool:
     )
 
 
+def get_session_hash(request: Request) -> str | None:
+    """Return a stable per-session hash for continue-reading storage.
+    
+    Uses the ikiru_dashboard_session cookie (JWT) — sha256[:16].
+    Falls back to Authorization Bearer <REDACTED>
+    """
+    import hashlib as _hashlib
+    
+    cookie = request.cookies.get("ikiru_dashboard_session", "")
+    if cookie:
+        return _hashlib.sha256(cookie.encode()).hexdigest()[:16]
+    
+    auth = request.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        if token and token != "null":
+            return _hashlib.sha256(token.encode()).hexdigest()[:16]
+    
+    return None
+
+
 def require_cron_auth(request: Request) -> bool:
     from app.utils.auth import check_cron_auth
 

@@ -7,7 +7,7 @@ export const API_PREFIX = "/api/v1" as const;
 export const OPENAPI_VERSION = "0.1.0";
 
 // TitleKey = canonical slug, Source = scraper origin
-export type Source = "shinigami" | "ikiru" | "voratoon";
+export type Source = "shinigami" | "ikiru" | "komiku";
 export type Origin = "KR" | "CN" | "JP";
 
 export interface WhitelistItem {

@@ -172,7 +172,7 @@ function MangaCard({
                 const s = src.toLowerCase();
                 const down = !isHealthy(health[s]);
                 const color =
-                  s === "voratoon"
+                  s === "komiku"
                     ? "bg-orange-600/90 text-white"
                     : s === "shinigami"
                       ? "bg-red-600/90 text-white"

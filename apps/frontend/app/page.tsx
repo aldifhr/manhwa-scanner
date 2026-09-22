@@ -76,7 +76,7 @@ function SourcePill({ source }: { source: string }) {
       ? "bg-red-500/15 text-red-400 border-red-500/20"
       : s === "ikiru"
         ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
-        : s === "voratoon"
+        : s === "komiku"
           ? "bg-orange-500/15 text-orange-400 border border-orange-500/20"
           : "bg-white/10 text-white/80 border-white/10";
   return (
@@ -186,7 +186,7 @@ function HomeGroupedCard({
       ? "bg-red-500 text-white"
       : sLower === "ikiru"
         ? "bg-emerald-500 text-black"
-        : sLower === "voratoon"
+        : sLower === "komiku"
           ? "bg-orange-500 text-white"
           : "bg-white/90 text-black";
 
@@ -290,7 +290,7 @@ function HomeGroupedCard({
                 ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
                 : src === "ikiru"
                   ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
-                  : src === "voratoon"
+                  : src === "komiku"
                     ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border-orange-500/20"
                     : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
             return (

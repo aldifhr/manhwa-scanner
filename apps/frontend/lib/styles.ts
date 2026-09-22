@@ -28,7 +28,7 @@ export function filterButtonClass(
 const SOURCE_COLOR: Record<string, string> = {
   shinigami: "red",
   ikiru: "emerald",
-  voratoon: "orange",
+  komiku: "orange",
 };
 const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
   shinigami: {
@@ -39,7 +39,7 @@ const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
     badge: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
     chip: "bg-green-500/15 text-green-400",
   },
-  voratoon: {
+  komiku: {
     badge: "bg-orange-500/15 text-orange-400 border border-orange-500/20",
     chip: "bg-orange-500/15 text-orange-400",
   },

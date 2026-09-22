@@ -30,9 +30,9 @@ function resolveDetailUrl(item: WhitelistRouteItem): string | undefined {
   })();
   const slug = slugFromTitle(title);
   if (!slug) return undefined;
-  if (sources.includes("voratoon"))
-    return `https://v2.voratoon.com/series/${slug}`;
-  if (sources.includes("ikiru")) return `https://07.ikiru.wtf/manga/${slug}/`;
+  if (sources.includes("komiku"))
+    return `https://01.komiku.asia/${slug}`;
+  if (sources.includes("ikiru")) return `https://08.ikiru.wtf/manga/${slug}/`;
   if (sources.includes("shinigami")) {
     const raw =
       (item as unknown as { titleKey?: string }).titleKey || item.id || "";

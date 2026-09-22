@@ -157,7 +157,22 @@ async def api_health(request: Request):
 
         hm = _h.load_source_health_map(_s.SOURCE_KEYS)
         sources = []
+        # Add disabled sources first
+        for src in _s.SOURCE_KEYS:
+            if src not in _s.active_sources:
+                sources.append({
+                    "name": src,
+                    "status": "disabled",
+                    "lastScrape": "",
+                    "lastSuccess": "",
+                    "errorRate24h": 0.0,
+                    "consecutiveFailures": 0,
+                    "lastError": "disabled via DISABLED_SOURCES",
+                    "disabledUntil": None,
+                })
         for src, row in (hm or {}).items():
+            if src not in _s.active_sources:
+                continue
             ok_24h = int(row.get("successes_today") or 0) + int(row.get("failures_today") or 0)
             err_rate = round(100.0 * int(row.get("failures_today") or 0) / ok_24h, 1) if ok_24h else 0.0
             sources.append({
@@ -211,7 +226,22 @@ async def health_detailed(request: Request):
         pool = {"active": -1, "idle": -1}
     hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
     sources = []
+    # Add disabled sources
+    for src in settings.SOURCE_KEYS:
+        if src not in settings.active_sources:
+            sources.append({
+                "name": src,
+                "status": "disabled",
+                "lastScrape": "",
+                "lastSuccess": "",
+                "errorRate24h": 0.0,
+                "consecutiveFailures": 0,
+                "lastError": "disabled via DISABLED_SOURCES",
+                "disabledUntil": None,
+            })
     for src, row in (hm or {}).items():
+        if src not in settings.active_sources:
+            continue
         ok_24h = int(row.get("successes_today") or 0) + int(row.get("failures_today") or 0)
         err_rate = round(100.0 * int(row.get("failures_today") or 0) / ok_24h, 1) if ok_24h else 0.0
         sources.append({

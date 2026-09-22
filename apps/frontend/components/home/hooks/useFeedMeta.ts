@@ -7,7 +7,7 @@ export function useFeedMeta(
   all: FlatChapter[],
   optimisticWhitelist: Set<string>
 ) {
-  const sources: string[] = useMemo(() => ["shinigami", "voratoon"], []);
+  const sources: string[] = useMemo(() => ["shinigami", "komiku"], []);
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of all) {

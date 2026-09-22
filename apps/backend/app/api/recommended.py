@@ -1,6 +1,6 @@
 """Recommended / Popular — GET /recommended (public).
 
-Aggregates Shinigami top daily + Voratoon popular into a single feed for
+Aggregates Shinigami top daily + Voratoon browse page into a single feed for
 the home hero. No DB, no auth — pure upstream fan-out with 5-min cache.
 """
 
@@ -50,7 +50,6 @@ def _fetch_shinigami(limit: int = 10) -> list[dict[str, Any]]:
             if cover:
                 cover = scrub_cover(cover) or cover
             slug = d.get("manga_id") or ""
-            # extract genres from taxonomy if present
             genres = []
             tax = d.get("taxonomy") or {}
             for g in (tax.get("Genre") or []):
@@ -80,7 +79,6 @@ def _fetch_shinigami(limit: int = 10) -> list[dict[str, Any]]:
 
 
 def _fetch_shinigami_manhua(limit: int = 10) -> list[dict[str, Any]]:
-    """Shinigami recommended manhua — /v1/manga/list?format=manhua&is_recommended=true."""
     try:
         from curl_cffi import requests as cffi_req
 
@@ -135,51 +133,67 @@ def _fetch_shinigami_manhua(limit: int = 10) -> list[dict[str, Any]]:
 
 
 def _fetch_voratoon(limit: int = 10) -> list[dict[str, Any]]:
-    try:
-        import httpx
+    """Fetch voratoon popular series from browse page HTML.
 
-        url = f"{settings.VORATOON_API_URL.rstrip('/')}/series"
-        params = {
-            "take": str(limit),
-            "page": "1",
-            "includeMeta": "true",
-            "sort": "popularity",
-            "sortOrder": "desc",
-        }
-        with httpx.Client(timeout=15.0) as c:
-            r = c.get(url, params=params, headers={"Accept": "application/json"})
-            if r.status_code != 200:
-                logger.warn("voratoon popular failed", status=r.status_code)
-                return []
-            j = r.json()
+    The API at api.voratoon.com is blocked by Cloudflare WAF from VPS IPs.
+    But the browse page at v2.voratoon.com/browse works and returns full HTML
+    with card titles and chapter counts.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+        from bs4 import BeautifulSoup
+
+        url = f"https://{settings.VORATOON_DOMAIN}/browse?format=manhwa&page=1"
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            pg = browser.new_page()
+            try:
+                pg.goto(url, wait_until="networkidle", timeout=30000)
+                pg.wait_for_timeout(2000)
+                html = pg.content()
+            finally:
+                browser.close()
+
+        soup = BeautifulSoup(html, "lxml")
         out: list[dict[str, Any]] = []
-        for s in (j.get("data") or [])[:limit]:
-            data = s.get("data") or {}
-            slug = data.get("slug") or ""
+
+        for a in soup.select("a.card-title")[:limit]:
+            href = str(a.get("href", ""))
+            if not href.startswith("/series/"):
+                continue
+            slug = href.removeprefix("/series/")
+            title = a.text.strip()
             if not slug:
                 continue
-            cover = data.get("coverImage") or ""
-            if cover:
-                # voratoon cover is presigned cvr.voratoon.id — must go through proxy
-                cover = scrub_cover(cover) or cover
-            genres = [g.get("data", {}).get("name", "") for g in (data.get("genres") or []) if g.get("data", {}).get("name")]
+
+            # Get cover — it's usually in a nearby img tag
+            card = a.find_parent("div", class_="card") or a.find_parent("div")
+            cover = ""
+            if card:
+                img = card.select_one("img[src*='prod/series/']")
+                if img:
+                    src = img.get("src")
+                    if isinstance(src, str):
+                        cover = scrub_cover(src) or ""
+
             out.append({
-                "title": data.get("title") or "",
+                "title": title,
                 "titleKey": slug,
                 "slug": slug,
                 "cover": cover,
                 "seriesUrl": _voratoon_series_url(slug),
                 "source": "voratoon",
-                "rating": float(data.get("rating") or 0) or None,
-                "views": int(str(data.get("totalViews") or "0").replace(",", "") or 0),
-                "bookmarks": int(str(data.get("bookmarkCount") or "0") or 0),
-                "genres": genres,
-                "description": (data.get("synopsis") or "")[:300],
-                "latestChapter": str(data.get("totalChapters") or ""),
-                "type": data.get("format") or "manhwa",
-                "origin": "CN" if (data.get("format") or "").lower() == "manhua" else "KR",
-                "isRecommended": bool(data.get("isRecommended")),
+                "rating": None,
+                "views": 0,
+                "bookmarks": 0,
+                "genres": [],
+                "description": "",
+                "latestChapter": "",
+                "type": "manhwa",
+                "origin": "KR",
             })
+
         return out
     except Exception as e:
         logger.warn("voratoon fetch error", err=str(e)[:160])
@@ -201,39 +215,36 @@ async def _fetch_all(limit: int) -> list[dict[str, Any]]:
             merged.append(sh_manhua[i])
         if i < len(vo):
             merged.append(vo[i])
-    # dedup by titleKey (shinigami daily vs manhua may overlap)
+    # dedup by titleKey
     seen: set[str] = set()
     deduped: list[dict[str, Any]] = []
     for it in merged:
         k = it.get("titleKey") or it.get("slug") or ""
         if k and k in seen:
             continue
-        if k:
-            seen.add(k)
+        seen.add(k)
         deduped.append(it)
-    return deduped[: limit * 3]
+    return deduped
 
 
 @router.get("/recommended")
-async def recommended(request: Request):
-    # public — no auth
-    raw_limit = request.query_params.get("limit", "10")
-    try:
-        limit = max(1, min(30, int(raw_limit)))
-    except Exception:
-        limit = 10
-    cache_key = f"rec:{limit}"
-    now = time.monotonic()
-    cached = _CACHE.get(cache_key)
+async def recommended(request: Request, limit: int = 20):
+    """Get recommended/popular series from all sources."""
+    now = time.time()
+    cached = _CACHE.get("recommended")
     if cached and (now - cached[0]) < _TTL:
-        return JSONResponse(content=cached[1], headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300", "X-Cache": "HIT"})
+        return JSONResponse(content=cached[1])
 
-    results = await _fetch_all(limit)
-    body = {"success": True, "data": {"results": results, "total": len(results)}}
-    _CACHE[cache_key] = (now, body)
-    # prune
-    if len(_CACHE) > 20:
-        oldest = sorted(_CACHE.items(), key=lambda kv: kv[1][0])[:10]
-        for k, _ in oldest:
-            _CACHE.pop(k, None)
-    return JSONResponse(content=body, headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300", "X-Cache": "MISS"})
+    try:
+        items = await _fetch_all(limit)
+    except Exception as e:
+        logger.error("recommended fetch failed", err=str(e)[:160])
+        items = []
+
+    result = {
+        "data": items,
+        "cached_at": now,
+        "source": "recommended",
+    }
+    _CACHE["recommended"] = (now, result)
+    return JSONResponse(content=result)

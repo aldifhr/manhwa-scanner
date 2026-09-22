@@ -19,7 +19,7 @@ async def catalog_search(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     q = request.query_params.get("q", "")
-    from app.scrapers import ikiru, shinigami
+    from app.scrapers import shinigami
 
     # C1 FIX: Run blocking scrapers in thread pool to avoid blocking event loop
     ikiru_results, shinigami_results = await asyncio.gather(

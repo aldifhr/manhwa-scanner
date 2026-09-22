@@ -7,6 +7,8 @@ Auth: PUT requires admin role (require_monitor_auth {"admin"}); GET is monitor-o
 """
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -68,6 +70,9 @@ async def settings_put(request: Request, guild_id: str):
     # Destructive-ish write (changes guild notification policy) — admin only.
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    # Validate path param
+    if not re.match(r"^[a-zA-Z0-9\-_ ]{1,80}$", guild_id):
+        return JSONResponse(content={"success": False, "error": "invalid guild_id"}, status_code=400)
     try:
         body = await request.json()
     except Exception:

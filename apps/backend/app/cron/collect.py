@@ -8,17 +8,16 @@ from app.logger import get_logger
 from app.utils.text import slugify_title_key
 from app.storage import health, whitelist as wl_store
 from app.cron.collectors.common import _SOURCE_TIMEOUT
-from app.cron.collectors.ikiru import _collect_ikiru_source
+from app.cron.collectors.komiku import _collect_komiku_source
 from app.cron.collectors.shinigami import _collect_shinigami_source
-from app.cron.collectors.voratoon import _collect_voratoon_source
 from app.cron.source_result import SourceResult
 import time as _time
 
 logger = get_logger("cron:collect")
 health_store = health
 
+
 def collect_recent_chapters(
-    with_whitelisted_ikiru: bool = False,
     with_whitelisted_shinigami: bool = False,
     source: str | None = None,
     fetch_meta: bool = True,
@@ -94,7 +93,6 @@ def collect_recent_chapters(
             "last_checked_at": _now_iso,
             "last_error": err if not ok else None,
         }
-        # Track RSS fetch metrics
         try:
             from app.metrics_prometheus import track_rss_fetch
             if not ok:
@@ -110,33 +108,21 @@ def collect_recent_chapters(
         started = _time.monotonic()
         try:
             _src_items: list[dict] = []
-            if src == "ikiru":
-                _exclude_keys: set[str] = set()
-                for _it in items:
-                    _tk = _it.get("title_key", "") or _it.get("title", "")
-                    if _tk:
-                        _exclude_keys.add(slugify_title_key(_tk))
-                _src_items = _collect_ikiru_source(_latest_sent, _disabled, fetch_meta, exclude_keys=_exclude_keys)
-            elif src == "shinigami":
+            if src == "shinigami":
                 _src_items = _collect_shinigami_source(_latest_sent, _disabled, fetch_meta)
-            elif src == "voratoon":
-                _src_items = _collect_voratoon_source(_latest_sent)
+            elif src == "komiku":
+                _src_items = _collect_komiku_source(_latest_sent)
             return SourceResult.ok(src, _src_items, started)
         except Exception as exc:
             logger.warn("collect provider failed", source=src, err=str(exc)[:300])
             return SourceResult.failed(src, started, exc)
 
     _sources_to_run: list[str] = []
-    for _src in ("ikiru", "shinigami", "voratoon"):
+    for _src in ("shinigami", "komiku"):
         if (source is None or source == _src) and _src not in _disabled:
             _sources_to_run.append(_src)
 
     if _sources_to_run:
-        # Sequential fix: collect shinigami+voratoon first (UUID vs slug), then ikiru with exclude_keys.
-        # Previously all 3 ran concurrently, so ikiru's _exclude_keys snapshot saw empty `items` (race)
-        # and voratoon/ikiru slug duplicates were never excluded. Now phase1 completes before ikiru.
-        _phase1 = [s for s in ("shinigami", "voratoon") if s in _sources_to_run]
-        _phase2 = [s for s in ("ikiru",) if s in _sources_to_run]
         _t0_map: dict[str, float] = {}
 
         def _run_phase(sources: list[str]):
@@ -177,25 +163,17 @@ def collect_recent_chapters(
                 try:
                     _executor.shutdown(wait=False, cancel_futures=True)
                 except TypeError:
-                    # Python <3.9 cancel_futures not supported
                     _executor.shutdown(wait=False)
 
-        _run_phase(_phase1)
-        _run_phase(_phase2)
+        _run_phase(_sources_to_run)
     else:
-        for _src in ("ikiru", "shinigami", "voratoon"):
+        for _src in ("shinigami", "komiku"):
             _hm[_src] = {"status": "disabled", "response_time_ms": 0, "successes_today": 0, "failures_today": 0, "consecutive_failures": 0, "last_success_at": None, "last_checked_at": _now_iso, "last_error": "cooldown"}
 
     _wl = None
-    if with_whitelisted_ikiru and "ikiru" not in _disabled:
-        try:
-            _wl = wl_store.load_whitelist()
-            items.extend(collect_whitelisted_ikiru_chapters(_wl))
-        except Exception as e:
-            logger.warn("collect whitelisted ikiru failed", err=str(e)[:120])
     if with_whitelisted_shinigami and "shinigami" not in _disabled:
         try:
-            _wl = _wl or wl_store.load_whitelist()
+            _wl = wl_store.load_whitelist()
             items.extend(collect_whitelisted_shinigami_chapters(_wl))
         except Exception as e:
             logger.warn("collect whitelisted shinigami failed", err=str(e)[:120])
@@ -231,6 +209,7 @@ def collect_recent_chapters(
 
     return items, _hm
 
+
 def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
     allowed: set[str] = set()
     for w in whitelist:
@@ -244,18 +223,6 @@ def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
             result.append(it)
     return result
 
-def _ikiru_slug_from_source(src: dict) -> str | None:
-    v = src.get("url") or ""
-    if v:
-        seg = v.rstrip("/").split("/")[-1]
-        if seg and "chapter-" not in seg:
-            return seg
-    p = src.get("permalink") or src.get("series_url") or ""
-    if p and "/manga/" in p:
-        part = p.split("/manga/")[-1].strip("/")
-        if part and "chapter-" not in part:
-            return part.split("/")[0]
-    return None
 
 def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
     import random
@@ -332,110 +299,7 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
             ch_url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}" if ch_id else (ch.get("url") or "")
             if not ch_url or num is None:
                 continue
-            # Note: no 24h cutoff here — rely on _sent + latest_sent + ON CONFLICT dedup
             if num in _sent:
                 continue
             items.append({"title": (wtitle or wk.replace("_", " ").title()).replace("’", "'"), "title_key": wk, "chapter": str(num), "chapter_num": float(num) if str(num).replace(".", "", 1).isdigit() else 0, "url": ch_url, "source": "shinigami", "cover": None, "series_url": series_url, "chapter_url": ch_url, "origin": "", "updated_time": ch.get("release_date") or ch.get("created_at") or "", "release_date": ch.get("release_date") or ""})
-    return items
-
-def collect_whitelisted_ikiru_chapters(whitelist: list[dict]) -> list[dict]:
-    slugs: list[str] = []
-    seen_slugs: set[str] = set()
-    slug_meta = {}
-    for w in whitelist:
-        src = w.get("source")
-        if src != "ikiru":
-            continue
-        from app.utils.text import ikiru_slug as _ikiru_slug
-        _src_url = w.get("url") or w.get("series_url") or w.get("permalink") or ""
-        slug = _ikiru_slug_from_source({"url": _src_url}) or _ikiru_slug(w.get("title") or w.get("title_key") or "")
-        if not slug and w.get("title"):
-            try:
-                from app.scrapers.ikiru import search_ikiru_api
-                _hits = search_ikiru_api(str(w.get("title")), per_page=5)
-                for _h in _hits:
-                    _perm = _h.get("permalink") or ""
-                    if "/manga/" in _perm:
-                        slug = _perm.split("/manga/")[-1].strip("/").split("/")[0]
-                        try:
-                            from app.db import get_supabase
-                            get_supabase().table("whitelist").update({"series_url": _perm}).eq("title_key", w.get("title_key")).eq("source", "ikiru").execute()
-                        except Exception:
-                            pass
-                        break
-            except Exception:
-                pass
-        if slug in seen_slugs:
-            continue
-        if not slug:
-            continue
-        seen_slugs.add(slug)
-        slugs.append(slug)
-        slug_meta[slug] = {"title": w.get("title") or w.get("title_key", "").replace("-", " ").title(), "origin": w.get("origin") or "", "cover": w.get("cover") or None, "latest_sent_chapter": float(w.get("latest_sent_chapter") or 0)}
-    items: list[dict] = []
-    HTML_CHAPTER_LIMIT = 30
-    _now = datetime.now(timezone.utc)
-    _cutoff = _now - timedelta(hours=24)
-    _slug_notified: dict[str, set[float]] = {}
-    try:
-        from app.db import get_supabase as _gsb3
-        _sb3 = _gsb3()
-        _tk_list = [slugify_title_key(s) for s in slugs]
-        if _tk_list:
-            _dh = (_sb3.table("dispatch_history").select("title_key, source, chapter_title").in_("title_key", _tk_list).execute())
-            for _row in (_dh.data or []):
-                _tk = _row.get("title_key")
-                _ct = _row.get("chapter_title")
-                try:
-                    _cn = float(_ct)
-                except (ValueError, TypeError):
-                    continue
-                _slug_notified.setdefault(f"{_tk}:{_row.get('source')}", set()).add(_cn)
-    except Exception as _e:
-        logger.warn("ikiru notified-history load failed", err=str(_e)[:120])
-    for slug in slugs:
-        _tk = slugify_title_key(slug)
-        _sent = _slug_notified.get(f"{_tk}:ikiru") or set()
-        from app.cron.collectors.common import _cached_chapter_list, _ikiru_re_touch_anchor, _is_ikiru_re_touch
-        from app.scrapers import ikiru
-        chapters = _cached_chapter_list("ikiru", slug, lambda: ikiru.get_ikiru_chapters(slug))
-        if not chapters:
-            continue
-        _max_num, _max_num_time = _ikiru_re_touch_anchor(chapters)
-        if len(chapters) > HTML_CHAPTER_LIMIT:
-            chapters = chapters[:HTML_CHAPTER_LIMIT]
-        series_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/"
-        meta = slug_meta.get(slug, {})
-        title = meta.get("title") or slug.replace("-", " ").title()
-        origin = meta.get("origin") or ""
-        cover = meta.get("cover") or None
-        _snapshot_max = float(meta.get("latest_sent_chapter") or 0)
-        _max_num = max(_max_num, _snapshot_max)
-        for ch in chapters:
-            num = ch.get("number")
-            try:
-                _num_f = float(num) if num is not None else None
-            except (ValueError, TypeError):
-                _num_f = None
-            ch_url = ch.get("url")
-            if not ch_url or _num_f is None:
-                continue
-            if _num_f in _sent:
-                continue
-            _ut = ch.get("updated_time") or ""
-            if not _ut:
-                continue
-            try:
-                _dtp = datetime.fromisoformat(_ut.replace("Z", "+00:00"))
-                if _dtp.tzinfo is None:
-                    _dtp = _dtp.replace(tzinfo=timezone.utc)
-                if _is_ikiru_re_touch(_num_f, _dtp, _max_num, _max_num_time):
-                    continue
-                if _num_f < _max_num:
-                    continue
-                if _dtp < _cutoff:
-                    break
-            except (ValueError, TypeError):
-                continue
-            items.append({"title": title, "title_key": slugify_title_key(ch_url.rstrip("/").split("/")[-2]) if ch_url else slugify_title_key(title), "chapter": str(num), "chapter_num": _num_f, "url": ch_url, "source": "ikiru", "cover": cover, "series_url": series_url, "chapter_url": ch_url, "origin": origin, "updated_time": _ut})
     return items

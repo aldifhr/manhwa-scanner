@@ -11,7 +11,7 @@ import re
 
 from app.cron.collectors.common import _parse_types
 from app.logger import get_logger
-from app.scrapers import ikiru, shinigami
+from app.scrapers import shinigami
 from app.scrapers.shinigami import _country_to_type
 from app.storage import metadata as meta_store
 from app.utils.origin import normalize_origin

@@ -1,210 +1,221 @@
 """VoratoonFeed seam — deep module for Voratoon collection.
 
-Hides combos, pagination, takeChapter, dedup, window filtering behind
-`VoratoonFeed(window=24h).collect() -> List[dict]`.
+Uses Playwright (headless Chromium) to scrape v2.voratoon.com/updates page.
+The API at api.voratoon.com is blocked by Cloudflare WAF from datacenter IPs,
+but the updates page returns full HTML with chapter links and timestamps.
+
+ponytail: Playwright only for updates page — the HTML has everything we need:
+    <a href="/series/{slug}/chapter/{num}">Chapter {N}</a>
+    with relative timestamps like "4 hours" or "8 days"
 """
-from __future__ import annotations
 
-import random
-import time
-import threading
-from datetime import datetime, timezone, timedelta
+import logging
+import re
+from datetime import datetime, timedelta, timezone
+from typing import Iterator
 
-import httpx
+from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
-from app.config import settings
-from app.logger import get_logger
-from app.utils.cover_scrub import scrub_cover
-from app.services.resilience import cb_voratoon
+logger = logging.getLogger(__name__)
 
-logger = get_logger("scraper:voratoon:feed")
+# ─── helpers ──────────────────────────────────────────────────────────────────
 
-TIMEOUT = 30.0
-_CLIENTS: dict[int, httpx.Client] = {}
-_CLIENTS_LOCK = threading.Lock()
+_CHAPTER_RE = re.compile(r"/series/(?P<slug>[^/]+)/chapter/(?P<num>\d+)")
+_TIME_RE = re.compile(r"(\d+)\s*(hour|day|week|minute)s?", re.IGNORECASE)
 
 
-def _base_url() -> str:
-    from app.utils.ssrf import assert_allowed_url
-    _b = settings.VORATOON_API_URL.rstrip("/")
-    assert_allowed_url(_b)
-    return _b
+def _parse_relative_time(text: str) -> datetime | None:
+    """Convert relative time like '4 hours ago' or '8 days' to a datetime."""
+    now = datetime.now(timezone.utc)
+    total_seconds = 0
+    for m in _TIME_RE.finditer(text):
+        val = int(m.group(1))
+        unit = m.group(2).lower()
+        if unit == "minute":
+            total_seconds += val * 60
+        elif unit == "hour":
+            total_seconds += val * 3600
+        elif unit == "day":
+            total_seconds += val * 86400
+        elif unit == "week":
+            total_seconds += val * 604800
+    if total_seconds == 0:
+        return None
+    return now - timedelta(seconds=total_seconds)
 
 
-def _client() -> httpx.Client:
-    key = threading.get_ident()
-    with _CLIENTS_LOCK:
-        return _CLIENTS.setdefault(key, httpx.Client(timeout=TIMEOUT))
+def _fetch_updates_html() -> str:
+    """Fetch rendered HTML from v2.voratoon.com/updates via Playwright."""
+    url = "https://v2.voratoon.com/updates"
+    logger.debug("voratoon updates fetching: %s", url)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        pg = browser.new_page()
+        try:
+            pg.goto(url, wait_until="networkidle", timeout=30000)
+            pg.wait_for_timeout(2000)
+            html = pg.content()
+        finally:
+            browser.close()
+
+    return html
 
 
-def _get(url: str, **kwargs):
-    return _client().get(url, **kwargs)
+def _parse_updates(html: str) -> list[dict]:
+    """Parse chapter updates from the updates page HTML."""
+    soup = BeautifulSoup(html, "lxml")
+    results = []
 
-
-def _parse_chapter_number(index: int | None) -> float:
-    try:
-        return float(index) if index is not None else 0.0
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _emit_series(results: list[dict], s: dict, cutoff: datetime | None = None) -> None:
-    data = s.get("data", {})
-    slug = data.get("slug", "")
-    title = data.get("title", "")
-    if not slug:
-        return
-    _fmt = str(data.get("format") or "").lower()
-    _orig_raw = str(data.get("origin") or data.get("country") or "").upper()
-    if _fmt == "manga" or _fmt == "jp" or _orig_raw == "JP":
-        return
-    cover = data.get("coverImage", "")
-    cover = scrub_cover(cover) if cover else ""
-    synopsis = data.get("synopsis", "")
-    rating = data.get("rating")
-    genres = [g.get("data", {}).get("name", "") for g in data.get("genres", [])]
-    fmt = data.get("format", "manhwa")
-    for ch in (s.get("chapters") or []):
-        ch_index = ch.get("chapterIndex") or ch.get("data", {}).get("index")
-        if not ch_index:
+    for a in soup.select('a[href*="/series/"][href*="/chapter/"]'):
+        href = str(a.get("href", ""))
+        m = _CHAPTER_RE.search(href)
+        if not m:
             continue
-        _created = ch.get("createdAt") or ch.get("updatedAt") or ""
-        if not _created:
-            # Skip chapters without valid timestamp — cannot determine release date
-            continue
-        if cutoff is not None and _created:
-            try:
-                _ts = datetime.fromisoformat(_created.replace("Z", "+00:00"))
-                if _ts.tzinfo is None:
-                    _ts = _ts.replace(tzinfo=timezone.utc)
-                if _ts < cutoff:
-                    continue
-            except (ValueError, TypeError):
-                pass
+
+        slug = m.group("slug")
+        ch_num = m.group("num")
+        text = a.text.strip()
+
+        # Try to extract timestamp from the text or nearby element
+        timestamp: datetime | None = None
+        time_el = a.find_next(["time", "span"], class_=re.compile(r"time|ago|relative"))
+        if time_el:
+            timestamp = _parse_relative_time(time_el.text)
+        if timestamp is None:
+            timestamp = _parse_relative_time(text)
+
         results.append({
-            "title": title,
-            "title_key": slug.lower(),
-            "chapter": str(ch_index),
-            "chapter_num": _parse_chapter_number(ch_index),
-            "source": "voratoon",
-            "cover": cover,
-            "series_url": f"https://{settings.VORATOON_DOMAIN}/series/{slug}",
-            "chapter_url": f"https://{settings.VORATOON_DOMAIN}/series/{slug}/chapter/{ch_index}",
-            "description": synopsis[:500] if synopsis else "",
-            "rating": float(rating) if rating else 0.0,
-            "genres": genres,
-            "type": fmt if fmt in ("manhwa", "manhua", "manga") else "manga" if fmt == "mangatoon" else "",
-            "origin": "CN" if fmt == "manhua" else "KR" if fmt == "manhwa" else "",
-            "updated_time": _created,
-            "release_date": _created,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "slug": slug,
+            "chapter_num": ch_num,
+            "chapter_url": f"https://v2.voratoon.com{href}",
+            "title": slug.replace("-", " ").title(),
+            "updated_time": timestamp or datetime.now(timezone.utc),
         })
 
+    return results
+
+
+# ─── VoratoonFeed class ──────────────────────────────────────────────────────
 
 class VoratoonFeed:
-    def __init__(self, window_hours: int = 24):
-        self.window_hours = window_hours
+    """Scrape recent chapter updates from Voratoon.
 
-    def _cutoff(self) -> datetime:
-        return datetime.now(timezone.utc) - timedelta(hours=self.window_hours)
+    Usage:
+        for item in VoratoonFeed(window_hours=24).collect():
+            print(item["title_key"], item["chapter"])
+    """
+
+    def __init__(self, window_hours: int = 24) -> None:
+        self.window_hours = window_hours
+        self._cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
 
     def collect(self) -> list[dict]:
+        """Collect recent chapter updates, deduplicated by series (latest only)."""
+        try:
+            html = _fetch_updates_html()
+        except Exception as exc:
+            logger.warning("voratoon updates fetch failed: %s", exc)
+            return []
+
+        items = _parse_updates(html)
+        if not items:
+            logger.debug("voratoon updates: no items found")
+            return []
+
+        # Group by slug, keep only the latest chapter per series
+        latest_by_slug: dict[str, dict] = {}
+        for item in items:
+            slug = item["slug"]
+            if slug not in latest_by_slug:
+                latest_by_slug[slug] = item
+            else:
+                existing_ch = latest_by_slug[slug]["chapter_num"]
+                if item["chapter_num"] > existing_ch:
+                    latest_by_slug[slug] = item
+
+        # Filter by window and format output
         results: list[dict] = []
-        cutoff = self._cutoff()
-        _combos = [
-            ("manhwa", None),
-            ("manhua", None),
-            ("mangatoon", None),
-            ("manhwa", "type==project"),
-            ("manhua", "type==project"),
-            ("mangatoon", "type==project"),
-        ]
-
-        def _fetch_combo(fmt: str, filt) -> list[dict]:
-            _out: list[dict] = []
-            page = 1
-            while True:
-                url = f"{_base_url()}/series"
-                params = {
-                    "take": 30,
-                    "page": page,
-                    "sort": "latest",
-                    "sortOrder": "desc",
-                    "includeMeta": "true",
-                    "takeChapter": 50,
-                    "format": fmt,
-                }
-                if filt:
-                    params["filter"] = filt
-                payload = None
-                for attempt in range(3):
-                    try:
-                        r = _get(
-                            url,
-                            params=params,
-                            timeout=TIMEOUT,
-                            headers={"Accept-Encoding": "gzip, deflate"},
-                        )
-                        if r.status_code == 429:
-                            retry_after = r.headers.get("retry-after")
-                            wait = float(retry_after) if retry_after else (2 ** attempt + random.uniform(0, 1))
-                            logger.debug("voratoon 429 rate limited", attempt=attempt, wait=round(wait, 2))
-                            time.sleep(wait)
-                            continue
-                        r.raise_for_status()
-                        payload = r.json()
-                        break
-                    except Exception as e:
-                        logger.error("voratoon series list failed", exc=e)
-                        break
-                if payload is None:
-                    break
-                series_list = payload.get("data", [])
-                if not series_list:
-                    break
-                page_has_recent = False
-                for s in series_list:
-                    for ch in (s.get("chapters") or []):
-                        stamp = ch.get("createdAt") or ch.get("updatedAt") or ""
-                        try:
-                            ts = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-                            if ts.tzinfo is None:
-                                ts = ts.replace(tzinfo=timezone.utc)
-                            if ts >= cutoff:
-                                page_has_recent = True
-                                break
-                        except (ValueError, TypeError):
-                            continue
-                    _emit_series(_out, s, cutoff)
-                if not page_has_recent:
-                    break
-                meta = payload.get("meta") or {}
-                if meta.get("lastPage") and page >= int(meta["lastPage"]):
-                    break
-                if len(series_list) < 30:
-                    break
-                page += 1
-            return _out
-
-        from concurrent.futures import ThreadPoolExecutor
-
-        with ThreadPoolExecutor(max_workers=len(_combos)) as _ex:
-            for _combo_results in _ex.map(lambda c: _fetch_combo(*c), _combos):
-                results.extend(_combo_results)
-
-        _seen: set[tuple[str, str]] = set()
-        _deduped: list[dict] = []
-        for r in results:
-            _k = (str(r.get("title_key") or "").lower(), str(r.get("chapter") or ""))
-            if _k in _seen:
+        for item in latest_by_slug.values():
+            updated = item["updated_time"]
+            if isinstance(updated, str):
+                updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+            if updated < self._cutoff:
                 continue
-            _seen.add(_k)
-            _deduped.append(r)
-        results = _deduped
-        logger.info("voratoon collect done", chapters=len(results))
+
+            results.append({
+                "title_key": item["slug"],
+                "title": item["title"],
+                "chapter": str(item["chapter_num"]),
+                "chapter_num": float(item["chapter_num"]),
+                "chapter_url": item["chapter_url"],
+                "series_url": f"https://v2.voratoon.com/series/{item['slug']}",
+                "source": "voratoon",
+                "origin": "KR",
+                "type": "manhwa",
+                "updated_time": updated.isoformat(),
+                "description": "",
+                "genres": [],
+                "rating": None,
+                "cover": "",
+                "url": item["chapter_url"],
+            })
+
+        logger.info(
+            "voratoon feed: %d series with updates in last %dh",
+            len(results),
+            self.window_hours,
+        )
         return results
 
 
-# compat: keep old function name for callers that import from app.scrapers.voratoon
-def collect_voratoon() -> list[dict]:
-    return VoratoonFeed(window_hours=24).collect()
+# ─── public API ──────────────────────────────────────────────────────────────
+
+def scrape_origin(origin: str, max_pages: int = 10) -> Iterator[dict]:
+    """Scrape all series for a given origin (KR/CN/JP). Not implemented — use feed."""
+    logger.warning("voratoon: scrape_origin not implemented for %r", origin)
+    yield from ()
+
+
+def backfill(origin: str, max_pages: int = 50) -> tuple[int, int]:
+    """Backfill whitelist with all series from browse pages. Not implemented."""
+    logger.warning("voratoon: backfill not implemented for %r", origin)
+    return 0, 0
+
+
+def fetch_series_detail(slug: str) -> dict | None:
+    """Fetch a single series detail page. Returns parsed info or None."""
+    url = f"https://v2.voratoon.com/series/{slug}"
+    logger.debug("voratoon detail: %s", url)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        pg = browser.new_page()
+        try:
+            pg.goto(url, wait_until="networkidle", timeout=30000)
+            pg.wait_for_timeout(2000)
+            html = pg.content()
+        finally:
+            browser.close()
+
+    soup = BeautifulSoup(html, "lxml")
+
+    cover_img = soup.select_one("img[src*='prod/series/']")
+    cover_url = str(cover_img["src"]) if cover_img else ""
+
+    synopsis_el = soup.select_one("[class*='synopsis']")
+    synopsis = synopsis_el.text.strip() if synopsis_el else ""
+
+    latest_chapter = 0
+    for tag in soup.select("span.tag-chapters"):
+        match = re.search(r"Chapter\s+(\d+)", tag.text)
+        if match:
+            latest_chapter = max(latest_chapter, int(match.group(1)))
+
+    return {
+        "slug": slug,
+        "cover_url": cover_url,
+        "synopsis": synopsis,
+        "latest_chapter": latest_chapter,
+    }
