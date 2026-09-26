@@ -1,250 +1,107 @@
-"""Continue reading API — per-user session-based continue reading."""
+"""Continue reading — per-device sync via session_hash."""
+import hashlib
+import time as _time
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
-from datetime import datetime, timezone
 
 from app.logger import get_logger
-from app.utils.request_auth import require_monitor_auth
 
-logger = get_logger("api:continue_reading")
+logger = get_logger("api:continue-reading")
 router = APIRouter()
 
-
-class ContinueReadingEntry(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    title_key: str
-    chapter: str
-    chapter_url: str
-    series_url: str
-    source: str
-    cover: Optional[str] = None
-    title: Optional[str] = None
-    updated_at: Optional[str] = None
+def _session_hash(request: Request) -> str | None:
+    # Use ikiru_dashboard_session JWT as device session identifier (same as FE continueReading)
+    cookie = request.cookies.get("ikiru_dashboard_session") or ""
+    if not cookie:
+        # fallback to Authorization Bearer token if present
+        auth = request.headers.get("authorization") or request.headers.get("Authorization") or ""
+        if auth.lower().startswith("bearer "):
+            cookie = auth[7:].strip()
+    if not cookie or len(cookie) < 5:
+        return None
+    return hashlib.sha256(cookie.encode()).hexdigest()[:16]
 
 
 @router.get("/continue-reading")
 async def get_continue_reading(request: Request):
-    """Get continue-reading entries for current user."""
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    
+    h = _session_hash(request)
+    if not h:
+        return JSONResponse(content={"success": True, "data": {"entries": {}}})
     try:
         from app.db import get_supabase
-        from app.utils.request_auth import get_session_hash
-        
-        session_hash = get_session_hash(request)
-        if not session_hash:
-            return JSONResponse(content={"success": True, "data": {"entries": {}}})
-        
         sb = get_supabase()
-        res = (
-            sb.table("continue_reading")
-            .select("entries")
-            .eq("session_hash", session_hash)
-            .maybe_single()
-            .execute()
-        )
-        
-        entries: dict = {}
-        if res.data and isinstance(res.data.get("entries"), dict):
-            entries = res.data["entries"]
-        
-        return JSONResponse(content={
-            "success": True,
-            "data": {"entries": entries}
-        })
+        res = sb.table("continue_reading").select("entries, updated_at").eq("session_hash", h).limit(1).execute()
+        if res.data:
+            row = res.data[0]
+            entries = row.get("entries") or {}
+            # entries is jsonb, may be string
+            if isinstance(entries, str):
+                import json as _j
+                try:
+                    entries = _j.loads(entries)
+                except Exception:
+                    entries = {}
+            return JSONResponse(content={"success": True, "data": {"entries": entries, "updated_at": row.get("updated_at")}})
+        return JSONResponse(content={"success": True, "data": {"entries": {}}})
     except Exception as e:
-        logger.warn("get_continue_reading failed", err=str(e)[:200])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+        logger.warn("continue-reading get failed", err=str(e)[:120])
+        return JSONResponse(content={"success": True, "data": {"entries": {}}})
 
 
-@router.post("/continue-reading")
-async def update_continue_reading(request: Request, entry: ContinueReadingEntry):
-    """Update continue-reading entry for current user."""
-    if not require_monitor_auth(request):
+@router.put("/continue-reading")
+async def put_continue_reading(request: Request):
+    h = _session_hash(request)
+    if not h:
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    
-    try:
-        from app.db import get_supabase
-        from app.utils.request_auth import get_session_hash
-        
-        session_hash = get_session_hash(request)
-        if not session_hash:
-            return JSONResponse(content={"success": False, "error": "no session"}, status_code=400)
-        
-        sb = get_supabase()
-        
-        # Get existing entries
-        existing = (
-            sb.table("continue_reading")
-            .select("entries")
-            .eq("session_hash", session_hash)
-            .maybe_single()
-            .execute()
-        )
-        
-        entries: dict = {}
-        if existing.data and isinstance(existing.data.get("entries"), dict):
-            entries = existing.data["entries"]
-        
-        # Update entry
-        entries[entry.title_key] = {
-            "chapter": entry.chapter,
-            "chapter_url": entry.chapter_url,
-            "series_url": entry.series_url,
-            "source": entry.source,
-            "cover": entry.cover or "",
-            "title": entry.title or entry.title_key,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        
-        # Upsert
-        sb.table("continue_reading").upsert(
-            {
-                "session_hash": session_hash,
-                "entries": entries,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            },
-            on_conflict="session_hash",
-        ).execute()
-        
-        return JSONResponse(content={"success": True})
-    except Exception as e:
-        logger.warn("update_continue_reading failed", err=str(e)[:200])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
-
-
-@router.get("/continue-reading/history")
-async def get_continue_reading_history(request: Request):
-    """Get continue-reading history (sorted by updated_at desc)."""
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    
-    try:
-        from app.db import get_supabase
-        from app.utils.request_auth import get_session_hash
-        
-        session_hash = get_session_hash(request)
-        if not session_hash:
-            return JSONResponse(content={"success": True, "data": {"history": []}})
-        
-        sb = get_supabase()
-        res = (
-            sb.table("continue_reading")
-            .select("entries")
-            .eq("session_hash", session_hash)
-            .maybe_single()
-            .execute()
-        )
-        
-        history = []
-        if res.data and res.data.get("entries"):
-            entries = res.data["entries"]
-            for tk, entry in entries.items():
-                history.append({
-                    "title_key": tk,
-                    **entry,
-                })
-            # Sort by updated_at desc
-            history.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-        
-        return JSONResponse(content={
-            "success": True,
-            "data": {"history": history}
-        })
-    except Exception as e:
-        logger.warn("get_continue_reading_history failed", err=str(e)[:200])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
-
-
-@router.post("/continue-reading/mark-read")
-async def mark_read(request: Request):
-    """Mark a chapter as read (remove from continue-reading)."""
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-
     try:
         body = await request.json()
-    except Exception:
-        return JSONResponse(content={"success": False, "error": "invalid JSON"}, status_code=400)
-
-    title_key = body.get("title_key", "").strip()
-    if not title_key:
-        return JSONResponse(content={"success": False, "error": "title_key required"}, status_code=400)
-
-    try:
+        entries = body.get("entries") or body.get("data") or {}
+        if not isinstance(entries, dict):
+            return JSONResponse(content={"success": False, "error": "invalid entries"}, status_code=400)
+        # cap 20 entries server-side too
+        if len(entries) > 20:
+            # keep most recent 20 by updatedAt
+            sorted_entries = sorted(entries.items(), key=lambda kv: kv[1].get("updatedAt", "") if isinstance(kv[1], dict) else "", reverse=True)[:20]
+            entries = dict(sorted_entries)
         from app.db import get_supabase
-        from app.utils.request_auth import get_session_hash
-
-        session_hash = get_session_hash(request)
-        if not session_hash:
-            return JSONResponse(content={"success": False, "error": "no session"}, status_code=400)
-
         sb = get_supabase()
-        existing = (
-            sb.table("continue_reading")
-            .select("entries")
-            .eq("session_hash", session_hash)
-            .maybe_single()
-            .execute()
-        )
-
-        entries: dict = {}
-        if existing.data and isinstance(existing.data.get("entries"), dict):
-            entries = existing.data["entries"]
-
-        if title_key in entries:
-            del entries[title_key]
-            sb.table("continue_reading").upsert(
-                {
-                    "session_hash": session_hash,
-                    "entries": entries,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                },
-                on_conflict="session_hash",
-            ).execute()
-
+        # upsert
+        sb.table("continue_reading").upsert({"session_hash": h, "entries": entries, "updated_at": _time.time()}, on_conflict="session_hash").execute()
         return JSONResponse(content={"success": True})
     except Exception as e:
-        logger.warn("mark_read failed", err=str(e)[:200])
+        logger.warn("continue-reading put failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
-@router.get("/continue-reading/unread-count")
-async def unread_count(request: Request):
-    """Get count of unread continue-reading entries."""
-    if not require_monitor_auth(request):
+@router.delete("/continue-reading")
+async def delete_continue_reading(request: Request):
+    h = _session_hash(request)
+    if not h:
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    
     try:
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        title_key = body.get("titleKey") or body.get("title_key") if isinstance(body, dict) else None
         from app.db import get_supabase
-        from app.utils.request_auth import get_session_hash
-        
-        session_hash = get_session_hash(request)
-        if not session_hash:
-            return JSONResponse(content={"success": True, "data": {"count": 0}})
-        
         sb = get_supabase()
-        res = (
-            sb.table("continue_reading")
-            .select("entries")
-            .eq("session_hash", session_hash)
-            .maybe_single()
-            .execute()
-        )
-        
-        count = 0
-        if res.data and res.data.get("entries"):
-            count = len(res.data["entries"])
-        
-        return JSONResponse(content={
-            "success": True,
-            "data": {"count": count}
-        })
+        if title_key:
+            res = sb.table("continue_reading").select("entries").eq("session_hash", h).limit(1).execute()
+            if res.data:
+                entries = res.data[0].get("entries") or {}
+                if isinstance(entries, str):
+                    import json as _j
+                    try:
+                        entries = _j.loads(entries)
+                    except Exception:
+                        entries = {}
+                if title_key in entries:
+                    del entries[title_key]
+                    sb.table("continue_reading").upsert({"session_hash": h, "entries": entries, "updated_at": _time.time()}, on_conflict="session_hash").execute()
+        else:
+            sb.table("continue_reading").delete().eq("session_hash", h).execute()
+        return JSONResponse(content={"success": True})
     except Exception as e:
-        logger.warn("unread_count failed", err=str(e)[:200])
+        logger.warn("continue-reading delete failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 
