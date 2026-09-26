@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DISCORD_BOT_TOKEN: str = ""
     DISCORD_PUBLIC_KEY: str = ""
     DISCORD_CLIENT_SECRET: str = ""
-    DISCORD_OAUTH_REDIRECT_URI: str = "https://scanner.aldifhr.fun/api/auth/discord/callback"
+    DISCORD_OAUTH_REDIRECT_URI: str = "https://scanner.aldifhr.my.id/api/auth/discord/callback"
     OUTBOUND_WEBHOOK_URLS: str = ""
     DISCORD_GUILD_ID: str = ""
     DISCORD_APPLICATION_ID: str = ""
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Public base URL used by cron/embeds/fe to build absolute links
     # and proxy endpoints. Defaults to the deployed scanner host.
-    PUBLIC_BASE_URL: str = "https://scanner.aldifhr.fun"
+    PUBLIC_BASE_URL: str = "https://scanner.aldifhr.my.id"
 
     # Network
     API_PORT: int = 3000

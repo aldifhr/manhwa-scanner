@@ -8,7 +8,7 @@ _SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' https://scanner.aldifhr.fun https://fe.aldifhr.fun; "
+        "connect-src 'self' https://scanner.aldifhr.my.id https://fe.aldifhr.fun; "
         "style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline'; "
         "frame-ancestors 'none'; "

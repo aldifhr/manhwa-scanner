@@ -78,7 +78,7 @@ export function resolveCoverUrl(
   }
 
   // 3. Backend-host absolute URL → strip to local path (handles scanner/manhwa + envHost)
-  const backendHosts = ["scanner.aldifhr.fun", "manhwa.aldifhr.my.id"]
+  const backendHosts = ["scanner.aldifhr.my.id", "manhwa.aldifhr.my.id"]
   try {
     const envHost = (
       typeof process !== "undefined"

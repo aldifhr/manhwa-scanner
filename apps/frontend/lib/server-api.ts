@@ -14,7 +14,7 @@ import { openapi } from "@manhwa-scanner/shared";
  * Resolution order:
  *   1. BACKEND_URL  — server-only runtime env, the correct knob for prod.
  *   2. NEXT_PUBLIC_API_BASE — only if it is NOT a localhost address.
- *   3. https://scanner.aldifhr.fun — safe remote default.
+ *   3. https://scanner.aldifhr.my.id — safe remote default.
  */
 export function backendUrl(): string {
   const fromEnv = process.env.BACKEND_URL?.trim();
@@ -31,7 +31,7 @@ export function backendUrl(): string {
   const sharedBase = (openapi as { servers?: { url: string }[] })?.servers?.[0]
     ?.url;
   if (sharedBase) return sharedBase.replace(/\/$/, "");
-  return "https://scanner.aldifhr.fun";
+  return "https://scanner.aldifhr.my.id";
 }
 
 /** @deprecated pakai backendUrl() per-request agar env reload (HMR/Vercel) kebaca. Tetap diekspor untuk compat. */

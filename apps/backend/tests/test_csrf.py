@@ -145,12 +145,12 @@ class TestCrossOrigin:
         r = client.options(
             PROTECTED_POST,
             headers={
-                "Origin": "https://scanner.aldifhr.fun",
+                "Origin": "https://scanner.aldifhr.my.id",
                 "Access-Control-Request-Method": "POST",
             },
         )
         assert r.status_code == 200
-        assert r.headers.get("access-control-allow-origin") == "https://scanner.aldifhr.fun"
+        assert r.headers.get("access-control-allow-origin") == "https://scanner.aldifhr.my.id"
 
     def test_preflight_from_regex_matched_origin_succeeds(self):
         """Origin matching allow_origin_regex is allowed."""

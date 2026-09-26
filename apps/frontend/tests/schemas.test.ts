@@ -69,10 +69,10 @@ describe("rssItemSchema", () => {
     const out = rssItemSchema.parse({
       title: "T",
       cover:
-        "https://scanner.aldifhr.fun/api/v1/reader/proxy?url=https%3A%2F%2Fimg.example.com%2Fcover.jpg",
+        "https://scanner.aldifhr.my.id/api/v1/reader/proxy?url=https%3A%2F%2Fimg.example.com%2Fcover.jpg",
     });
     expect(out.cover).toContain("/api/v1/reader/proxy?url=");
-    expect(out.cover).not.toContain("scanner.aldifhr.fun");
+    expect(out.cover).not.toContain("scanner.aldifhr.my.id");
   });
 
   it("does not throw on missing/empty fields", () => {

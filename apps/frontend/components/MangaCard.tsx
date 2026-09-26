@@ -53,7 +53,7 @@ function MangaCard({
 
   // All sources this title is tracked under (deduped card merges ikiru+shinigami)
   // BE whitelist route historically returned sources as {source,url}[] or string[] or mixed (prod).
-  // When local FE points at prod BE (BACKEND_URL=https://scanner.aldifhr.fun) the shape can change without rebuild.
+  // When local FE points at prod BE (BACKEND_URL=https://scanner.aldifhr.my.id) the shape can change without rebuild.
   // Harden: only string sources survive to .join(), never "[object Object]".
   const normalizeSource = (s: unknown): string | null => {
     if (typeof s === "string" && s.trim()) return s.trim();
