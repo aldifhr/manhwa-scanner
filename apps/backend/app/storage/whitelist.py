@@ -158,8 +158,26 @@ def add_whitelist_entries(rows: list[dict]) -> dict:
     """
     if not rows:
         return {"status": "ok", "whitelist": []}
+    
+    import httpx
     for _r in rows:
+        _src = (_r.get("source") or "").lower()
         _tk = str(_r.get("title_key") or "").strip()
+        
+        # Komiku: normalize slug via API to prevent x10 vs 10 mismatch
+        if _src == "komiku":
+            try:
+                _url = f"https://01.komiku.asia/api/v2/comics/{_tk}"
+                _resp = httpx.get(_url, timeout=8)
+                if _resp.status_code == 200:
+                    _canonical = _resp.json().get("slug")
+                    if _canonical and _canonical != _tk:
+                        _r["title_key"] = _canonical
+                        _r["series_url"] = f"https://01.komiku.asia/manga/{_canonical}"
+                        logger.info("komiku slug normalized", from_tk=_tk, to_tk=_canonical)
+            except Exception as _e:
+                logger.debug("komiku normalize failed", err=str(_e)[:80])
+        
         if _re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _tk, _re.I):
             _title = str(_r.get("title") or "").strip()
             _nw = slugify_title_key(_title) if _title else ""

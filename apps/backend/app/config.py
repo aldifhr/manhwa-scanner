@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DISCORD_BOT_TOKEN: str = ""
     DISCORD_PUBLIC_KEY: str = ""
     DISCORD_CLIENT_SECRET: str = ""
-    DISCORD_OAUTH_REDIRECT_URI: str = "https://scanner.aldifhr.fun/api/auth/discord/callback"
+    DISCORD_OAUTH_REDIRECT_URI: str = "https://scanner.aldifhr.my.id/api/auth/discord/callback"
     OUTBOUND_WEBHOOK_URLS: str = ""
     DISCORD_GUILD_ID: str = ""
     DISCORD_APPLICATION_ID: str = ""
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Public base URL used by cron/embeds/fe to build absolute links
     # and proxy endpoints. Defaults to the deployed scanner host.
-    PUBLIC_BASE_URL: str = "https://scanner.aldifhr.fun"
+    PUBLIC_BASE_URL: str = "https://scanner.aldifhr.my.id"
 
     # Network
     API_PORT: int = 3000
@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     VORATOON_SERIES_PATH: str = "/series/"
     VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
 
+    KIRYUU_PUBLIC_URL: str = "https://v7.kiryuu.to"
+    KIRYUU_SERIES_PATH: str = "/manga/"
+    KIRYUU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}/"
+
+    WURMZ_PUBLIC_URL: str = "https://wurmz.net"
+    WURMZ_SERIES_PATH: str = "/detail/"
+    WURMZ_CHAPTER_PATH: str = "/detail/{slug}/chapter/{num}/"
+
     # Discord toggle — set false to run locally without bot / disable dispatch
     DISCORD_ENABLED: bool = True
 
@@ -61,7 +69,7 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
-    SOURCE_KEYS: list[str] = ["shinigami", "komiku"]
+    SOURCE_KEYS: list[str] = ["shinigami", "komiku", "kiryuu", "wurmz"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     # e.g. DISABLED_SOURCES=ikiru focuses collection on shinigami only.
     DISABLED_SOURCES: str = ""
@@ -170,8 +178,9 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-VALID_SOURCES = ("shinigami", "komiku")
-VALID_SOURCES_WITH_ALL = ("shinigami", "komiku", "all")
+_SOURCE_KEYS = ("shinigami", "komiku", "kiryuu", "wurmz")
+VALID_SOURCES = ("shinigami", "komiku", "kiryuu", "wurmz")
+VALID_SOURCES_WITH_ALL = ("shinigami", "komiku", "kiryuu", "wurmz", "all")
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:shinigami", "rss-fetch:komiku",

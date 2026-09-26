@@ -13,9 +13,9 @@ from urllib.parse import quote as _urlquote
 
 try:
     from app.config import settings as _settings
-    _PUBLIC_BASE = (_settings.PUBLIC_BASE_URL or "https://scanner.aldifhr.fun").rstrip("/")
+    _PUBLIC_BASE = (_settings.PUBLIC_BASE_URL or "https://scanner.aldifhr.my.id").rstrip("/")
 except Exception:
-    _PUBLIC_BASE = "https://scanner.aldifhr.fun"
+    _PUBLIC_BASE = "https://scanner.aldifhr.my.id"
 
 
 def _escape_discord_md(text: str) -> str:
@@ -40,7 +40,7 @@ def _proxy_cover(cover: str | None) -> str | None:
     # Already proxied — return as-is
     if "/api/v1/reader/cover-img" in cover or "/api/reader/cover-img" in cover:
         return cover
-    public_base = (_PUBLIC_BASE or "https://scanner.aldifhr.fun").rstrip("/")
+    public_base = (_PUBLIC_BASE or "https://scanner.aldifhr.my.id").rstrip("/")
     # Voratoon covers are stored as a same-origin /api/reader/proxy?url=<enc
     # upstream> wrapper (so the FE fetches them through the authed proxy).
     # Discord needs the DIRECT upstream URL wrapped in the PUBLIC cover-img

@@ -45,16 +45,13 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-icon.svg" />
+        {/*
+          next/font/google handles Geist optimization (self-hosted, no network).
+          Inter and Space Grotesk are loaded via CSS @import in gold.css —
+          removing the manual stylesheet link eliminates preload warnings.
+        */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin=""
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       </head>
       <body className="min-h-dvh bg-black text-white overflow-x-hidden">
         <QueryProvider>

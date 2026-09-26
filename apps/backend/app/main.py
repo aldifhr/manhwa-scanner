@@ -132,7 +132,7 @@ app = FastAPI(
 # Windows dev: tambahkan localhost biar FE lokal bisa hit BE lokal tanpa ubah VPS (VPS tetap strict, dev dapat localhost)
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-_cors_origins = ["https://scanner.aldifhr.fun", "https://manhwa.aldifhr.fun"]
+_cors_origins = ["https://scanner.aldifhr.my.id", "https://manhwa.aldifhr.my.id"]
 if (os.getenv("ENVIRONMENT") or "production").lower() != "production":
     _cors_origins += [
         "http://localhost:3000",

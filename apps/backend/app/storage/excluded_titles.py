@@ -24,7 +24,7 @@ from app.utils.text import slugify_title_key
 logger = get_logger("storage:excluded-titles")
 
 from app.config import settings as _cfg
-_VALID_SOURCES = ("all", "ikiru", "shinigami", "voratoon")
+_VALID_SOURCES = ("all", "ikiru", "shinigami", "voratoon", "kiryuu", "wurmz")
 
 def _norm_source(src: str) -> str:
     s = (src or "all").strip().lower()

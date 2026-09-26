@@ -82,11 +82,24 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         logger.info("dispatch: nothing to send")
         return 0
 
-    # CEILING FILTER REMOVED — was incorrectly skipping chapters after backfill.
-    # whitelist.latest_sent_chapter is updated by backfill, so ALL chapters ≤
-    # latest_sent_chapter get filtered. FCFS dedup against dispatch_history is the
-    # correct guard — only actually-sent chapters are recorded there.
-    # See: dispatch_history is the single source of truth for "actually notified".
+    # CEILING: skip chapters at or below the max already-dispatched chapter
+    # per (title_key, source). Prevents re-dispatching old chapters when
+    # a higher chapter was already sent (e.g. 125 sent, 110 re-appears).
+    _ceilings: dict[tuple[str, str], float] = {}
+    try:
+        from app.db import get_supabase as _gs_ceil
+        _sb_ceil = _gs_ceil()
+        _ceil_tks = list({(str(it.get("title_key") or "").strip(), str(it.get("source") or "").strip()) for it in to_send if it.get("title_key") and it.get("source")})
+        if _ceil_tks:
+            for _tk, _src in _ceil_tks:
+                _r = _sb_ceil.table("dispatch_history").select("chapter_title").eq("title_key", _tk).eq("source", _src).order("chapter_title", desc=True).limit(1).execute()
+                if _r.data:
+                    try:
+                        _ceilings[(_tk, _src)] = float(_r.data[0]["chapter_title"])
+                    except (ValueError, TypeError):
+                        pass
+    except Exception:
+        pass
 
     # FCFS dedupe: skip chapters ALREADY NOTIFIED (in dispatch_history).
     # NOTE: we intentionally do NOT consult dispatch_claims here. The deep-queue
@@ -155,13 +168,15 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_CHAPTER_PATH}",
         f"https://{settings.VORATOON_DOMAIN}{settings.VORATOON_SERIES_PATH}",
         "https://v1.voratoon.com/series/",
-        f"https://{settings.VORATOON_DOMAIN}{settings.VORATOON_SERIES_PATH}",
         "https://voratoon.com/series/",
         f"{settings.IKIRU_BASE_URL.rstrip('/')}{settings.IKIRU_SERIES_PATH}",
+        "https://01.komiku.asia/",
+        f"{settings.KIRYUU_PUBLIC_URL}{settings.KIRYUU_SERIES_PATH}",
+        f"{settings.WURMZ_PUBLIC_URL}{settings.WURMZ_SERIES_PATH}",
     )
     _junk_urls = {u for u in _all_urls if not any(u.startswith(p) for p in _VALID_URL_PREFIXES)}
     if _junk_urls:
-        logger.warn("dispatch: filtering junk urls", count=len(_junk_urls), examples=list(_junk_urls)[:3])
+        logger.debug("dispatch: filtering junk urls", count=len(_junk_urls), examples=list(_junk_urls)[:3])
         to_send = [it for it in to_send if it.get("url") not in _junk_urls]
 
     # Claim once before channel loop (skipped when force=True — onboarding
@@ -218,7 +233,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         # Per-guild filters (multi-server). Falls back to empty filters when
         # the channel has no guild_settings row (e.g. explicit channel_ids arg).
         _gs_row = next((g for g in guild_rows if str(g.get("channel_id")) == str(ch)), {})
-        _origin_f = {o.strip().upper() for o in str(_gs_row.get("origin_filter") or "").split(",") if o.strip()}
+        _type_f = {t.strip().lower() for t in str(_gs_row.get("type_filter") or "").split(",") if t.strip()}
         _excl_titles = {slugify_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
         seen_key_run: set[str] = set()
         _consec_fail = 0
@@ -226,24 +241,25 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             url = it.get("url", "")
             if not url or not _acq_map.get(url):
                 continue
-            # per-guild origin filter
-            if _origin_f:
-                _item_origin = str(it.get("origin") or "").strip().upper()
-                # Fallback: derive origin from type if API didn't provide it
-                if not _item_origin:
-                    _type = str(it.get("type") or "").lower()
-                    if _type == "manhwa":
-                        _item_origin = "KR"
-                    elif _type == "manhua":
-                        _item_origin = "CN"
-                    elif _type == "manga":
-                        _item_origin = "JP"
-                # If filter is set and item has no origin OR origin not in filter, skip
-                if not _item_origin or _item_origin not in _origin_f:
+            # per-guild type filter (by manhwa/manga/manhua)
+            if _type_f:
+                _item_type = str(it.get("type") or "").strip().lower()
+                if not _item_type or _item_type not in _type_f:
                     continue
             # per-guild excluded titles
             if _excl_titles and slugify_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:
                 continue
+            # Ceiling: skip chapters at or below the max already-dispatched chapter
+            _it_tk = str(it.get("title_key") or "").strip()
+            _it_src = str(it.get("source") or "").strip()
+            _ceil = _ceilings.get((_it_tk, _it_src))
+            if _ceil is not None:
+                try:
+                    _it_ch = float(it.get("chapter") or "0")
+                    if _it_ch <= _ceil:
+                        continue
+                except (ValueError, TypeError):
+                    pass
             norm = fcfs_key(it.get("title", ""), it.get("chapter", ""))
             if norm in claimed_keys or norm in seen_key_run or url in _claimed_urls_set:
                 continue
@@ -414,7 +430,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     return sent
 
 def _load_channels() -> list[str]:
-    """Load target channels from guild_settings (simplified)."""
+    """Load target channels from guild_settings (max 1 for single-server mode)."""
     try:
         from app.db import get_supabase
 
@@ -422,6 +438,7 @@ def _load_channels() -> list[str]:
             get_supabase()
             .table("guild_settings")
             .select("channel_id")
+            .limit(1)
             .execute()
         )
         return [r["channel_id"] for r in (res.data or []) if r.get("channel_id")]
@@ -429,14 +446,14 @@ def _load_channels() -> list[str]:
         return []
 
 def load_guild_settings() -> list[dict]:
-    """Full per-guild rows: channel_id, origin_filter, excluded_titles, label."""
+    """Full per-guild rows: channel_id, type_filter, excluded_titles, label."""
     try:
         from app.db import get_supabase
 
         res = (
             get_supabase()
             .table("guild_settings")
-            .select("guild_id, channel_id, origin_filter, label")
+            .select("guild_id, channel_id, type_filter, label")
             .execute()
         )
         rows = [r for r in (res.data or []) if r.get("channel_id")]

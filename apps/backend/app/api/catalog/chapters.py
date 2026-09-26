@@ -80,7 +80,7 @@ async def catalog_chapters(title_key: str, request: Request):
                         rows.append({"title_key": norm_tk, "title": "", "source": "shinigami", "chapter": num, "chapter_url": url, "cover": "", "series_url": f"{_s.SHINIGAMI_PUBLIC_BASE.rstrip('/')}/series/{title_key}", "origin": "KR", "updated_time": ch.get("created_at") or ch.get("updated_at") or ""})
                 elif _source_q == "komiku":
                     # Komiku: fetch from latest-updates and find this slug
-                    from app.scrapers.komiku import fetch_latest_updates, chapter_url as _kom_ch_url
+                    from app.scrapers.komiku import fetch_latest_updates, chapter_url as _kom_ch_url, series_url as _kom_series_url
                     updates = fetch_latest_updates(page=1, per_page=32)
                     for entry in updates:
                         comic = entry.get("comic", {})
@@ -95,9 +95,9 @@ async def catalog_chapters(title_key: str, request: Request):
                                     "title": comic.get("title", ""),
                                     "source": "komiku",
                                     "chapter": str(ch_num),
-                                    "chapter_url": _kom_ch_url(slug, ch_num),
+                                    "chapter_url": _kom_ch_url(slug, ch_num, ch.get("id")),
                                     "cover": comic.get("coverUrl", ""),
-                                    "series_url": f"https://01.komiku.asia/{slug}",
+                                    "series_url": _kom_series_url(slug),
                                     "origin": "KR",
                                     "updated_time": "",
                                 })

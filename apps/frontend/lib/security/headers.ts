@@ -22,7 +22,7 @@ export function getCsp(isDev: boolean): string {
     "img-src 'self' data: https: blob:",
     "font-src 'self' https://fonts.gstatic.com",
     // connect-src: 'self' + scanner + image CDNs (sw.js fetch() counts as connect-src, not img-src)
-    `connect-src 'self' https://scanner.aldifhr.fun https://manhwa.aldifhr.fun https://fe.aldifhr.fun https://assets.shngm.id https://*.shngm.id https://*.shinigami.asia https://shinigami.asia https://*.ikiru.wtf https://ikiru.wtf https://01.komiku.asia https://content.komiku.me https://imgkc1.my.id https://minio.imgkc1.my.id https:${connectExtra} wss: ws: blob:`,
+    `connect-src 'self' https://scanner.aldifhr.my.id https://manhwa.aldifhr.my.id https://fe.aldifhr.fun https://assets.shngm.id https://*.shngm.id https://*.shinigami.asia https://shinigami.asia https://*.ikiru.wtf https://ikiru.wtf https://01.komiku.asia https://content.komiku.me https://imgkc1.my.id https://minio.imgkc1.my.id https:${connectExtra} wss: ws: blob:`,
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",

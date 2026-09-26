@@ -8,6 +8,8 @@ import httpx
 import random
 import time as _t
 
+from curl_cffi import requests as cffi_req
+
 from app.config import settings
 from app.logger import get_logger
 from app.services.resilience import cb_shinigami
@@ -39,15 +41,25 @@ _HEADERS = {
 # _get() call. httpx.Client is thread-safe (internal connection pool).
 _CLIENT = httpx.Client(timeout=TIMEOUT, headers=_HEADERS, verify=True)
 
+def _fetch(url: str):
+    """Fetch URL, fallback to curl_cffi if httpx blocked by TLS fingerprint."""
+    r = _CLIENT.get(url)
+    if r.status_code == 200:
+        return r
+    logger.debug("shinigami httpx blocked, trying curl_cffi", status=r.status_code)
+    return cffi_req.get(url, headers=_HEADERS, impersonate="chrome", timeout=TIMEOUT)
+
+
 def _get(path: str, retries: int = 4):
     from app.utils.ssrf import assert_allowed_url
+
     assert_allowed_url(f"{API}{path}")
     if not cb_shinigami.allow():
         logger.debug("shinigami circuit OPEN — skipping fetch", path=path)
         return None
     try:
         for attempt in range(retries + 1):
-            r = _CLIENT.get(f"{API}{path}")
+            r = _fetch(f"{API}{path}")
             if r.status_code == 200:
                 cb_shinigami.record_success()
                 return r.json()

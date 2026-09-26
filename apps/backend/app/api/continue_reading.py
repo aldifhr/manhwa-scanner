@@ -246,3 +246,76 @@ async def unread_count(request: Request):
     except Exception as e:
         logger.warn("unread_count failed", err=str(e)[:200])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+
+
+@router.delete("/continue-reading")
+async def delete_continue_reading(request: Request):
+    """Delete continue-reading entries (single or all) for current user."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        from app.db import get_supabase
+        from app.utils.request_auth import get_session_hash
+        session_hash = get_session_hash(request)
+        if not session_hash:
+            return JSONResponse(content={"success": False, "error": "no session"}, status_code=400)
+        
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        
+        title_key = body.get("title_key", "").strip()
+        
+        sb = get_supabase()
+        
+        if title_key:
+            # Single: fetch, remove key, upsert back
+            res = (
+                sb.table("continue_reading").select("entries")
+                .eq("session_hash", session_hash).maybe_single().execute()
+            )
+            entries = {}
+            if res.data and isinstance(res.data.get("entries"), dict):
+                entries = res.data["entries"]
+            entries.pop(title_key, None)
+            sb.table("continue_reading").upsert(
+                {"session_hash": session_hash, "entries": entries, "updated_at": datetime.now(timezone.utc).isoformat()},
+                on_conflict="session_hash"
+            ).execute()
+        else:
+            # All: delete row
+            sb.table("continue_reading").delete().eq("session_hash", session_hash).execute()
+        
+        return JSONResponse(content={"success": True})
+    except Exception as e:
+        logger.warn("delete_continue_reading failed", err=str(e)[:200])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+
+
+@router.post("/continue-reading/bulk")
+async def bulk_update_continue_reading(request: Request):
+    """Bulk update continue-reading entries (full map) for current user."""
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"success": False, "error": "invalid JSON"}, status_code=400)
+    entries = body.get("entries", {})
+    if not isinstance(entries, dict):
+        return JSONResponse(content={"success": False, "error": "entries must be object"}, status_code=400)
+    try:
+        from app.db import get_supabase
+        from app.utils.request_auth import get_session_hash
+        session_hash = get_session_hash(request)
+        if not session_hash:
+            return JSONResponse(content={"success": False, "error": "no session"}, status_code=400)
+        get_supabase().table("continue_reading").upsert(
+            {"session_hash": session_hash, "entries": entries, "updated_at": datetime.now(timezone.utc).isoformat()},
+            on_conflict="session_hash",
+        ).execute()
+        return JSONResponse(content={"success": True})
+    except Exception as e:
+        logger.warn("bulk_update_continue_reading failed", err=str(e)[:200])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)

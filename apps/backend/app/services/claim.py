@@ -60,7 +60,7 @@ def claim_recent_chapters_for_dispatch(
     allowed: set[tuple[str, str]] = set()
     _latest_sent: dict[tuple[str, str], float] = {}
     for w in whitelist:
-        from app.utils.text import normalize_title_key as _ntk
+        from app.utils.text import slugify_title_key as _ntk
 
         tk = _ntk(str(w.get("title_key") or ""))
         src = str(w.get("source") or "")
@@ -92,7 +92,7 @@ def claim_recent_chapters_for_dispatch(
         for r in rows:
             tk = str(r.get("title_key") or "")
             src = str(r.get("source") or "")
-            from app.utils.text import normalize_title_key as _ntk2
+            from app.utils.text import slugify_title_key as _ntk2
 
             ntk = _ntk2(tk)
             if (tk, src) not in allowed and (ntk, src) not in allowed:
@@ -168,7 +168,7 @@ def claim_recent_chapters_for_dispatch(
                 _cn = 0
             if _cn:
                 _tk2 = str(c.get("title_key") or "")
-                from app.utils.text import normalize_title_key as _ntk3
+                from app.utils.text import slugify_title_key as _ntk3
 
                 _ntk_c = _ntk3(_tk2)
                 _src2 = str(c.get("source") or "")

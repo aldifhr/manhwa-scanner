@@ -141,7 +141,7 @@ def _route_setchannel(payload: dict, data: dict):
             _ex.submit(_do_upsert).result(timeout=2.5)
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": f"✅ Notifications will be sent to <#{channel_id}>\nUse `/setfilter` to restrict origins (KR/CN/JP) for this server."},
+            {"content": f"✅ Notifications will be sent to <#{channel_id}>\nUse `/setfilter` to restrict types (manhwa/manga/manhua) for this server."},
         )
     except TimeoutError:
         logger.warn("setchannel DB timeout", guild=guild_id, channel=channel_id)
@@ -157,16 +157,16 @@ def _route_setchannel(payload: dict, data: dict):
         )
 
 def _route_setfilter(payload: dict, data: dict):
-    """Per-guild origin filter: /setfilter origins:KR,CN — empty = all."""
+    """Per-guild type filter: /setfilter types:manhwa,manhua — empty = all."""
     opts = _extract_options(data)
     guild_id = payload.get("guild_id", "")
-    origins_raw = (opts.get("origins") or "").upper()
-    origins = {o.strip() for o in origins_raw.split(",") if o.strip()}
-    bad = origins - {"KR", "CN", "JP"}
+    types_raw = (opts.get("types") or "").lower()
+    types = {t.strip() for t in types_raw.split(",") if t.strip()}
+    bad = types - {"manhwa", "manga", "manhua"}
     if bad:
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": f"❌ Invalid origins: {', '.join(sorted(bad))}. Use KR, CN, JP (comma-separated, empty = all)."},
+            {"content": f"❌ Invalid types: {', '.join(sorted(bad))}. Use manhwa, manga, manhua (comma-separated, empty = all)."},
         )
     if not guild_id:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "❌ Missing guild"})
@@ -175,7 +175,7 @@ def _route_setfilter(payload: dict, data: dict):
 
         def _do_upsert():
             return get_supabase().table("guild_settings").upsert(
-                {"guild_id": guild_id, "origin_filter": ",".join(sorted(origins))},
+                {"guild_id": guild_id, "type_filter": ",".join(sorted(types))},
                 on_conflict="guild_id",
             ).execute()
 
@@ -183,7 +183,7 @@ def _route_setfilter(payload: dict, data: dict):
 
         with ThreadPoolExecutor(max_workers=1) as _ex:
             _ex.submit(_do_upsert).result(timeout=2.5)
-        msg = f"✅ This server will now receive: **{', '.join(sorted(origins))}**" if origins else "✅ Filter cleared — this server receives ALL origins"
+        msg = f"✅ This server will now receive: **{', '.join(sorted(types))}**" if types else "✅ Filter cleared — this server receives ALL types"
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": msg})
     except TimeoutError:
         logger.warn("setfilter DB timeout", guild=guild_id)

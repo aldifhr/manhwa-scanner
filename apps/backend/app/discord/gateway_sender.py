@@ -35,7 +35,19 @@ async def main():
     intents.guilds = True
     client = discord.Client(intents=intents)
     await client.login(tok)
-    ch = await client.fetch_channel(cid)
+    try:
+        await asyncio.wait_for(client.wait_until_ready(), timeout=10)
+    except Exception:
+        pass
+    ch = client.get_channel(int(cid))
+    if ch is None:
+        for g in client.guilds:
+            ch = discord.utils.get(g.text_channels, id=int(cid))
+            if ch:
+                break
+    if ch is None:
+        await client.close()
+        sys.exit(1)
     disc_embeds = []
     for e in embeds:
         try:

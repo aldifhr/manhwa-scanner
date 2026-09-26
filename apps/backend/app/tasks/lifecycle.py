@@ -140,7 +140,7 @@ def _recover_processing() -> None:
                 job = r.rpoplpush(proc_key, main_key)
                 if not job:
                     break
-                logger.warn("recovered orphaned job from processing", queue=main_key)
+                logger.debug("recovered orphaned job from processing", queue=main_key)
                 if main_key == CRON_QUEUE_KEY:
                     try:
                         r.sadd(CRON_QUEUE_SET, job)

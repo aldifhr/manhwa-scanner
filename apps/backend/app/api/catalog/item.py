@@ -35,7 +35,7 @@ async def catalog_item(title_key: str, request: Request):
     # source-aware early fetch — Popular cards pass ?source=voratoon/shinigami so voratoon slug doesn't get hijacked by ikiru whitelist
     if _source_q == "komiku":
         try:
-            from app.scrapers.komiku import fetch_latest_updates
+            from app.scrapers.komiku import fetch_latest_updates, series_url as _kom_series_url
             updates = fetch_latest_updates(page=1, per_page=32)
             for entry in updates:
                 comic = entry.get("comic", {})
@@ -45,7 +45,7 @@ async def catalog_item(title_key: str, request: Request):
                     genres = comic.get("genres", []) or []
                     _type = (comic.get("type") or "manhwa").lower()
                     rating = comic.get("rating")
-                    _resp = {"success": True, "data": {"titleKey": title_key, "title": comic.get("title", title_key), "cover": cover, "sources": [{"source": "komiku", "url": f"https://01.komiku.asia/{slug}"}], "metadata": {"status": comic.get("status", ""), "rating": str(rating) if rating else "", "genres": genres, "description": comic.get("synopsis", ""), "origin": "KR"}, "latestChapter": str(comic.get("latestChapter", ""))}}
+                    _resp = {"success": True, "data": {"titleKey": title_key, "title": comic.get("title", title_key), "cover": cover, "sources": [{"source": "komiku", "url": _kom_series_url(slug)}], "metadata": {"status": comic.get("status", ""), "rating": str(rating) if rating else "", "genres": genres, "description": comic.get("synopsis", ""), "origin": "KR"}, "latestChapter": str(comic.get("latestChapter", ""))}}
                     _CATALOG_CACHE[_cache_key] = (_qtime.time(), _resp)
                     _CATALOG_CACHE.move_to_end(_cache_key)
                     while len(_CATALOG_CACHE) > _CATALOG_CACHE_MAX:
@@ -138,7 +138,7 @@ async def catalog_item(title_key: str, request: Request):
 
     # Fallback: Komiku by slug (via API — no auth, no CF block)
     try:
-        from app.scrapers.komiku import fetch_latest_updates
+        from app.scrapers.komiku import fetch_latest_updates, series_url as _kom_series_url
         # Search through recent updates for this slug
         updates = fetch_latest_updates(page=1, per_page=32)
         for entry in updates:
@@ -149,7 +149,7 @@ async def catalog_item(title_key: str, request: Request):
                 genres = comic.get("genres", []) or []
                 _type = (comic.get("type") or "manhwa").lower()
                 rating = comic.get("rating")
-                _resp = {"success": True, "data": {"titleKey": title_key, "title": comic.get("title", title_key), "cover": cover, "sources": [{"source": "komiku", "url": f"https://01.komiku.asia/{slug}"}], "metadata": {"status": comic.get("status", ""), "rating": str(rating) if rating else "", "genres": genres, "description": comic.get("synopsis", ""), "origin": "KR"}, "latestChapter": str(comic.get("latestChapter", ""))}}
+                _resp = {"success": True, "data": {"titleKey": title_key, "title": comic.get("title", title_key), "cover": cover, "sources": [{"source": "komiku", "url": _kom_series_url(slug)}], "metadata": {"status": comic.get("status", ""), "rating": str(rating) if rating else "", "genres": genres, "description": comic.get("synopsis", ""), "origin": "KR"}, "latestChapter": str(comic.get("latestChapter", ""))}}
                 _CATALOG_CACHE[_cache_key] = (_qtime.time(), _resp)
                 _CATALOG_CACHE.move_to_end(_cache_key)
                 while len(_CATALOG_CACHE) > _CATALOG_CACHE_MAX:

@@ -67,7 +67,7 @@ def _set_session_cookies(resp: JSONResponse, token: str) -> None:
         httponly=True,
         secure=True,
         samesite="none",
-        domain=".aldifhr.fun",
+        domain=".aldifhr.my.id",
         path="/",
         max_age=_COOKIE_MAX_AGE,
     )
@@ -78,7 +78,7 @@ def _set_session_cookies(resp: JSONResponse, token: str) -> None:
         httponly=False,
         secure=True,
         samesite="none",
-        domain=".aldifhr.fun",
+        domain=".aldifhr.my.id",
         path="/",
         max_age=_COOKIE_MAX_AGE,
     )

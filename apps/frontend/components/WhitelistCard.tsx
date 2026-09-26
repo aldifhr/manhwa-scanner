@@ -31,7 +31,7 @@ function resolveDetailUrl(item: WhitelistRouteItem): string | undefined {
   const slug = slugFromTitle(title);
   if (!slug) return undefined;
   if (sources.includes("komiku"))
-    return `https://01.komiku.asia/${slug}`;
+    return `https://01.komiku.asia/manga/${slug}`;
   if (sources.includes("ikiru")) return `https://08.ikiru.wtf/manga/${slug}/`;
   if (sources.includes("shinigami")) {
     const raw =

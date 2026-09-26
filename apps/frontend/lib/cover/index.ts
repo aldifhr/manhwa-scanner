@@ -33,7 +33,7 @@ function extractCoverImgInner(
 ): { inner: string; param: string } | null {
   if (!cover.includes("cover-img?")) return null;
   try {
-    const u = new URL(cover, "https://manhwa.aldifhr.fun");
+    const u = new URL(cover, "https://manhwa.aldifhr.my.id");
     const inner = u.searchParams.get("url") || u.searchParams.get("series");
     if (!inner) return null;
     const param = u.searchParams.has("url") ? "url" : "series";
@@ -78,7 +78,7 @@ export function resolveCoverUrl(
   }
 
   // 3. Backend-host absolute URL → strip to local path (handles scanner/manhwa + envHost)
-  const backendHosts = ["scanner.aldifhr.fun", "manhwa.aldifhr.fun"];
+  const backendHosts = ["scanner.aldifhr.my.id", "manhwa.aldifhr.my.id"]
   try {
     const envHost = (
       typeof process !== "undefined"

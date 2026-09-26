@@ -9,8 +9,8 @@ function clearClientCookies() {
     document.cookie = `ikiru_csrf_token=; ${opts}`;
     document.cookie = `ikiru_dashboard_session=; ${opts}`;
     // legacy domain variants — no-op on localhost but harmless
-    document.cookie = `ikiru_csrf_token=; ${opts}; domain=.aldifhr.fun`;
-    document.cookie = `ikiru_dashboard_session=; ${opts}; domain=.aldifhr.fun`;
+    document.cookie = `ikiru_csrf_token=; ${opts}; domain=.aldifhr.my.id`;
+    document.cookie = `ikiru_dashboard_session=; ${opts}; domain=.aldifhr.my.id`;
   } catch {}
 }
 

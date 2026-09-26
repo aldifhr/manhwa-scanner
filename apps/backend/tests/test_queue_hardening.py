@@ -383,40 +383,39 @@ class TestRaceCondition:
 
 class TestDoubleDispatch:
     def test_dispatch_same_chapter_twice_second_skipped_via_history(self):
-        """dispatch_history UNIQUE + claimed_keys prevents second send."""
+        """claim_and_record prevents double-send of same chapter."""
         from datetime import datetime, timezone
         now_iso = datetime.now(timezone.utc).isoformat()
         from app.cron.dispatch_mod import dispatch
         item = {"title": "A", "title_key": "a", "chapter": "1", "chapter_num": 1, "url": "https://11.shinigami.asia/chapter/1", "source": "shinigami", "cover": "", "series_url": "https://11.shinigami.asia/series/a", "origin": "KR", "updated_time": now_iso}
-        # First run: empty history → sends
+        # First run: claim_and_record returns True → sends
         with patch("app.cron.dispatch_mod.load_guild_settings", return_value=[{"channel_id": "123", "origin_filter": "", "excluded_titles": []}]):
             with patch("app.db.get_supabase") as mock_gs:
-                # _already_dispatched / claimed empty → allow send, then complete_claim writes history
                 mock_sb = MagicMock()
                 mock_gs.return_value = mock_sb
-                # dispatch() does multiple table calls: we make them return empty (no prior)
                 mock_sb.table.return_value.select.return_value.in_.return_value.execute.return_value.data = []
                 mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
-                # claim_and_record + complete paths
-                with patch("app.storage.dispatch.claim_and_record", return_value=[True]):
-                    with patch("app.storage.dispatch.complete_dispatch_claim"):
-                        with patch("app.discord.client.send_channel_message", return_value={"id": "m1"}):
-                            with patch("app.db.q"):
-                                sent = dispatch([item], ["123"], "inst", force=True)
-                                assert sent == 1
-        # Second run: history now contains fcfs_key → skipped
+                mock_sb.table.return_value.select.return_value.execute.return_value.data = []
+                with patch("app.storage.dispatch._already_dispatched", return_value=set()):
+                    with patch("app.storage.dispatch.claim_and_record", return_value=[True]):
+                        with patch("app.storage.dispatch.complete_dispatch_claim"):
+                            with patch("app.discord.client.send_channel_message", return_value={"id": "m1"}) as mock_send:
+                                with patch("app.db.q"):
+                                    sent = dispatch([item], ["123"], "inst", force=False)
+                                    assert sent == 1
+                                    mock_send.assert_called_once()
+        # Second run: claim_and_record returns False (fcfs_key in history) → skipped
         with patch("app.cron.dispatch_mod.load_guild_settings", return_value=[{"channel_id": "123", "origin_filter": "", "excluded_titles": []}]):
             with patch("app.db.get_supabase") as mock_gs2:
                 mock_sb2 = MagicMock()
                 mock_gs2.return_value = mock_sb2
-                # Simulate history hit for fcfs_key
                 mock_sb2.table.return_value.select.return_value.in_.return_value.execute.return_value.data = [{"fcfs_key": "a#1", "chapter_url": "https://x/1"}]
-                with patch("app.storage.dispatch.claim_and_record", return_value=[False]):
-                    with patch("app.discord.client.send_channel_message") as mock_send:
-                        sent2 = dispatch([item], ["123"], "inst", force=True)
-                        # force still checks dispatch_history, so should skip
-                        assert sent2 == 0
-                        mock_send.assert_not_called()
+                with patch("app.storage.dispatch._already_dispatched", return_value=set()):
+                    with patch("app.storage.dispatch.claim_and_record", return_value=[False]):
+                        with patch("app.discord.client.send_channel_message") as mock_send:
+                            sent2 = dispatch([item], ["123"], "inst", force=False)
+                            assert sent2 == 0
+                            mock_send.assert_not_called()
 
     def test_complete_dispatch_duplicate_upsert_handled(self):
         """Two concurrent complete_dispatch_claim for same fcfs_key → second is idempotent (ON CONFLICT)."""

@@ -1,7 +1,7 @@
 """Web settings API — manage per-guild notification settings from the FE.
 
 GET  /api/settings            -> list guild rows (safe fields only)
-PUT  /api/settings/{guild_id} -> update origin_filter / excluded_titles / label
+PUT  /api/settings/{guild_id} -> update type_filter / excluded_titles / label
 
 Auth: PUT requires admin role (require_monitor_auth {"admin"}); GET is monitor-only.
 """
@@ -21,24 +21,24 @@ from app.logger import get_logger
 logger = get_logger("api:settings")
 router = APIRouter()
 
-_VALID_ORIGINS = {"KR", "CN", "JP"}
+_VALID_TYPES = {"manhwa", "manga", "manhua"}
 
 
 class GuildSettingsPutRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    originFilter: Optional[List[str] | str] = Field(default=None)
+    typeFilter: Optional[List[str] | str] = Field(default=None)
     excludedTitles: Optional[List[str]] = Field(default=None)
     label: Optional[str] = Field(default=None, max_length=60)
 
 
-def _clean_origins(raw) -> list[str]:
+def _clean_types(raw) -> list[str]:
     if isinstance(raw, str):
         parts = raw.split(",")
     elif isinstance(raw, (list, tuple)):
         parts = [str(x) for x in raw]
     else:
         return []
-    return sorted({o.strip().upper() for o in parts if o.strip()})
+    return sorted({t.strip().lower() for t in parts if t.strip()})
 
 
 @router.get("/settings")
@@ -49,14 +49,14 @@ async def settings_get(request: Request):
         rows = load_guild_settings()
         out = []
         for g in rows:
-            origins_raw = str(g.get("origin_filter") or "")
+            types_raw = str(g.get("type_filter") or "")
             from app.cron.dispatch_mod import _guild_name
             out.append({
                 "guildId": str(g.get("guild_id") or ""),
                 "guildName": _guild_name(str(g.get("guild_id") or "")),
                 "channelId": str(g.get("channel_id") or ""),
                 "label": str(g.get("label") or ""),
-                "originFilter": [o for o in origins_raw.split(",") if o],
+                "typeFilter": [t for t in types_raw.split(",") if t],
                 "excludedTitles": list(g.get("excluded_titles") or []),
             })
         return JSONResponse(content={"success": True, "data": {"guilds": out}})
@@ -94,15 +94,15 @@ async def settings_put(request: Request, guild_id: str):
                 return JSONResponse(content={"success": False, "error": "validation_error", "details": [{"loc": ["excludedTitles"], "msg": "each title ≤200"}]}, status_code=422)
 
     update: dict = {}
-    if "originFilter" in body:
-        origins = _clean_origins(validated.originFilter)
-        bad = set(origins) - _VALID_ORIGINS
+    if "typeFilter" in body:
+        types = _clean_types(validated.typeFilter)
+        bad = set(types) - _VALID_TYPES
         if bad:
             return JSONResponse(content={
                 "success": False,
-                "error": f"invalid origins: {', '.join(sorted(bad))} (allowed: KR, CN, JP)",
+                "error": f"invalid types: {', '.join(sorted(bad))} (allowed: manhwa, manga, manhua)",
             }, status_code=400)
-        update["origin_filter"] = ",".join(origins)
+        update["type_filter"] = ",".join(types)
     if "excludedTitles" in body:
         titles = validated.excludedTitles
         if not isinstance(titles, list) or not all(isinstance(t, str) for t in titles):
@@ -130,7 +130,7 @@ async def settings_put(request: Request, guild_id: str):
             "success": True,
             "data": {
                 "guildId": str(g.get("guild_id") or ""),
-                "originFilter": [o for o in str(g.get("origin_filter") or "").split(",") if o],
+                "typeFilter": [t for t in str(g.get("type_filter") or "").split(",") if t],
                 "excludedTitles": list(g.get("excluded_titles") or []),
                 "label": str(g.get("label") or ""),
             },

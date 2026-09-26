@@ -43,12 +43,12 @@ COMMANDS = [
     },
     {
         "name": "setfilter",
-        "description": "Restrict which origins this server receives (empty = all)",
+        "description": "Restrict which content types this server receives (empty = all)",
         "default_member_permissions": "32",
         "options": [
             {
-                "name": "origins",
-                "description": "Comma-separated origins: KR, CN, JP. Leave empty to receive all.",
+                "name": "types",
+                "description": "Comma-separated types: manhwa, manga, manhua. Leave empty to receive all.",
                 "type": 3,
                 "required": False,
             }

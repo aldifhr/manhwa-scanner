@@ -55,7 +55,7 @@ export async function POST(request: Request) {
           httpOnly: true,
           secure: true,
           sameSite: "none",
-          domain: ".aldifhr.fun",
+          domain: ".aldifhr.my.id",
           path: "/",
           maxAge: 7 * 24 * 60 * 60,
         });
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
             httpOnly: false,
             secure: true,
             sameSite: "none",
-            domain: ".aldifhr.fun",
+            domain: ".aldifhr.my.id",
             path: "/",
             maxAge: 7 * 24 * 60 * 60,
           });

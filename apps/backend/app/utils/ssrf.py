@@ -13,7 +13,7 @@ ALLOWED_HOSTS = {
     "voratoon.id",
     "discord.com", "cdn.discordapp.com",
     "imgkc1.my.id", "minio.imgkc1.my.id",
-    "scanner.aldifhr.fun", "manhwa.aldifhr.fun",
+    "scanner.aldifhr.my.id", "manhwa.aldifhr.my.id",
 }
 
 # suffix match for *.shinigami.asia, *.ikiru.wtf

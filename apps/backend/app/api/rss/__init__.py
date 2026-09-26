@@ -52,7 +52,7 @@ def invalidate_rss_cache(key_prefix: str | None = None):
 
 @router.get("/rss")
 async def rss(request: Request):
-    # Public read-only feed (used by the manhwa.aldifhr.fun /recent reader page
+    # Public read-only feed (used by the manhwa.aldifhr.my.id /recent reader page
     # via the FE proxy, which has no session token in serverless). No secrets or
     # writes are exposed here, so auth is intentionally not required.
     # Mutating/operational endpoints (whitelist writes, dispatch, rss/new,
