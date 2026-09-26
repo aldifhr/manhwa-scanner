@@ -17,7 +17,7 @@ client = TestClient(app)
 CSRF_COOKIE = "ikiru_csrf_token"
 CSRF_HEADER = "x-csrf-token"
 # POST endpoint NOT whitelisted — CSRF applies
-PROTECTED_POST = "/api/v1/health/refresh-voratoon"
+PROTECTED_POST = "/api/v1/settings"
 
 
 def _assert_not_csrf_failure(response):

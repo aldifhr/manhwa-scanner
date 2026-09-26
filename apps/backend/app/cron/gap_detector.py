@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.logger import get_logger
-from app.scrapers.voratoon import fetch_chapters
 
 logger = get_logger("gap-detector")
 
@@ -197,18 +196,6 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                         url = c.get("chapter_url") or c.get("url") or ""
                         if num > 0 and url:
                             chapters.append((num, url, str(c.get("title") or ""), c.get("updated_time")))
-                elif src == "voratoon":
-                    slug = series_url.rstrip("/").split("/")[-1] if series_url else tk.replace(" ", "-")
-                    for c in fetch_chapters(slug):
-                        try:
-                            num = float(str(c.get("chapter_number") or c.get("number") or 0) or 0)
-                        except ValueError:
-                            continue
-                        ch_index = c.get("chapter") or c.get("chapter_number")
-                        if num > 0 and ch_index:
-                            url = f"https://{settings.VORATOON_DOMAIN}/series/{slug}/chapter/{ch_index}"
-                            chapters.append((num, url, str(c.get("title") or ""), c.get("updated_time")))
-
                 if not chapters:
                     logger.warn("gap backfill: no chapters fetched", title_key=tk, source=src, lo=lo, hi=hi)
                     # don't mark fixed — will show needs manual fix with reason

@@ -32,9 +32,7 @@ function SourcePill({ source }: { source: string }) {
       ? "bg-red-500/15 text-red-400 border-red-500/20"
       : s === "ikiru"
         ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
-        : s === "voratoon"
-          ? "bg-orange-500/15 text-orange-400 border border-orange-500/20"
-          : "bg-white/10 text-white/80 border-white/10";
+        : "bg-white/10 text-white/80 border-white/10";
   return (
     <span
       className={`text-[10px] font-semibold px-2.5 py-1 rounded-full capitalize backdrop-blur-md border shadow-sm ${cls}`}

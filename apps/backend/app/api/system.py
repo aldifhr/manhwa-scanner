@@ -58,12 +58,12 @@ async def cron_trigger(request: Request):
     action = request.query_params.get("action", "update")
     source = request.query_params.get("source")
     
-    # Build action string: "rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon"
+    # Build action string: "rss-fetch:ikiru", "rss-fetch:shinigami"
     if source and action == "rss-fetch":
         action = f"rss-fetch:{source}"
     
-    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover")
-    valid_source_actions = ("rss-fetch:ikiru", "rss-fetch:shinigami", "rss-fetch:voratoon")
+    valid_actions = ("update", "rss-fetch", "health", "dispatch", "sync-meta", "enrich", "enrich-missing", "enrich-refresh")
+    valid_source_actions = ("rss-fetch:ikiru", "rss-fetch:shinigami")
     
     if action not in valid_actions and action not in valid_source_actions:
         return JSONResponse(content={"success": False, "error": f"unknown action: {action}"}, status_code=400)

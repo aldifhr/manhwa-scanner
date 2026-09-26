@@ -217,8 +217,7 @@ def get_cron_status() -> dict:
         "enrich_interval_s": 3600,
         "enrich_missing_interval_s": 3600,
         "enrich_refresh_interval_s": 604800,
-        "voratoon_cover_interval_s": 86400,
-        "sources": ["ikiru", "shinigami", "voratoon"],
+        "sources": ["ikiru", "shinigami"],
         "now": datetime.now(timezone.utc).isoformat(),
     }
     try:
@@ -239,7 +238,7 @@ def get_cron_status() -> dict:
     try:
         from app.db import get_supabase
         sb = get_supabase()
-        for src in ("ikiru", "shinigami", "voratoon"):
+        for src in ("ikiru", "shinigami"):
             last = None
             if r is not None:
                 try:

@@ -43,12 +43,6 @@ class Settings(BaseSettings):
     SHINIGAMI_SERIES_PATH: str = "/series/"
     SHINIGAMI_CHAPTER_PATH: str = "/chapter/"
 
-    VORATOON_API_URL: str = "https://api.voratoon.com"
-    VORATOON_DOMAIN: str = "v2.voratoon.com"
-    VORATOON_COVER_BUCKET: str = "cvr.voratoon.id"
-    VORATOON_SERIES_PATH: str = "/series/"
-    VORATOON_CHAPTER_SEGMENT: str = "/chapter/"
-
     KIRYUU_PUBLIC_URL: str = "https://v7.kiryuu.to"
     KIRYUU_SERIES_PATH: str = "/manga/"
     KIRYUU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}/"
@@ -116,8 +110,6 @@ class Settings(BaseSettings):
         "g.shinigami.asia:443",
         "shinigami.asia:443",
         "assets.shngm.id:443",
-        f"{VORATOON_COVER_BUCKET}:443",
-        "cdn.voratoon.com:443",
         "content.komiku.me:443",
     ]
 
@@ -184,7 +176,7 @@ VALID_SOURCES_WITH_ALL = ("shinigami", "komiku", "kiryuu", "wurmz", "all")
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:shinigami", "rss-fetch:komiku",
-    "enrich", "enrich-missing", "enrich-refresh", "voratoon-cover", "failed-retry",
+    "enrich", "enrich-missing", "enrich-refresh", "failed-retry",
 )
 
 settings = Settings()

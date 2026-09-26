@@ -50,11 +50,11 @@ def test_reader_cover_finds_shinigami_via_slug_and_series_meta():
             assert result.body == b"jpegdata"
 
 
-def test_reader_cover_unwraps_voratoon_proxy():
+def test_reader_cover_unwraps_proxy_url():
     from unittest.mock import MagicMock, patch
     from app.api.cover import reader_cover
 
-    proxy_cover = "/api/v1/reader/proxy?url=https%3A%2F%2Fcvr.voratoon.id%2Fprod%2Fseries%2Fdao-of-the-bizarre-immortal%2Fcover%2Fdao.webp%3FX-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Signature%3D322a"
+    proxy_cover = "/api/v1/reader/proxy?url=https%3A%2F%2Fassets.shngm.id%2Fcover%2Fdao.webp%3FX-Amz-Algorithm%3DAWS4-HMAC-SHA256%26X-Amz-Signature%3D322a"
 
     def table_side(name):
         m = MagicMock()
@@ -81,7 +81,7 @@ def test_reader_cover_unwraps_voratoon_proxy():
 
             async def fake_fetch(url, cache_control="public, max-age=3600"):
                 # assert called with unwrapped https url
-                assert url.startswith("https://cvr.voratoon.id"), f"got {url}"
+                assert url.startswith("https://assets.shngm.id"), f"got {url}"
                 assert "X-Amz-" in url
                 return Response(content=b"webpdata", media_type="image/webp")
 

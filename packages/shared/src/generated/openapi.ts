@@ -922,7 +922,7 @@ export interface operations {
                 /** @description Rows per page (1..10000). */
                 page_size?: number;
                 /** @description Filter by source. */
-                source?: "ikiru" | "shinigami" | "voratoon";
+                source?: "ikiru" | "shinigami";
                 /** @description Case-insensitive title search. */
                 title?: string;
             };
@@ -951,7 +951,7 @@ export interface operations {
                 /** @description Rows per page (1..10000). */
                 page_size?: number;
                 /** @description Filter by source. */
-                source?: "ikiru" | "shinigami" | "voratoon";
+                source?: "ikiru" | "shinigami";
                 /** @description Case-insensitive title search. */
                 title?: string;
             };

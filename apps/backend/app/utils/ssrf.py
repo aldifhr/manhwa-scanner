@@ -9,15 +9,13 @@ from urllib.parse import urlparse
 ALLOWED_HOSTS = {
     "ikiru.wtf", "08.ikiru.wtf", "07.ikiru.wtf",
     "shinigami.asia", "11.shinigami.asia", "f.shinigami.asia", "api.shngm.io", "assets.shngm.id",
-    "voratoon.com", "v2.voratoon.com", "api.voratoon.com", "cvr.voratoon.id",
-    "voratoon.id",
     "discord.com", "cdn.discordapp.com",
     "imgkc1.my.id", "minio.imgkc1.my.id",
     "scanner.aldifhr.my.id", "manhwa.aldifhr.my.id",
 }
 
 # suffix match for *.shinigami.asia, *.ikiru.wtf
-ALLOWED_SUFFIXES = (".shinigami.asia", ".ikiru.wtf", ".voratoon.id", ".voratoon.com")
+ALLOWED_SUFFIXES = (".shinigami.asia", ".ikiru.wtf")
 
 def _is_private_ip(host: str) -> bool:
     try:

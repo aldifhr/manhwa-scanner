@@ -8,8 +8,7 @@ Keyed by composite (title_key, source); source='all' blocks every source.
 (title_key, source) (see 042_db_audit_fix.sql fix 6). JOIN series_meta at
 read time (rss_service sm>it>wl) instead of duplicating. Kept for
 back-compat list_excluded_titles fast path; idx_excluded_titles_source
-speeds the LIKE '%' || VORATOON_COVER_BUCKET || '%X-Amz-%' scan which is always
-source-filtered (source='voratoon').
+keeps the source-filtered scan cheap.
 """
 from __future__ import annotations
 
@@ -24,7 +23,7 @@ from app.utils.text import slugify_title_key
 logger = get_logger("storage:excluded-titles")
 
 from app.config import settings as _cfg
-_VALID_SOURCES = ("all", "ikiru", "shinigami", "voratoon", "kiryuu", "wurmz")
+_VALID_SOURCES = ("all", "ikiru", "shinigami", "kiryuu", "wurmz")
 
 def _norm_source(src: str) -> str:
     s = (src or "all").strip().lower()

@@ -28,28 +28,6 @@
         ]
       }
     },
-    "/api/v1/health/refresh-voratoon": {
-      "post": {
-        "summary": "Refresh Voratoon",
-        "description": "Force refresh voratoon covers (bypass throttle).",
-        "operationId": "refresh_voratoon_api_v1_health_refresh_voratoon_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/v1/health": {
       "get": {
         "summary": "Api Health",
@@ -75,7 +53,7 @@
     "/api/v1/health/detailed": {
       "get": {
         "summary": "Health Detailed",
-        "description": "Detailed health \u2014 circuit breakers, pool stats, voratoon cover expiry.",
+        "description": "Detailed health — circuit breakers, pool stats, voratoon cover expiry.",
         "operationId": "health_detailed_api_v1_health_detailed_get",
         "responses": {
           "200": {
@@ -161,7 +139,7 @@
     "/api/v1/reader/dispatch-history": {
       "get": {
         "summary": "Dispatch History Reader",
-        "description": "Alias for FE compatibility \u2014 /api/v1/reader/dispatch-history \u2192 /api/v1/dispatch-history.",
+        "description": "Alias for FE compatibility — /api/v1/reader/dispatch-history → /api/v1/dispatch-history.",
         "operationId": "dispatch_history_reader_api_v1_reader_dispatch_history_get",
         "responses": {
           "200": {
@@ -183,7 +161,7 @@
     "/api/v1/reader/whitelist": {
       "get": {
         "summary": "Get Whitelist Reader",
-        "description": "Backward-compat alias \u2014 public GET for anon dashboard, same as /whitelist.",
+        "description": "Backward-compat alias — public GET for anon dashboard, same as /whitelist.",
         "operationId": "get_whitelist_reader_api_v1_reader_whitelist_get",
         "responses": {
           "200": {
@@ -232,8 +210,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -254,7 +231,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Keyset cursor (created_at ISO) for pagination \u2014 preferred over page for large tables."
+            "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables."
           },
           {
             "name": "merge",
@@ -270,7 +247,7 @@
       },
       "post": {
         "summary": "Whitelist Post Reader",
-        "description": "Alias for FE compatibility \u2014 /api/v1/reader/whitelist \u2192 /api/v1/whitelist.",
+        "description": "Alias for FE compatibility — /api/v1/reader/whitelist → /api/v1/whitelist.",
         "operationId": "whitelist_post_reader_api_v1_reader_whitelist_post",
         "responses": {
           "200": {
@@ -340,8 +317,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -362,7 +338,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Keyset cursor (created_at ISO) for pagination \u2014 preferred over page for large tables."
+            "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables."
           },
           {
             "name": "merge",
@@ -1129,8 +1105,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -1255,7 +1230,7 @@
     "/api/v1/reader/rss": {
       "get": {
         "summary": "Rss Reader",
-        "description": "Alias for FE compatibility \u2014 /api/v1/reader/rss \u2192 /api/v1/rss.",
+        "description": "Alias for FE compatibility — /api/v1/reader/rss → /api/v1/rss.",
         "operationId": "rss_reader_api_v1_reader_rss_get",
         "responses": {
           "200": {
@@ -1370,8 +1345,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -1769,7 +1743,7 @@
     "/api/v1/interactive": {
       "post": {
         "summary": "Api Interactive",
-        "description": "Discord interaction endpoint \u2014 verifies Ed25519 signature and routes.",
+        "description": "Discord interaction endpoint — verifies Ed25519 signature and routes.",
         "operationId": "api_interactive_api_v1_interactive_post",
         "responses": {
           "200": {

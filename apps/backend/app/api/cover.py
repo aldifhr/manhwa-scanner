@@ -81,8 +81,6 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             "g.shinigami.asia:443",
             "shinigami.asia:443",
             "assets.shngm.id:443",
-            f"{settings.VORATOON_COVER_BUCKET}:443",
-            "cdn.voratoon.com:443",
             "content.komiku.me:443",
         ]
     host = (p.hostname or "").strip().lower()
@@ -293,31 +291,6 @@ async def reader_refresh_cover(request: Request):
 
     if not stored_cover:
         return JSONResponse(content={"success": False, "error": "no cover found"}, status_code=404)
-
-    # If voratoon presigned URL, fetch fresh one from API
-    if "cvr.voratoon.id" in str(stored_cover) and "X-Amz-" in str(stored_cover):
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(str(stored_cover))
-            path_parts = parsed.path.split("/")
-            if len(path_parts) >= 4 and path_parts[1] == "prod" and path_parts[2] == "series":
-                slug = path_parts[3]
-                from app.scrapers.voratoon import fetch_series_detail
-                detail = await asyncio.to_thread(fetch_series_detail, slug)
-                if detail:
-                    inner = detail.get("data", detail)
-                    fresh_cover_url = inner.get("coverImage") or ""
-                    if fresh_cover_url:
-                        fresh_scrubbed = scrub_cover(fresh_cover_url)
-                        if fresh_scrubbed:
-                            try:
-                                from datetime import datetime, timezone
-                                sb.table("series_meta").update({"cover": fresh_scrubbed, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("title_key", series).eq("source", "voratoon").execute()
-                            except Exception:
-                                pass
-                            return JSONResponse(content={"success": True, "cover": fresh_scrubbed})
-        except Exception as e:
-            logger.warn("refresh-cover voratoon failed", series=series, err=str(e)[:120])
 
     # Komiku covers are stable URLs — return as-is
     if "content.komiku.me" in str(stored_cover):

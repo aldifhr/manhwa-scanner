@@ -49,27 +49,6 @@
         ]
       }
     },
-    "/api/v1/health/refresh-voratoon": {
-      "post": {
-        "summary": "Refresh Voratoon",
-        "operationId": "refresh_voratoon_api_v1_health_refresh_voratoon_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/v1/health/detailed": {
       "get": {
         "summary": "Health Detailed",
@@ -116,7 +95,7 @@
     "/api/v1/reader/dispatch-history": {
       "get": {
         "summary": "Dispatch History Reader",
-        "description": "Alias for FE compatibility \u2014 /api/v1/reader/dispatch-history \u2192 /api/v1/dispatch-history.",
+        "description": "Alias for FE compatibility — /api/v1/reader/dispatch-history → /api/v1/dispatch-history.",
         "operationId": "dispatch_history_reader_api_v1_reader_dispatch_history_get",
         "responses": {
           "200": {
@@ -138,7 +117,7 @@
     "/api/v1/reader/whitelist": {
       "get": {
         "summary": "Get Whitelist Reader",
-        "description": "Backward-compat alias \u2014 public GET for anon dashboard, same as /whitelist.",
+        "description": "Backward-compat alias — public GET for anon dashboard, same as /whitelist.",
         "operationId": "get_whitelist_reader_api_v1_reader_whitelist_get",
         "responses": {
           "200": {
@@ -187,8 +166,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -209,7 +187,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Keyset cursor (created_at ISO) for pagination \u2014 preferred over page for large tables."
+            "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables."
           },
           {
             "name": "merge",
@@ -225,7 +203,7 @@
       },
       "post": {
         "summary": "Whitelist Post Reader",
-        "description": "Alias for FE compatibility \u2014 /api/v1/reader/whitelist \u2192 /api/v1/whitelist.",
+        "description": "Alias for FE compatibility — /api/v1/reader/whitelist → /api/v1/whitelist.",
         "operationId": "whitelist_post_reader_api_v1_reader_whitelist_post",
         "responses": {
           "200": {
@@ -295,8 +273,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -317,7 +294,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Keyset cursor (created_at ISO) for pagination \u2014 preferred over page for large tables."
+            "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables."
           },
           {
             "name": "merge",
@@ -993,7 +970,7 @@
     "/api/v1/img": {
       "get": {
         "summary": "Img",
-        "description": "Canonical public image proxy \u2014 GET /img?url=... . Compat aliases: /reader/cover, /reader/cover-img, /reader/proxy.",
+        "description": "Canonical public image proxy — GET /img?url=... . Compat aliases: /reader/cover, /reader/cover-img, /reader/proxy.",
         "operationId": "img_api_v1_img_get",
         "responses": {
           "200": {
@@ -1150,8 +1127,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -1276,7 +1252,7 @@
     "/api/v1/reader/rss": {
       "get": {
         "summary": "Rss Reader",
-        "description": "Alias for FE compatibility \u2014 /api/v1/reader/rss \u2192 /api/v1/rss.",
+        "description": "Alias for FE compatibility — /api/v1/reader/rss → /api/v1/rss.",
         "operationId": "rss_reader_api_v1_reader_rss_get",
         "responses": {
           "200": {
@@ -1391,8 +1367,7 @@
               "type": "string",
               "enum": [
                 "ikiru",
-                "shinigami",
-                "voratoon"
+                "shinigami"
               ]
             },
             "description": "Filter by source."
@@ -1745,7 +1720,7 @@
     "/api/v1/analytics/overview": {
       "get": {
         "summary": "Analytics Overview",
-        "description": "Overview analytics \u2014 popular series, velocity, engagement.",
+        "description": "Overview analytics — popular series, velocity, engagement.",
         "operationId": "analytics_overview_api_v1_analytics_overview_get",
         "responses": {
           "200": {
@@ -1838,7 +1813,7 @@
     "/api/v1/analytics/engagement": {
       "get": {
         "summary": "Analytics Engagement",
-        "description": "User engagement metrics \u2014 reading activity, active users.",
+        "description": "User engagement metrics — reading activity, active users.",
         "operationId": "analytics_engagement_api_v1_analytics_engagement_get",
         "responses": {
           "200": {
@@ -2202,7 +2177,7 @@
     "/api/v1/queue/status": {
       "get": {
         "summary": "Queue Status",
-        "description": "Redis queue status \u2014 pending jobs, breakdown, pending chapters.",
+        "description": "Redis queue status — pending jobs, breakdown, pending chapters.",
         "operationId": "queue_status_api_v1_queue_status_get",
         "responses": {
           "200": {
@@ -2310,7 +2285,7 @@
     "/api/v1/interactive": {
       "post": {
         "summary": "Api Interactive",
-        "description": "Discord interaction endpoint \u2014 verifies Ed25519 signature and routes.",
+        "description": "Discord interaction endpoint — verifies Ed25519 signature and routes.",
         "operationId": "api_interactive_api_v1_interactive_post",
         "responses": {
           "200": {

@@ -142,7 +142,7 @@ async def _rss_impl(request: Request):
         hours = 24  # RSS shows last 24h by design — fresh discovery feed
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        # (voratoon 70 + shinigami 121 in 24h = 191, 1000 covers all + margin for filtering)
+        # (shinigami 121 in 24h, 1000 covers all + margin for filtering)
         if group:
             _fetch_limit = 2000
         else:

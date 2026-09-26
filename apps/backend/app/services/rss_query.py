@@ -134,16 +134,16 @@ def map_result(
                 is_wl = True
                 break
     _title_norm = normalize_title_key(it.get("title") or "")
-    if _title_norm and src in ("ikiru", "voratoon") and not is_wl:
+    if _title_norm and src == "ikiru" and not is_wl:
         if wl_title_set is not None:
             if _title_norm in wl_title_set:
                 for (wtk, wsrc) in wl_map:
-                    if wsrc in ("ikiru", "voratoon") and normalize_title_key(wtk) == _title_norm:
+                    if wsrc == "ikiru" and normalize_title_key(wtk) == _title_norm:
                         is_wl = True
                         break
         else:
             for (wtk, wsrc), wrow in wl_map.items():
-                if wsrc not in ("ikiru", "voratoon"):
+                if wsrc != "ikiru":
                     continue
                 if normalize_title_key(wrow.get("title") or wtk) == _title_norm:
                     is_wl = True

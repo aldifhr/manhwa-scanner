@@ -28,7 +28,7 @@ class TestNormSource:
     def test_valid_sources(self):
         assert _norm_source("ikiru") == "ikiru"
         assert _norm_source("shinigami") == "shinigami"
-        assert _norm_source("voratoon") == "voratoon"
+        assert _norm_source("kiryuu") == "kiryuu"
         assert _norm_source("all") == "all"
 
     def test_invalid_source_defaults_to_all(self):

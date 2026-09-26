@@ -32,7 +32,7 @@ async def catalog_item(title_key: str, request: Request):
     _cached = _CATALOG_CACHE.get(_cache_key)
     if _cached is not None and (_now - _cached[0]) < _CATALOG_TTL:
         return JSONResponse(content=_cached[1])
-    # source-aware early fetch — Popular cards pass ?source=voratoon/shinigami so voratoon slug doesn't get hijacked by ikiru whitelist
+    # source-aware early fetch — Popular cards pass ?source= so the slug doesn't get hijacked by the wrong source whitelist
     if _source_q == "komiku":
         try:
             from app.scrapers.komiku import fetch_latest_updates, series_url as _kom_series_url
@@ -124,8 +124,8 @@ async def catalog_item(title_key: str, request: Request):
     except Exception:
         pass
     if not sources and wl_row:
-        _src = wl_row.get("source") or "voratoon"
-        _url = wl_row.get("series_url") or wl_row.get("url") or f"https://{settings.VORATOON_DOMAIN}/series/{slug}"
+        _src = wl_row.get("source") or "shinigami"
+        _url = wl_row.get("series_url") or wl_row.get("url") or f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{slug}"
         sources = [{"source": _src, "url": _url}]
     # No fallback for non-whitelisted recent_chapters — return 404 instead of empty cover/metadata
     if meta or wl_row:

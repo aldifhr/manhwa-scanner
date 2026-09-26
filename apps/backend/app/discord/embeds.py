@@ -41,7 +41,7 @@ def _proxy_cover(cover: str | None) -> str | None:
     if "/api/v1/reader/cover-img" in cover or "/api/reader/cover-img" in cover:
         return cover
     public_base = (_PUBLIC_BASE or "https://scanner.aldifhr.my.id").rstrip("/")
-    # Voratoon covers are stored as a same-origin /api/reader/proxy?url=<enc
+    # Covers may be stored as a same-origin /api/reader/proxy?url=<enc
     # upstream> wrapper (so the FE fetches them through the authed proxy).
     # Discord needs the DIRECT upstream URL wrapped in the PUBLIC cover-img
     # proxy instead — unwrap the inner url first, else the double-wrap 403s.
@@ -59,11 +59,6 @@ def _proxy_cover(cover: str | None) -> str | None:
             return cover
     except Exception:
         pass
-    # Voratoon presigned S3 — return direct URL so Discord fetches from S3
-    # directly. Proxying through /cover-img times out from this VPS.
-    from app.config import settings as _cfg
-    if _cfg.VORATOON_COVER_BUCKET in cover:
-        return cover
     # Direct URLs — wrap in public cover-img proxy
     # Fix double-encode: RSS cover already %2F-encoded (X-Amz-Credential), _urlquote with safe='' would %→%25. Normalize first.
     from urllib.parse import unquote as _uq2
@@ -78,13 +73,11 @@ def _proxy_cover(cover: str | None) -> str | None:
 SOURCE_COLORS = {
     "ikiru": 0x22C55E,
     "shinigami": 0xEF4444,
-    "voratoon": 0xFFA500,
 }
 
 SOURCE_LABELS = {
     "ikiru": "Ikiru",
     "shinigami": "Shinigami",
-    "voratoon": "Voratoon",
 }
 
 STAR_FILLED = "⭐"

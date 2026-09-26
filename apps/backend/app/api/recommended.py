@@ -1,6 +1,6 @@
 """Recommended / Popular — GET /recommended (public).
 
-Aggregates Shinigami top daily + Voratoon browse page into a single feed for
+Aggregates Shinigami top daily (KR) + manhua top (CN) into a single feed for
 the home hero. No DB, no auth — pure upstream fan-out with 5-min cache.
 """
 
@@ -27,10 +27,6 @@ _TTL = 300.0  # 5 min
 def _shinigami_series_url(manga_id: str) -> str:
     base = (settings.SHINIGAMI_PUBLIC_BASE or settings.SHINIGAMI_PUBLIC_URL or "https://11.shinigami.asia").rstrip("/")
     return f"{base}/series/{manga_id}"
-
-
-def _voratoon_series_url(slug: str) -> str:
-    return f"https://{settings.VORATOON_DOMAIN}/series/{slug}"
 
 
 def _fetch_shinigami(limit: int = 10) -> list[dict[str, Any]]:
@@ -132,89 +128,18 @@ def _fetch_shinigami_manhua(limit: int = 10) -> list[dict[str, Any]]:
         return []
 
 
-def _fetch_voratoon(limit: int = 10) -> list[dict[str, Any]]:
-    """Fetch voratoon popular series from browse page HTML.
-
-    The API at api.voratoon.com is blocked by Cloudflare WAF from VPS IPs.
-    But the browse page at v2.voratoon.com/browse works and returns full HTML
-    with card titles and chapter counts.
-    """
-    try:
-        from playwright.sync_api import sync_playwright
-        from bs4 import BeautifulSoup
-
-        url = f"https://{settings.VORATOON_DOMAIN}/browse?format=manhwa&page=1"
-
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            pg = browser.new_page()
-            try:
-                pg.goto(url, wait_until="networkidle", timeout=30000)
-                pg.wait_for_timeout(2000)
-                html = pg.content()
-            finally:
-                browser.close()
-
-        soup = BeautifulSoup(html, "lxml")
-        out: list[dict[str, Any]] = []
-
-        for a in soup.select("a.card-title")[:limit]:
-            href = str(a.get("href", ""))
-            if not href.startswith("/series/"):
-                continue
-            slug = href.removeprefix("/series/")
-            title = a.text.strip()
-            if not slug:
-                continue
-
-            # Get cover — it's usually in a nearby img tag
-            card = a.find_parent("div", class_="card") or a.find_parent("div")
-            cover = ""
-            if card:
-                img = card.select_one("img[src*='prod/series/']")
-                if img:
-                    src = img.get("src")
-                    if isinstance(src, str):
-                        cover = scrub_cover(src) or ""
-
-            out.append({
-                "title": title,
-                "titleKey": slug,
-                "slug": slug,
-                "cover": cover,
-                "seriesUrl": _voratoon_series_url(slug),
-                "source": "voratoon",
-                "rating": None,
-                "views": 0,
-                "bookmarks": 0,
-                "genres": [],
-                "description": "",
-                "latestChapter": "",
-                "type": "manhwa",
-                "origin": "KR",
-            })
-
-        return out
-    except Exception as e:
-        logger.warn("voratoon fetch error", err=str(e)[:160])
-        return []
-
-
 async def _fetch_all(limit: int) -> list[dict[str, Any]]:
-    sh, sh_manhua, vo = await asyncio.gather(
+    sh, sh_manhua = await asyncio.gather(
         asyncio.to_thread(_fetch_shinigami, limit),
         asyncio.to_thread(_fetch_shinigami_manhua, limit),
-        asyncio.to_thread(_fetch_voratoon, limit),
     )
-    # round-robin 3 sources: daily top, manhua rec, voratoon popular
+    # round-robin 2 sources: daily top (KR), manhua rec (CN)
     merged: list[dict[str, Any]] = []
-    for i in range(max(len(sh), len(sh_manhua), len(vo))):
+    for i in range(max(len(sh), len(sh_manhua))):
         if i < len(sh):
             merged.append(sh[i])
         if i < len(sh_manhua):
             merged.append(sh_manhua[i])
-        if i < len(vo):
-            merged.append(vo[i])
     # dedup by titleKey
     seen: set[str] = set()
     deduped: list[dict[str, Any]] = []

@@ -43,108 +43,6 @@ async def healthz():
     return {"status": "ok", "service": "be-ag-py"}
 
 
-def _refresh_voratoon_cover(slug: str) -> str | None:
-    """Fetch fresh presigned voratoon cover for a slug."""
-    try:
-        from app.scrapers import voratoon as _vt
-        d = _vt.fetch_series_detail(slug)
-        if d and d.get("data"):
-            cover = d["data"].get("coverImage")
-            if cover:
-                from app.utils.cover_scrub import scrub_cover
-                return scrub_cover(cover) or cover
-    except Exception as e:
-        logger.debug("voratoon cover refresh failed", slug=slug, err=str(e)[:120])
-    return None
-
-
-def _is_voratoon_expiring(cover: str | None) -> bool:
-    """Check if voratoon presigned URL expires within 24h."""
-    if not cover or "cvr.voratoon.id" not in cover:
-        return False
-    from app.config import settings as _cfg
-    if _cfg.VORATOON_COVER_BUCKET not in cover:
-        return False
-    from datetime import datetime, timedelta, timezone
-    import re as _re
-    m = _re.search(r"X-Amz-Date=([^&]+).*?X-Amz-Expires=(\d+)", cover)
-    if not m:
-        return False
-    try:
-        d = m.group(1)
-        exp = int(m.group(2))
-        from datetime import datetime as _dt
-        dt = _dt.strptime(d, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-        expiry_ts = dt.timestamp() + exp
-        return (expiry_ts - datetime.now(timezone.utc).timestamp()) < 86400
-    except Exception:
-        return False
-
-
-def refresh_all_voratoon_covers(force: bool = False, limit: int = 200) -> dict:
-    """Scan voratoon covers across tables, refresh expiring presigned URLs."""
-    from app.db import get_supabase
-    sb = get_supabase()
-    updated = 0
-    scanned = 0
-
-    tables = [
-        ("whitelist", "title_key, cover, source"),
-        ("series_meta", "title_key, cover, source"),
-        ("recent_chapters", "title_key, cover, source"),
-        ("excluded_titles", "title_key, cover, source"),
-    ]
-
-    for table, select_cols in tables:
-        rows: list[dict] = []
-        try:
-            rows = sb.table(table).select(select_cols).eq("source", "voratoon").limit(limit).execute().data or []
-        except Exception as e:
-            # Live whitelist may lack cover column (migration not applied) — fallback to title_key/source only
-            if "cover" in str(e) and "does not exist" in str(e):
-                try:
-                    rows = sb.table(table).select("title_key, source").eq("source", "voratoon").limit(limit).execute().data or []
-                    # cover missing → treat as expiring if force, else skip
-                    if not force:
-                        continue
-                except Exception as e2:
-                    logger.warn(f"voratoon scan failed: {table}", err=str(e2)[:120])
-                    continue
-            else:
-                logger.warn(f"voratoon scan failed: {table}", err=str(e)[:120])
-                continue
-        for r in rows:
-            cover = r.get("cover")
-            if not force and not _is_voratoon_expiring(cover):
-                continue
-            slug = r.get("title_key")
-            if not slug:
-                continue
-            scanned += 1
-            new_cover = _refresh_voratoon_cover(slug)
-            if new_cover:
-                try:
-                    sb.table(table).update({"cover": new_cover}).eq("title_key", slug).eq("source", "voratoon").execute()
-                    updated += 1
-                except Exception:
-                    pass
-
-    return {"scanned": scanned, "updated": updated}
-
-
-@router.post("/health/refresh-voratoon")
-async def refresh_voratoon(request: Request):
-    """Force refresh voratoon covers (bypass throttle)."""
-    if not require_monitor_auth(request):
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    try:
-        result = refresh_all_voratoon_covers(force=True)
-        return JSONResponse(content={"success": True, "data": {"refreshed": result["updated"], "scanned": result["scanned"]}})
-    except Exception as e:
-        logger.warn("refresh-voratoon failed", err=str(e)[:200])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
-
-
 @router.get("/health")
 async def api_health(request: Request):
     """Health + source status overview (monitor auth)."""
@@ -213,10 +111,10 @@ async def api_health(request: Request):
 
 @router.get("/health/detailed")
 async def health_detailed(request: Request):
-    """Detailed health — circuit breakers, pool stats, voratoon cover expiry."""
+    """Detailed health — circuit breakers + pool stats."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami, cb_voratoon
+    from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami
     from app.db import get_pool_stats
     from app.storage import health as health_store
     from app.config import settings
@@ -276,7 +174,6 @@ async def health_detailed(request: Request):
                 "db": cb_db.state.value,
                 "ikiru": cb_ikiru.state.value,
                 "shinigami": cb_shinigami.state.value,
-                "voratoon": cb_voratoon.state.value,
             },
         },
     }

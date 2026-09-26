@@ -164,10 +164,6 @@ cb_ikiru = CircuitBreaker("ikiru", failure_threshold=5, recovery_timeout=120)
 # breaker trips earlier on a 429 burst and stays OPEN longer (5min) — prevents an
 # immediate re-burst right after recovery that would just 429 again.
 cb_shinigami = CircuitBreaker("shinigami", failure_threshold=3, recovery_timeout=300)
-# Voratoon (2026-08-30): added so the reader health endpoint + status page
-# report voratoon circuit state alongside ikiru/shinigami. Voratoon's API is
-# stable but rate-limits (429) under burst, so a moderate threshold.
-cb_voratoon = CircuitBreaker("voratoon", failure_threshold=5, recovery_timeout=120)
 # ApiFailureDetector merged here — ikiru API → HTML fallback (threshold 5, cooldown 300)
 cb_ikiru_api = CircuitBreaker("ikiru_api", failure_threshold=5, recovery_timeout=300)
 

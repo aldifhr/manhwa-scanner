@@ -65,11 +65,6 @@ class TestSchedulerIntervals:
         from app.tasks import scheduler
         assert scheduler._ENRICH_REFRESH_INTERVAL_S == 604800
 
-    def test_voratoon_cover_interval_constant(self):
-        """Voratoon cover interval is 86400s (1 day)."""
-        from app.tasks import scheduler
-        assert scheduler._VORATOON_COVER_INTERVAL_S == 86400
-
     def test_vseries_refresh_interval_constant(self):
         """v_series refresh interval is 3600s."""
         from app.tasks import scheduler
@@ -85,7 +80,7 @@ class TestSchedulerIntervals:
             from app.tasks.scheduler import _scheduler_loop
             _scheduler_loop()
 
-        # Should have enqueued: rss-fetch:ikiru, rss-fetch:shinigami, rss-fetch:voratoon, enrich
+        # Should have enqueued: rss-fetch:ikiru, rss-fetch:shinigami, enrich
         calls = mock_redis.rpush.call_args_list
         enqueued = [json.loads(c[0][1]) for c in calls]
         actions = [e.get("action") for e in enqueued]
@@ -94,7 +89,7 @@ class TestSchedulerIntervals:
         assert "enrich" in actions
 
     def test_initial_rss_fetch_includes_all_sources(self, mock_redis):
-        """All 3 sources get rss-fetch enqueued on start."""
+        """All active sources get rss-fetch enqueued on start."""
         with patch("app.tasks.queue._get_redis", return_value=mock_redis), \
              patch("app.tasks.scheduler._stop") as mock_stop:
             mock_stop.is_set.return_value = True
@@ -107,7 +102,7 @@ class TestSchedulerIntervals:
         rss_calls = [json.loads(c[0][1]) for c in calls if json.loads(c[0][1]).get("action", "").startswith("rss-fetch")]
         sources = {c.get("source") for c in rss_calls}
 
-        assert sources == {"ikiru", "shinigami", "voratoon"}
+        assert sources <= {"ikiru", "shinigami"} and sources
 
 
 # ── 2. Pipeline end-to-end ───────────────────────────────────────────

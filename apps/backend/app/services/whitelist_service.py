@@ -189,7 +189,7 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
         title_key = normalize_title_key(title)
 
     # UUID / spaced lower cause merge false + delete mismatches — enforce slug here
-    # for voratoon prefer seriesUrl slug (grand-duchesss-constitution) over title slug (grand-duchess-s-constitution) — rss uses seriesUrl slug
+    # prefer seriesUrl slug over title slug — rss uses seriesUrl slug
     if title_key and re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", title_key, re.I):
         logger.warn("post_whitelist: UUID title_key detected, expected slug", title_key=title_key[:16], title=(title or "")[:40])
         _su2 = (body.get("seriesUrl") or body.get("series_url") or url or "") if body else ""
@@ -225,7 +225,7 @@ def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | Non
             entry["series_url"] = _su.strip()
 
     # Enrich missing fields — non-blocking: insert immediately, enrich in background
-    # so POST stays 0.02s instead of 0.5s (was 3 sync HTTP fetches to ikiru/voratoon/shinigami).
+    # so POST stays 0.02s instead of 0.5s (was 3 sync HTTP fetches to upstream APIs).
     # Insert into whitelist FIRST (series_meta has FK → whitelist)
     res = wl_store.add_whitelist_entries([entry])
     # Now upsert static fields into series_meta (FK will be satisfied)
@@ -539,29 +539,6 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
                             _o = normalize_origin(meta.get("type"))
                             if _o:
                                 entry["origin"] = _o
-            elif source == "voratoon" and _url_for_meta:
-                _m = re.search(r"/series/([^/?#]+)", _url_for_meta)
-                if _m:
-                    from app.scrapers import voratoon as _vt2
-                    try:
-                        d = _vt2.fetch_series_detail(_m.group(1))
-                        if d:
-                            data = d.get("data", {})
-                            meta = {
-                                "cover": scrub_cover(data.get("coverImage")),
-                                
-                                "rating": float(data.get("rating")) if data.get("rating") not in (None, "", 0) else 0.0,
-                                "genres": [g.get("data", {}).get("name", "") for g in data.get("genres", []) if g.get("data", {}).get("name")],
-                                "description": data.get("synopsis", ""),
-                                "series_url": f"{settings.VORATOON_API_URL.rstrip(chr(47))}/series/{_m.group(1)}",
-                                "type": (data.get("format") or "").lower() or None,
-                                "origin": "CN" if (data.get("format") or "").lower() == "manhua" else "KR",
-                            }
-                            for k in ("cover", "rating", "genres", "description", "series_url", "type", "origin"):
-                                if not entry.get(k) and meta.get(k):
-                                    entry[k] = meta[k]
-                    except Exception:
-                        pass
             # Fallback: search by title if still missing
             if (not entry.get("description") or not entry.get("cover")) and title:
                 try:
@@ -599,7 +576,7 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
     """Build a single whitelist response row with metadata joins.
 
     Shared by get_whitelist() to map storage rows to API response format.
-    rc_map is keyed by (title_key, source) so each whitelist row (voratoon
+    rc_map is keyed by (title_key, source) so each whitelist row
     vs shinigami for the same title) gets its OWN recent_chapters
     series_url instead of an arbitrary cross-source one.
     """
@@ -614,8 +591,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
             _wl_series = _u
         elif tk and s == "ikiru":
             _wl_series = f"https://{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{tk}/"
-        elif tk and s == "voratoon":
-            _wl_series = f"https://{settings.VORATOON_DOMAIN}/series/{tk}"
         elif tk and s == "shinigami":
             if rc.get("series_url"):
                 _wl_series = rc.get("series_url") or ""
@@ -624,19 +599,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
                 _wl_series = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{tk}"
             elif " " not in tk:
                 _wl_series = f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{tk}"
-    if s == "voratoon" and _wl_series and (" " in _wl_series or "%20" in _wl_series):
-        import re as _re2
-        from urllib.parse import unquote as _unq2
-
-        try:
-            _slug_raw = _wl_series.rstrip("/").split("/")[-1]
-            _slug_raw = _unq2(_slug_raw)
-            _slug = _re2.sub(r"[^a-z0-9-]", "-", _slug_raw.lower().replace(" ", "-").replace("_", "-"))
-            _slug = _re2.sub(r"-+", "-", _slug).strip("-")
-            if _slug:
-                _wl_series = f"https://{settings.VORATOON_DOMAIN}/series/{_slug}"
-        except Exception:
-            pass
     # cover must be a real http(s) URL; scrapers/FE sometimes store 'x' or
     # other non-URL placeholders — fall through to recent_chapters cover.
     _wl_cover = r.get("cover")

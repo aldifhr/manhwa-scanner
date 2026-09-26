@@ -29,7 +29,6 @@ _W_META = 10
 _SOURCE_HOSTS = {
     "ikiru": ("ikiru.wtf", "08.ikiru.wtf", "08.ikiru.wtf"),
     "shinigami": ("shinigami.asia", "shngm.io", "api.shngm.io"),
-    "voratoon": ("voratoon.com", "v2.voratoon.com", "api.voratoon.com"),
 }
 
 # origin → valid type set (for metadata consistency check)
@@ -43,7 +42,7 @@ def compute_confidence(source: str, chapter_data: dict) -> int:
     """Compute 0-100 confidence score for a single collector item.
 
     Args:
-        source: source key (ikiru|shinigami|voratoon)
+        source: source key (ikiru|shinigami|kiryuu|wurmz)
         chapter_data: dict from collector item (must contain title_key, chapter/url)
 
     Returns:

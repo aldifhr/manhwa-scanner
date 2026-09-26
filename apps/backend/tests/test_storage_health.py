@@ -21,7 +21,7 @@ class TestSaveSourceHealthMap:
     @patch("app.config.settings")
     def test_with_valid_sources(self, mock_settings):
         mock_sb = MagicMock()
-        mock_settings.SOURCE_KEYS = ["ikiru", "shinigami", "voratoon"]
+        mock_settings.SOURCE_KEYS = ["ikiru", "shinigami", "kiryuu"]
         health_map = {
             "ikiru": {"status": "healthy", "consecutive_failures": 0, "response_time_ms": 100},
             "shinigami": {"status": "healthy", "consecutive_failures": 0},
@@ -34,7 +34,7 @@ class TestSaveSourceHealthMap:
     def test_cooldown_disabled_source(self, mock_settings):
         """Sources with status=disabled + last_error=cooldown should be skipped."""
         mock_sb = MagicMock()
-        mock_settings.SOURCE_KEYS = ["ikiru", "shinigami", "voratoon"]
+        mock_settings.SOURCE_KEYS = ["ikiru", "shinigami", "kiryuu"]
         health_map = {
             "voratoon": {"status": "disabled", "last_error": "cooldown"},
         }
@@ -46,7 +46,7 @@ class TestSaveSourceHealthMap:
     def test_consecutive_failures_triggers_cooldown(self, mock_settings):
         """Sources with consecutive_failures >= 3 should get disabled_until set."""
         mock_sb = MagicMock()
-        mock_settings.SOURCE_KEYS = ["ikiru", "shinigami", "voratoon"]
+        mock_settings.SOURCE_KEYS = ["ikiru", "shinigami", "kiryuu"]
         health_map = {
             "ikiru": {"status": "degraded", "consecutive_failures": 3, "last_error": "timeout"},
         }

@@ -69,9 +69,9 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 source=source,
                 fetch_meta=False,  # metadata enrichment runs in scheduled enrich job
             )
-            # PERF: persist per-source health (incl. voratoon) so /status shows
+            # PERF: persist per-source health so /status shows
             # real telemetry instead of a stale row. collect_recent_chapters
-            # builds _hm but never saved it before — voratoon's disabled_until
+            # builds _hm but never saved it before — a source's disabled_until
             # stayed frozen from an old failure, making /status show "cooldown".
             try:
                 health_store.save_source_health_map(_health_map)
@@ -238,7 +238,6 @@ def _probe_source_health(force: bool = False) -> dict:
     probes = {
         "ikiru": str(_s.IKIRU_BASE_URL).rstrip("/") + "/wp-json/readerkiru/v1/list/latest?page=1&per_page=1",
         "shinigami": str(_s.SECONDARY_SOURCE_URL).rstrip("/") + "/v1/manga/list?page=1&page_size=1&is_update=true&sort=latest",
-        "voratoon": f"{settings.VORATOON_API_URL.rstrip(chr(47))}/backend/series?take=1&page=1&sort=latest&sortOrder=desc&includeMeta=true",
     }
     _probe_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

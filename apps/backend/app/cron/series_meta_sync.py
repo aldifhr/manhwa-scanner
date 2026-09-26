@@ -106,7 +106,7 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
             continue
         su = (r.get("series_url") or "").rstrip("/")
         slug = su.split("/")[-1] if su else ""
-        # fallback: title_key itself is slug for voratoon/ikiru
+        # fallback: title_key itself is slug for ikiru
         if not slug:
             slug = tk
         slug_map[key] = slug

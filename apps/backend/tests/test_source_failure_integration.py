@@ -21,7 +21,6 @@ from app.services.resilience import (
     cb_shinigami,
     cb_ikiru,
     cb_ikiru_api,
-    cb_voratoon,
     cb_discord,
     cb_db,
 )

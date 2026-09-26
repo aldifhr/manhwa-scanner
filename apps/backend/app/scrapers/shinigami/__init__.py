@@ -95,7 +95,7 @@ def search_shinigami_api(query: str, per_page: int = 20):
 def get_shinigami_latest_updates(page: int = 1, per_page: int = 100, max_pages: int = 10, hours_cutoff: int = 24):
     """Fetch latest-updates across BOTH manga types (mirror + project).
 
-    Mirip voratoon: stop kalau oldest di page udah lewat cutoff, biar gak miss kalau
+    Stop kalau oldest di page udah lewat cutoff, biar gak miss kalau
     update >24 dalam 24 jam tapi juga gak boros fetch 10 page terus kalau cuma 1 page fresh.
     """
     from datetime import datetime, timezone, timedelta

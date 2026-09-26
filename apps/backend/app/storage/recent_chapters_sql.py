@@ -177,7 +177,7 @@ def _row_to_item(r: dict) -> dict:
         "updated_time": r.get("updated_time") or "",
         "description": r.get("description") or "",
         # Carry rating + genres through to dispatch embeds. Previously dropped
-        # here, so voratoon (and all sources via the claim path) rendered empty
+        # here, so all sources via the claim path rendered empty
         # rating/genre in Discord. DB stores them; the embed builder consumes them.
         "rating": r.get("rating") or "",
         "genres": r.get("genres") or [],
