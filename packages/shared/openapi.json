@@ -2817,7 +2817,7 @@
   },
   "servers": [
     {
-      "url": "https://scanner.aldifhr.my.id",
+      "url": "https://scanner.aldifhr.fun",
       "description": "Production (VPS)"
     }
   ]
