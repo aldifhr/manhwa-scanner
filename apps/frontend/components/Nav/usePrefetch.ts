@@ -48,6 +48,16 @@ export function usePrefetch() {
           gcTime: gcTimes.excluded,
         });
         break;
+      case "/status":
+        qc.prefetchQuery({
+          queryKey: ["watchdog"],
+          queryFn: () =>
+            fetch("/api/v1/watchdog", { credentials: "include" })
+              .then((r) => r.json())
+              .then((j) => j?.data ?? j),
+          staleTime: 30_000,
+        });
+        break;
     }
   };
 }

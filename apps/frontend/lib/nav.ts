@@ -14,6 +14,7 @@ export const NAV = [
   { href: "/whitelist", label: "Whitelist", icon: Books } as const,
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash } as const,
   { href: "/notifications", label: "Notifications", icon: Bell } as const,
+  { href: "/status", label: "Status", icon: ChartBar } as const,
 ] as const;
 
 /** Sidebar / nav active-state helper (single source of truth).
