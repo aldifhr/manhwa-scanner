@@ -9,6 +9,7 @@ re-exported for backward compatibility with existing call sites.
 from __future__ import annotations
 
 import json
+import os
 import time
 
 from app.cron import collect, dispatch_mod, enrich as enrich_mod
@@ -25,6 +26,73 @@ collect_recent_chapters = collect.collect_recent_chapters  # noqa: shim
 filter_whitelisted = collect.filter_whitelisted  # noqa: shim
 enrich = enrich_mod.enrich  # noqa: shim
 dispatch = dispatch_mod.dispatch  # noqa: shim
+
+# Freshness window for scraped chapters.
+#
+# collect_recent_chapters(with_whitelisted_shinigami=True) pulls up to
+# API_CHAPTER_LIMIT (100) chapters per whitelisted series from the source API.
+# With 182 shinigami series that is ~18.2k rows on EVERY rss-fetch cycle, of
+# which only a few dozen are new — so batch_insert_recent_chapters spent
+# ~150s re-upserting 16.5k stale rows to persist ~33 new ones. That held the
+# single cron worker long enough to starve the `update` (dispatch) job, which
+# then hit the dedup set on every tick.
+#
+# We only care about chapters released inside the freshness window; anything
+# older was already offered for notification on an earlier cycle. Dispatch
+# reads recent_chapters with hours=24, so a 24h window is exactly its own
+# horizon — nothing it can act on gets dropped here.
+#
+# Override with SCRAPE_FRESH_WINDOW_HOURS if the dispatch window ever widens.
+_FRESH_WINDOW_HOURS = int(os.getenv("SCRAPE_FRESH_WINDOW_HOURS", "24") or 24)
+
+
+def _filter_fresh_window(items: list[dict], hours: int = _FRESH_WINDOW_HOURS) -> list[dict]:
+    """Drop scraped chapters released before the freshness window.
+
+    Mirrors batch_insert_recent_chapters' release_date resolution: prefer
+    release_date, fall back to updated_time, and KEEP the row when neither
+    parses — an unknown age must not silently discard a chapter.
+    """
+    if hours <= 0:
+        return items
+    from datetime import datetime, timezone, timedelta
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    kept: list[dict] = []
+    dropped_by_source: dict[str, int] = {}
+    dropped_unknown = 0
+    for it in items:
+        ts = None
+        for field in ("release_date", "updated_time"):
+            raw = it.get(field)
+            if isinstance(raw, str) and raw.strip():
+                try:
+                    ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    break
+                except (ValueError, TypeError):
+                    continue
+        if ts is None:
+            # Unknown age → keep (never discard on missing data).
+            kept.append(it)
+            dropped_unknown += 1
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts >= cutoff:
+            kept.append(it)
+        else:
+            src = str(it.get("source") or "unknown")
+            dropped_by_source[src] = dropped_by_source.get(src, 0) + 1
+    if dropped_by_source:
+        logger.info(
+            "pipeline: fresh-window filter",
+            window_hours=hours,
+            kept=len(kept),
+            dropped=sum(dropped_by_source.values()),
+            by_source=dropped_by_source,
+            kept_unknown_age=dropped_unknown,
+        )
+    return kept
 
 def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True, dry_run: bool = False, action: str = "update") -> dict:
     """Full dual-pass run. Returns stats dict.
@@ -77,6 +145,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 health_store.save_source_health_map(_health_map)
             except Exception as _he:
                 logger.warn("collect health persist failed", err=str(_he)[:160])
+            items = _filter_fresh_window(items, hours=_FRESH_WINDOW_HOURS)
             enriched_all = enrich_mod.enrich(items, persist_cache=True, skip_api=True)
             insert_stats = recent_chapters.batch_insert_recent_chapters(enriched_all)
             if insert_stats.get("failed", 0):
