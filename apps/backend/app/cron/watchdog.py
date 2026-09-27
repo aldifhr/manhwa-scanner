@@ -32,8 +32,17 @@ logger = get_logger("watchdog")
 # dispatch has been failing for a long time and is worth waking someone for.
 _URGENT_AGE_H = 12
 
-# Below this many stalled chapters it is just noise from normal lag.
-_MIN_REPORT = 1
+# Dispatch runs every 2 minutes and the watchdog every 15, so the two
+# inevitably interleave: a chapter that landed seconds ago is always briefly
+# "stalled" before its own cycle picks it up. That is normal queueing, not a
+# fault, and alerting on it trains us to ignore the output.
+#
+# Discord notification is therefore off. The numbers are still logged at warn
+# level and still surfaced by GET /api/v1/watchdog, so the state stays
+# inspectable without paging anyone. Flip this to notify again only alongside
+# an age floor well past one dispatch cycle, otherwise the same false alarm
+# comes straight back.
+_SEND_ALERTS = False
 
 
 def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
@@ -215,13 +224,14 @@ def check_and_alert() -> dict[str, Any]:
         stats["aged_out"] = _aged_out_count(48)
         stats.update(_dispatch_health())
 
-        if len(stalled) >= _MIN_REPORT:
+        if stalled:
             by_source: dict[str, int] = {}
             for c in stalled:
                 by_source[c["source"] or "?"] = by_source.get(c["source"] or "?", 0) + 1
-            logger.warn(
-                "watchdog: whitelisted chapters inside the 24h window were never "
-                "dispatched — dispatch is lagging, not expiring",
+            # Observation, not an alarm. Most of these are chapters that landed
+            # since the last dispatch cycle and are simply next in line.
+            (logger.warn if urgent else logger.info)(
+                "watchdog: whitelisted chapters inside the 24h window not yet dispatched",
                 stalled=len(stalled),
                 urgent=len(urgent),
                 by_source=",".join(f"{k}:{v}" for k, v in sorted(by_source.items())),
@@ -230,7 +240,8 @@ def check_and_alert() -> dict[str, Any]:
                 processing=stats.get("processing"),
                 claims=stats.get("claims"),
             )
-            _notify(stalled, urgent, stats)
+            if _SEND_ALERTS:
+                _notify(stalled, urgent, stats)
     except Exception as exc:
         # A failing watchdog must never take the scheduler down with it.
         logger.error("watchdog: check failed", error=str(exc))
