@@ -271,9 +271,14 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             if _excl_titles and slugify_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:
                 continue
             # Ceiling: skip chapters at or below the max already-dispatched chapter
+            # Skipped when force=True. force exists precisely for the
+            # backfill/resend path, and the ceiling was still applied there,
+            # which made those chapters permanently undeliverable: a chapter
+            # stuck below the ceiling could never be force-sent, because
+            # force did not actually bypass it.
             _it_tk = str(it.get("title_key") or "").strip()
             _it_src = str(it.get("source") or "").strip()
-            _ceil = _ceilings.get((_it_tk, _it_src))
+            _ceil = None if force else _ceilings.get((_it_tk, _it_src))
             if _ceil is not None:
                 try:
                     _it_ch = float(it.get("chapter") or "0")

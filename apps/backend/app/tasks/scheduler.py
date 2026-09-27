@@ -17,6 +17,9 @@ _FAILED_RETRY_INTERVAL_S = 3600
 _DASHBOARD_INTERVAL_S = 600
 _RETENTION_INTERVAL_S = 86400
 _ALERT_INTERVAL_S = 600
+# Watchdog runs on the scheduler's own beat, not as an external cron: it
+# reports on dispatch lag, so it has to live where dispatch is scheduled.
+_WATCHDOG_INTERVAL_S = 900
 _VSERIES_REFRESH_INTERVAL_S = 3600
 
 _SCHED_THREAD: threading.Thread | None = None
@@ -34,6 +37,7 @@ def _scheduler_loop() -> None:
     last_dashboard = 0.0
     last_retention = 0.0
     last_alert = 0.0
+    last_watchdog = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
@@ -117,6 +121,12 @@ def _scheduler_loop() -> None:
                     enqueue_cron("dispatch-alert")
                     enqueue_cron("gap-detect")
                     last_alert = _now
+                except Exception:
+                    pass
+            if _now - last_watchdog >= _WATCHDOG_INTERVAL_S:
+                try:
+                    enqueue_cron("watchdog")
+                    last_watchdog = _now
                 except Exception:
                     pass
             if _now - last_dashboard >= _DASHBOARD_INTERVAL_S:

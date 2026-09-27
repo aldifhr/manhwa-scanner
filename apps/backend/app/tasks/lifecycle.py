@@ -71,6 +71,11 @@ def run_cron_inline(action: str) -> None:
         maybe_alert_gaps()
         return
 
+    if action == "watchdog":
+        from app.cron.watchdog import check_and_alert
+        check_and_alert()
+        return
+
     if action == "dashboard-snapshot":
         from app.api.admin.stats import build_snapshot_sync
         from app.storage import health
