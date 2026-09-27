@@ -14,15 +14,18 @@ import { useDebounced } from "@/lib/useDebounced";
 import { decodeHtml } from "@/lib/utils";
 import { PageShell } from "@/components/PageShell";
 
+// Sentinel for "no source filter" in the UI. Deliberately NOT "all" —
+// "all" is not a source, and reusing it made the filter indistinguishable
+// from a (former) global-exclude scope.
+const FILTER_ALL = "*";
+
 function SourceBadge({ source }: { source: string }) {
   const color =
-    source === "ikiru"
-      ? "bg-sky-500/15 text-sky-400"
-      : source === "shinigami"
-        ? "bg-violet-500/15 text-violet-400"
-        : source === "all"
-          ? "bg-amber-500/15 text-amber-400"
-          : "bg-surface-hover text-text-muted";
+    source === "shinigami"
+      ? "bg-violet-500/15 text-violet-400"
+      : source === "komiku"
+        ? "bg-sky-500/15 text-sky-400"
+        : "bg-surface-hover text-text-muted";
   return (
     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${color}`}>
       {source}
@@ -42,7 +45,7 @@ export function ExcludeListClient() {
   });
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("All");
+  const [sourceFilter, setSourceFilter] = useState(FILTER_ALL);
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
@@ -54,7 +57,7 @@ export function ExcludeListClient() {
         const t = (it.title || it.titleKey || "").toLowerCase();
         if (!t.includes(debouncedSearch.toLowerCase())) return false;
       }
-      if (sourceFilter !== "All" && (it.source || "all") !== sourceFilter)
+      if (sourceFilter !== FILTER_ALL && it.source !== sourceFilter)
         return false;
       return true;
     });
@@ -66,31 +69,31 @@ export function ExcludeListClient() {
   const grouped = useMemo(() => {
     const map: Record<string, ExcludedTitleItem[]> = {};
     for (const it of filtered) {
-      const s = it.source || "all";
+      const s = it.source;
+      if (!s) continue;
       (map[s] ??= []).push(it);
     }
     return map;
   }, [filtered]);
 
   const groupOrder = useMemo(() => {
-    const order = ["all", "ikiru", "shinigami"];
     const present = Object.keys(grouped);
-    present.sort((a, b) => {
-      const ia = order.indexOf(a);
-      const ib = order.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
+    // Stable, predictable order without hardcoding a source list.
+    present.sort((a, b) => a.localeCompare(b));
     return present;
   }, [grouped]);
 
   const sources = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((i) => set.add(i.source || "all"));
+    items.forEach((i) => {
+      if (i.source) set.add(i.source);
+    });
     return [...set].sort();
   }, [items]);
 
   const handleRemove = async (it: ExcludedTitleItem) => {
-    const key = `${it.titleKey || it.id}:${it.source || "all"}`;
+    if (!it.source) return;
+    const key = `${it.titleKey || it.id}:${it.source}`;
     const prev =
       queryClient.getQueryData<ExcludedTitleItem[]>(queryKeys.excludedTitles) ??
       items;
@@ -101,21 +104,17 @@ export function ExcludeListClient() {
           (x) =>
             !(
               (x.titleKey || x.id) === (it.titleKey || it.id) &&
-              (x.source || "all") === (it.source || "all")
+              x.source === it.source
             )
         )
     );
     setBusyKey(key);
     try {
-      const rawKey = it.titleKey || it.id || it.title || "";
-      const title_key = rawKey
-        .replace(/[\u2018\u2019]/g, "'")
-        .replace(/[\u201C\u201D]/g, '"')
-        .trim();
+      const title_key = it.titleKey || it.id || it.title || "";
       if (!title_key) throw new Error("title_key missing");
       await Reader.removeExcludedTitle({
         title_key,
-        source: it.source || "all",
+        source: it.source,
         title: it.title ?? undefined,
       } as unknown as Record<string, unknown>);
       toast(`Un-excluded ${displayTitle(it)}`, {
@@ -127,7 +126,7 @@ export function ExcludeListClient() {
               await Reader.addExcludedTitle({
                 title_key: it.titleKey || it.id || "",
                 title: it.title ?? undefined,
-                source: it.source || "all",
+                source: it.source,
                 cover: it.cover ?? null,
                 series_url: it.seriesUrl ?? null,
               } as Record<string, unknown>);
@@ -159,7 +158,9 @@ export function ExcludeListClient() {
   };
 
   const handleBulk = async () => {
-    const src = sourceFilter !== "All" ? sourceFilter : "ikiru";
+    // No "All" scope: bulk-exclude always targets one concrete source.
+    const src = sourceFilter !== FILTER_ALL ? sourceFilter : sources[0];
+    if (!src) return;
     const ok = window.confirm(`Exclude ALL ${src} titles from recent (up to 2000)? This will hide them from RSS.`);
     if (!ok) return;
     const before =
@@ -177,10 +178,10 @@ export function ExcludeListClient() {
       try {
         const fresh = (await Reader.getExcludedTitles()) as ExcludedTitleItem[];
         const beforeSet = new Set(
-          before.map((x) => `${x.titleKey || x.id}:${x.source || "all"}`)
+          before.map((x) => `${x.titleKey || x.id}:${x.source ?? ""}`)
         );
         added = fresh.filter(
-          (x) => !beforeSet.has(`${x.titleKey || x.id}:${x.source || "all"}`)
+          (x) => !beforeSet.has(`${x.titleKey || x.id}:${x.source ?? ""}`)
         );
       } catch {}
       toast(`Excluded ${res.excluded} titles from ${src}`, {
@@ -257,7 +258,7 @@ export function ExcludeListClient() {
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
           options={[
-            { value: "All", label: "Source: All" },
+            { value: FILTER_ALL, label: "Semua source" },
             ...sources.map((s) => ({ value: s, label: s })),
           ]}
         />
@@ -277,14 +278,14 @@ export function ExcludeListClient() {
 
       {isLoading ? (
         <div className="space-y-6">
-          {["all", "ikiru", "shinigami"].map((src) => (
+          {(sources.length ? sources : ["shinigami", "komiku"]).map((src) => (
             <div key={src} className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="skeleton h-5 w-12 rounded" />
                 <div className="skeleton h-3 w-20 rounded" />
               </div>
               <div className="flex flex-col gap-1.5">
-                {Array.from({ length: src === "all" ? 1 : 2 }).map((_, i) => (
+                {Array.from({ length: 2 }).map((_, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-surface-hover/40"
@@ -329,7 +330,7 @@ export function ExcludeListClient() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   {list.map((it, idx) => {
-                    const key = `${it.titleKey || it.id}:${it.source || "all"}`;
+                    const key = `${it.titleKey || it.id}:${it.source ?? ""}`;
                     return (
                       <div
                         key={`${key}:${idx}`}
@@ -354,7 +355,7 @@ export function ExcludeListClient() {
                             {displayTitle(it)}
                           </p>
                           <p className="text-[11px] text-text-muted truncate">
-                            {it.source || "all"}
+                            {it.source}
                           </p>
                         </div>
                         <button

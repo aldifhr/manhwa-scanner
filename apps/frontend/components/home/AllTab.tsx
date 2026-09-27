@@ -155,17 +155,12 @@ function AllTabInner() {
 
   const isExcludedFlat = useCallback(
     (c: FlatChapter) => {
-      const src = (c.source || "all").toLowerCase();
+      const src = (c.source || "").toLowerCase();
+      if (!src) return false;
       const nk = normalizeTitleKey(c.titleKey);
-      const key = `${c.titleKey}:${src}`;
-      const nkey = `${nk}:${src}`;
       return (
-        optimisticExcluded.has(key) ||
-        optimisticExcluded.has(nkey) ||
-        optimisticExcluded.has(`${c.titleKey}:all`) ||
-        optimisticExcluded.has(`${nk}:all`) ||
-        optimisticExcluded.has(c.titleKey) ||
-        optimisticExcluded.has(nk)
+        optimisticExcluded.has(`${c.titleKey}:${src}`) ||
+        optimisticExcluded.has(`${nk}:${src}`)
       );
     },
     [optimisticExcluded]
@@ -181,24 +176,13 @@ function AllTabInner() {
               `${ch.titleKey || s.titleKey}:${(ch.source || "").toLowerCase()}`
           )
         ),
-      ];
+      ].filter((k) => !k.endsWith(":"));
+      if (keys.length === 0) return false;
       const nkeys = keys.map((k) => {
         const [tk, src] = k.split(":");
         return `${normalizeTitleKey(tk)}:${src}`;
       });
-      const allKeys = [...keys, ...nkeys];
-      if (keys.length === 0) {
-        const fk = `${s.titleKey}:all`;
-        const nfk = `${normalizeTitleKey(s.titleKey)}:all`;
-        const nk = normalizeTitleKey(s.titleKey);
-        return optimisticExcluded.has(fk) || optimisticExcluded.has(nfk) || optimisticExcluded.has(s.titleKey) || optimisticExcluded.has(nk);
-      }
-      return allKeys.every(
-        (k) =>
-          optimisticExcluded.has(k) ||
-          optimisticExcluded.has(`${k.split(":")[0]}:all`) ||
-          optimisticExcluded.has(k.split(":")[0])
-      );
+      return [...keys, ...nkeys].every((k) => optimisticExcluded.has(k));
     },
     [optimisticExcluded]
   );

@@ -51,9 +51,9 @@ export function useFeedActions() {
     if (excludedData) {
       setOptimisticExcluded(
         new Set(
-          excludedData.map(
-            (e) => `${e.titleKey}:${(e.source || "all").toLowerCase()}`
-          )
+          excludedData
+            .filter((e) => !!e.source)
+            .map((e) => `${e.titleKey}:${e.source!.toLowerCase()}`)
         )
       );
     }
@@ -270,48 +270,33 @@ export function useFeedActions() {
 
   const excludeMutation = useMutation({
     mutationFn: async (item: FlatChapter) => {
-      const src = (item.source || "all").toLowerCase();
+      const src = (item.source || "").toLowerCase();
+      if (!src) throw new Error("Cannot exclude: item has no source");
       const key = `${item.titleKey}:${src}`;
-      const legacyKey = `${item.titleKey}:all`;
-      const excl = excludedRef.current;
       if (pendingKeys.current.has(key)) throw new Error("Duplicate request");
       pendingKeys.current.add(key);
-      const isExcl = excl.has(key) || excl.has(legacyKey);
-      if (isExcl) {
-        // Prefer deleting the specific source if present, else legacy "all"
-        const srcToDelete = excl.has(key) && !excl.has(legacyKey) ? src : excl.has(legacyKey) ? "all" : src;
+      if (excludedRef.current.has(key)) {
         await Reader.removeExcludedTitle({
           title_key: item.titleKey,
-          source: srcToDelete,
-        } as Record<string, unknown>);
-        // If both keys exist (edge: duplicate all+specific), clean up the other as well
-        if (excl.has(key) && excl.has(legacyKey)) {
-          try {
-            await Reader.removeExcludedTitle({
-              title_key: item.titleKey,
-              source: srcToDelete === "all" ? src : "all",
-            } as Record<string, unknown>);
-          } catch {}
-        }
-        return { isExcl: true, key, legacyKey, srcToDelete };
-      } else {
-        await Reader.addExcludedTitle({
-          title_key: item.titleKey,
-          title: item.title,
           source: src,
-          cover: item.cover ?? null,
-          series_url: item.seriesUrl ?? null,
         } as Record<string, unknown>);
-        return { isExcl: false, key };
+        return { isExcl: true, key };
       }
+      await Reader.addExcludedTitle({
+        title_key: item.titleKey,
+        title: item.title,
+        source: src,
+        cover: item.cover ?? null,
+        series_url: item.seriesUrl ?? null,
+      } as Record<string, unknown>);
+      return { isExcl: false, key };
     },
     onMutate: (item) => setExcludingKey(item.titleKey),
-    onSuccess: ({ isExcl, key, legacyKey }) => {
+    onSuccess: ({ isExcl, key }) => {
       if (isExcl) {
         setOptimisticExcluded((prev) => {
           const n = new Set(prev);
           n.delete(key);
-          if (legacyKey) n.delete(legacyKey);
           return n;
         });
         toast("Title shown again", "success");
@@ -327,11 +312,12 @@ export function useFeedActions() {
     },
     onError: (err) =>
       toast(err instanceof Error ? err.message : "Failed to exclude", "error"),
-    onSettled: (_data, _err, vars) => {
+    onSettled: (_data, _e, vars) => {
       setExcludingKey(null);
-      if (vars) {
-        const k = `${vars.titleKey}:${(vars.source || "all").toLowerCase()}`;
-        pendingKeys.current.delete(k);
+      if (vars?.source) {
+        pendingKeys.current.delete(
+          `${vars.titleKey}:${vars.source.toLowerCase()}`
+        );
       }
     },
   });
@@ -345,49 +331,38 @@ export function useFeedActions() {
         const s = c.source.toLowerCase();
         if (!bySource.has(s)) bySource.set(s, { titleKey: c.titleKey || series.titleKey, seriesUrl: c.seriesUrl || series.seriesUrl });
       }
-      // Fallback if chapters have no source (should not happen)
-      if (bySource.size === 0 && series.titleKey) {
-        bySource.set("all", { titleKey: series.titleKey, seriesUrl: series.seriesUrl });
-      }
+      // No source anywhere → nothing addressable to exclude (no 'all' scope)
+      if (bySource.size === 0) throw new Error("Cannot exclude: series has no source");
       const distinctKeys = [...bySource.entries()].map(([s, v]) => `${v.titleKey}:${s}`);
       for (const k of distinctKeys) if (pendingKeys.current.has(k)) throw new Error("Duplicate request");
       for (const k of distinctKeys) pendingKeys.current.add(k);
       const excl = excludedRef.current;
-      const isExcl = distinctKeys.length > 0 && distinctKeys.every((k) => excl.has(k) || excl.has(`${k.split(":")[0]}:all`));
+      const isExcl = distinctKeys.every((k) => excl.has(k));
       if (isExcl) {
         for (const [s, v] of bySource) {
-          const k = `${v.titleKey}:${s}`;
-          const srcToDelete = excl.has(k) && !excl.has(`${v.titleKey}:all`) ? s : excl.has(`${v.titleKey}:all`) ? "all" : s;
-          await Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete } as Record<string, unknown>);
-          if (excl.has(k) && excl.has(`${v.titleKey}:all`)) {
-            try { await Reader.removeExcludedTitle({ title_key: v.titleKey, source: srcToDelete === "all" ? s : "all" } as Record<string, unknown>); } catch {}
-          }
+          await Reader.removeExcludedTitle({ title_key: v.titleKey, source: s } as Record<string, unknown>);
         }
         return { isExcl: true, keys: distinctKeys };
-      } else {
-        await Promise.all(
-          [...bySource.entries()].map(([s, v]) =>
-            Reader.addExcludedTitle({
-              title_key: v.titleKey,
-              title: series.title,
-              source: s,
-              cover: series.cover ?? null,
-              series_url: v.seriesUrl ?? null,
-            } as Record<string, unknown>)
-          )
-        );
-        return { isExcl: false, keys: distinctKeys };
       }
+      await Promise.all(
+        [...bySource.entries()].map(([s, v]) =>
+          Reader.addExcludedTitle({
+            title_key: v.titleKey,
+            title: series.title,
+            source: s,
+            cover: series.cover ?? null,
+            series_url: v.seriesUrl ?? null,
+          } as Record<string, unknown>)
+        )
+      );
+      return { isExcl: false, keys: distinctKeys };
     },
     onMutate: (series) => setExcludingKey(series.titleKey),
     onSuccess: ({ isExcl, keys }) => {
       if (isExcl) {
         setOptimisticExcluded((prev) => {
           const n = new Set(prev);
-          for (const k of keys) {
-            n.delete(k);
-            n.delete(`${k.split(":")[0]}:all`);
-          }
+          for (const k of keys) n.delete(k);
           return n;
         });
         toast("Title shown again", "success");
@@ -406,14 +381,12 @@ export function useFeedActions() {
     onSettled: (_data, _err, vars) => {
       setExcludingKey(null);
       if (vars) {
-        const bySource = new Map<string, { titleKey: string; seriesUrl: string }>();
         for (const c of vars.chapters as unknown as { titleKey: string; source: string; seriesUrl: string }[]) {
           if (!c.source) continue;
-          const s = c.source.toLowerCase();
-          if (!bySource.has(s)) bySource.set(s, { titleKey: c.titleKey || vars.titleKey, seriesUrl: c.seriesUrl || vars.seriesUrl });
+          pendingKeys.current.delete(
+            `${c.titleKey || vars.titleKey}:${c.source.toLowerCase()}`
+          );
         }
-        if (bySource.size === 0 && vars.titleKey) bySource.set("all", { titleKey: vars.titleKey, seriesUrl: vars.seriesUrl });
-        for (const [s, v] of bySource) pendingKeys.current.delete(`${v.titleKey}:${s}`);
       }
     },
   });

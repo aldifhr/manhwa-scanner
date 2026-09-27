@@ -17,7 +17,7 @@ export const excludedTitleSchema = z
     title_key: z.string().min(1).nullable().optional(),
     titleKey: z.string().min(1).nullable().optional(),
     title: z.string().nullable().optional(),
-    source: z.enum(["ikiru", "shinigami", "komiku"]).nullable().optional(),
+    source: z.enum(["shinigami", "komiku"]).nullable().optional(),
     created_at: z.string().nullable().optional(),
     createdAt: z.string().nullable().optional(),
     cover: z.string().nullable().optional(),
@@ -37,7 +37,8 @@ export const excludedTitleSchema = z
       (r.id as string) ||
       "",
     title: (r.title as string | null) ?? null,
-    source: (r.source as string) || "all",
+    // Exclude rows always name one concrete source; backend rejects 'all'.
+    source: (r.source as "shinigami" | "komiku") ?? "shinigami",
     createdAt:
       (r.created_at as string | null) || (r.createdAt as string | null) || null,
     cover: (r.cover as string | null) ?? null,

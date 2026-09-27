@@ -3,7 +3,9 @@
 Mirror of whitelist.py but inverse: a title here is REMOVED from the /rss
 feed and SKIPPED by the cron collector so it is never scraped/dispatched.
 
-Keyed by composite (title_key, source); source='all' blocks every source.
+Keyed by composite (title_key, source). There is NO 'all' source: every row
+is scoped to one concrete source (shinigami, komiku). An unknown source is
+rejected, never silently widened to a global block.
 
 (title_key, source) (see 042_db_audit_fix.sql fix 6). JOIN series_meta at
 read time (rss_service sm>it>wl) instead of duplicating. Kept for
@@ -22,12 +24,14 @@ from app.utils.text import slugify_title_key
 
 logger = get_logger("storage:excluded-titles")
 
-from app.config import settings as _cfg
-_VALID_SOURCES = ("all", "ikiru", "shinigami", "kiryuu", "wurmz")
+from app.config import EXCLUDE_SOURCES as _VALID_SOURCES
 
+# Source is REQUIRED and must be a real, known source. Returning "" (instead of
+# widening to 'all') makes callers reject the row instead of silently blocking
+# the title everywhere.
 def _norm_source(src: str) -> str:
-    s = (src or "all").strip().lower()
-    return s if s in _VALID_SOURCES else "all"
+    s = (src or "").strip().lower()
+    return s if s in _VALID_SOURCES else ""
 
 # In-memory cache: load_excluded_keys is called in hot paths (rss, collect).
 # DB round-trip ~0.3s; cache 30s. Exclude changes are rare (manual button),
@@ -40,9 +44,8 @@ _LOCK = Lock()
 def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
     """Return set of (title_key, source) pairs that are excluded.
 
-    Includes an implicit (title_key, 'all') expansion so callers can check
-    either the exact (title_key, source) or a universal 'all' rule with a
-    single set membership test.
+    Rows with an unknown/blank source are skipped — they cannot match any
+    real feed item, so keeping them would only mask data drift.
     """
     global _CACHE, _CACHE_TS
     now = time.monotonic()
@@ -62,8 +65,8 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
             keys: set[tuple[str, str]] = set()
             for r in (rows.data or []):
                 tk = slugify_title_key(str(r.get("title_key") or ""))
-                src = _norm_source(str(r.get("source") or "all"))
-                if tk:
+                src = _norm_source(str(r.get("source") or ""))
+                if tk and src:
                     keys.add((tk, src))
             _CACHE = keys
             _CACHE_TS = now
@@ -76,15 +79,21 @@ def load_excluded_keys(force: bool = False) -> set[tuple[str, str]]:
 def add_excluded_title(
     title_key: str,
     title: Optional[str] = None,
-    source: str = "all",
+    source: str = "",
     cover: Optional[str] = None,
     series_url: Optional[str] = None,
 ) -> dict:
-    """Upsert an excluded-title row (idempotent via unique (title_key,source))."""
-    tk = slugify_title_key(str(title_key or "").strip())  # guard: trim leading/trailing spaces
+    """Upsert an excluded-title row (idempotent via unique (title_key,source)).
+
+    title_key is stored in the canonical dashed form (slugify_title_key) — the
+    same form load_excluded_keys normalizes to, so add/remove/lookup agree.
+    """
+    tk = slugify_title_key(str(title_key or "").strip())
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
+    if not src:
+        return {"status": "error", "error": f"invalid source: {source!r}"}
     try:
         payload: dict = {"title_key": tk, "source": src}
         if title is not None:
@@ -108,12 +117,18 @@ def add_excluded_title(
         logger.error("add_excluded_title failed", exc=e)
         return {"status": "error", "error": "internal error"}
 
-def remove_excluded_title(title_key: str, source: str = "all") -> dict:
-    """Delete an excluded-title row."""
-    tk = title_key.strip()  # Use as-is to match DB (spaces, not dashes)
+def remove_excluded_title(title_key: str, source: str = "") -> dict:
+    """Delete an excluded-title row.
+
+    title_key is slugified so it matches the stored canonical form regardless
+    of whether the caller sends the legacy spaced form or the dashed form.
+    """
+    tk = slugify_title_key(str(title_key or "").strip())
     if not tk:
         return {"status": "error", "error": "title_key required"}
     src = _norm_source(source)
+    if not src:
+        return {"status": "error", "error": f"invalid source: {source!r}"}
     try:
         get_supabase().table("excluded_titles").delete().eq(
             "title_key", tk
@@ -169,8 +184,8 @@ def exclude_all_by_source(source: str) -> dict:
     - title derived from series_url slug as last resort
     """
     src = _norm_source(source)
-    if src == "all":
-        return {"status": "error", "error": "source required (cannot bulk-exclude 'all')"}
+    if not src:
+        return {"status": "error", "error": f"invalid source: {source!r}"}
     try:
         rows = (
             get_supabase()

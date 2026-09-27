@@ -1,11 +1,13 @@
 """Continue reading — per-device sync via session_hash."""
 import hashlib
 import time as _time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.logger import get_logger
+from app.utils.request_auth import require_monitor_auth
 
 logger = get_logger("api:continue-reading")
 router = APIRouter()
@@ -67,41 +69,10 @@ async def put_continue_reading(request: Request):
         from app.db import get_supabase
         sb = get_supabase()
         # upsert
-        sb.table("continue_reading").upsert({"session_hash": h, "entries": entries, "updated_at": _time.time()}, on_conflict="session_hash").execute()
+        sb.table("continue_reading").upsert({"session_hash": h, "entries": entries, "updated_at": datetime.now(timezone.utc).isoformat()}, on_conflict="session_hash").execute()
         return JSONResponse(content={"success": True})
     except Exception as e:
         logger.warn("continue-reading put failed", err=str(e)[:120])
-        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
-
-
-@router.delete("/continue-reading")
-async def delete_continue_reading(request: Request):
-    h = _session_hash(request)
-    if not h:
-        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    try:
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-        title_key = body.get("titleKey") or body.get("title_key") if isinstance(body, dict) else None
-        from app.db import get_supabase
-        sb = get_supabase()
-        if title_key:
-            res = sb.table("continue_reading").select("entries").eq("session_hash", h).limit(1).execute()
-            if res.data:
-                entries = res.data[0].get("entries") or {}
-                if isinstance(entries, str):
-                    import json as _j
-                    try:
-                        entries = _j.loads(entries)
-                    except Exception:
-                        entries = {}
-                if title_key in entries:
-                    del entries[title_key]
-                    sb.table("continue_reading").upsert({"session_hash": h, "entries": entries, "updated_at": _time.time()}, on_conflict="session_hash").execute()
-        else:
-            sb.table("continue_reading").delete().eq("session_hash", h).execute()
-        return JSONResponse(content={"success": True})
-    except Exception as e:
-        logger.warn("continue-reading delete failed", err=str(e)[:120])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
 
 

@@ -173,6 +173,9 @@ class Settings(BaseSettings):
 _SOURCE_KEYS = ("shinigami", "komiku", "kiryuu", "wurmz")
 VALID_SOURCES = ("shinigami", "komiku", "kiryuu", "wurmz")
 VALID_SOURCES_WITH_ALL = ("shinigami", "komiku", "kiryuu", "wurmz", "all")
+# Sources an exclude row may target. Exclude has no 'all' scope — a row always
+# names one concrete source. Only sources that actually produce chapters.
+EXCLUDE_SOURCES = ("shinigami", "komiku")
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:shinigami", "rss-fetch:komiku",

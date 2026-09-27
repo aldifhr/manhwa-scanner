@@ -17,7 +17,7 @@ from app.logger import get_logger
 from app.storage import excluded_titles as excl_store
 from app.utils.text import slugify_title_key
 from app.utils.request_auth import require_monitor_auth, safe_error, int_safe
-from app.config import VALID_SOURCES
+from app.config import EXCLUDE_SOURCES
 from app.services.audit import log_action, AuditAction
 
 
@@ -25,7 +25,7 @@ class ExcludedAddRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title_key: str = Field(..., min_length=1, max_length=200)
     title: Optional[str] = Field(default=None, max_length=200)
-    source: Optional[str] = Field(default="all", max_length=50)
+    source: str = Field(..., min_length=1, max_length=50)
     cover: Optional[str] = Field(default=None, max_length=2000)
     series_url: Optional[str] = Field(default=None, max_length=500)
 
@@ -33,7 +33,7 @@ class ExcludedAddRequest(BaseModel):
 class ExcludedDeleteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title_key: str = Field(..., min_length=1, max_length=200)
-    source: Optional[str] = Field(default="all", max_length=50)
+    source: str = Field(..., min_length=1, max_length=50)
 
 
 class ExcludedBulkRequest(BaseModel):
@@ -167,12 +167,17 @@ async def post_excluded(request: Request):
             raise
         title_key = slugify_title_key(data.title_key.strip())
         title = data.title
-        source = data.source or "all"
+        source = data.source.strip().lower()
+        if source not in EXCLUDE_SOURCES:
+            return JSONResponse(
+                content={"success": False, "error": f"invalid source: {source}"},
+                status_code=400,
+            )
         cover = data.cover
         series_url = data.series_url
         res = excl_store.add_excluded_title(title_key=title_key, title=title, source=source, cover=cover, series_url=series_url)
         if res.get("status") == "error":
-            return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+            return JSONResponse(content={"success": False, "error": res.get("error", "internal error")}, status_code=400)
         _LIST_CACHE[0] = 0.0
         try:
             excl_store._CACHE_TS = 0.0
@@ -209,10 +214,15 @@ async def delete_excluded(request: Request):
                 return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
             raise
         title_key = data.title_key.strip()  # Don't slugify - use as-is to match DB
-        source = data.source or "all"
+        source = data.source.strip().lower()
+        if source not in EXCLUDE_SOURCES:
+            return JSONResponse(
+                content={"success": False, "error": f"invalid source: {source}"},
+                status_code=400,
+            )
         res = excl_store.remove_excluded_title(title_key=title_key, source=source)
         if res.get("status") == "error":
-            return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+            return JSONResponse(content={"success": False, "error": res.get("error", "internal error")}, status_code=400)
         _LIST_CACHE[0] = 0.0
         try:
             excl_store._CACHE_TS = 0.0
@@ -249,7 +259,7 @@ async def post_excluded_bulk(request: Request):
                 return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
             raise
         source = data.source.strip()
-        if source not in VALID_SOURCES:
+        if source not in EXCLUDE_SOURCES:
             return JSONResponse(content={"success": False, "error": f"invalid source: {source}"}, status_code=400)
         res = excl_store.exclude_all_by_source(source)
         if res.get("status") == "error":

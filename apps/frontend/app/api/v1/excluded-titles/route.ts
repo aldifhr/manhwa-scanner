@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
           (r.id as string) ||
           "",
         title: (r.title as string | null) || null,
-        source: (r.source as string) || "all",
+        source: (r.source as string) || "shinigami",
         createdAt:
           (r.created_at as string | null) ||
           (r.createdAt as string | null) ||
@@ -125,7 +125,7 @@ export async function DELETE(request: NextRequest) {
       (raw.title as string) ||
       (raw.id as string) ||
       "";
-    const source = (raw.source as string) || "all";
+    const source = String((raw.source as string) || "").trim().toLowerCase();
     if (!title_key || !String(title_key).trim()) {
       console.error(
         "[excluded DELETE] missing title_key, raw:",
@@ -136,13 +136,19 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!source) {
+      return NextResponse.json(
+        { success: false, error: "source is missing" },
+        { status: 400 }
+      );
+    }
     const normalizedKey = String(title_key)
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
       .trim();
     const payload = {
       title_key: normalizedKey,
-      source: String(source).trim() || "all",
+      source,
     };
     const res = await fetch(`${backendUrl()}/api/excluded-titles`, {
       method: "DELETE",

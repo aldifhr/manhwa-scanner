@@ -200,7 +200,7 @@ def collect_recent_chapters(
         _excl = excl_store.load_excluded_keys()
         if _excl:
             _before = len(items)
-            items = [it for it in items if not ((tk := _ntk_c(it.get("title_key", "") or it.get("title", ""))) and ((tk, (it.get("source") or "all")) in _excl or (tk, "all") in _excl))]
+            items = [it for it in items if not ((tk := _ntk_c(it.get("title_key", "") or it.get("title", ""))) and (tk, (it.get("source") or "")) in _excl)]
             _dropped = _before - len(items)
             if _dropped:
                 logger.info("collect: dropped excluded titles", count=_dropped)
