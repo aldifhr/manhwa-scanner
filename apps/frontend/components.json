@@ -21,6 +21,11 @@
   "menuColor": "default",
   "menuAccent": "subtle",
   "registries": {
-    "@kobra": "https://kobra.systems/r/{name}.json"
+    "@kobra": {
+      "url": "https://kobra.systems/r/{name}.json",
+      "headers": {
+        "Authorization": "Bearer ${KOBRA_TOKEN}"
+      }
+    }
   }
 }
