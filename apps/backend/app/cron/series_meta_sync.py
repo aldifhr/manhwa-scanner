@@ -9,7 +9,7 @@ Why this exists (decoupled from the per-minute chapter collect):
 - This job runs on its own schedule (e.g. every 6h via cron action
   "sync-meta") and patiently fetches + upserts series_meta for every distinct
   (title_key, source), with a long inter-fetch delay so we stay well under
-  shinigami's 429 / ikiru's Cloudflare 403 thresholds. No timeout pressure.
+  shinigami's 429 threshold. No timeout pressure.
 
 It is idempotent: re-running only refreshes rows, never duplicates.
 
@@ -32,15 +32,6 @@ _MAX_PER_RUN = 2000  # safety cap; distinct series is ~85 so we never hit this
 
 def _fetch_meta(source: str, sid: str) -> dict:
     """Fetch one series' meta via the scraper (same path collect used)."""
-    if source == "ikiru":
-        try:
-            from app.scrapers import ikiru as _ik
-        except ImportError:
-            return {}
-        try:
-            from app.scrapers import ikiru as _ik
-        except ImportError:
-            return {}
     if source == "shinigami":
         from app.scrapers import shinigami as _sh
         return _sh.get_shinigami_series_meta(sid) or {}
@@ -106,7 +97,7 @@ def sync_series_meta(limit: int = _MAX_PER_RUN) -> dict:
             continue
         su = (r.get("series_url") or "").rstrip("/")
         slug = su.split("/")[-1] if su else ""
-        # fallback: title_key itself is slug for ikiru
+        # fallback: the title_key doubles as the slug when series_url is absent
         if not slug:
             slug = tk
         slug_map[key] = slug

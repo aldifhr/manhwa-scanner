@@ -6,6 +6,7 @@ app/services/scraper_service.py. The public symbols here remain exported
 """
 from __future__ import annotations
 
+import concurrent.futures
 import html as _html
 import re
 
@@ -39,31 +40,21 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
     populated whitelist, so the cache is fresh enough for web display.
     """
 
-    def _ikiru_slug(it: dict) -> str | None:
-        return it["series_url"].rstrip("/").split("/")[-1] if it.get("series_url") else None
-
     def _shinigami_id(it: dict) -> str | None:
         return it["series_url"].rstrip("/").split("/")[-1] if it.get("series_url") else None
 
     # ── Collect keys per source ──
-    ikiru_slugs: list[str] = []
     shin_mids: list[str] = []
-    ikiru_idx: dict[str, list[int]] = {}
     shin_idx: dict[str, list[int]] = {}
     for i, it in enumerate(items):
-        if it.get("source") == "ikiru":
-            slug = _ikiru_slug(it)
-            if slug:
-                ikiru_slugs.append(slug)
-                ikiru_idx.setdefault(slug, []).append(i)
-        elif it.get("source") == "shinigami":
+        if it.get("source") == "shinigami":
             mid = _shinigami_id(it)
             if mid:
                 shin_mids.append(mid)
                 shin_idx.setdefault(mid, []).append(i)
 
     # ── Cache load (by title_key) ──
-    cache_keys = list(set(ikiru_slugs + shin_mids))
+    cache_keys = list(set(shin_mids))
     cached: dict[str, dict] = {}
     if cache_keys:
         rows = meta_store.batch_get_manga_metadata(cache_keys)
@@ -72,70 +63,6 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
                 if row.get("origin") and row["origin"] not in ("KR", "CN", "JP"):
                     row["origin"] = normalize_origin(row.get("origin"))
                 cached[key] = row
-
-    # ── Ikiru enrich (parallelized) ──
-    import concurrent.futures
-
-    def _fetch_ikiru(slug: str) -> tuple[str, dict | None]:
-        if cached.get(slug, {}).get("origin"):
-            return slug, None  # already enriched in cache
-        if skip_api:
-            return slug, None
-        try:
-            s = ikiru.get_ikiru_series(slug)
-            # get_ikiru_series_meta() which scrapes JSON-LD for aggregateRating
-            if not s or not s.get("rating"):
-                meta = ikiru.get_ikiru_series_meta(slug)
-                if meta:
-                    return slug, meta
-        except Exception:
-            s = None
-        return slug, s
-
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-            futures = {ex.submit(_fetch_ikiru, slug): slug for slug in set(ikiru_slugs)}
-            for fut in concurrent.futures.as_completed(futures):
-                slug, s = fut.result()
-                if not s:
-                    continue
-                cached[slug] = s
-                # Do NOT auto-upsert to whitelist on RSS fetch — that's enrich_whitelist's job
-                # if persist_cache:
-                #     ... (removed)
-    except RuntimeError:
-        # Interpreter shutting down (PM2 restart) — fallback to sequential
-        for slug in set(ikiru_slugs):
-            try:
-                _slug, s = _fetch_ikiru(slug)
-                if s:
-                    cached[slug] = s
-            except Exception:
-                pass
-
-    # ── Ikiru apply to items ──
-    for slug, indices in ikiru_idx.items():
-        s = cached.get(slug)
-        if not s:
-            continue
-        is_project = s.get("is_project")
-        _types = _parse_types(s.get("type"))
-        ikiru_origin = normalize_origin(_types[0]) if _types else ""
-        if not ikiru_origin:
-            ikiru_origin = (cached.get(slug, {}) or {}).get("origin") or ""
-        for i in indices:
-            it = items[i]
-            it["cover"] = s.get("cover")
-            it["status"] = ("ongoing" if is_project else "completed") if is_project is not None else (s.get("status") or "unknown")
-            it["rating"] = s.get("rating")
-            it["genres"] = s.get("genres") or s.get("genre") or []
-            it["description"] = _strip_html(s.get("description", ""))
-            # no type -> no origin (hide flag) — don't fallback to KR
-            # Only override origin if we have a new value; preserve existing DB origin
-            if _types and ikiru_origin:
-                it["origin"] = normalize_origin(ikiru_origin)
-            elif not it.get("origin"):
-                it["origin"] = ""
 
     # ── Shinigami enrich (parallelized) ──
     def _fetch_shin(mid: str) -> tuple[str, dict | None]:

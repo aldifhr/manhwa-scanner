@@ -66,8 +66,11 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # title_key) is wrong: when ch.9-25 are already dispatched, dedup keeps
     # ch.25, FCFS filters it, and ch.7-8 never get sent.
 
-    # Backfill HTML-backlog items silently
-    if to_backfill:
+    # Backfill HTML-backlog items silently. Skipped on dry_run: it writes to
+    # dispatch_history, so a dry run would mutate the very state it is meant
+    # to leave untouched, and the rows would then be skipped as "already
+    # dispatched" by the real run.
+    if to_backfill and not dry_run:
         bf_urls = [it.get("url") or it.get("chapter_url") for it in to_backfill if (it.get("url") or it.get("chapter_url"))]
         already = set()
         if bf_urls:

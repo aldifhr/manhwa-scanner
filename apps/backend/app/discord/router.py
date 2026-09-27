@@ -91,7 +91,8 @@ def _route_search(data: dict):
     q = opts.get("query", "")
     from app.scrapers import shinigami
 
-    results = ikiru.search_ikiru_api(q, 5) + shinigami.search_shinigami_api(q, 5)
+    # ikiru was removed as a source; shinigami is the only scraper with search.
+    results = shinigami.search_shinigami_api(q, 5)
     if not results:
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE, {"content": f"No results for `{q}`"}

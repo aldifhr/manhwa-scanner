@@ -39,9 +39,11 @@ async def audit_stale(request: Request):
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
     try:
-        days = int(request.query_params.get("days", "30"))
+        # int() on a raw query param raises ValueError on ?days=abc, which was
+        # a 500. int_safe falls back to the default instead.
+        days = int_safe(request.query_params.get("days"), 30)
         days = max(7, min(days, 365))
-        limit = int(request.query_params.get("limit", "20"))
+        limit = int_safe(request.query_params.get("limit"), 20)
         limit = max(1, min(limit, 100))
         from app.db import q
         rows = q("""

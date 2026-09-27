@@ -21,16 +21,14 @@ async def catalog_search(request: Request):
     q = request.query_params.get("q", "")
     from app.scrapers import shinigami
 
-    # C1 FIX: Run blocking scrapers in thread pool to avoid blocking event loop
-    ikiru_results, shinigami_results = await asyncio.gather(
-        asyncio.to_thread(ikiru.search_ikiru_api, q, 10),
-        asyncio.to_thread(shinigami.search_shinigami_api, q, 10),
-    )
-    raw = ikiru_results + shinigami_results
+    # ikiru was removed as a source but this still called ikiru.search_ikiru_api,
+    # so the endpoint raised NameError on every request. shinigami is the only
+    # scraper left with a search API, so that is all this searches.
+    raw = await asyncio.to_thread(shinigami.search_shinigami_api, q, 10)
     for _r in raw:
         if not _r.get("source"):
             _perm = _r.get("permalink", "") or ""
-            _r["source"] = "ikiru" if _perm.startswith("https://08.ikiru") else "shinigami"
+            _r["source"] = "shinigami"
     from app.storage import whitelist as _wl_store
     _wl_keys = set()
     try:

@@ -18,7 +18,6 @@ def _fetch_synopsis_map(slugs: list[str]) -> dict[str, str]:
     Komiku's latest-updates endpoint doesn't include synopsis,
     so we fetch single comic endpoint for each unique slug.
     """
-    import httpx
     synopses: dict[str, str] = {}
     for slug in slugs:
         try:

@@ -55,38 +55,6 @@ def _cached_chapter_list(source: str, sid: str, fetcher) -> list:
                 _CHAPTER_CACHE.pop(_k, None)
     return data
 
-def _ikiru_re_touch_anchor(chapters: list[dict]) -> tuple[float, "datetime | None"]:
-    _max_num = 0.0
-    for c in chapters:
-        try:
-            n = float(c.get("number") or 0)
-        except (ValueError, TypeError):
-            continue
-        if n > _max_num:
-            _max_num = n
-    _max_time = None
-    for c in chapters:
-        try:
-            if float(c.get("number") or 0) == _max_num:
-                _mt = c.get("updated_time") or ""
-                if _mt:
-                    from datetime import datetime as _dt, timezone as _tz
-                    _max_time = _dt.fromisoformat(_mt.replace("Z", "+00:00"))
-                    if _max_time.tzinfo is None:
-                        _max_time = _max_time.replace(tzinfo=_tz.utc)
-                break
-        except (ValueError, TypeError):
-            continue
-    return _max_num, _max_time
-
-def _is_ikiru_re_touch(num, ts, max_num: float, max_time) -> bool:
-    if max_time is None or num is None:
-        return False
-    try:
-        return num < max_num and ts > max_time
-    except TypeError:
-        return False
-
 def _parse_types(raw) -> list[str]:
     import ast
     cache_key = (str(raw) if raw is not None else "")

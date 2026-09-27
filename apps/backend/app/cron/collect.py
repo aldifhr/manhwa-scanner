@@ -37,7 +37,6 @@ def collect_recent_chapters(
             if _s:
                 _disabled.add(_s)
     try:
-        from datetime import datetime, timezone
         hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
         _now = datetime.now(timezone.utc)
         for src, row in (hm or {}).items():
