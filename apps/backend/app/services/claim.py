@@ -83,9 +83,64 @@ def claim_recent_chapters_for_dispatch(
         # Disable autocommit so the lock holds until conn.commit().
         conn.autocommit = False
         cur = conn.cursor()
+        # Pushed-down claim SELECT.
+        #
+        # SCALABILITY FIX: the old query was `SELECT * FROM recent_chapters
+        # WHERE release_date >= %s ORDER BY id DESC LIMIT 500` and did ALL
+        # filtering in Python. That made the 500-row window the effective cap
+        # on what could EVER be dispatched: once the newest 500 rows were all
+        # already notified, the claim returned 0 no matter how many older
+        # undispatched chapters existed. Dispatch silently degraded to
+        # sent:0 (the deep-queue path was bypassed entirely via the
+        # get_recent_chapters fallback).
+        #
+        # Now the cheap, exactly-indexable predicates run in SQL:
+        #   - whitelist join on (title_key, source)   [idx_whitelist_source_title_key]
+        #   - NOT EXISTS dispatch_history on chapter_url [dispatch_history_pkey]
+        #   - NOT EXISTS dispatch_claims on chapter_url [dispatch_claims_chapter_url_key]
+        #   - ceiling vs whitelist.latest_sent_chapter
+        #   - placeholder / missing-metadata row filters
+        # The Python guards below stay as a second line of defence (they also
+        # cover the normalized-title_key and legacy-pair paths that SQL cannot
+        # express cheaply).
         cur.execute(
-            "SELECT * FROM recent_chapters WHERE release_date >= %s ORDER BY id DESC LIMIT %s FOR UPDATE SKIP LOCKED",
-            (cutoff, limit),
+            """
+            SELECT rc.* FROM recent_chapters rc
+            JOIN whitelist w
+              ON w.source = rc.source
+             AND (w.title_key = rc.title_key
+                  -- Normalized fallback, mirroring the Python guard. Costs
+                  -- ~0.04ms at 266 whitelist rows (whitelist is hash-joined
+                  -- either way, so the index is not lost) and prevents a
+                  -- silent permanent skip if a scraper ever writes
+                  -- space-form title_key while the whitelist holds dash-form.
+                  OR replace(normalize_title_key(w.title_key), ' ', '-')
+                     = replace(normalize_title_key(rc.title_key), ' ', '-'))
+            WHERE rc.release_date >= %s
+              AND NOT EXISTS (
+                    SELECT 1 FROM dispatch_history dh
+                    WHERE dh.chapter_url = rc.chapter_url
+              )
+              AND NOT EXISTS (
+                    SELECT 1 FROM dispatch_claims dc
+                    WHERE dc.chapter_url = rc.chapter_url
+                      AND dc.expires_at >= %s
+              )
+              -- Ceiling. Mirrors the Python guard exactly: a chapter_num of
+              -- 0/NULL is "unknown", and Python skips the ceiling for those
+              -- (`if _cn:` is false), so SQL must NOT drop them here.
+              AND (COALESCE(rc.chapter_num, 0) = 0
+                   OR COALESCE(w.latest_sent_chapter, 0) = 0
+                   OR rc.chapter_num > w.latest_sent_chapter)
+              AND rc.chapter_url NOT LIKE 'https://x/%%'
+              AND rc.chapter_url NOT LIKE 'http://x/%%'
+              AND length(COALESCE(rc.series_url, '')) >= 10
+              AND (COALESCE(rc.origin, '') <> '' OR COALESCE(rc.cover, '') <> '')
+            ORDER BY rc.id DESC
+            LIMIT %s
+            FOR UPDATE OF rc SKIP LOCKED
+            """,
+            (cutoff, now, limit),
         )
         rows = cur.fetchall()
         candidates: list[dict] = []
