@@ -39,10 +39,19 @@ _MIN_REPORT = 1
 def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
     """Whitelisted chapters inside the window that were never dispatched.
 
-    Joined on the real dispatch_history key (title_key, source,
-    chapter_title). Matching on fcfs_key instead gives false positives,
-    because fcfs_key is derived from the display title and is not guaranteed
-    to agree with title_key.
+    Two dedup rules are applied, matching dispatch exactly, because anything
+    looser reports chapters that were correctly skipped:
+
+    1. (title_key, source, chapter_title) in dispatch_history — the direct
+       record of "this exact chapter of this exact source was sent".
+
+    2. fcfs_key in dispatch_history — the cross-source rule. fcfs_key is
+       built from the display title and deliberately excludes the source, so
+       a chapter that already shipped from one source is considered
+       delivered even when a second source later surfaces the same chapter.
+       Without this, every chapter that shipped on shinigami is reported as
+       stalled komiku forever, because the komiku row has a different
+       chapter_url and rule 1 cannot see it.
     """
     conn = get_conn()
     try:
@@ -50,6 +59,7 @@ def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
         cur.execute(
             """
             select rc.source,
+                   rc.title,
                    rc.title_key,
                    rc.chapter,
                    extract(epoch from (now() - rc.release_date)) / 3600.0 as age_h
@@ -68,17 +78,49 @@ def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
             (age_hours,),
         )
         # The shared cursor yields RealDictRow (mapping access), not tuples.
-        return [
+        rows = cur.fetchall()
+    finally:
+        put_conn(conn)
+
+    # Cross-source dedup in Python, not SQL: fcfs_key() is slugify_title_key()
+    # plus a normalized chapter token, and slugify_title_key is Python-only.
+    # SQL has no equivalent, so the candidate set is narrowed there and the
+    # exact key is applied here. The candidate set is small (only chapters
+    # inside the window that are not a direct history hit), so this is cheap.
+    if not rows:
+        return []
+    from app.services.fcfs import fcfs_key
+
+    keys = [fcfs_key(r.get("title") or "", r.get("chapter") or "") for r in rows]
+    delivered: set[str] = set()
+    uniq = list(dict.fromkeys(k for k in keys if k))
+    if uniq:
+        try:
+            conn = get_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute("select fcfs_key from dispatch_history where fcfs_key = any(%s)", (uniq,))
+                delivered = {r.get("fcfs_key") for r in cur.fetchall() if r.get("fcfs_key")}
+            finally:
+                put_conn(conn)
+        except Exception as exc:
+            # Fail open: without the cross-source filter we would over-report,
+            # which is noisy but never hides a real loss.
+            logger.warn("watchdog: fcfs cross-source lookup failed", error=str(exc)[:120])
+
+    out: list[dict[str, Any]] = []
+    for r, k in zip(rows, keys):
+        if k and k in delivered:
+            continue
+        out.append(
             {
                 "source": r.get("source"),
                 "title_key": r.get("title_key"),
                 "chapter": r.get("chapter"),
                 "age_h": float(r.get("age_h") or 0),
             }
-            for r in cur.fetchall()
-        ]
-    finally:
-        put_conn(conn)
+        )
+    return out
 
 
 def _aged_out_count(lookback_hours: float) -> int:
