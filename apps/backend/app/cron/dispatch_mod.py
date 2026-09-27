@@ -85,19 +85,43 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # CEILING: skip chapters at or below the max already-dispatched chapter
     # per (title_key, source). Prevents re-dispatching old chapters when
     # a higher chapter was already sent (e.g. 125 sent, 110 re-appears).
+    #
+    # The max MUST be computed numerically, not by text ordering. Postgres
+    # orders '9' > '20' as text, so a series that had shipped through
+    # ch.20 resolved to a ceiling of 9 (observed on
+    # the-crimson-dragon-martial-emperor). Every chapter from 10..20 then
+    # passed the ceiling check on every run. FCFS still skipped them
+    # because they are in dispatch_history, so nothing was double-sent —
+    # but the guard was doing nothing for exactly the series that needed
+    # it. A non-numeric chapter_title (e.g. 'OVA') is ignored rather than
+    # raising, so it can never become a bogus ceiling.
     _ceilings: dict[tuple[str, str], float] = {}
     try:
-        from app.db import get_supabase as _gs_ceil
-        _sb_ceil = _gs_ceil()
-        _ceil_tks = list({(str(it.get("title_key") or "").strip(), str(it.get("source") or "").strip()) for it in to_send if it.get("title_key") and it.get("source")})
-        if _ceil_tks:
-            for _tk, _src in _ceil_tks:
-                _r = _sb_ceil.table("dispatch_history").select("chapter_title").eq("title_key", _tk).eq("source", _src).order("chapter_title", desc=True).limit(1).execute()
-                if _r.data:
-                    try:
-                        _ceilings[(_tk, _src)] = float(_r.data[0]["chapter_title"])
-                    except (ValueError, TypeError):
-                        pass
+        from app.db import get_conn as _get_conn, put_conn as _put_conn
+        _c_tks = list({(str(it.get("title_key") or "").strip(), str(it.get("source") or "").strip()) for it in to_send if it.get("title_key") and it.get("source")})
+        if _c_tks:
+            _cc = _get_conn()
+            try:
+                _cur = _cc.cursor()
+                for _tk, _src in _c_tks:
+                    # NULLIF discards non-numeric labels; max() then
+                    # ignores them, matching the Python float() guard.
+                    _cur.execute(
+                        "SELECT max(NULLIF(trim(chapter_title), '')::numeric) FROM dispatch_history "
+                        "WHERE title_key = %s AND source = %s",
+                        (_tk, _src),
+                    )
+                    _row = _cur.fetchone()
+                    if _row and _row[0] is not None:
+                        _ceilings[(_tk, _src)] = float(_row[0])
+            finally:
+                # Return the borrowed connection to the pool — get_conn()
+                # holds a semaphore slot; dropping it without put_conn
+                # would starve the pool after enough ceiling queries.
+                try:
+                    _put_conn(_cc)
+                except Exception:
+                    pass
     except Exception:
         pass
 
