@@ -31,6 +31,32 @@ class AuditAction:
     CONTINUE_READING_PUT = "CONTINUE_READING_PUT"
     CONTINUE_READING_MARK_READ = "CONTINUE_READING_MARK_READ"
 
+def _coerce_inet(value: str) -> str | None:
+    """Return a value Postgres `inet` accepts, else None.
+
+    The inet column rejects anything that is not a literal IP. Client-supplied
+    input reaches this from x-forwarded-for and client.host, so it can be a
+    hostname ("testclient"), an "ip:port" pair, or a bracketed IPv6 literal.
+    Normalize those here; return None when there is no usable IP so the caller
+    stores NULL instead of aborting the whole audit insert.
+    """
+    import ipaddress
+
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    # Bracketed IPv6 with port: "[::1]:8080" -> "::1"
+    if raw.startswith("["):
+        raw = raw[1:].split("]")[0]
+    # IPv4 with port: "1.2.3.4:8080" -> "1.2.3.4" (a bare IPv6 has >1 colon)
+    if raw.count(":") == 1 and "." in raw:
+        raw = raw.split(":")[0]
+    try:
+        return str(ipaddress.ip_address(raw))
+    except ValueError:
+        return None
+
+
 def _extract_request_meta(request) -> dict[str, str]:
     """Extract actor/ip/user_agent from Request without raising."""
     try:
@@ -39,6 +65,7 @@ def _extract_request_meta(request) -> dict[str, str]:
         ip = fwd.split(",")[0].strip() if fwd else ""
         if not ip and hasattr(request, "client") and request.client:
             ip = getattr(request.client, "host", "") or ""
+        ip = _coerce_inet(ip) or ""
         ua = request.headers.get("user-agent", "")[:500] if hasattr(request, "headers") else ""
         # actor: session hash or Bearer prefix (don't log secret)
         actor = "dashboard"
@@ -65,10 +92,10 @@ def log_action(
     try:
         meta_req = _extract_request_meta(request) if request is not None else {}
         final_actor = (actor or meta_req.get("actor") or "unknown")[:100]
-        final_ip = (ip if ip is not None else meta_req.get("ip", ""))[:45]
-        # inet column rejects empty string — convert to None
-        if not final_ip or final_ip.strip() == "":
-            final_ip = None
+        # inet column rejects anything that is not a literal IP (empty string,
+        # hostnames, "ip:port") — normalize, else store NULL. An explicit ip=
+        # argument is caller-supplied and needs the same treatment.
+        final_ip = _coerce_inet(ip if ip is not None else meta_req.get("ip", ""))
         final_ua = (user_agent if user_agent is not None else meta_req.get("user_agent", ""))[:500]
         final_metadata = metadata or {}
         # Ensure JSON serializable, truncate large values
