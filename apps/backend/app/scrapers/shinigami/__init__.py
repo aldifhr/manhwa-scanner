@@ -7,6 +7,7 @@ shared/scrapers/secondary/api.ts.
 import httpx
 import random
 import time as _t
+from datetime import datetime, timezone, timedelta
 
 from curl_cffi import requests as cffi_req
 
@@ -209,20 +210,60 @@ def get_shinigami_series_meta(manga_id: str) -> dict | None:
         "series_url": f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_SERIES_PATH}{manga_id}",
     }
 
-def get_shinigami_chapters(manga_id: str, per_page: int = 100) -> list[dict]:
+def get_shinigami_chapters(
+    manga_id: str,
+    per_page: int = 100,
+    max_pages: int = 5,
+    within_hours: int | None = None,
+) -> list[dict]:
     """Fetch chapter list for a shinigami manga. Returns list of
     dicts with chapter_number and chapter_id. Alias of the
     canonical fetcher (preserved for callers in gap_detector,
-    backfill scripts)."""
+    backfill scripts).
+
+    max_pages bounds pagination. The default (5) keeps the historical
+    full-archive behaviour for callers that need it (gap_detector,
+    catalog).
+
+    within_hours switches to adaptive pagination: keep fetching pages
+    only while chapters are still inside the freshness window, and stop as
+    soon as a page comes back entirely outside it. The endpoint sorts by
+    chapter_number desc, so chapters outside the window always sit behind
+    the fresh ones — no need to guess a page count. max_pages remains a
+    hard ceiling so a series that dumps a huge batch in one window still
+    terminates.
+    """
     all_ch: list[dict] = []
     seen_ids: set[str] = set()
-    # Paginate until no rows or gap >50 chapters (safety bound).
-    for page in range(1, 6):  # max 5 pages = 500 chapters
+    cutoff: datetime | None = None
+    if within_hours is not None and within_hours > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=within_hours)
+
+    def _is_fresh(ch: dict) -> bool:
+        """True if the chapter is inside the window (or undated -> keep)."""
+        if cutoff is None:
+            return True
+        raw = ch.get("release_date") or ch.get("created_at") or ""
+        if not isinstance(raw, str) or not raw.strip():
+            return True  # undated: never drop on missing data
+        try:
+            ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return True
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return ts >= cutoff
+
+    for page in range(1, max(1, max_pages) + 1):
         data = _get(f"/chapter/{manga_id}/list?page={page}&page_size={per_page}&sort_by=chapter_number&sort_order=desc")
         if not data:
             break
         items = data.get("data", [])
         if not items:
+            break
+        # Freshness scan: every chapter on this page is outside the window,
+        # and the list is sorted desc, so nothing deeper can be fresh.
+        if cutoff is not None and not any(_is_fresh(ch) for ch in items):
             break
         new_count = 0
         for ch in items:

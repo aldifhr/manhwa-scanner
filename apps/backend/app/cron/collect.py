@@ -1,7 +1,14 @@
 """Source collection orchestrator"""
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone, timedelta
+
+# Freshness window for scraped chapters (hours). One source of truth for
+# both the API-side adaptive pagination (collect_whitelisted_shinigami_chapters)
+# and the post-collect row filter (pipeline._filter_fresh_window), so the two
+# can never drift apart and silently disagree about what counts as fresh.
+FRESH_WINDOW_HOURS = int(os.getenv("SCRAPE_FRESH_WINDOW_HOURS", "24") or 24)
 
 from app.config import settings
 from app.logger import get_logger
@@ -259,6 +266,11 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
         ids.append((mid, wk, w.get("title") or wk.replace("_", " ").title()))
     items: list[dict] = []
     API_CHAPTER_LIMIT = 100
+    # Freshness scan: fetch pages only while chapters are still inside the
+    # window, so a series that releases 10 or 20 chapters in a day is fully
+    # captured, while a quiet series stops at page 1. max_pages stays a hard
+    # ceiling. No page count is hardcoded from observation.
+    API_MAX_PAGES = int(os.getenv("SHINIGAMI_FRESH_MAX_PAGES", "5") or 5)
     _notified: dict[str, set[float]] = {}
     try:
         from app.db import get_supabase as _gsb2
@@ -280,7 +292,9 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
         chapters = None
         for _att in range(5):
             try:
-                chapters = shinigami.get_shinigami_chapters(mid, per_page=API_CHAPTER_LIMIT)
+                chapters = shinigami.get_shinigami_chapters(
+                    mid, per_page=API_CHAPTER_LIMIT, max_pages=API_MAX_PAGES, within_hours=FRESH_WINDOW_HOURS
+                )
                 break
             except Exception as e:
                 import time as _bt

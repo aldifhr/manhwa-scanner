@@ -42,8 +42,9 @@ dispatch = dispatch_mod.dispatch  # noqa: shim
 # reads recent_chapters with hours=24, so a 24h window is exactly its own
 # horizon — nothing it can act on gets dropped here.
 #
-# Override with SCRAPE_FRESH_WINDOW_HOURS if the dispatch window ever widens.
-_FRESH_WINDOW_HOURS = int(os.getenv("SCRAPE_FRESH_WINDOW_HOURS", "24") or 24)
+# Single source of truth, shared with the API-side adaptive pagination in
+# collect.py so the two stages can never disagree about what "fresh" means.
+_FRESH_WINDOW_HOURS = collect.FRESH_WINDOW_HOURS
 
 
 def _filter_fresh_window(items: list[dict], hours: int = _FRESH_WINDOW_HOURS) -> list[dict]:
