@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Announcement from "@/components/Announcement";
 import QueryProvider from "@/components/QueryProvider";
 import { ToastProvider } from "@/lib/useToast";
+import { CommandPalette } from "@/components/CommandPalette";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,7 @@ export default function RootLayout({
           <ToastProvider>
             <Announcement />
             <Navbar />
+            <CommandPalette />
             <main className="min-h-dvh pb-safe">{children}</main>
           </ToastProvider>
         </QueryProvider>

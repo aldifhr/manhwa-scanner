@@ -24,6 +24,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@kmenu/react':
+        specifier: ^2.0.4
+        version: 2.0.4(kmenu@2.0.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@manhwa-scanner/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -54,9 +57,9 @@ importers:
       geist:
         specifier: ^1.7.2
         version: 1.7.2(next@16.3.4(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
-      input-otp:
-        specifier: ^1.5.0
-        version: 1.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      kmenu:
+        specifier: ^2.0.4
+        version: 2.0.4
       motion:
         specifier: ^13.4.4
         version: 13.4.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -853,6 +856,13 @@ packages:
 
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
+
+  '@kmenu/react@2.0.4':
+    resolution: {integrity: sha512-1Ig54cGeSrr4Z0vft2Hc8vE3OKnvpRiHm6DBtuFOgzORHIUQj+OSoGoMpS967yu3cWMAu2gRJm8OOfJsIXtkmg==}
+    peerDependencies:
+      kmenu: 2.0.3
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   '@laststance/tailwindcss-canonical-classes-core@0.1.0':
     resolution: {integrity: sha512-fxupxOtZtEnax/HizY3rin3zrGnEJB8MJ1DC3j9NokByksgl+riup8+aDQ3nc7GWTuElK5IkbXX6iTMCl4V99w==}
@@ -2176,12 +2186,6 @@ packages:
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
 
-  input-otp@1.5.0:
-    resolution: {integrity: sha512-3AcfdW1sNG0FmSA5hHMBXG7jNW5CdcdKs8ln8JOmn6S2SRkoXoJx+2UwC+ZvjflfnOdHJx0SfQ9/YjlxVYLtGQ==}
-    peerDependencies:
-      react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
-      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
-
   ip-address@10.7.0:
     resolution: {integrity: sha512-BGFsyJd5mpXp3rK6jIdADLNgpJUK1jnjzvYF8lK+VyDab9JAmqN0YOKDdP17HlgKb2+ehPgDc8EtnRLbGCAMhA==}
     engines: {node: '>= 12'}
@@ -2376,6 +2380,9 @@ packages:
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
     engines: {node: '>=6'}
+
+  kmenu@2.0.4:
+    resolution: {integrity: sha512-nXMQyTO7T23CGRu39WSTt9ZxMZVuvswjJzdrx+mT+AL/Wop2Tj2utSsM2gkLI0AJXDCn46wF/3vexDPkBdayKw==}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -4320,6 +4327,12 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
+  '@kmenu/react@2.0.4(kmenu@2.0.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      kmenu: 2.0.4
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+
   '@laststance/tailwindcss-canonical-classes-core@0.1.0(tailwindcss@4.3.3)':
     dependencies:
       '@tailwindcss/language-service': 0.14.29
@@ -5622,11 +5635,6 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  input-otp@1.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
-    dependencies:
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
-
   ip-address@10.7.0: {}
 
   ipaddr.js@1.9.1: {}
@@ -5770,6 +5778,8 @@ snapshots:
   kleur@3.0.3: {}
 
   kleur@4.1.5: {}
+
+  kmenu@2.0.4: {}
 
   levn@0.4.1:
     dependencies:

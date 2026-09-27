@@ -11,6 +11,8 @@ import { useAuth } from "@/components/Nav/useAuth";
 import { usePrefetch } from "@/components/Nav/usePrefetch";
 import NavbarStatus from "@/components/NavbarStatus";
 import { useNewCount, NotificationDot } from "@/components/Nav/NotificationDot";
+import { openCommandMenu } from "@/components/ui/command-menu";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -87,6 +89,16 @@ export default function Navbar() {
             </div>
 
             <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => openCommandMenu()}
+              className="hidden md:inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors text-xs"
+              aria-label="Open command menu"
+            >
+              <MagnifyingGlass size={14} />
+              <span>Search</span>
+              <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">⌘K</kbd>
+            </button>
             <NavbarStatus />
             <div
               className="hidden md:block w-px h-6 bg-white/10 mx-2"
