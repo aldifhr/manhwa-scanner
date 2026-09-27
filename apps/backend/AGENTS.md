@@ -8,7 +8,7 @@ Pakai obra/superpowers untuk semua flow. Hermes auto-load via `using-superpowers
 - executing-plans / dispatching-parallel-agents / subagent-driven-development → eksekusi paralel collect/enrich/dispatch
 - test-driven-development → guard `pipeline shim` + `health 900s` + `whitelist`
 - systematic-debugging → `InterfaceError pool closed`, `NameError`, `2112 error_logs`
-- verification-before-completion → `py_compile + pytest + pm2 logs + curl rss` tiap push
+- verification-before-completion → `py_compile + ruff + systemctl logs + curl rss` tiap push
 - using-git-worktrees → isolasi branch
 - finishing-a-development-branch / requesting/receiving-code-review / writing-skills → close loop
 

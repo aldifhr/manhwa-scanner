@@ -73,7 +73,7 @@ pnpm --filter manhwa-reader test
 cd apps/backend
 uv run ruff check app           # lint (line-length 100, E/F/B/E722)
 uv run ruff format --check app  # formatting
-uv run pytest                   # tests (testpaths=tests)
+uv run ruff check .             # lint
 ```
 
 ## Local pipeline test

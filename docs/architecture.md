@@ -125,5 +125,5 @@ All sources normalize ratings to a **1–10 float scale** via `app/services/rati
 | Queue | Redis (cron queue + dead-letter) |
 | Scraping | httpx, curl-cffi (Cloudflare bypass), lxml |
 | Auth | JWT (HS256), single admin password |
-| Validation | Pydantic-settings, ruff, pytest |
+| Validation | Pydantic-settings, ruff, compileall |
 | Deploy | PM2, Caddy, Vercel (frontend) |

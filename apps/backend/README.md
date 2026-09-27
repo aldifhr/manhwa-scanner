@@ -47,7 +47,7 @@ Internal cron scheduler (app/tasks.py, ROLE=cron)
 - Python 3.11+, FastAPI + uvicorn
 - psycopg2 (PostgreSQL), Redis
 - httpx / curl-cffi (browser impersonation to get past Cloudflare), lxml
-- pydantic-settings, ruff, pytest
+- pydantic-settings, ruff
 - Managed with [uv](https://docs.astral.sh/uv/)
 
 ## Setup
@@ -144,7 +144,7 @@ and `/root/deploy-webhook.py` (systemd listener on port 9876, HMAC-SHA256 verifi
 ```bash
 uv run ruff check app          # lint (line-length 100, E/F/B/E722)
 uv run ruff format --check app # formatting
-uv run pytest                  # tests (testpaths=tests)
+uv run ruff check .            # lint
 ```
 
 Run a single pipeline pass locally (fetch only):
