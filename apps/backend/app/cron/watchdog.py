@@ -135,6 +135,31 @@ def _dispatch_health() -> dict[str, Any]:
     return {"queue": depth, "processing": processing, "claims": claims}
 
 
+def snapshot(window_hours: int = 24) -> dict[str, Any]:
+    """Read-only health snapshot for the API. Never notifies, never raises.
+
+    Separate from check_and_alert so the dashboard can poll it without
+    spamming the alert channel.
+    """
+    out: dict[str, Any] = {"ok": True, "window_hours": window_hours}
+    try:
+        stalled = _stalled_chapters(window_hours)
+        out.update(
+            {
+                "stalled": len(stalled),
+                "urgent": sum(1 for c in stalled if c["age_h"] >= _URGENT_AGE_H),
+                "aged_out": _aged_out_count(48),
+                "oldest_stalled_h": round(max((c["age_h"] for c in stalled), default=0.0), 1),
+                "chapters": stalled[:50],
+                **_dispatch_health(),
+            }
+        )
+    except Exception as exc:
+        out["ok"] = False
+        out["error"] = str(exc)
+    return out
+
+
 def check_and_alert() -> dict[str, Any]:
     """Entry point for the scheduler's watchdog action."""
     started = time.monotonic()

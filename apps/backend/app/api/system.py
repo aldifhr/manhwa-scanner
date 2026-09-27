@@ -122,3 +122,38 @@ async def metrics(request: Request):
     except Exception as e:
         logger.warn("cleanup failed", err=str(e)[:160])
         return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)
+
+
+@router.get("/watchdog")
+async def watchdog_status(request: Request):
+    """Dispatch-lag health: whitelisted chapters inside the collect window
+    that never made it into dispatch_history, plus queue/claim state.
+
+    Read-only. Does NOT notify, so the dashboard can poll it freely.
+    """
+    if not require_monitor_auth(request):
+        return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
+    try:
+        from app.cron.watchdog import snapshot as _wd_snapshot
+
+        raw = request.query_params.get("window")
+        window = 24
+        if raw:
+            try:
+                window = max(1, min(168, int(raw)))
+            except ValueError:
+                return JSONResponse(
+                    content={"success": False, "error": "invalid window"}, status_code=400
+                )
+
+        data = _wd_snapshot(window_hours=window)
+        # stalled is the signal; surface a status the UI can colour-code on.
+        data["status"] = "error" if not data.get("ok") else (
+            "critical" if data.get("urgent", 0) > 0
+            else "warning" if data.get("stalled", 0) > 0
+            else "healthy"
+        )
+        return JSONResponse(content={"success": True, "data": data})
+    except Exception as e:
+        logger.warn("watchdog endpoint failed", err=str(e)[:160])
+        return JSONResponse(content={"success": False, "error": "internal error"}, status_code=500)

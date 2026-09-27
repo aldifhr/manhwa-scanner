@@ -3,6 +3,7 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
+import { WatchdogCard } from "./WatchdogCard";
 
 const badge = (s: string) => {
   const v = s?.toLowerCase();
@@ -97,7 +98,9 @@ export default function StatusPage() {
       ) : list.length === 0 ? (
         <div className="text-center py-12 text-white/50">No health data</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-3">
+          <WatchdogCard />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {list.map((s: any) => (
             <div key={s.name || s.source} className="bg-surface border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -115,6 +118,7 @@ export default function StatusPage() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
     </PageShell>
