@@ -54,7 +54,7 @@ export default function StatusPage() {
   const list = (() => {
     const base = sources.length ? sources : (cron as any)?.sources ?? [];
     // ensure sources always shown
-    const want = ["shinigami", "komiku"];
+    const want = ["shinigami"];
     const map = new Map<string, any>();
     for (const s of base) {
       const key = (s.name || s.source || "").toLowerCase();

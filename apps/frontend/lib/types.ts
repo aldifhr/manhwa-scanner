@@ -111,7 +111,7 @@ export interface ExcludedTitleItem {
   id?: string;
   titleKey: string;
   title?: string | null;
-  // Always a concrete source ("shinigami" | "komiku") — exclude has no
+  // Always a concrete source ("shinigami") — exclude has no
   // cross-source "all" scope. The API rejects any other value.
   source: string;
   createdAt?: string | null;

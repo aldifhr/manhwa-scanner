@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
-    SOURCE_KEYS: list[str] = ["shinigami", "komiku", "kiryuu", "wurmz"]
+    SOURCE_KEYS: list[str] = ["shinigami", "kiryuu", "wurmz"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     # e.g. DISABLED_SOURCES=ikiru focuses collection on shinigami only.
     DISABLED_SOURCES: str = ""
@@ -110,10 +110,6 @@ class Settings(BaseSettings):
         "g.shinigami.asia:443",
         "shinigami.asia:443",
         "assets.shngm.id:443",
-        "content.komiku.me:443",
-        # komiku's newer CDN. Without this, 120 of the 317 komiku covers in the
-        # 7-day window returned 403 and rendered blank.
-        "cdnkomiku.xyz:443",
     ]
 
     def get_proxy_hosts(self) -> list[str]:
@@ -173,15 +169,15 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-_SOURCE_KEYS = ("shinigami", "komiku", "kiryuu", "wurmz")
-VALID_SOURCES = ("shinigami", "komiku", "kiryuu", "wurmz")
-VALID_SOURCES_WITH_ALL = ("shinigami", "komiku", "kiryuu", "wurmz", "all")
+_SOURCE_KEYS = ("shinigami", "kiryuu", "wurmz")
+VALID_SOURCES = ("shinigami", "kiryuu", "wurmz")
+VALID_SOURCES_WITH_ALL = ("shinigami", "kiryuu", "wurmz", "all")
 # Sources an exclude row may target. Exclude has no 'all' scope — a row always
 # names one concrete source. Only sources that actually produce chapters.
-EXCLUDE_SOURCES = ("shinigami", "komiku")
+EXCLUDE_SOURCES = ("shinigami",)
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
-    "rss-fetch:shinigami", "rss-fetch:komiku",
+    "rss-fetch:shinigami",
     "enrich", "enrich-missing", "enrich-refresh", "failed-retry",
 )
 

@@ -22,7 +22,7 @@ def do_add(item: dict) -> None:
     url = item["url"]
     tk = normalize_title_key(title)
     res = whitelist.add_whitelist_entries(
-        [{"title": title, "title_key": tk, "source": "komiku", "url": url, "series_url": url}]
+        [{"title": title, "title_key": tk, "source": "shinigami", "url": url, "series_url": url}]
     )
     logger.info("add done", title=title, status=res.get("status"))
 

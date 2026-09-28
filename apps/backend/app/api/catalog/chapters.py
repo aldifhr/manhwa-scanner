@@ -63,12 +63,10 @@ async def catalog_chapters(title_key: str, request: Request):
                     "updated_time": rc.get("updated_time") or "",
                 })
         if not rows:
-            # upstream fallback for Popular (not yet in DB) — shinigami UUID / komiku slug
+            # upstream fallback for Popular (not yet in DB) — shinigami UUID
             try:
                 import re as _re3
                 is_uuid = bool(_re3.match(r"^[0-9a-fA-F-]{36}$", title_key))
-                if _source_q == "komiku":
-                    is_uuid = False
                 if is_uuid:
                     from app.scrapers.shinigami import get_shinigami_chapters
                     from app.config import settings as _s
@@ -78,30 +76,6 @@ async def catalog_chapters(title_key: str, request: Request):
                         cid = ch.get("chapter_id") or ch.get("id") or ""
                         url = f"{_s.SHINIGAMI_PUBLIC_BASE.rstrip('/')}/chapter/{cid}" if cid else ""
                         rows.append({"title_key": norm_tk, "title": "", "source": "shinigami", "chapter": num, "chapter_url": url, "cover": "", "series_url": f"{_s.SHINIGAMI_PUBLIC_BASE.rstrip('/')}/series/{title_key}", "origin": "KR", "updated_time": ch.get("created_at") or ch.get("updated_at") or ""})
-                elif _source_q == "komiku":
-                    # Komiku: fetch from latest-updates and find this slug
-                    from app.scrapers.komiku import fetch_latest_updates, chapter_url as _kom_ch_url, series_url as _kom_series_url
-                    updates = fetch_latest_updates(page=1, per_page=32)
-                    for entry in updates:
-                        comic = entry.get("comic", {})
-                        if comic.get("slug", "") == slug:
-                            chs = entry.get("chapters", []) or []
-                            for ch in chs[:100]:
-                                ch_num = ch.get("n")
-                                if ch_num is None:
-                                    continue
-                                rows.append({
-                                    "title_key": norm_tk,
-                                    "title": comic.get("title", ""),
-                                    "source": "komiku",
-                                    "chapter": str(ch_num),
-                                    "chapter_url": _kom_ch_url(slug, ch_num, ch.get("id")),
-                                    "cover": comic.get("coverUrl", ""),
-                                    "series_url": _kom_series_url(slug),
-                                    "origin": "KR",
-                                    "updated_time": "",
-                                })
-                            break
             except Exception:
                 pass
         payload = {"success": True, "data": {"results": rows, "total": len(rows), "titleKey": norm_tk}}

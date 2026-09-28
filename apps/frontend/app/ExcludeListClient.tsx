@@ -23,9 +23,7 @@ function SourceBadge({ source }: { source: string }) {
   const color =
     source === "shinigami"
       ? "bg-violet-500/15 text-violet-400"
-      : source === "komiku"
-        ? "bg-sky-500/15 text-sky-400"
-        : "bg-surface-hover text-text-muted";
+      : "bg-surface-hover text-text-muted";
   return (
     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${color}`}>
       {source}
@@ -278,7 +276,7 @@ export function ExcludeListClient() {
 
       {isLoading ? (
         <div className="space-y-6">
-          {(sources.length ? sources : ["shinigami", "komiku"]).map((src) => (
+          {(sources.length ? sources : ["shinigami"]).map((src) => (
             <div key={src} className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="skeleton h-5 w-12 rounded" />

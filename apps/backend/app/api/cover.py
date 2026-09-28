@@ -81,8 +81,6 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             "g.shinigami.asia:443",
             "shinigami.asia:443",
             "assets.shngm.id:443",
-            "content.komiku.me:443",
-            "cdnkomiku.xyz:443",
         ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)
@@ -113,8 +111,6 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             if "ikiru.wtf" in url:
                 headers_req["Referer"] = f"https://{settings.IKIRU_PUBLIC_URL.rstrip('/')}/"
                 headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
-            if "komiku" in url:
-                headers_req["Referer"] = "https://01.komiku.asia/"
             r = await asyncio.to_thread(
                 lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=8, allow_redirects=False)
             )
@@ -292,9 +288,5 @@ async def reader_refresh_cover(request: Request):
 
     if not stored_cover:
         return JSONResponse(content={"success": False, "error": "no cover found"}, status_code=404)
-
-    # Komiku covers are stable URLs — return as-is
-    if "content.komiku.me" in str(stored_cover):
-        return JSONResponse(content={"success": True, "cover": stored_cover})
 
     return JSONResponse(content={"success": True, "cover": stored_cover})

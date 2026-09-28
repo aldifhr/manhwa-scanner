@@ -33,26 +33,6 @@ async def catalog_item(title_key: str, request: Request):
     if _cached is not None and (_now - _cached[0]) < _CATALOG_TTL:
         return JSONResponse(content=_cached[1])
     # source-aware early fetch — Popular cards pass ?source= so the slug doesn't get hijacked by the wrong source whitelist
-    if _source_q == "komiku":
-        try:
-            from app.scrapers.komiku import fetch_latest_updates, series_url as _kom_series_url
-            updates = fetch_latest_updates(page=1, per_page=32)
-            for entry in updates:
-                comic = entry.get("comic", {})
-                slug = comic.get("slug", "")
-                if slug == title_key or slug.replace("-", "") == title_key.replace("-", ""):
-                    cover = comic.get("coverUrl", "")
-                    genres = comic.get("genres", []) or []
-                    _type = (comic.get("type") or "manhwa").lower()
-                    rating = comic.get("rating")
-                    _resp = {"success": True, "data": {"titleKey": title_key, "title": comic.get("title", title_key), "cover": cover, "sources": [{"source": "komiku", "url": _kom_series_url(slug)}], "metadata": {"status": comic.get("status", ""), "rating": str(rating) if rating else "", "genres": genres, "description": comic.get("synopsis", ""), "origin": "KR"}, "latestChapter": str(comic.get("latestChapter", ""))}}
-                    _CATALOG_CACHE[_cache_key] = (_qtime.time(), _resp)
-                    _CATALOG_CACHE.move_to_end(_cache_key)
-                    while len(_CATALOG_CACHE) > _CATALOG_CACHE_MAX:
-                        _CATALOG_CACHE.popitem(last=False)
-                    return JSONResponse(content=_resp)
-        except Exception:
-            pass
     if _source_q == "shinigami" and __import__("re").match(r"^[0-9a-fA-F-]{36}$", title_key):
         try:
             from curl_cffi import requests as _cffi2
@@ -135,28 +115,6 @@ async def catalog_item(title_key: str, request: Request):
         while len(_CATALOG_CACHE) > _CATALOG_CACHE_MAX:
             _CATALOG_CACHE.popitem(last=False)
         return JSONResponse(content=_resp)
-
-    # Fallback: Komiku by slug (via API — no auth, no CF block)
-    try:
-        from app.scrapers.komiku import fetch_latest_updates, series_url as _kom_series_url
-        # Search through recent updates for this slug
-        updates = fetch_latest_updates(page=1, per_page=32)
-        for entry in updates:
-            comic = entry.get("comic", {})
-            slug = comic.get("slug", "")
-            if slug == title_key or slug.replace("-", "") == title_key.replace("-", ""):
-                cover = comic.get("coverUrl", "")
-                genres = comic.get("genres", []) or []
-                _type = (comic.get("type") or "manhwa").lower()
-                rating = comic.get("rating")
-                _resp = {"success": True, "data": {"titleKey": title_key, "title": comic.get("title", title_key), "cover": cover, "sources": [{"source": "komiku", "url": _kom_series_url(slug)}], "metadata": {"status": comic.get("status", ""), "rating": str(rating) if rating else "", "genres": genres, "description": comic.get("synopsis", ""), "origin": "KR"}, "latestChapter": str(comic.get("latestChapter", ""))}}
-                _CATALOG_CACHE[_cache_key] = (_qtime.time(), _resp)
-                _CATALOG_CACHE.move_to_end(_cache_key)
-                while len(_CATALOG_CACHE) > _CATALOG_CACHE_MAX:
-                    _CATALOG_CACHE.popitem(last=False)
-                return JSONResponse(content=_resp)
-    except Exception:
-        pass
 
     _resp = {"success": False, "error": "not found"}
     _CATALOG_CACHE[_cache_key] = (_qtime.time(), _resp)

@@ -7,7 +7,7 @@ import time as _time
 
 logger = logging.getLogger("tasks.scheduler")
 
-_RSS_SOURCES = ("shinigami", "komiku")
+_RSS_SOURCES = ("shinigami",)
 
 
 def _disabled_sources() -> set[str]:

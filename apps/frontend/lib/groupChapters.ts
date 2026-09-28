@@ -12,11 +12,10 @@ function coverPriority(source: string): number {
   const s = (source || "").toLowerCase();
   if (s === "shinigami") return 0;
   if (s === "ikiru") return 1;
-  if (s === "komiku") return 2;
   return 10;
 }
 function isVoratoonExpired(cover: string): boolean {
-  if (!cover || !cover.includes("cvr.komiku.id")) return false;
+  if (!cover) return false;
   const m = cover.match(/X-Amz-Date=([^&]+).*?X-Amz-Expires=(\d+)/);
   if (!m) return false;
   try {
@@ -74,8 +73,8 @@ export interface GroupedSeries {
 }
 
 /** Group flat RSS rows. Group key is normalized titleKey (dash/space/case) so the SAME title
- *  from multiple sources (ikiru/shinigami/komiku) merges into ONE card
- *  with merged chapters. Cover priority: shinigami > ikiru > komiku (non-expired). */
+ *  from multiple sources merges into ONE card
+ *  with merged chapters. Cover priority: shinigami > ikiru. */
 export function groupChapters(items: FlatChapter[] | null | undefined): GroupedSeries[] {
   const safeItems = Array.isArray(items) ? items : [];
   const map = new Map<string, GroupedSeries>();
@@ -144,7 +143,7 @@ export function groupChapters(items: FlatChapter[] | null | undefined): GroupedS
         new Date(it.sentAt).getTime() > new Date(g!.sentAt).getTime())
     )
       g!.sentAt = it.sentAt;
-    // cover priority: shinigami > ikiru > komiku (non-expired). Expired komiku presigned is skipped.
+    // cover priority: shinigami > ikiru. Expired presigned covers are skipped.
     const curPri = g!.cover ? coverPriority(coverSource.get(gk) || "") : 99;
     const newPri = coverPriority(it.source);
     const curExpired = isVoratoonExpired(g!.cover);

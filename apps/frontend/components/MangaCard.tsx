@@ -172,13 +172,11 @@ function MangaCard({
                 const s = src.toLowerCase();
                 const down = !isHealthy(health[s]);
                 const color =
-                  s === "komiku"
-                    ? "bg-orange-600/90 text-white"
-                    : s === "shinigami"
-                      ? "bg-red-600/90 text-white"
-                      : s === "ikiru"
-                        ? "bg-green-600/90 text-white"
-                        : "bg-black/70 text-white/90";
+                  s === "shinigami"
+                    ? "bg-red-600/90 text-white"
+                    : s === "ikiru"
+                      ? "bg-green-600/90 text-white"
+                      : "bg-black/70 text-white/90";
                 return (
                   <span
                     key={src}

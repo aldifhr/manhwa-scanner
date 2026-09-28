@@ -434,10 +434,6 @@ export const Reader = {
     return readerFetch("/api/v1/whitelist", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
   },
 
-  refreshVoratoonHealth: async () => {
-    await readerFetch("/api/v1/health/refresh-komiku", { method: "POST" });
-  },
-
   testErrorLog: async () => {
     await readerFetch("/api/v1/logs/errors/test", { method: "POST" });
   },

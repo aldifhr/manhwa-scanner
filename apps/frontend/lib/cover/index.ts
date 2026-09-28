@@ -15,7 +15,6 @@ function putCover(key: string, val: string | null): string | null {
 }
 
 const DIRECT_HOSTS = new Set([
-  "content.komiku.me",
   "minio.imgkc1.my.id",
   "imgkc1.my.id",
   "assets.shngm.id",

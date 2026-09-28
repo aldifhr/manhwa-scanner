@@ -15,7 +15,6 @@ from app.logger import get_logger
 from app.utils.text import slugify_title_key
 from app.storage import health, whitelist as wl_store
 from app.cron.collectors.common import _SOURCE_TIMEOUT
-from app.cron.collectors.komiku import _collect_komiku_source
 from app.cron.collectors.shinigami import _collect_shinigami_source
 from app.cron.source_result import SourceResult
 import time as _time
@@ -116,15 +115,13 @@ def collect_recent_chapters(
             _src_items: list[dict] = []
             if src == "shinigami":
                 _src_items = _collect_shinigami_source(_latest_sent, _disabled, fetch_meta)
-            elif src == "komiku":
-                _src_items = _collect_komiku_source(_latest_sent)
             return SourceResult.ok(src, _src_items, started)
         except Exception as exc:
             logger.warn("collect provider failed", source=src, err=str(exc)[:300])
             return SourceResult.failed(src, started, exc)
 
     _sources_to_run: list[str] = []
-    for _src in ("shinigami", "komiku"):
+    for _src in ("shinigami",):
         if (source is None or source == _src) and _src not in _disabled:
             _sources_to_run.append(_src)
 
@@ -173,7 +170,7 @@ def collect_recent_chapters(
 
         _run_phase(_sources_to_run)
     else:
-        for _src in ("shinigami", "komiku"):
+        for _src in ("shinigami",):
             _hm[_src] = {"status": "disabled", "response_time_ms": 0, "successes_today": 0, "failures_today": 0, "consecutive_failures": 0, "last_success_at": None, "last_checked_at": _now_iso, "last_error": "cooldown"}
 
     _wl = None
