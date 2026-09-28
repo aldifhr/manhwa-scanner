@@ -57,6 +57,19 @@ def claim_recent_chapters_for_dispatch(
         return []
     now = datetime.now(timezone.utc).isoformat()
 
+    # DISABLED_SOURCES has to be honoured here, not only in collect(). Collect
+    # stops adding new rows for a disabled source, but the rows it already wrote
+    # stay in recent_chapters for the whole 24h window and would still be
+    # claimed and notified, so turning a source off only stopped the new stuff.
+    from app.config import settings as _settings
+
+    _disabled: set[str] = set()
+    try:
+        _raw = (getattr(_settings, "DISABLED_SOURCES", "") or "").strip().lower()
+        _disabled = {s.strip() for s in _raw.split(",") if s.strip()}
+    except Exception:
+        pass
+
     allowed: set[tuple[str, str]] = set()
     _latest_sent: dict[tuple[str, str], float] = {}
     for w in whitelist:
@@ -64,6 +77,8 @@ def claim_recent_chapters_for_dispatch(
 
         tk = _ntk(str(w.get("title_key") or ""))
         src = str(w.get("source") or "")
+        if src and src in _disabled:
+            continue
         if tk:
             allowed.add((tk, src))
         try:

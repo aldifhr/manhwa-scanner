@@ -34,14 +34,19 @@ from app.services.fcfs import (  # noqa: F401
     normalize_title,
 )
 
-def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_run: bool = False, force: bool = False, guild_rows: list[dict] | None = None) -> int:
+def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_run: bool = False, force: bool = False, guild_rows: list[dict] | None = None, skip_ceiling: bool = False) -> int:
     """Send Discord embeds for whitelisted chapters.
 
     Dedupe: FCFS via fcfs_key (normalized title+chapter) in dispatch_history.
     No ceiling check needed — once a chapter is recorded, it's never re-sent.
 
-    force=True → skip the FCFS guard (used to bypass dedupe when an explicit
-    re-send is required, e.g. manual backfill or operator-triggered resend).
+    force=True -> skip the in-run claim guard (dispatch_claims) and the
+    permanent URL guard. It does NOT skip the ceiling: the claimed path in
+    pipeline.py sets force=True on every normal run, so tying the ceiling to
+    force meant chapters below the ceiling were always notified.
+
+    skip_ceiling=True is a separate, explicit escape hatch for a manual
+    backfill or resend of a chapter that is genuinely below the ceiling.
     """
     if not getattr(settings, "DISCORD_ENABLED", True):
         logger.info("dispatch: skipped (DISCORD_ENABLED=false)")
@@ -109,10 +114,19 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 for _tk, _src in _c_tks:
                     # NULLIF discards non-numeric labels; max() then
                     # ignores them, matching the Python float() guard.
+                    # Cross-source on purpose. The ceiling is "how far has this
+                    # series already been notified", and a series is one series
+                    # regardless of which site it was read from: fcfs_key() and the
+                    # watchdog both treat komiku ch23 and shinigami ch23 as the
+                    # same event. Scoping the ceiling per source meant a brand new
+                    # source started at zero, so when komiku re-uploaded old
+                    # chapters with a fresh release_date (ch 23/24/25 of a series
+                    # already shipped through ch330 on shinigami) all of them
+                    # passed the ceiling and were notified.
                     _cur.execute(
                         "SELECT max(NULLIF(trim(chapter_title), '')::numeric) FROM dispatch_history "
-                        "WHERE title_key = %s AND source = %s",
-                        (_tk, _src),
+                        "WHERE title_key = %s",
+                        (_tk,),
                     )
                     _row = _cur.fetchone()
                     if _row and _row[0] is not None:
@@ -273,15 +287,16 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             # per-guild excluded titles
             if _excl_titles and slugify_title_key(str(it.get("title_key") or it.get("title") or "")) in _excl_titles:
                 continue
-            # Ceiling: skip chapters at or below the max already-dispatched chapter
-            # Skipped when force=True. force exists precisely for the
-            # backfill/resend path, and the ceiling was still applied there,
-            # which made those chapters permanently undeliverable: a chapter
-            # stuck below the ceiling could never be force-sent, because
-            # force did not actually bypass it.
+            # Ceiling: skip chapters at or below the max already-dispatched
+            # chapter. Only skip_ceiling=True bypasses this — force does not,
+            # because pipeline.py passes force=True on the ordinary claimed
+            # path and the ceiling has to hold there. The cross-source re-upload
+            # case is what makes this matter: komiku re-uploaded ch 23/24/25 of a
+            # series already shipped through ch 330 on shinigami, and per-source
+            # ceilings started komiku at 0 so every one of them was notified.
             _it_tk = str(it.get("title_key") or "").strip()
             _it_src = str(it.get("source") or "").strip()
-            _ceil = None if force else _ceilings.get((_it_tk, _it_src))
+            _ceil = None if skip_ceiling else _ceilings.get((_it_tk, _it_src))
             if _ceil is not None:
                 try:
                     _it_ch = float(it.get("chapter") or "0")

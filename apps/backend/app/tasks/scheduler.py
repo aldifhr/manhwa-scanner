@@ -8,6 +8,25 @@ import time as _time
 logger = logging.getLogger("tasks.scheduler")
 
 _RSS_SOURCES = ("shinigami", "komiku")
+
+
+def _disabled_sources() -> set[str]:
+    """Sources turned off via DISABLED_SOURCES (process env, else .env).
+
+    pydantic loads .env into settings, not os.environ, so the process env is
+    checked first and settings is the fallback — otherwise a value set in .env
+    is silently ignored and the source keeps getting scheduled.
+    """
+    raw = (os.getenv("DISABLED_SOURCES", "") or "").strip().lower()
+    if not raw:
+        try:
+            from app.config import settings as _s
+
+            raw = (getattr(_s, "DISABLED_SOURCES", "") or "").strip().lower()
+        except Exception:
+            pass
+    return {s.strip() for s in raw.split(",") if s.strip()}
+
 _SOURCE_INTERVAL_S = 300
 _DISPATCH_INTERVAL_S = 120
 _ENRICH_INTERVAL_S = 1200
@@ -45,6 +64,9 @@ def _scheduler_loop() -> None:
                 enrich_missing_interval=_ENRICH_MISSING_INTERVAL_S,
                 enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S)
     for i, src in enumerate(_RSS_SOURCES):
+        if src in _disabled_sources():
+            logger.info("scheduler skip disabled source at startup: %s", src)
+            continue
         try:
             enqueue_cron(f"rss-fetch:{src}", source=src)
         except Exception as e:
@@ -59,9 +81,9 @@ def _scheduler_loop() -> None:
     last_source = _time.monotonic()
     while True:
         try:
-            # Reload disabled sources from env each cycle
-            _disabled_raw = (os.getenv("DISABLED_SOURCES", "") or "").strip().lower()
-            _disabled_set = {s.strip() for s in _disabled_raw.split(",") if s.strip()}
+            # Reload disabled sources each cycle. See _disabled_sources() for why
+            # os.getenv alone is not enough.
+            _disabled_set = _disabled_sources()
             if _stop.wait(_DISPATCH_INTERVAL_S):
                 break
             _now = _time.monotonic()
