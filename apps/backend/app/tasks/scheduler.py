@@ -96,7 +96,7 @@ def _scheduler_loop() -> None:
                     logger.warn("scheduler enqueue dispatch failed", err=str(e)[:120])
             if _now - last_source >= _SOURCE_INTERVAL_S:
                 if not _stop.is_set():
-                    for src in ("shinigami", "komiku"):
+                    for src in _RSS_SOURCES:
                         if src in _disabled_set:
                             continue
                         try:
@@ -105,7 +105,7 @@ def _scheduler_loop() -> None:
                         except Exception as e:
                             logger.warn("scheduler enqueue failed", src=src, err=str(e)[:120])
                         _stop.wait(20)
-                logger.info("scheduler rss-fetch batch done", sources=("shinigami", "komiku"))
+                logger.info("scheduler rss-fetch batch done", sources=_RSS_SOURCES)
                 last_source = _now
             if _now - last_enrich >= _ENRICH_INTERVAL_S:
                 try:
