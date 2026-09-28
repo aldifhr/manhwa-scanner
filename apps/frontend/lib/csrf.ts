@@ -1,12 +1,13 @@
 /**
- * CSRF protection helper — reads the `ikiru_csrf_token` cookie set by the
+ * CSRF protection helper — reads the CSRF cookie set by the
  * backend on login and attaches it as an `X-CSRF-Token` header on every
  * mutating request (POST / PUT / DELETE / PATCH).
  *
  * Safe methods (GET / HEAD / OPTIONS) are NOT affected.
  */
+import { CSRF_COOKIE as CSRF_COOKIE_NAME } from "@/lib/cookies";
 
-const CSRF_COOKIE = "ikiru_csrf_token";
+const CSRF_COOKIE = CSRF_COOKIE_NAME;
 const CSRF_HEADER = "X-CSRF-Token";
 
 function getCsrfToken(): string {

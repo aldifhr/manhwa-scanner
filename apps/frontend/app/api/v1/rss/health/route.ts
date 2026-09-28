@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { readSessionCookie } from "@/lib/cookies";
 import {
   backendUrl,
   authHeaders,
@@ -37,9 +38,7 @@ function setCache(key: string, data: unknown) {
 export async function GET(request: Request) {
   try {
     const sessionKey =
-      (request.headers.get("cookie") || "").match(
-        /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
-      )?.[1] || "anon";
+      readSessionCookie(request.headers.get("cookie") || "") || "anon";
     const cached = getCached(sessionKey);
     if (cached) return NextResponse.json(cached);
 

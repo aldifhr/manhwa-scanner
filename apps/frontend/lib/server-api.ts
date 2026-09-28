@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { CSRF_COOKIE, SESSION_COOKIE, readCsrfCookie, readSessionCookie } from "@/lib/cookies";
 import { withCsrf } from "@/lib/csrf";
 import { openapi } from "@manhwa-scanner/shared";
 
@@ -44,7 +45,7 @@ const TOKEN =
 
 if (!TOKEN) {
   console.warn(
-    "[server-api] API_TOKEN env not set — backend calls will be unauthenticated unless ikiru_dashboard_session cookie is present."
+    "[server-api] API_TOKEN env not set — backend calls will be unauthenticated unless the session_session cookie is present."
   );
 }
 
@@ -54,13 +55,11 @@ export function authHeaders(request: Request): Record<string, string> {
   // Forward ALL cookies to backend — double-submit CSRF requires both the
   // cookie value AND the header value to match.
   const cookie = request.headers.get("cookie") || "";
-  const sessionMatch = cookie.match(
-    /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
-  );
-  const csrfMatch = cookie.match(/(?:^|;\s*)ikiru_csrf_token=([^;]*)/);
+  const sessionValue = readSessionCookie(cookie);
+  const csrfValue = readCsrfCookie(cookie);
   const parts: string[] = [];
-  if (sessionMatch) parts.push(`ikiru_dashboard_session=${sessionMatch[1]}`);
-  if (csrfMatch) parts.push(`ikiru_csrf_token=${csrfMatch[1]}`);
+  if (sessionValue) parts.push(`${SESSION_COOKIE}=${sessionValue}`);
+  if (csrfValue) parts.push(`${CSRF_COOKIE}=${csrfValue}`);
   if (parts.length > 0) headers["Cookie"] = parts.join("; ");
 
   // Forward CSRF token header for mutating requests.
@@ -70,7 +69,7 @@ export function authHeaders(request: Request): Record<string, string> {
   }
 
   // Fall back to static API_TOKEN only if no session cookie and token present.
-  if (!sessionMatch && TOKEN) {
+  if (!sessionValue && TOKEN) {
     headers["Authorization"] = `Bearer ${TOKEN}`;
   }
 

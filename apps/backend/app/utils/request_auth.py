@@ -2,25 +2,26 @@
 
 from fastapi import Request
 from app.utils.auth import check_monitor_auth
+from app.utils.cookies import read_session_cookie
 
 
 def require_monitor_auth(request: Request) -> bool:
     return check_monitor_auth(
         request.headers.get("authorization", ""),
         request.query_params.get("token", ""),
-        cookie=request.cookies.get("ikiru_dashboard_session", ""),
+        cookie=read_session_cookie(request.cookies),
     )
 
 
 def get_session_hash(request: Request) -> str | None:
     """Return a stable per-session hash for continue-reading storage.
     
-    Uses the ikiru_dashboard_session cookie (JWT) — sha256[:16].
+    Uses the session cookie (JWT) — sha256[:16].
     Falls back to Authorization Bearer <REDACTED>
     """
     import hashlib as _hashlib
     
-    cookie = request.cookies.get("ikiru_dashboard_session", "")
+    cookie = read_session_cookie(request.cookies)
     if cookie:
         return _hashlib.sha256(cookie.encode()).hexdigest()[:16]
     

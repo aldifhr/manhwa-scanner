@@ -1,7 +1,7 @@
 """Auth endpoint: POST /api/auth?action=login|refresh.
 
 Single shared password `manhwascan` (or DASHBOARD_PASSWORD env) — no admin/member roles.
-Sets the `ikiru_dashboard_session` JWT cookie used by the FE gate.
+Sets the `manhwa_dashboard_session` JWT cookie used by the FE gate.
 """
 
 from __future__ import annotations
@@ -23,8 +23,14 @@ class LoginRequest(BaseModel):
 
 router = APIRouter()
 
-_COOKIE_SESSION = "ikiru_dashboard_session"
-_COOKIE_CSRF = "ikiru_csrf_token"
+from app.utils.cookies import (
+    CSRF_COOKIE as _COOKIE_CSRF,
+    SESSION_COOKIE as _COOKIE_SESSION,
+    _LEGACY_CSRF_COOKIE,
+    _LEGACY_ROLE_COOKIE,
+)
+
+_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 _COOKIE_MAX_AGE = 7 * 24 * 60 * 60
 
 def _issue_jwt() -> str:
@@ -82,8 +88,11 @@ def _set_session_cookies(resp: JSONResponse, token: str) -> None:
         path="/",
         max_age=_COOKIE_MAX_AGE,
     )
-    # clear legacy ikiru_role cookie if present
-    resp.delete_cookie(key="ikiru_role", path="/")
+    # Clear the pre-rename cookies. They are no longer written, and the
+    # client still dual-reads the old session name, so this only drops the
+    # csrf and role leftovers that nothing reads any more.
+    resp.delete_cookie(key=_LEGACY_CSRF_COOKIE, path="/", domain=".aldifhr.my.id")
+    resp.delete_cookie(key=_LEGACY_ROLE_COOKIE, path="/", domain=".aldifhr.my.id")
 
 def _password_ok(pw: str) -> bool:
     return bool(pw and settings.DASHBOARD_PASSWORD and hmac.compare_digest(pw, str(settings.DASHBOARD_PASSWORD)))

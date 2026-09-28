@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import { CSRF_COOKIE, LEGACY_CSRF_COOKIE, browserHasCookie } from "@/lib/cookies";
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { decodeHtml, rewriteCoverUrl, getChapterLabel, safeUrl } from "@/lib/utils";
@@ -401,7 +402,7 @@ export default function HomePage() {
 
   const [isLoggedInForSnapshot, setIsLoggedInForSnapshot] = useState(false);
   useEffect(() => {
-    setIsLoggedInForSnapshot(!!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/));
+    setIsLoggedInForSnapshot(browserHasCookie(CSRF_COOKIE, LEGACY_CSRF_COOKIE));
   }, []);
   const { data: snapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: queryKeys.dashboardSnapshot,

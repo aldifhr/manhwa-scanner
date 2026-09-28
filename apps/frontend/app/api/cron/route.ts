@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { readCsrfCookie } from "@/lib/cookies";
 import {
   backendUrl,
   authHeaders,
@@ -71,7 +72,7 @@ function authorized(request: Request): boolean {
   const token = cookieHeader.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`))?.[1];
   if (token && hasValidToken(token)) return true;
   // fallback 1: double-submit CSRF
-  const csrfCookie = cookieHeader.match(/(?:^|;\s*)ikiru_csrf_token=([^;]*)/)?.[1];
+  const csrfCookie = readCsrfCookie(cookieHeader);
   const csrfHeader = request.headers.get("x-csrf-token") || request.headers.get("X-CSRF-Token") || "";
   if (csrfCookie && csrfHeader && decodeURIComponent(csrfCookie) === decodeURIComponent(csrfHeader) && csrfCookie.length > 5) return true;
   // fallback 2: ada session cookie apapun (meski exp mepet) → izinkan, backend akan validasi via CRON_SECRET yang kita append server-side

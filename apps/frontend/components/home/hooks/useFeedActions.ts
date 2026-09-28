@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { CSRF_COOKIE, LEGACY_CSRF_COOKIE, browserHasCookie } from "@/lib/cookies";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
@@ -28,7 +29,7 @@ export function useFeedActions() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    const check = () => setIsLoggedIn(typeof document !== "undefined" && !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/));
+    const check = () => setIsLoggedIn(typeof document !== "undefined" && browserHasCookie(CSRF_COOKIE, LEGACY_CSRF_COOKIE));
     check();
     const id = setInterval(check, 2000);
     const onFocus = () => check();

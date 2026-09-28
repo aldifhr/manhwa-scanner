@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CSRF_COOKIE, LEGACY_CSRF_COOKIE, browserHasCookie } from "@/lib/cookies";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOut, X } from "@phosphor-icons/react";
@@ -29,7 +30,7 @@ export default function Navbar() {
     }
   }, [pathname, newCount, markSeen]);
   useEffect(() => {
-    const hasCsrf = !!document.cookie.match(/(?:^|;\s*)ikiru_csrf_token=/);
+    const hasCsrf = browserHasCookie(CSRF_COOKIE, LEGACY_CSRF_COOKIE);
     if (hasCsrf) { setIsLoggedIn(true); return; }
     fetch("/api/v1/auth/me", { credentials: "include" })
       .then((r) => r.json())

@@ -13,8 +13,10 @@ logger = get_logger("api:continue-reading")
 router = APIRouter()
 
 def _session_hash(request: Request) -> str | None:
-    # Use ikiru_dashboard_session JWT as device session identifier (same as FE continueReading)
-    cookie = request.cookies.get("ikiru_dashboard_session") or ""
+    # Use the session JWT as device session identifier (same as FE continueReading)
+    from app.utils.cookies import read_session_cookie
+
+    cookie = read_session_cookie(request.cookies)
     if not cookie:
         # fallback to Authorization Bearer token if present
         auth = request.headers.get("authorization") or request.headers.get("Authorization") or ""

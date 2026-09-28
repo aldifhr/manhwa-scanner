@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { CSRF_COOKIE, LEGACY_CSRF_COOKIE, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from "@/lib/cookies";
 import { backendUrl } from "@/lib/server-api";
 
 export async function POST(request: Request) {
@@ -24,15 +25,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: backendMsg || "Invalid credentials" }, { status: 401 });
     }
     const setCookies = res.headers.getSetCookie?.() ?? [];
-    const backendJwt = setCookies.map((c) => c.split(";")[0]).find((c) => c.startsWith("ikiru_dashboard_session="));
-    const backendJwtValue = backendJwt ? backendJwt.split("=").slice(1).join("=") : "";
-    const csrfCookie = setCookies.map((c) => c.split(";")[0]).find((c) => c.startsWith("ikiru_csrf_token="));
-    const csrfTokenValue = csrfCookie ? csrfCookie.split("=").slice(1).join("=") : "";
+    const findSetCookie = (name: string, legacy: string) => {
+      const pair = setCookies
+        .map((c) => c.split(";")[0])
+        .find((c) => c.startsWith(`${name}=`) || c.startsWith(`${legacy}=`));
+      return pair ? pair.split("=").slice(1).join("=") : "";
+    };
+    // Accept the pre-rename name too, in case the backend is one deploy behind.
+    const backendJwtValue = findSetCookie(SESSION_COOKIE, LEGACY_SESSION_COOKIE);
+    const csrfTokenValue = findSetCookie(CSRF_COOKIE, LEGACY_CSRF_COOKIE);
     const response = NextResponse.json({ success: true });
     if (backendJwtValue) {
       const isProd = process.env.NODE_ENV === "production";
       // host-only lax for same-site (Brave/Incognito tidak blok 3rd-party)
-      response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
+      response.cookies.set(SESSION_COOKIE, backendJwtValue, {
         httpOnly: true,
         secure: isProd,
         sameSite: "lax",
@@ -40,7 +46,7 @@ export async function POST(request: Request) {
         maxAge: 7 * 24 * 60 * 60,
       });
       if (csrfTokenValue) {
-        response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
+        response.cookies.set(CSRF_COOKIE, csrfTokenValue, {
           httpOnly: false,
           secure: isProd,
           sameSite: "lax",
@@ -51,7 +57,7 @@ export async function POST(request: Request) {
       // domain .aldifhr.fun + SameSite none untuk cross-subdomain (manhwa -> scanner via server-side forward
       // butuh fallback jika FE di-cached cross-site). Set tambahan, tidak replace host-only.
       if (isProd) {
-        response.cookies.set("ikiru_dashboard_session", backendJwtValue, {
+        response.cookies.set(SESSION_COOKIE, backendJwtValue, {
           httpOnly: true,
           secure: true,
           sameSite: "none",
@@ -60,7 +66,7 @@ export async function POST(request: Request) {
           maxAge: 7 * 24 * 60 * 60,
         });
         if (csrfTokenValue) {
-          response.cookies.set("ikiru_csrf_token", csrfTokenValue, {
+          response.cookies.set(CSRF_COOKIE, csrfTokenValue, {
             httpOnly: false,
             secure: true,
             sameSite: "none",

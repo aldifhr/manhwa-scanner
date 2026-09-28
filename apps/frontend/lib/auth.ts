@@ -1,4 +1,6 @@
-const COOKIE_NAME = "ikiru_dashboard_session";
+import { SESSION_COOKIE } from "@/lib/cookies";
+
+const COOKIE_NAME = SESSION_COOKIE;
 
 function b64UrlDecode(input: string): string {
   let b64 = input.replace(/-/g, "+").replace(/_/g, "/");

@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
+import { readSessionCookie } from "@/lib/cookies";
 import {
   backendUrl,
   TIMEOUT,
@@ -45,9 +46,7 @@ export async function GET(request: NextRequest) {
   // Key the cache by session so one user's authed response is never served
   // to another (cross-user data leak).
   const session =
-    (request.headers.get("cookie") || "").match(
-      /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
-    )?.[1] || "anon";
+    readSessionCookie(request.headers.get("cookie") || "") || "anon";
   const page = String(
     Math.min(
       Math.max(Number(request.nextUrl.searchParams.get("page")) || 1, 1),

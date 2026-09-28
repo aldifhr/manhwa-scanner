@@ -10,6 +10,7 @@ import time
 from typing import Any
 
 from app.logger import get_logger
+from app.utils.cookies import read_session_cookie
 
 logger = get_logger("services:audit")
 
@@ -72,8 +73,8 @@ def _extract_request_meta(request) -> dict[str, str]:
         auth = request.headers.get("authorization", "") if hasattr(request, "headers") else ""
         if auth.lower().startswith("bearer "):
             actor = "bearer:" + auth[7:].strip()[:8] + "***"
-        elif request.cookies.get("ikiru_dashboard_session"):
-            actor = "session:" + request.cookies.get("ikiru_dashboard_session", "")[:8] + "***"
+        elif _sess := read_session_cookie(request.cookies):
+            actor = "session:" + _sess[:8] + "***"
         return {"ip": ip[:45], "user_agent": ua, "actor": actor[:100]}
     except Exception:
         return {"ip": "", "user_agent": "", "actor": "unknown"}

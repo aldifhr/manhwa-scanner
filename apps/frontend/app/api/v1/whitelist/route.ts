@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
+import { readSessionCookie } from "@/lib/cookies";
 import {
   backendUrl,
   authHeaders,
@@ -81,9 +82,7 @@ export async function GET(request: NextRequest) {
   // Key the cache by session so one user's authed response is never served
   // to another — hash JWT biar tidak bocor di memory.
   const rawSession =
-    (request.headers.get("cookie") || "").match(
-      /(?:^|;\s*)ikiru_dashboard_session=([^;]*)/
-    )?.[1] || "anon";
+    readSessionCookie(request.headers.get("cookie") || "") || "anon";
   const session = hashSession(rawSession);
   const page = String(
     Math.min(

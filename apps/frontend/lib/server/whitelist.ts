@@ -3,12 +3,12 @@
  * Route handlers stay thin (10 lines), testable via injected fetch.
  */
 import { backendUrl, authHeaders, TIMEOUT, catchError, hashSession } from "@/lib/server-api";
+import { readSessionCookie } from "@/lib/cookies";
 import { clearCachesForSession } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 function clearForRequest(request: Request): void {
-  const raw =
-    (request.headers.get("cookie") || "").match(/(?:^|;\s*)ikiru_dashboard_session=([^;]*)/)?.[1] || "anon";
+  const raw = readSessionCookie(request.headers.get("cookie") || "") || "anon";
   clearCachesForSession(hashSession(raw));
 }
 
