@@ -159,7 +159,7 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         },
     }
 
-def post_whitelist(title: str, url: str, source: str = "ikiru", body: dict | None = None) -> dict:
+def post_whitelist(title: str, url: str, source: str = "shinigami", body: dict | None = None) -> dict:
     """Add a whitelist entry with enrichment.
 
     """
@@ -524,21 +524,6 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
                                 entry[k] = meta[k]
                         if not entry.get("series_url") and meta.get("series_url"):
                             entry["series_url"] = meta["series_url"]
-            elif source == "ikiru" and _url_for_meta:
-                _slug = _url_for_meta.rstrip("/").split("/")[-1]
-                if "/manga/" in _url_for_meta:
-                    _slug = _url_for_meta.split("/manga/")[-1].split("/")[0]
-                if _slug and "chapter-" not in _slug:
-                    from app.scrapers import ikiru as _ik2
-                    meta = _ik2.get_ikiru_series_meta(_slug)
-                    if meta:
-                        for k in ("cover", "rating", "genres", "description", "series_url"):
-                            if not entry.get(k) and meta.get(k):
-                                entry[k] = meta[k]
-                        if not entry.get("origin") and meta.get("type"):
-                            _o = normalize_origin(meta.get("type"))
-                            if _o:
-                                entry["origin"] = _o
             # Fallback: search by title if still missing
             if (not entry.get("description") or not entry.get("cover")) and title:
                 try:
@@ -551,18 +536,6 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
                                 m2 = _gsm(mid)
                                 if m2 and m2.get("description"):
                                     for k in ("cover", "rating", "genres", "description", "origin", "series_url"):
-                                        if not entry.get(k) and m2.get(k):
-                                            entry[k] = m2[k]
-                                    break
-                    elif source == "ikiru":
-                        from app.scrapers.ikiru import search_ikiru_api, get_ikiru_series_meta as _gim
-                        hits = search_ikiru_api(title, per_page=3)
-                        for h in hits:
-                            slug2 = (h.get("permalink") or "").rstrip("/").split("/")[-1] if h.get("permalink") else h.get("slug")
-                            if slug2:
-                                m2 = _gim(slug2)
-                                if m2 and m2.get("description"):
-                                    for k in ("cover", "rating", "genres", "description", "series_url"):
                                         if not entry.get(k) and m2.get(k):
                                             entry[k] = m2[k]
                                     break
@@ -589,8 +562,6 @@ def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cove
         _u = str(r.get("url") or "").strip()
         if _u.startswith(("http://", "https://")):
             _wl_series = _u
-        elif tk and s == "ikiru":
-            _wl_series = f"https://{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{tk}/"
         elif tk and s == "shinigami":
             if rc.get("series_url"):
                 _wl_series = rc.get("series_url") or ""

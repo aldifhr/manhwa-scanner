@@ -54,7 +54,7 @@ describe("getRssFeedFlatPage", () => {
     mockFetchOnce({
       success: true,
       data: {
-        results: [{ titleKey: "a", source: "ikiru", chapter: "1" }],
+        results: [{ titleKey: "a", source: "shinigami", chapter: "1" }],
         total: 48,
         page: 1,
         pageSize: 24,

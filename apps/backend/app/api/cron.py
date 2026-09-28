@@ -119,8 +119,8 @@ async def cron_health(request: Request):
         pass
     circuits = {}
     try:
-        from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami
-        for name, cb in [("discord", cb_discord), ("db", cb_db), ("ikiru", cb_ikiru), ("shinigami", cb_shinigami)]:
+        from app.services.resilience import cb_discord, cb_db, cb_shinigami
+        for name, cb in [("discord", cb_discord), ("db", cb_db), ("shinigami", cb_shinigami)]:
             circuits[name] = cb.state.value
     except Exception:
         pass

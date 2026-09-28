@@ -30,8 +30,6 @@ function SourcePill({ source }: { source: string }) {
   const cls =
     s === "shinigami"
       ? "bg-red-500/15 text-red-400 border-red-500/20"
-      : s === "ikiru"
-        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
         : "bg-white/10 text-white/80 border-white/10";
   return (
     <span

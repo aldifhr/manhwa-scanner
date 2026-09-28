@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-# Source "type" (ikiru) -> country code
+# Source "type" -> country code
 TYPE_TO_CC = {
     "manhwa": "KR",
     "manga": "JP",

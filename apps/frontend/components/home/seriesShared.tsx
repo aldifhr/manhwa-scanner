@@ -57,8 +57,6 @@ export function SeriesShell({
   const pillCls =
     s === "shinigami"
       ? "bg-red-500 text-white"
-      : s === "ikiru"
-        ? "bg-emerald-500 text-black"
           : "bg-white/90 text-black";
   return (
     <Card
@@ -397,8 +395,6 @@ export function ChapterChips({
           const chipColor =
             src === "shinigami"
               ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-              : src === "ikiru"
-                ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
                   : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
           return (
             <span key={ch.key} className="inline-flex items-center gap-1 min-w-0">

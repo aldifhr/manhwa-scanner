@@ -7,15 +7,14 @@ from urllib.parse import urlparse
 
 # harus dibatasi ke allowed domains, jangan 127.0.0.1 / 169.254.169.254 / localhost
 ALLOWED_HOSTS = {
-    "ikiru.wtf", "08.ikiru.wtf", "07.ikiru.wtf",
     "shinigami.asia", "11.shinigami.asia", "f.shinigami.asia", "api.shngm.io", "assets.shngm.id",
     "discord.com", "cdn.discordapp.com",
     "imgkc1.my.id", "minio.imgkc1.my.id",
     "scanner.aldifhr.my.id", "manhwa.aldifhr.my.id",
 }
 
-# suffix match for *.shinigami.asia, *.ikiru.wtf
-ALLOWED_SUFFIXES = (".shinigami.asia", ".ikiru.wtf")
+# suffix match for *.shinigami.asia
+ALLOWED_SUFFIXES = (".shinigami.asia",)
 
 def _is_private_ip(host: str) -> bool:
     try:

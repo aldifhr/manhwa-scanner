@@ -51,7 +51,7 @@ function MangaCard({
   const ratingNum = rating != null && rating !== "" ? Number(rating) : null;
   const hasRating = ratingNum !== null && !isNaN(ratingNum) && ratingNum > 0;
 
-  // All sources this title is tracked under (deduped card merges ikiru+shinigami)
+  // All sources this title is tracked under (deduped card merges sources)
   // BE whitelist route historically returned sources as {source,url}[] or string[] or mixed (prod).
   // When local FE points at prod BE (BACKEND_URL=https://scanner.aldifhr.my.id) the shape can change without rebuild.
   // Harden: only string sources survive to .join(), never "[object Object]".
@@ -60,7 +60,7 @@ function MangaCard({
     if (s && typeof s === "object") {
       const v = (s as Record<string, unknown>).source;
       if (typeof v === "string" && v.trim()) return v.trim();
-      // fallback: some BE variants nest as {source: { name: "ikiru"}} or plain object
+      // fallback: some BE variants nest as {source: { name: "..."}} or plain object
       if (
         typeof v === "object" &&
         v !== null &&
@@ -174,8 +174,6 @@ function MangaCard({
                 const color =
                   s === "shinigami"
                     ? "bg-red-600/90 text-white"
-                    : s === "ikiru"
-                      ? "bg-green-600/90 text-white"
                       : "bg-black/70 text-white/90";
                 return (
                   <span

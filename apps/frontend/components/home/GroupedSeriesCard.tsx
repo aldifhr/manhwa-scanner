@@ -120,8 +120,6 @@ function GroupedSeriesCard({
             const chipColor =
               src === "shinigami"
                 ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-                : src === "ikiru"
-                  ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
                     : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
             return (
               <a

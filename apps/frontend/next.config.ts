@@ -11,7 +11,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "scanner.aldifhr.my.id" },
       { protocol: "https", hostname: "manhwa.aldifhr.my.id" },
-      { protocol: "https", hostname: "ikiru.wtf" },
       { protocol: "https", hostname: "imgkc1.my.id" },
       { protocol: "https", hostname: "minio.imgkc1.my.id" },
       { protocol: "https", hostname: "assets.shngm.id" },
@@ -108,7 +107,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://scanner.aldifhr.my.id https://manhwa.aldifhr.my.id https://assets.shngm.id https://*.shngm.id https://*.shinigami.asia https://shinigami.asia https://*.ikiru.wtf https://ikiru.wtf https://*.voratoon.id https://voratoon.com https://imgkc1.my.id https://minio.imgkc1.my.id https://cvr.voratoon.id https: wss: ws: blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://scanner.aldifhr.my.id https://manhwa.aldifhr.my.id https://assets.shngm.id https://*.shngm.id https://*.shinigami.asia https://shinigami.asia https://imgkc1.my.id https://minio.imgkc1.my.id https: wss: ws: blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests",
           },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },

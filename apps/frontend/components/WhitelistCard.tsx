@@ -30,7 +30,6 @@ function resolveDetailUrl(item: WhitelistRouteItem): string | undefined {
   })();
   const slug = slugFromTitle(title);
   if (!slug) return undefined;
-  if (sources.includes("ikiru")) return `https://08.ikiru.wtf/manga/${slug}/`;
   if (sources.includes("shinigami")) {
     const raw =
       (item as unknown as { titleKey?: string }).titleKey || item.id || "";

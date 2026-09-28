@@ -50,7 +50,7 @@ async def catalog_search(request: Request):
             _raw_origin = _raw_origin[0] if _raw_origin else ""
         _origin_cc = normalize_origin(_raw_origin)
         if not _origin_cc:
-            _origin_cc = "KR" if src == "ikiru" else ("JP" if src == "shinigami" else "")
+            _origin_cc = "JP" if src == "shinigami" else ""
         _is_wl = normalize_title_key(slug) in _wl_keys
         results.append({
             "title": title,

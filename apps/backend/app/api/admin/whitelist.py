@@ -39,7 +39,7 @@ class WhitelistPatch(BaseModel):
     title_key: Optional[str] = Field(default=None, max_length=200)
     titleKey: Optional[str] = Field(default=None, max_length=200)
     title: Optional[str] = Field(default=None, max_length=200)
-    source: Optional[Literal["ikiru", "shinigami", ""]] = None
+    source: Optional[Literal["shinigami", ""]] = None
     url: Optional[str] = Field(default=None, max_length=500)
     seriesUrl: Optional[str] = Field(default=None, max_length=500)
     series_url: Optional[str] = Field(default=None, max_length=500)

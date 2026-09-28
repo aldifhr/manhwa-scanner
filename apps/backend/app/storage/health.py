@@ -29,7 +29,7 @@ def save_source_health_map(health_map: dict) -> None:
             continue
         # Skip "disabled/cooldown" placeholders: these are written by
         # collect_recent_chapters for sources NOT scraped in this run
-        # (e.g. `rss-fetch:shinigami` leaves ikiru in the else
+        # (e.g. `rss-fetch:shinigami` leaves the other in the else
         # branch with status="disabled", last_error="cooldown"). They are
         # NOT real failures — persisting them would falsely mark a healthy
         # source as down on /status. Only upsert sources that were actually

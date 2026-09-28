@@ -8,7 +8,7 @@ from app.logger import get_logger
 
 logger = get_logger("storage:series_meta")
 
-# Single source TTL 6h for ikiru+shinigami
+# Single source TTL 6h for shinigami
 _SERIES_META_TTL_S = 6 * 3600  # 6h
 
 
@@ -103,11 +103,7 @@ class SeriesMeta:
             except Exception:
                 return {}
         try:
-            if source == "ikiru":
-                from app.scrapers import ikiru as _ik
-
-                return _ik.get_ikiru_series_meta(sid) or {}
-            elif source == "shinigami":
+            if source == "shinigami":
                 from app.scrapers import shinigami as _sh
 
                 return _sh.get_shinigami_series_meta(sid) or {}
@@ -131,7 +127,7 @@ class SeriesMeta:
         return _redis()
 
     def get(self, source: str, sid: str) -> dict:
-        if source not in ("ikiru", "shinigami"):
+        if source not in ("shinigami",):
             return {}
         cache_key = f"{source}:{sid}"
         now = _time_mod.monotonic()
@@ -237,7 +233,7 @@ class SeriesMeta:
 
         by_src: dict[str, list[str]] = defaultdict(list)
         for sid, src in deduped:
-            if src in ("ikiru", "shinigami") and sid:
+            if src in ("shinigami",) and sid:
                 by_src[src].append(sid)
             else:
                 # unknown source -> empty

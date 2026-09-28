@@ -38,27 +38,9 @@ def deslugify_title_key(slug: str) -> str:
         return ""
     return slug.replace("-", " ").strip()
 
-def ikiru_slug(title: str) -> str:
-    """Canonical ikiru manga slug for a series title.
-
-    ikiru (and most reader sites) render possessives WITHOUT an extra dash:
-    "World's Strongest Punch" -> "worlds-strongest-punch" (NOT
-    "world-s-strongest-punch" and NOT "world-8217-s-strongest-punch").
-
-    Steps: decode HTML entities (&#8217; -> '), drop apostrophes/quotes
-    entirely (don't convert to a space/dash), lowercase, then collapse any
-    other non-alnum runs to a single dash. Centralizing this keeps ikiru
-    series_url slugs consistent so chapter scrapes don't 404 on slug mismatch.
-    """
-    if not title:
-        return ""
-    t = html.unescape(str(title).lower())
-    # Remove apostrophes/quotes (possessive "world's" -> "worlds").
-    t = re.sub(r"[\'’\u2019\"]", "", t)
-    t = re.sub(r"[^a-z0-9]+", "-", t)
-    return re.sub(r"-+", "-", t).strip("-")
 
 _SHINIGAMI_HOST_RE = re.compile(r"https?://([^/]+)\.shinigami\.asia")
+
 
 def normalize_shinigami_url(url: str | None) -> str | None:
     """Rewrite stale shinigami hostnames to current SECONDARY_PUBLIC_BASE.

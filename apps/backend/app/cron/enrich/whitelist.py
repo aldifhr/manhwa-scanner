@@ -14,25 +14,7 @@ def enrich_whitelist_entry(title_key: str, source: str, series_url: str | None =
     """Fetch metadata from source API. Returns dict of updates or None."""
     updates: dict = {}
 
-    if source == "ikiru":
-        from app.scrapers import ikiru
-        # Derive slug from series_url or title_key
-        slug = None
-        if series_url and "/manga/" in series_url:
-            slug = series_url.split("/manga/")[-1].strip("/").split("/")[0]
-        if not slug:
-            from app.utils.text import ikiru_slug
-            slug = ikiru_slug(title_key)
-
-        meta = ikiru.get_ikiru_series_meta(slug)
-        if meta:
-            for f in ("title", "cover", "rating", "genres", "description", "status", "type"):
-                v = meta.get(f)
-                if v:
-                    updates[f] = v
-            updates["source"] = "ikiru"
-
-    elif source == "shinigami":
+    if source == "shinigami":
         from app.scrapers import shinigami
         # Derive manga_id from series_url, else from recent_chapters
         mid = None

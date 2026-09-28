@@ -49,14 +49,6 @@ def _shinigami_chapters(manga_id: str) -> list[dict]:
         logger.warn("gap backfill: shinigami urllib fallback failed", err=str(e)[:120])
         return []
 
-def _ikiru_chapters(slug: str) -> list[dict]:
-    try:
-        from app.scrapers.ikiru import get_ikiru_chapters
-        return get_ikiru_chapters(slug) or []
-    except (Exception, ImportError) as e:
-        logger.warn("gap backfill: ikiru fetch failed", err=str(e)[:120])
-        return []
-
 def detect_gaps() -> list[dict]:
     """Return [{title_key, source, sent, scraped}] where scraped - sent > threshold.
     
@@ -186,16 +178,6 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                             if num > 0 and ch_id:
                                 url = f"{settings.SHINIGAMI_PUBLIC_BASE}/chapter/{ch_id}"
                                 chapters.append((num, url, str(c.get("chapter_title") or ""), c.get("release_date")))
-                elif src == "ikiru":
-                    slug = series_url.rstrip("/").split("/")[-1] if series_url else tk.replace(" ", "-")
-                    for c in _ikiru_chapters(slug):
-                        try:
-                            num = float(str(c.get("chapter_number") or c.get("number") or 0) or 0)
-                        except ValueError:
-                            continue
-                        url = c.get("chapter_url") or c.get("url") or ""
-                        if num > 0 and url:
-                            chapters.append((num, url, str(c.get("title") or ""), c.get("updated_time")))
                 if not chapters:
                     logger.warn("gap backfill: no chapters fetched", title_key=tk, source=src, lo=lo, hi=hi)
                     # don't mark fixed — will show needs manual fix with reason

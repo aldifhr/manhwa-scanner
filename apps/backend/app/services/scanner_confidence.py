@@ -27,7 +27,6 @@ _W_META = 10
 
 # Source host patterns (for reachability heuristic when health store unavailable)
 _SOURCE_HOSTS = {
-    "ikiru": ("ikiru.wtf", "08.ikiru.wtf", "08.ikiru.wtf"),
     "shinigami": ("shinigami.asia", "shngm.io", "api.shngm.io"),
 }
 
@@ -42,7 +41,7 @@ def compute_confidence(source: str, chapter_data: dict) -> int:
     """Compute 0-100 confidence score for a single collector item.
 
     Args:
-        source: source key (ikiru|shinigami|kiryuu|wurmz)
+        source: source key (shinigami|kiryuu|wurmz)
         chapter_data: dict from collector item (must contain title_key, chapter/url)
 
     Returns:
@@ -199,9 +198,6 @@ def _score_metadata(chapter_data: dict) -> int:
 def attach_confidence(items: list[dict], source: str) -> list[dict]:
     """Attach confidence score to each collector item in-place.
 
-    Usage in collectors:
-        items = _collect_ikiru_source(...)
-        return attach_confidence(items, "ikiru")
     """
     if not items:
         return items

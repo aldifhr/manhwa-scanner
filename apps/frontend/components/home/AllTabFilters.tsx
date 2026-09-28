@@ -35,7 +35,7 @@ export default function AllTabFilters({
           >
             All Sources
           </button>
-          {sources.filter((s) => s !== "ikiru").map((s) => (
+          {sources.map((s) => (
             <button
               key={s}
               onClick={() => setSourceFilter(sourceFilter === s ? null : s)}

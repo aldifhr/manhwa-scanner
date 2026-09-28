@@ -8,7 +8,7 @@ Payload:
 {
   "event": "chapter_released",
   "title": "...", "title_key": "...", "chapter": "145", "chapter_number": 145.0,
-  "url": "https://...", "series_url": "...", "source": "ikiru",
+  "url": "https://...", "series_url": "...", "source": "shinigami",
   "cover": "...", "origin": "KR", "type": "manhwa", "sent_at": "<iso>"
 }
 """

@@ -74,8 +74,6 @@ function SourcePill({ source }: { source: string }) {
   const cls =
     s === "shinigami"
       ? "bg-red-500/15 text-red-400 border-red-500/20"
-      : s === "ikiru"
-        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
           : "bg-white/10 text-white/80 border-white/10";
   return (
     <span
@@ -182,8 +180,6 @@ function HomeGroupedCard({
   const pillCls =
     sLower === "shinigami"
       ? "bg-red-500 text-white"
-      : sLower === "ikiru"
-        ? "bg-emerald-500 text-black"
           : "bg-white/90 text-black";
 
   return (
@@ -284,8 +280,6 @@ function HomeGroupedCard({
             const chipColor =
               src === "shinigami"
                 ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-                : src === "ikiru"
-                  ? "bg-green-500/15 text-green-400 hover:bg-green-500/25 border-green-500/20"
                     : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
             return (
               <a

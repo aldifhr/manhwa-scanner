@@ -133,20 +133,6 @@ def map_result(
                 is_wl = True
                 break
     _title_norm = normalize_title_key(it.get("title") or "")
-    if _title_norm and src == "ikiru" and not is_wl:
-        if wl_title_set is not None:
-            if _title_norm in wl_title_set:
-                for (wtk, wsrc) in wl_map:
-                    if wsrc == "ikiru" and normalize_title_key(wtk) == _title_norm:
-                        is_wl = True
-                        break
-        else:
-            for (wtk, wsrc), wrow in wl_map.items():
-                if wsrc != "ikiru":
-                    continue
-                if normalize_title_key(wrow.get("title") or wtk) == _title_norm:
-                    is_wl = True
-                    break
 
     series_url = it.get("series_url") or wl.get("series_url") or sm.get("series_url") or ""
     cover = scrub_cover(it.get("cover") or wl.get("cover") or sm.get("cover") or "")
@@ -154,19 +140,6 @@ def map_result(
     ls = wl.get("latest_sent_chapter")
 
     chapter_url = it.get("chapter_url") or ""
-    if chapter_url == "?chapter" or (chapter_url.startswith(f"{settings.IKIRU_BASE_URL.rstrip(chr(47))}/") and "/chapter-" not in chapter_url and "?" in chapter_url):
-        series_url_rc = it.get("series_url") or ""
-        ch_num = it.get("chapter") or ""
-        cid = it.get("chapter_id") or ""
-        if series_url_rc and ch_num:
-            slug = series_url_rc.rstrip("/").split("/")[-1]
-            if slug and slug != "manga":
-                chapter_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/chapter-{ch_num}.{cid}/" if cid else f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{slug}/chapter-{ch_num}/"
-            else:
-                chapter_url = f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{series_url_rc.split('/')[-2] if '/' in series_url_rc else ''}/chapter-{ch_num}.{cid}/" if cid else f"{settings.IKIRU_BASE_URL.rstrip('/')}/manga/{series_url_rc.split('/')[-2] if '/' in series_url_rc else ''}/chapter-{ch_num}/"
-        else:
-            chapter_url = ""
-
     _raw_title = it.get("title", "") or ""
     _title = html.unescape(_raw_title) if _raw_title else ""
     _genres_raw = sm.get("genres") or it.get("genres") or wl.get("genres") or []

@@ -76,8 +76,6 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
         allowed = settings.get_proxy_hosts()
     except Exception:
         allowed = getattr(settings, "PROXY_ALLOWED_HOSTS", []) or [
-            f"{settings.IKIRU_BASE_URL.rstrip('/')}:443",
-            "ikiru.wtf:443",
             "g.shinigami.asia:443",
             "shinigami.asia:443",
             "assets.shngm.id:443",
@@ -108,9 +106,6 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
                 "Accept-Encoding": "gzip, deflate, br",
             }
-            if "ikiru.wtf" in url:
-                headers_req["Referer"] = f"https://{settings.IKIRU_PUBLIC_URL.rstrip('/')}/"
-                headers_req["Accept"] = "image/avif,image/webp,image/apng,*/*"
             r = await asyncio.to_thread(
                 lambda: cffi_req.get(url, headers=headers_req, impersonate="chrome", timeout=8, allow_redirects=False)
             )

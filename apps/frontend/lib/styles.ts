@@ -27,16 +27,11 @@ export function filterButtonClass(
 
 const SOURCE_COLOR: Record<string, string> = {
   shinigami: "red",
-  ikiru: "emerald",
 };
 const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
   shinigami: {
     badge: "bg-red-500/15 text-red-400 border border-red-500/20",
     chip: "bg-red-500/15 text-red-400",
-  },
-  ikiru: {
-    badge: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
-    chip: "bg-green-500/15 text-green-400",
   },
 };
 export function sourceBadgeClass(source: string | null | undefined): string {

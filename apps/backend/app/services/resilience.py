@@ -159,13 +159,11 @@ class CircuitBreaker:
 # Shared circuit breakers (module-level singletons)
 cb_discord = CircuitBreaker("discord", failure_threshold=5, recovery_timeout=60)
 cb_db = CircuitBreaker("db", failure_threshold=3, recovery_timeout=30)
-cb_ikiru = CircuitBreaker("ikiru", failure_threshold=5, recovery_timeout=120)
 # Shinigami (2026-08-30): tightened from failure_threshold=5/recovery=120 so the
 # breaker trips earlier on a 429 burst and stays OPEN longer (5min) — prevents an
 # immediate re-burst right after recovery that would just 429 again.
 cb_shinigami = CircuitBreaker("shinigami", failure_threshold=3, recovery_timeout=300)
 # ApiFailureDetector merged here — ikiru API → HTML fallback (threshold 5, cooldown 300)
-cb_ikiru_api = CircuitBreaker("ikiru_api", failure_threshold=5, recovery_timeout=300)
 
 def with_circuit_breaker(cb: CircuitBreaker):
     return cb

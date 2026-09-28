@@ -55,7 +55,7 @@ def _proxy_cover(cover: str | None) -> str | None:
     from urllib.parse import urlparse
     try:
         host = (urlparse(cover).hostname or "").lower()
-        if host in ("assets.shngm.id", "ikiru.wtf", "imgkc1.my.id", "minio.imgkc1.my.id"):
+        if host in ("assets.shngm.id", "imgkc1.my.id", "minio.imgkc1.my.id"):
             return cover
     except Exception:
         pass
@@ -71,12 +71,10 @@ def _proxy_cover(cover: str | None) -> str | None:
 
 
 SOURCE_COLORS = {
-    "ikiru": 0x22C55E,
     "shinigami": 0xEF4444,
 }
 
 SOURCE_LABELS = {
-    "ikiru": "Ikiru",
     "shinigami": "Shinigami",
 }
 

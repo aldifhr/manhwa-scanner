@@ -31,10 +31,6 @@ class Settings(BaseSettings):
     # ══════════════════════════════════════════════════════════════════════════════
     # SOURCE DOMAINS — single source of truth. Change here + DB REPLACE once.
     # ══════════════════════════════════════════════════════════════════════════════
-    IKIRU_BASE_URL: str = "https://08.ikiru.wtf/"
-    IKIRU_PUBLIC_URL: str = ""
-    IKIRU_SERIES_PATH: str = "/manga/"
-    IKIRU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}.{id}/"
 
     SHINIGAMI_API_URL: str = ""
     SHINIGAMI_API_BASE: str = "https://api.shngm.io"
@@ -65,7 +61,6 @@ class Settings(BaseSettings):
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
     SOURCE_KEYS: list[str] = ["shinigami", "kiryuu", "wurmz"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
-    # e.g. DISABLED_SOURCES=ikiru focuses collection on shinigami only.
     DISABLED_SOURCES: str = ""
 
     @property
@@ -105,8 +100,6 @@ class Settings(BaseSettings):
     # Image proxy: only these upstream hosts may be fetched. NO wildcards,
     # NO arbitrary ports — explicit host:port pairs to prevent SSRF.
     PROXY_ALLOWED_HOSTS: list[str] = [
-        "08.ikiru.wtf:443",
-        "ikiru.wtf:443",
         "g.shinigami.asia:443",
         "shinigami.asia:443",
         "assets.shngm.id:443",
@@ -120,8 +113,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _sync_aliases(self):
-        # Canonical: IKIRU_PUBLIC_URL / SHINIGAMI_API_URL / SHINIGAMI_PUBLIC_URL
-        # Aliases (deprecated): IKIRU_BASE_URL, SECONDARY_SOURCE_URL, SECONDARY_PUBLIC_BASE
+        # Canonical: SHINIGAMI_API_URL / SHINIGAMI_PUBLIC_URL
+        # Aliases (deprecated): SECONDARY_SOURCE_URL, SECONDARY_PUBLIC_BASE
         # Migration: 2026-09-09 → 2026-12-09 warn period, then remove alias branches + code refs.
         import os as _os
 
@@ -132,19 +125,12 @@ class Settings(BaseSettings):
             except Exception:
                 pass
 
-        _has_old_ikiru = bool(_os.environ.get("IKIRU_BASE_URL"))
-        _has_new_ikiru = bool(_os.environ.get("IKIRU_PUBLIC_URL"))
         _has_old_api = bool(_os.environ.get("SECONDARY_SOURCE_URL"))
         _has_new_api = bool(_os.environ.get("SHINIGAMI_API_URL"))
         _has_old_pub = bool(_os.environ.get("SECONDARY_PUBLIC_BASE"))
         _has_new_pub = bool(_os.environ.get("SHINIGAMI_PUBLIC_URL"))
 
         # New names take precedence; sync both so code reading either still works during migration.
-        if self.IKIRU_PUBLIC_URL:
-            object.__setattr__(self, "IKIRU_BASE_URL", self.IKIRU_PUBLIC_URL)
-        elif self.IKIRU_BASE_URL:
-            _warn("IKIRU_BASE_URL (alias)", "IKIRU_PUBLIC_URL")
-            object.__setattr__(self, "IKIRU_PUBLIC_URL", self.IKIRU_BASE_URL)
         if self.SHINIGAMI_API_URL:
             object.__setattr__(self, "SECONDARY_SOURCE_URL", self.SHINIGAMI_API_URL)
         elif self.SECONDARY_SOURCE_URL:
@@ -155,12 +141,6 @@ class Settings(BaseSettings):
         elif self.SECONDARY_PUBLIC_BASE:
             _warn("SECONDARY_PUBLIC_BASE (alias)", "SHINIGAMI_PUBLIC_URL")
             object.__setattr__(self, "SHINIGAMI_PUBLIC_URL", self.SECONDARY_PUBLIC_BASE)
-        # normalize trailing slash for canonical ikiru (and mirror to alias)
-        _canonical_ikiru = self.IKIRU_PUBLIC_URL or self.IKIRU_BASE_URL
-        if _canonical_ikiru and not _canonical_ikiru.endswith("/"):
-            _canonical_ikiru = _canonical_ikiru + "/"
-            object.__setattr__(self, "IKIRU_PUBLIC_URL", _canonical_ikiru)
-            object.__setattr__(self, "IKIRU_BASE_URL", _canonical_ikiru)
         return self
 
     # M4 FIX: Warn on unrecognized env vars (extra="ignore" silently drops typos)

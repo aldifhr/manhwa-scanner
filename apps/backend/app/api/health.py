@@ -114,7 +114,7 @@ async def health_detailed(request: Request):
     """Detailed health — circuit breakers + pool stats."""
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
-    from app.services.resilience import cb_discord, cb_db, cb_ikiru, cb_shinigami
+    from app.services.resilience import cb_discord, cb_db, cb_shinigami
     from app.db import get_pool_stats
     from app.storage import health as health_store
     from app.config import settings
@@ -172,7 +172,6 @@ async def health_detailed(request: Request):
             "circuit_breakers": {
                 "discord": cb_discord.state.value,
                 "db": cb_db.state.value,
-                "ikiru": cb_ikiru.state.value,
                 "shinigami": cb_shinigami.state.value,
             },
         },

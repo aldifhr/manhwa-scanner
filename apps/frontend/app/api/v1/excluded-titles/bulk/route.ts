@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as { source?: unknown };
     if (
       typeof body.source !== "string" ||
-      !["ikiru", "shinigami"].includes(body.source)
+      !["shinigami"].includes(body.source)
     ) {
       return NextResponse.json(
         { success: false, error: "Invalid source" },
