@@ -82,6 +82,7 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
             "shinigami.asia:443",
             "assets.shngm.id:443",
             "content.komiku.me:443",
+            "cdnkomiku.xyz:443",
         ]
     host = (p.hostname or "").strip().lower()
     port = p.port or (443 if p.scheme == "https" else 80)

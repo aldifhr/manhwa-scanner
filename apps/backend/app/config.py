@@ -111,6 +111,9 @@ class Settings(BaseSettings):
         "shinigami.asia:443",
         "assets.shngm.id:443",
         "content.komiku.me:443",
+        # komiku's newer CDN. Without this, 120 of the 317 komiku covers in the
+        # 7-day window returned 403 and rendered blank.
+        "cdnkomiku.xyz:443",
     ]
 
     def get_proxy_hosts(self) -> list[str]:
