@@ -13,7 +13,7 @@ function coverPriority(source: string): number {
   if (s === "shinigami") return 0;
   return 10;
 }
-function isVoratoonExpired(cover: string): boolean {
+function isPresignedCoverExpired(cover: string): boolean {
   if (!cover) return false;
   const m = cover.match(/X-Amz-Date=([^&]+).*?X-Amz-Expires=(\d+)/);
   if (!m) return false;
@@ -145,8 +145,8 @@ export function groupChapters(items: FlatChapter[] | null | undefined): GroupedS
     // cover priority: shinigami. Expired presigned covers are skipped.
     const curPri = g!.cover ? coverPriority(coverSource.get(gk) || "") : 99;
     const newPri = coverPriority(it.source);
-    const curExpired = isVoratoonExpired(g!.cover);
-    const newExpired = isVoratoonExpired(it.cover || "");
+    const curExpired = isPresignedCoverExpired(g!.cover);
+    const newExpired = isPresignedCoverExpired(it.cover || "");
     if (
       it.cover &&
       (!g!.cover || curExpired || (!newExpired && newPri < curPri))

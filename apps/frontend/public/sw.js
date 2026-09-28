@@ -21,7 +21,6 @@ function isMangaImage(url) {
   if (!/^https?:$/.test(url.protocol)) return false;
   return (
     /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(url.pathname) ||
-    url.hostname.includes("ikiru") ||
     url.hostname.includes("shinigami") ||
     url.hostname.includes("shngm")
   );
