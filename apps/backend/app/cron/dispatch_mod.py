@@ -207,8 +207,6 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # Reject junk URLs that don't match known source patterns
     _VALID_URL_PREFIXES = (
         f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_CHAPTER_PATH}",
-        f"{settings.KIRYUU_PUBLIC_URL}{settings.KIRYUU_SERIES_PATH}",
-        f"{settings.WURMZ_PUBLIC_URL}{settings.WURMZ_SERIES_PATH}",
     )
     _junk_urls = {u for u in _all_urls if not any(u.startswith(p) for p in _VALID_URL_PREFIXES)}
     if _junk_urls:

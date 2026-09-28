@@ -39,14 +39,6 @@ class Settings(BaseSettings):
     SHINIGAMI_SERIES_PATH: str = "/series/"
     SHINIGAMI_CHAPTER_PATH: str = "/chapter/"
 
-    KIRYUU_PUBLIC_URL: str = "https://v7.kiryuu.to"
-    KIRYUU_SERIES_PATH: str = "/manga/"
-    KIRYUU_CHAPTER_PATH: str = "/manga/{slug}/chapter-{num}/"
-
-    WURMZ_PUBLIC_URL: str = "https://wurmz.net"
-    WURMZ_SERIES_PATH: str = "/detail/"
-    WURMZ_CHAPTER_PATH: str = "/detail/{slug}/chapter/{num}/"
-
     # Discord toggle — set false to run locally without bot / disable dispatch
     DISCORD_ENABLED: bool = True
 
@@ -59,7 +51,7 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
-    SOURCE_KEYS: list[str] = ["shinigami", "kiryuu", "wurmz"]
+    SOURCE_KEYS: list[str] = ["shinigami"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     DISABLED_SOURCES: str = ""
 
@@ -149,9 +141,9 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-_SOURCE_KEYS = ("shinigami", "kiryuu", "wurmz")
-VALID_SOURCES = ("shinigami", "kiryuu", "wurmz")
-VALID_SOURCES_WITH_ALL = ("shinigami", "kiryuu", "wurmz", "all")
+_SOURCE_KEYS = ("shinigami",)
+VALID_SOURCES = ("shinigami",)
+VALID_SOURCES_WITH_ALL = ("shinigami", "all")
 # Sources an exclude row may target. Exclude has no 'all' scope — a row always
 # names one concrete source. Only sources that actually produce chapters.
 EXCLUDE_SOURCES = ("shinigami",)

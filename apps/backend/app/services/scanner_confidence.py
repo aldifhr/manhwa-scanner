@@ -41,7 +41,7 @@ def compute_confidence(source: str, chapter_data: dict) -> int:
     """Compute 0-100 confidence score for a single collector item.
 
     Args:
-        source: source key (shinigami|kiryuu|wurmz)
+        source: source key (shinigami)
         chapter_data: dict from collector item (must contain title_key, chapter/url)
 
     Returns:
