@@ -137,13 +137,20 @@ def _aged_out_count(lookback_hours: float) -> int:
 
     Reported, not alerted: the 24h policy is the agreed tradeoff, so these
     are a number to trend rather than a page to answer.
+
+    The exact (title_key, source, chapter) exclusion below only proves the
+    row was not sent by *that* source. A chapter delivered through the other
+    source for the same series is already dispatched as far as the user is
+    concerned, so the candidates are re-checked against the shared fcfs_key
+    in Python, exactly like _stalled_candidates(). Without this the count
+    was 13 when the true number of lost chapters was 0.
     """
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute(
             """
-            select count(*) as n
+            select rc.title, rc.chapter
             from recent_chapters rc
             join whitelist w
               on w.title_key = rc.title_key and w.source = rc.source
@@ -158,9 +165,32 @@ def _aged_out_count(lookback_hours: float) -> int:
             """,
             (lookback_hours,),
         )
-        return int(cur.fetchone()["n"])
+        rows = cur.fetchall()
     finally:
         put_conn(conn)
+
+    if not rows:
+        return 0
+
+    from app.services.fcfs import fcfs_key
+
+    keys = [fcfs_key(r.get("title") or "", r.get("chapter") or "") for r in rows]
+    uniq = list(dict.fromkeys(k for k in keys if k))
+    if not uniq:
+        return 0
+    try:
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("select fcfs_key from dispatch_history where fcfs_key = any(%s)", (uniq,))
+            delivered = {r.get("fcfs_key") for r in cur.fetchall() if r.get("fcfs_key")}
+        finally:
+            put_conn(conn)
+    except Exception as exc:
+        # Fail open: over-reporting is noisy, hiding a real loss is not.
+        logger.warn("watchdog: aged_out fcfs lookup failed", error=str(exc)[:120])
+        return len(rows)
+    return sum(1 for k in keys if k not in delivered)
 
 
 def _dispatch_health() -> dict[str, Any]:
