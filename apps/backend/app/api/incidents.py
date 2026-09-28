@@ -65,7 +65,7 @@ async def incidents(request: Request):
             )
             for row in fd.data or []:
                 ts = row.get("created_at", "")
-                msg = f"Failed to notify {row.get('source', '?')} chapter: {row.get('error_message', 'unknown error')[:80]}"
+                msg = f"Failed to notify {row.get('source') or '?'} chapter: {(row.get('error_message') or 'unknown error')[:80]}"
                 timeline.append({"type": "Dispatch Failure", "message": msg, "timestamp": ts})
                 by_severity["critical"] += 1
                 by_type["dispatch"] = by_type.get("dispatch", 0) + 1

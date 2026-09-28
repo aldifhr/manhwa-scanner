@@ -164,7 +164,7 @@ def _split_send_backfill(items: list[dict]) -> tuple[list[dict], list[dict]]:
     to_backfill: list[dict] = []
     seen_fcfs: set[str] = set()
     for it in items:
-        norm = fcfs_key(it.get("title", ""), it.get("chapter", ""))
+        norm = fcfs_key(it.get("title") or "", it.get("chapter") or "")
         if norm in seen_fcfs:
             if it.get("html_backlog"):
                 to_backfill.append(it)
@@ -198,10 +198,16 @@ def _split_send_backfill(items: list[dict]) -> tuple[list[dict], list[dict]]:
                 to_send.append(it)
             else:
                 it["window_status"] = "unknown_time"
+                # .get() returns the stored None when the key is present but
+                # null, so this must coerce rather than slice the default.
+                _t = it.get("title") or ""
+                _c = it.get("chapter") or ""
                 logger.warn(
                     "enrich: null updated_time, non-whitelist source — skipped",
-                    title=it.get("title", "")[:40],
-                    source=it.get("source", ""),
+                    title=_t[:40],
+                    chapter=_c[:20],
+                    source=it.get("source") or "",
+                    url=(it.get("url") or "")[:120],
                 )
     return to_send, to_backfill
 

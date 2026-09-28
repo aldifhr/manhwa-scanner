@@ -47,7 +47,7 @@ def check_and_alert_failed_dispatches() -> None:
         err = str(sample.get("error_message") or "unknown")[:120]
         content = (
             f"🚨 **Dispatch failures: {len(rows)} in the last {_WINDOW_MIN}m**\n"
-            f"Sample: `{sample.get('chapter_url', '')[:80]}` — {err}\n"
+            f"Sample: `{(sample.get('chapter_url') or '')[:80]}` — {err}\n"
             f"Check `/api/failed-dispatches` and retry with `/api/dispatches`."
         )
 

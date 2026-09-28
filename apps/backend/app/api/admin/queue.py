@@ -32,7 +32,7 @@ async def cron_list(request: Request):
                 jobs.append({
                     "action": data.get("action", "unknown"),
                     "kind": data.get("kind", "unknown"),
-                    "title": data.get("title", "")[:60],
+                    "title": (data.get("title") or "")[:60],
                     "attempts": data.get("attempts", 0),
                     "source": data.get("source", ""),
                 })

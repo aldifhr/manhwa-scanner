@@ -354,7 +354,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 resp = discord.send_channel_message(channel_id=ch, content=content, embeds=[embed])
                 if resp is None:
                     _consec_fail += 1
-                    logger.warn("dispatch: send returned None", title=it.get("title", "")[:40], consecutive=_consec_fail, channel=ch)
+                    logger.warn("dispatch: send returned None", title=(it.get("title") or "")[:40], consecutive=_consec_fail, channel=ch)
                     dispatch_store.unclaim(url)
                     if _consec_fail >= 3:
                         try:

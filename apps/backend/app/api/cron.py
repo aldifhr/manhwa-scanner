@@ -97,7 +97,7 @@ async def cron_health(request: Request):
         sb = get_supabase()
         failed_rows = sb.table("failed_dispatches").select("*").order("created_at", desc=True).limit(10).execute()
         for r in (failed_rows.data or []):
-            failed.append({"id": r.get("id"), "title_key": r.get("title_key"), "source": r.get("source"), "chapter": r.get("chapter_title"), "error": r.get("error_message", "")[:100], "createdAt": r.get("created_at")})
+            failed.append({"id": r.get("id"), "title_key": r.get("title_key"), "source": r.get("source"), "chapter": r.get("chapter_title"), "error": (r.get("error_message") or "")[:100], "createdAt": r.get("created_at")})
     except Exception:
         pass
     queue_depth = 0
