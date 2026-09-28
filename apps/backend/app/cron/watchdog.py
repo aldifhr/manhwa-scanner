@@ -59,7 +59,7 @@ def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
        a chapter that already shipped from one source is considered
        delivered even when a second source later surfaces the same chapter.
        Without this, every chapter that shipped on shinigami is reported as
-       stalled komiku forever, because the komiku row has a different
+       stalled forever, because the second row has a different
        chapter_url and rule 1 cannot see it.
     """
     conn = get_conn()

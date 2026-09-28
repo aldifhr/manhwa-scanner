@@ -170,7 +170,7 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
     dispatch_claims with a TTL) and return True. A url/fcfs already present in
     either returns False (skip).
 
-    NOTE: the guard keys off BOTH chapter_url AND fcfs_key. shinigami/ikiru
+    NOTE: the guard keys off BOTH chapter_url AND fcfs_key. Sources
     rotate chapter URLs every scrape, so URL-only dedupe misses cross-source /
     cross-run duplicates of the SAME title+chapter. fcfs_key = normalized
     title+chapter is stable across URL rotations, so we also skip when the

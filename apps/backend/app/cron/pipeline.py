@@ -112,7 +112,7 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
     instance_id = f"be-ag-py-{int(start)}"
     _use_claimed = False  # set True only when the deep-queue claim path is used
 
-    # Parse source from action string (e.g., "rss-fetch:ikiru" → source="ikiru")
+    # Parse source from action string (e.g., "rss-fetch:shinigami" → source="shinigami")
     source = None
     if ":" in action:
         action, source = action.split(":", 1)

@@ -35,7 +35,7 @@ _AMZ_PARAMS = (
 def scrub_cover(url: str | None) -> str:
     """Return a safe cover URL for the client.
 
-    ikiru/shinigami/komiku covers are PUBLIC, so we strip the AWS presign
+    Source covers are PUBLIC, so we strip the AWS presign
     noise and return the bare host/path (client can fetch directly or via
     /api/v1/reader/proxy).
     """

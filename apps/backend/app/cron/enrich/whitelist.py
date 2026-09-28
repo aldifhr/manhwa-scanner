@@ -1,7 +1,7 @@
 """Unified metadata enrichment for whitelist entries.
 
 Fetches rich metadata (cover, rating, genres, description, status)
-from source APIs (ikiru / shinigami) and stores directly in the
+from source APIs and stores directly in the
 whitelist table — single source of truth, no manga_metadata dependency.
 """
 

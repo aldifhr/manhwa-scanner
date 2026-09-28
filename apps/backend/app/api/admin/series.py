@@ -21,7 +21,7 @@ async def catalog_search(request: Request):
     q = request.query_params.get("q", "")
     from app.scrapers import shinigami
 
-    # ikiru was removed as a source but this still called ikiru.search_ikiru_api,
+    # A removed source was still referenced here,
     # so the endpoint raised NameError on every request. shinigami is the only
     # scraper left with a search API, so that is all this searches.
     raw = await asyncio.to_thread(shinigami.search_shinigami_api, q, 10)

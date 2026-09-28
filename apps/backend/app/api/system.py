@@ -58,7 +58,7 @@ async def cron_trigger(request: Request):
     action = request.query_params.get("action", "update")
     source = request.query_params.get("source")
     
-    # Build action string: "rss-fetch:ikiru", "rss-fetch:shinigami"
+    # Build action string: "rss-fetch:shinigami"
     if source and action == "rss-fetch":
         action = f"rss-fetch:{source}"
     

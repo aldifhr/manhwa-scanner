@@ -3,7 +3,7 @@
 Why this exists (decoupled from the per-10-min chapter fetch):
 - The rss-fetch pipeline scrapes new chapters + inserts them. Running the
   full per-series enrich (rating/status/genres/description via source APIs)
-  inside that hot path is what made ikiru's run ~100s and occasionally blow
+  inside that hot path is what made a run ~100s and occasionally blow
   the _SOURCE_TIMEOUT budget.
 - Collect now already carries rating/cover/description from the list response,
   so the fetch path is fast (~30s) WITHOUT hitting the source APIs.
@@ -11,7 +11,7 @@ Why this exists (decoupled from the per-10-min chapter fetch):
   "enrich") and patiently re-enriches every recent_chapters row in the 24h
   window: it fills status + genres (and refreshes rating/description/cover)
   from series_meta / source APIs, with a polite inter-fetch delay so we stay
-  under shinigami 429 / ikiru Cloudflare 403 thresholds. No timeout pressure.
+  under source 429 / Cloudflare 403 thresholds. No timeout pressure.
 
 It is idempotent: re-running only refreshes rows, never duplicates.
 

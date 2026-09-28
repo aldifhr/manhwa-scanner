@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 
 # Same-origin image proxy so Discord can load covers that would
-# otherwise 403 on hotlink (ikiru/shinigami block cross-origin img).
+# otherwise 403 on hotlink (sources block cross-origin img).
 # Mirror of the frontend rewriteCoverUrl() logic.
 from urllib.parse import quote as _urlquote
 

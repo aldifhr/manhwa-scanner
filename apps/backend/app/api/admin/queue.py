@@ -94,7 +94,7 @@ async def queue_status(request: Request):
                 try:
                     data = json.loads(j)
                     action = data.get("action", "unknown")
-                    # Normalize: rss-fetch:ikiru → rss-fetch
+                    # Normalize: rss-fetch:shinigami → rss-fetch
                     key = action.split(":")[0] if ":" in action else action
                     cron_breakdown[key] = cron_breakdown.get(key, 0) + 1
                 except Exception:

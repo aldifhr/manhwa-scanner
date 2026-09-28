@@ -163,7 +163,7 @@ cb_db = CircuitBreaker("db", failure_threshold=3, recovery_timeout=30)
 # breaker trips earlier on a 429 burst and stays OPEN longer (5min) — prevents an
 # immediate re-burst right after recovery that would just 429 again.
 cb_shinigami = CircuitBreaker("shinigami", failure_threshold=3, recovery_timeout=300)
-# ApiFailureDetector merged here — ikiru API → HTML fallback (threshold 5, cooldown 300)
+# ApiFailureDetector merged here — API → HTML fallback (threshold 5, cooldown 300)
 
 def with_circuit_breaker(cb: CircuitBreaker):
     return cb

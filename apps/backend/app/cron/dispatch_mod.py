@@ -117,9 +117,9 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     # Cross-source on purpose. The ceiling is "how far has this
                     # series already been notified", and a series is one series
                     # regardless of which site it was read from: fcfs_key() and the
-                    # watchdog both treat komiku ch23 and shinigami ch23 as the
+                    # watchdog both treat the two ch23 rows as the
                     # same event. Scoping the ceiling per source meant a brand new
-                    # source started at zero, so when komiku re-uploaded old
+                    # source started at zero, so when one re-uploaded old
                     # chapters with a fresh release_date (ch 23/24/25 of a series
                     # already shipped through ch330 on shinigami) all of them
                     # passed the ceiling and were notified.
@@ -287,9 +287,9 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             # chapter. Only skip_ceiling=True bypasses this — force does not,
             # because pipeline.py passes force=True on the ordinary claimed
             # path and the ceiling has to hold there. The cross-source re-upload
-            # case is what makes this matter: komiku re-uploaded ch 23/24/25 of a
+            # case is what makes this matter: one source re-uploaded ch 23/24/25 of a
             # series already shipped through ch 330 on shinigami, and per-source
-            # ceilings started komiku at 0 so every one of them was notified.
+            # ceilings started that source at 0 so every one of them was notified.
             _it_tk = str(it.get("title_key") or "").strip()
             _it_src = str(it.get("source") or "").strip()
             _ceil = None if skip_ceiling else _ceilings.get((_it_tk, _it_src))

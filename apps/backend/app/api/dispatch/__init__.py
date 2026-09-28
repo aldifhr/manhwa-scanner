@@ -305,7 +305,7 @@ async def failed_queue(request: Request):
                 pass
             # FCFS-aware: a chapter is "sent" if its (title, chapter) fcfs_key
             # is already in dispatch_history — even when the *URL* differs
-            # (ikiru vs shinigami publish the same chapter with different URLs;
+            # (different sources publish the same chapter with different URLs;
             # the faster source wins FCFS and the slower one is correctly
             # skipped, but its distinct URL would otherwise look "pending" here).
             try:

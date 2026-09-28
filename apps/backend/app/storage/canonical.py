@@ -1,6 +1,6 @@
 """Canonical series mapping: title_key -> canonical_title_key.
 
-Canonical identity collapses the same series across sources (ikiru slug vs
+Canonical identity collapses the same series across sources (slug vs
 shinigami slug) so the FE can group/dedupe by canonical_title_key instead of
 per-source title_key. Self-canonical (title_key == canonical_title_key) when
 no mapping exists.

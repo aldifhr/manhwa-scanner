@@ -335,7 +335,7 @@ async def _build_snapshot() -> dict:
             wl_rows = wl_store.load_whitelist()
             # Source-aware: a chapter counts as queued only if its
             # (title_key, source) is whitelisted. This matches the
-            # actual dispatch path (filter_whitelisted) so ikiru +
+            # actual dispatch path (filter_whitelisted) so the
             # shinigami for the same title don't double-count, and a
             # source the user did NOT whitelist is excluded.
             queued = filter_whitelisted(rc_24h_q, wl_rows) if wl_rows else []
@@ -369,7 +369,7 @@ async def _build_snapshot() -> dict:
                     continue
                 _pending_raw.append(c)
             # Drop ones already sent — use FCFS key (normalized title+chapter),
-            # NOT chapter_url. ikiru/shinigami rotate chapter URLs every scrape,
+            # NOT chapter_url. Sources rotate chapter URLs every scrape,
             # so URL-based matching misses chapters that WERE notified under a
             # different (older) URL → false "pending" in the queue depth.
             # This mirrors the actual dispatch path (_claimed_titles), so the
@@ -452,7 +452,7 @@ async def _build_snapshot() -> dict:
     except Exception:
         pass
     # Provider metrics for the status page — built from source_health
-    # (ikiru/shinigami telemetry: status, resp time, daily
+    # (shinigami telemetry: status, resp time, daily
     # successes/failures). FE reads health.providerMetrics.
     provider_metrics = [
         {

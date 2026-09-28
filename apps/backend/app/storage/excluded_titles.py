@@ -4,7 +4,7 @@ Mirror of whitelist.py but inverse: a title here is REMOVED from the /rss
 feed and SKIPPED by the cron collector so it is never scraped/dispatched.
 
 Keyed by composite (title_key, source). There is NO 'all' source: every row
-is scoped to one concrete source (shinigami, komiku). An unknown source is
+is scoped to one concrete source. An unknown source is
 rejected, never silently widened to a global block.
 
 (title_key, source) (see 042_db_audit_fix.sql fix 6). JOIN series_meta at
