@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { Star } from "@phosphor-icons/react";
-import { getOriginFlag } from "@/lib/constants";
+import { getOriginFlag, normalizeOrigin } from "@/lib/constants";
 import { decodeHtml, rewriteCoverUrl, safeUrl } from "@/lib/utils";
 import { timeAgo } from "@/lib/timeAgo";
 import { Card, CardContent } from "@/components/ui/card";
@@ -151,20 +151,27 @@ function MangaCard({
             </div>
           )}
 
-          {/* Top-left cluster: origin flag — only when type exists (no type = no flag) */}
-          {origin && type && getOriginFlag(origin) ? (
+          {/* Top-left cluster: origin flag. `country` is NULL on every row, so
+              the always-populated `type` (manhwa/manhua/manga) is the fallback. */}
+          {(() => {
+            const flagSrc = getOriginFlag(origin || type || "");
+            if (!flagSrc) return null;
+            const flagLabel = normalizeOrigin(origin || type || "");
+            return (
             <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
               <span className="shadow-[0_2px_6px_rgba(0,0,0,0.4)] rounded-[3px] overflow-hidden block">
                 <img
-                  src={getOriginFlag(origin)}
-                  alt={origin}
+                  src={flagSrc}
+                  alt={flagLabel}
+                  title={flagLabel}
                   referrerPolicy="no-referrer"
                   loading="lazy"
                   className="w-5 h-auto block"
                 />
               </span>
             </div>
-          ) : null}
+            );
+          })()}
           {/* Source badge(s) — top-right with health dot */}
           {allSources.length > 0 && (
             <div className="absolute top-2 right-2 inline-flex items-center gap-1 z-10">

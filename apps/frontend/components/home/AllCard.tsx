@@ -70,8 +70,13 @@ function AllCard({
   const prefetch = () => {};
   const { trackChapter } = useContinueReading();
   const origin = normalizeOrigin(item.origin);
-  const t = ((item as any).format ?? item.type ?? "").toString().toLowerCase().trim();
-  const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
+  // `country` is NULL on every row, so fall back to the always-populated
+  // format field. normalizeOrigin maps manhwa/manhua/manga to KR/CN/JP.
+  const t = ((item as unknown as { format?: string | null }).format ?? item.type ?? "")
+    .toString()
+    .toLowerCase()
+    .trim();
+  const flag = t ? getOriginFlag(origin || t) : "";
   const lbl = getChapterLabel(item);
   const doTrack = () => {
     trackChapter({
@@ -123,7 +128,15 @@ function AllCard({
         titleAttr="Click to open chapter"
       >
         <div className="flex min-w-0 items-start gap-2">
-          {flag && <img src={flag} alt={origin} className="mt-0.5 h-4 w-4 shrink-0" loading="lazy" />}
+          {flag && (
+            <img
+              src={flag}
+              alt={normalizeOrigin(origin || t)}
+              title={normalizeOrigin(origin || t)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+              loading="lazy"
+            />
+          )}
           <a href={seriesHref} target="_blank" rel="noopener noreferrer" className="block min-h-0 min-w-0 flex-1 rounded focus-visible:ring-2 focus-visible:ring-white">
             <h3 className="line-clamp-2 text-[15px] font-semibold leading-tight text-white transition-colors group-hover:text-white/80 sm:text-base">
               {decodeHtml(item.title)}
