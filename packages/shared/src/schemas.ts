@@ -146,6 +146,25 @@ export const baseRssItemSchema = z.preprocess(
       .string()
       .nullish()
       .catch(() => undefined),
+    // The backend sends the content format (manhwa / manhua / manga) as
+    // `format`; `country` is the separate, currently-NULL column. Without this
+    // field Zod strips it at the proxy boundary and the country flag has no
+    // signal to fall back to.
+    format: z
+      .string()
+      .nullish()
+      .catch(() => undefined),
+    // Also sent by the backend and read by the frontend; Zod strips any key
+    // that is not declared, so every consumed field has to be listed here.
+    country: z
+      .string()
+      .nullish()
+      .catch(() => undefined),
+    latestUpdated: z
+      .string()
+      .nullish()
+      .catch(() => undefined),
+    sources: z.array(z.string()).catch([]),
     type: z
       .string()
       .nullish()
