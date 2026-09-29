@@ -2,9 +2,10 @@
 import { useMemo } from "react";
 import {
   groupChapters,
-  seriesHasNewWithin,
+  seriesHasNewSince,
   type GroupedSeries,
 } from "@/lib/groupChapters";
+import { useLastSeen } from "@/lib/useLastSeen";
 import type { FlatChapter } from "@/lib/feed";
 import { compareFlatByNewest } from "@/lib/feed";
 
@@ -17,6 +18,10 @@ export function useFeedGrouping(
   }
 ) {
   const { pinnedSet, sortMode, view } = opts;
+  // Falls back to a 24h window on a first visit, matching what the nav badge
+  // counts via /api/v1/rss/new?since=.
+  const lastSeen = useLastSeen();
+  const newCutoff = lastSeen || Date.now() - 24 * 3600 * 1000;
   const safeFiltered = (filtered ?? []) as FlatChapter[];
 
   const grouped = useMemo<GroupedSeries[]>(() => {
@@ -69,9 +74,9 @@ export function useFeedGrouping(
 
   const newSeriesKeys = useMemo(() => {
     const s = new Set<string>();
-    for (const g of grouped) if (seriesHasNewWithin(g, 24)) s.add(g.titleKey);
+    for (const g of grouped) if (seriesHasNewSince(g, newCutoff)) s.add(g.titleKey);
     return s;
-  }, [grouped]);
+  }, [grouped, newCutoff]);
 
   return { grouped: grouped ?? [], flatDisplay: flatDisplay ?? [], newSeriesKeys } as const;
 }

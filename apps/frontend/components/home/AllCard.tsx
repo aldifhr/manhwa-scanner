@@ -134,6 +134,11 @@ function AllCard({
           </a>
         </div>
 
+        {isNew && (
+          <span className="inline-flex shrink-0 items-center rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            Baru
+          </span>
+        )}
         <RatingRow rating={item.rating} genres={item.genres} />
         {(item.sentAt || item.createdAt) && (
           <span suppressHydrationWarning className="text-[11px] text-white/50">{timeAgo(item.sentAt || item.createdAt)}</span>

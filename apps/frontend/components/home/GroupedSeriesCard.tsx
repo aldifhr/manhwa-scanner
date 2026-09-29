@@ -47,6 +47,7 @@ function GroupedSeriesCard({
   isPinned,
   onTogglePin,
   isDeepMatch,
+  isNew = false,
 }: {
   series: GroupedSeries;
   isRead: boolean;
@@ -106,6 +107,11 @@ function GroupedSeriesCard({
           </a>
         </div>
 
+        {isNew && (
+          <span className="inline-flex shrink-0 items-center rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            Baru
+          </span>
+        )}
         <RatingRow rating={series.rating} genres={series.genres} />
         {(series.chapters[0]?.sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt) && (
           <span suppressHydrationWarning className="text-[11px] text-white/50">{timeAgo(series.chapters[0].sentAt || (series as any).latestUpdated || (series.chapters[0] as any)?.createdAt)}</span>

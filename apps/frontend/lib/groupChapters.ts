@@ -166,12 +166,22 @@ export function groupChapters(items: FlatChapter[] | null | undefined): GroupedS
   return out;
 }
 
-/** True if any chapter in the series arrived within `hours` (default 24). */
-export function seriesHasNewWithin(series: GroupedSeries, hours = 24): boolean {
-  const cutoff = Date.now() - hours * 3600 * 1000;
+/**
+ * True when the series has a chapter newer than the given cutoff.
+ *
+ * Pass `Date.now() - N * 3600_000` for a rolling window. AllTab passes the
+ * previous-visit timestamp instead, so "new" means "released since you were
+ * last here" rather than "released today" — the nav badge counts that same
+ * window via /api/v1/rss/new?since=.
+ */
+export function seriesHasNewSince(series: GroupedSeries, cutoffMs: number): boolean {
   for (const ch of series.chapters) {
     const t = ch.sentAt ? Date.parse(ch.sentAt) : NaN;
-    if (!isNaN(t) && t >= cutoff) return true;
+    if (!isNaN(t) && t >= cutoffMs) return true;
   }
   return false;
+}
+
+export function seriesHasNewWithin(series: GroupedSeries, hours = 24): boolean {
+  return seriesHasNewSince(series, Date.now() - hours * 3600 * 1000);
 }
