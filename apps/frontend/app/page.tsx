@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import { OriginFlag } from "@/components/ui/OriginFlag";
 import { CSRF_COOKIE, LEGACY_CSRF_COOKIE, browserHasCookie } from "@/lib/cookies";
 import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -33,7 +34,6 @@ import EmptyState from "@/components/EmptyState";
 import { ErrorFallback } from "@/components/ErrorFallback";
 import VirtualizedList from "@/components/home/VirtualizedList";
 import { groupChapters, type GroupedSeries } from "@/lib/groupChapters";
-import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import type { FlatChapter } from "@/components/home/AllTab";
 import { RatingRow } from "@/components/home/seriesShared";
@@ -156,9 +156,12 @@ function HomeGroupedCard({
   adding?: boolean;
   onAdd?: () => void;
 }) {
-  const origin = normalizeOrigin(series.origin);
-  const t = ((series as any).format ?? series.type ?? "").toString().toLowerCase().trim();
-  const flag = t === "manhwa" || t === "manhua" ? getOriginFlag(origin) : "";
+  // `country` is NULL on every row; OriginFlag falls back to `format`
+  // (manhwa / manhua / manga) and owns the country mapping.
+  const flagType = ((series as unknown as { format?: string | null }).format ?? series.type ?? "")
+    .toString()
+    .toLowerCase()
+    .trim();
   const health = useSourcesHealth();
   const densityHC = useUiStore((s) => s.density);
   const isCompactHC = densityHC === "compact";
@@ -237,9 +240,11 @@ function HomeGroupedCard({
       {/* Body */}
       <div className="flex min-w-0 flex-1 flex-col py-0.5 sm:py-1">
         <div className="flex items-start gap-2">
-          {flag && (
-            <img src={flag} alt={origin} className="mt-0.5 h-4 w-4 shrink-0" loading="lazy" />
-          )}
+          <OriginFlag
+            origin={series.origin}
+            type={flagType}
+            className="mt-0.5 h-4 w-4 shrink-0"
+          />
           <a
             href={safeUrl(series.seriesUrl || sCh[0]?.seriesUrl) || "#"}
             target="_blank"

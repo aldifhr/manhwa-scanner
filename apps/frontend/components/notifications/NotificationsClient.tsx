@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { OriginFlag } from "@/components/ui/OriginFlag";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageShell } from "@/components/PageShell";
 import { Reader } from "@/lib/reader";
@@ -10,7 +11,6 @@ import { useDebounced } from "@/lib/useDebounced";
 import { timeAgo } from "@/lib/timeAgo";
 import { decodeHtml, getChapterLabel, rewriteCoverUrl, safeUrl } from "@/lib/utils";
 import { SourceBadge } from "@/components/ui/SourceBadge";
-import { getOriginFlag } from "@/lib/constants";
 import type { DispatchHistoryItem } from "@/lib/types";
 import {
   Bell,
@@ -50,9 +50,7 @@ function ChapterRow({ item }: { item: DispatchHistoryItem }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text truncate">{decodeHtml(item.title)}</span>
-          {item.origin && item.type && getOriginFlag(item.origin) && (
-            <img src={getOriginFlag(item.origin)} alt={item.origin} referrerPolicy="no-referrer" loading="lazy" className="w-4 h-auto shrink-0" />
-          )}
+          <OriginFlag origin={item.origin} type={item.type} className="w-4 h-auto shrink-0" />
         </div>
         <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5">
           <span className="font-medium text-accent">Ch. {getChapterLabel(item)}</span>

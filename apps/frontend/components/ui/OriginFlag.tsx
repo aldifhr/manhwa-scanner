@@ -10,11 +10,13 @@ export function OriginFlag({
   type?: string | null;
   className?: string;
 }) {
-  // no type / no_type = no flag (hide flag untuk type=no_type & data lama tanpa type)
+  // `country` is NULL on every row, so `type` (manhwa / manhua / manga) is the
+  // only populated signal. normalizeOrigin maps all three to KR / CN / JP.
   const t = (type || "").toLowerCase().trim();
-  if (!t || (t !== "manhwa" && t !== "manhua")) return null;
-  const normalized = normalizeOrigin(origin);
+  if (!t) return null;
+  // Prefer the real country when present, otherwise derive it from the format.
+  const normalized = normalizeOrigin(origin || t);
   const flag = getOriginFlag(normalized);
   if (!flag) return null;
-  return <img src={flag} alt={normalized} className={className} />;
+  return <img src={flag} alt={normalized} title={normalized} className={className} />;
 }

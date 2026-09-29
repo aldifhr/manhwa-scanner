@@ -7,9 +7,9 @@ import { ContextMenu } from "@/components/ui/ContextMenu";
 import { useLongPress } from "@/lib/hooks/useLongPress";
 import { useContinueReading } from "@/lib/continueReading";
 import { useReadItems } from "./useReadItems";
-import { normalizeOrigin, getOriginFlag } from "@/lib/constants";
 import { SeriesShell, Synopsis, CardActions, RatingRow } from "./seriesShared";
 import { timeAgo } from "@/lib/timeAgo";
+import { OriginFlag } from "@/components/ui/OriginFlag";
 
 interface GroupedSeries {
   title: string;
@@ -73,14 +73,12 @@ function GroupedSeriesCard({
   const seriesHref = safeUrl(series.seriesUrl) || "#";
   const { trackChapter } = useContinueReading();
   const { readItems } = useReadItems();
-  const origin = normalizeOrigin(series.origin);
-  // `country` is NULL on every row, so fall back to the always-populated
-  // format field. normalizeOrigin maps manhwa/manhua/manga to KR/CN/JP.
-  const t = ((series as unknown as { format?: string | null }).format ?? series.type ?? "")
+  // `country` is NULL on every row; OriginFlag falls back to `format`
+  // (manhwa / manhua / manga) and owns the country mapping.
+  const flagType = ((series as unknown as { format?: string | null }).format ?? series.type ?? "")
     .toString()
     .toLowerCase()
     .trim();
-  const flag = t ? getOriginFlag(origin || t) : "";
 
   const first = series.chapters[0];
   return (
@@ -100,15 +98,7 @@ function GroupedSeriesCard({
       >
         {/* Title + flag — same as HomeGroupedCard */}
         <div className="flex min-w-0 items-start gap-2">
-          {flag && (
-            <img
-              src={flag}
-              alt={normalizeOrigin(origin || t)}
-              title={normalizeOrigin(origin || t)}
-              className="mt-0.5 h-4 w-4 shrink-0"
-              loading="lazy"
-            />
-          )}
+          <OriginFlag origin={series.origin} type={flagType} className="mt-0.5 h-4 w-4 shrink-0" />
           <a href={seriesHref} target="_blank" rel="noopener noreferrer" className="block min-h-0 min-w-0 flex-1 rounded focus-visible:ring-2 focus-visible:ring-white">
             <h3 className="line-clamp-2 text-[15px] font-semibold leading-tight text-white transition-colors group-hover:text-white/80 sm:text-base">
               {decodeHtml(series.title)}
