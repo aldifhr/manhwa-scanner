@@ -1,12 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Minimal component tests using renderToString
 // These are smoke tests to verify components don't crash on render
 
 // We need to set environment to client for components using 'use client' directives
 vi.stubEnv("NODE_ENV", "development");
+
+// MangaCard reads source health through useQuery, so it needs a provider. A
+// fresh client per render keeps the tests independent.
+function renderWithQuery(node: React.ReactNode): string {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return renderToString(createElement(QueryClientProvider, { client }, node));
+}
 
 describe("ErrorBoundary", () => {
   it("renders children without crashing", async () => {
@@ -32,7 +42,7 @@ describe("MangaCard", () => {
   it("renders with minimal props", async () => {
     vi.resetModules();
     const { default: MangaCard } = await import("@/components/MangaCard");
-    const html = renderToString(
+    const html = renderWithQuery(
       createElement(MangaCard, {
         title: "Test Manga",
         cover: null,
@@ -46,7 +56,7 @@ describe("MangaCard", () => {
   it("renders with cover image", async () => {
     vi.resetModules();
     const { default: MangaCard } = await import("@/components/MangaCard");
-    const html = renderToString(
+    const html = renderWithQuery(
       createElement(MangaCard, {
         title: "Test Manga",
         cover: "/api/reader/proxy?url=https://example.com/cover.jpg",
