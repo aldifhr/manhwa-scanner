@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     SHINIGAMI_SERIES_PATH: str = "/series/"
     SHINIGAMI_CHAPTER_PATH: str = "/chapter/"
 
+    # Voratoon — site moved to v4, /api/v1/comics replaced by /series
+    VORATOON_API_BASE: str = "https://api.voratoon.com"
+    VORATOON_PUBLIC_BASE: str = "https://v4.voratoon.com"
+
     # Discord toggle — set false to run locally without bot / disable dispatch
     DISCORD_ENABLED: bool = True
 
@@ -51,7 +55,7 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
-    SOURCE_KEYS: list[str] = ["shinigami"]
+    SOURCE_KEYS: list[str] = ["shinigami", "voratoon"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     DISABLED_SOURCES: str = ""
 
@@ -95,6 +99,8 @@ class Settings(BaseSettings):
         "g.shinigami.asia:443",
         "shinigami.asia:443",
         "assets.shngm.id:443",
+        "cvr.voratoon.id:443",
+        "api.voratoon.com:443",
     ]
 
     def get_proxy_hosts(self) -> list[str]:
@@ -141,9 +147,9 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-_SOURCE_KEYS = ("shinigami",)
-VALID_SOURCES = ("shinigami",)
-VALID_SOURCES_WITH_ALL = ("shinigami", "all")
+_SOURCE_KEYS = ("shinigami", "voratoon")
+VALID_SOURCES = ("shinigami", "voratoon")
+VALID_SOURCES_WITH_ALL = ("shinigami", "voratoon", "all")
 # Sources an exclude row may target. Exclude has no 'all' scope — a row always
 # names one concrete source. Only sources that actually produce chapters.
 EXCLUDE_SOURCES = ("shinigami",)

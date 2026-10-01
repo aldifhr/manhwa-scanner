@@ -16,6 +16,7 @@ from app.utils.text import slugify_title_key
 from app.storage import health, whitelist as wl_store
 from app.cron.collectors.common import _SOURCE_TIMEOUT
 from app.cron.collectors.shinigami import _collect_shinigami_source
+from app.cron.collectors.voratoon import _collect_voratoon_source
 from app.cron.source_result import SourceResult
 import time as _time
 
@@ -115,13 +116,15 @@ def collect_recent_chapters(
             _src_items: list[dict] = []
             if src == "shinigami":
                 _src_items = _collect_shinigami_source(_latest_sent, _disabled, fetch_meta)
+            elif src == "voratoon":
+                _src_items = _collect_voratoon_source(_latest_sent, _disabled, fetch_meta)
             return SourceResult.ok(src, _src_items, started)
         except Exception as exc:
             logger.warn("collect provider failed", source=src, err=str(exc)[:300])
             return SourceResult.failed(src, started, exc)
 
     _sources_to_run: list[str] = []
-    for _src in ("shinigami",):
+    for _src in ("shinigami", "voratoon"):
         if (source is None or source == _src) and _src not in _disabled:
             _sources_to_run.append(_src)
 

@@ -17,7 +17,7 @@ export const excludedTitleSchema = z
     title_key: z.string().min(1).nullable().optional(),
     titleKey: z.string().min(1).nullable().optional(),
     title: z.string().nullable().optional(),
-    source: z.enum(["shinigami"]).nullable().optional(),
+    source: z.enum(["shinigami", "voratoon"]).nullable().optional(),
     created_at: z.string().nullable().optional(),
     createdAt: z.string().nullable().optional(),
     cover: z.string().nullable().optional(),
@@ -38,7 +38,7 @@ export const excludedTitleSchema = z
       "",
     title: (r.title as string | null) ?? null,
     // Exclude rows always name one concrete source; backend rejects 'all'.
-    source: (r.source as "shinigami") ?? "shinigami",
+    source: (r.source as "shinigami" | "voratoon") ?? "shinigami",
     createdAt:
       (r.created_at as string | null) || (r.createdAt as string | null) || null,
     cover: (r.cover as string | null) ?? null,
@@ -51,7 +51,7 @@ export const whitelistSchema = z
     title_key: z.string().min(1).optional(),
     titleKey: z.string().min(1).optional(),
     title: z.string().min(1).optional(),
-    source: z.enum(["shinigami"]).optional(),
+    source: z.enum(["shinigami", "voratoon"]).optional(),
     cover: z.string().nullable().optional(),
     series_url: z.string().url().nullable().optional(),
     seriesUrl: z.string().url().nullable().optional(),

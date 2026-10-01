@@ -7,7 +7,7 @@ import time as _time
 
 logger = logging.getLogger("tasks.scheduler")
 
-_RSS_SOURCES = ("shinigami",)
+_RSS_SOURCES = ("shinigami", "voratoon")
 
 
 def _disabled_sources() -> set[str]:
@@ -177,11 +177,11 @@ def _scheduler_loop() -> None:
             try:
                 from app.metrics_prometheus import DB_POOL_SIZE, CIRCUIT_BREAKER_STATE, REDIS_QUEUE_DEPTH
                 from app.db_adapter import get_pool_stats
-                from app.services.resilience import cb_db, cb_shinigami
+                from app.services.resilience import cb_shinigami, cb_voratoon
                 ps = get_pool_stats()
                 DB_POOL_SIZE.labels(state="active").set(ps.get("active", 0))
                 DB_POOL_SIZE.labels(state="idle").set(ps.get("idle", 0))
-                for name, cb in [("db", cb_db), ("shinigami", cb_shinigami)]:
+                for name, cb in [("db", cb_db), ("shinigami", cb_shinigami), ("voratoon", cb_voratoon)]:
                     CIRCUIT_BREAKER_STATE.labels(service=name).set({"closed": 0, "half_open": 1, "open": 2}.get(cb.state, 0))
             except Exception:
                 pass

@@ -68,7 +68,11 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         if not row.get("type") and _norm:
             _origin_to_type = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
             row["type"] = _origin_to_type.get(_norm, "")
+        # origin is dropped from the row dict and re-added here: _norm is the
+        # only normalized value, and using row["origin"] would write the raw
+        # manhwa/KR string straight into a column constrained to KR/CN/JP.
         _r = {k: row.get(k) for k in allowed if k != "origin"}
+        _r["origin"] = _norm or None
         for _k in ("rating", "description", "type"):
             if _r.get(_k) is None:
                 _r[_k] = ""
