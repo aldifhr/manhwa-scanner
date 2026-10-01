@@ -59,7 +59,9 @@ export async function GET(request: NextRequest) {
     .slice(0, 50);
   const whitelist = request.nextUrl.searchParams.get("whitelist") || "";
   const groupRaw = request.nextUrl.searchParams.get("group") ?? "false";
-  const group = groupRaw === "true" ? "true" : "false";
+  // Accept both spellings. `group=1` was silently treated as false, which meant
+  // grouped callers got a flat payload with no error to explain it.
+  const group = groupRaw === "true" || groupRaw === "1" ? "true" : "false";
   const exclude = (request.nextUrl.searchParams.get("exclude") || "")
     .trim()
     .slice(0, 100);

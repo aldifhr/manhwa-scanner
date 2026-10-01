@@ -22,12 +22,32 @@ def _composite_key(r: dict) -> tuple[str, str, str] | None:
     return (tk, src, cn)
 
 
-def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
-    if not rows:
-        return {"inserted": 0, "failed": 0, "deduped": 0}
-    inserted = failed = 0
-    allowed = {"chapter_url","title_key","title","chapter","chapter_num","source","cover","series_url","updated_time","release_date","origin","description","type","genres","rating"}
-    _wl_origins_local = _get_wl_origins()
+ALLOWED_FIELDS = {
+    "chapter_url", "title_key", "title", "chapter", "chapter_num", "source",
+    "cover", "series_url", "updated_time", "release_date", "origin",
+    "description", "type", "genres", "rating",
+}
+
+
+def normalize_recent_chapter_rows(
+    rows: list[dict],
+    wl_origins: dict | None = None,
+) -> tuple[list[dict], dict[str, int]]:
+    """Validate and coerce collector rows into the shape the table expects.
+
+    Returns (cleaned, skipped_by_source). Every field a collector emits is
+    either carried through or replaced by a typed default -- never silently
+    dropped.
+
+    `origin` is written from the normalized value rather than row["origin"],
+    because the raw field holds "manhwa"/"KR" depending on the source while
+    the column only accepts KR/CN/JP. Getting this wrong writes NULL and the
+    country flag disappears from the feed with no error anywhere.
+
+    Pure on purpose: no database access, so it can be asserted directly.
+    """
+    allowed = ALLOWED_FIELDS
+    wl_origins = wl_origins or {}
     cleaned = []
     _skipped_invalid: dict[str, int] = {}
     for row in rows:
@@ -63,8 +83,8 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
         if not _norm:
             _norm = ""
         _tk_override = str(row.get("title_key") or "").strip()
-        if _tk_override and (_tk_override, _src) in _wl_origins_local:
-            _norm = _wl_origins_local[(_tk_override, _src)]
+        if _tk_override and (_tk_override, _src) in wl_origins:
+            _norm = wl_origins[(_tk_override, _src)]
         if not row.get("type") and _norm:
             _origin_to_type = {"KR": "manhwa", "CN": "manhua", "JP": "manga"}
             row["type"] = _origin_to_type.get(_norm, "")
@@ -89,6 +109,15 @@ def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
                     _r[_k] = 0.0
         _r["chapter_url"] = row["chapter_url"]
         cleaned.append(_r)
+    return cleaned, _skipped_invalid
+
+
+def batch_insert_recent_chapters(rows: list[dict]) -> dict[str, int]:
+    if not rows:
+        return {"inserted": 0, "failed": 0, "deduped": 0}
+    inserted = failed = 0
+    _wl_origins_local = _get_wl_origins()
+    cleaned, _skipped_invalid = normalize_recent_chapter_rows(rows, _wl_origins_local)
     if _skipped_invalid:
         logger.info("batch_insert: skipped invalid release_date aggregated", skipped=_skipped_invalid, total_skipped=sum(_skipped_invalid.values()), total_rows=len(rows))
     to_upsert: list[dict] = []
