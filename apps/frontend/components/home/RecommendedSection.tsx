@@ -9,6 +9,7 @@ import "swiper/css/free-mode";
 import { decodeHtml, safeUrl } from "@/lib/utils";
 import { resolveCoverUrl } from "@/lib/cover";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
+import { sourceOverlayClass } from "@/lib/styles";
 
 type RecItem = {
   title: string;
@@ -127,9 +128,7 @@ export function RecommendedSection() {
                       <span className={isTop3 ? "ml-0.5" : ""}>{rank}</span>
                     </div>
                     <span
-                      className={`absolute right-2 top-2 text-[9px] font-bold px-1.5 py-0.5 rounded-md capitalize ${
-                        it.source === "shinigami" ? "bg-red-500 text-white" : "bg-orange-500 text-white"
-                      }`}
+                      className={`absolute right-2 top-2 text-[9px] font-bold px-1.5 py-0.5 rounded-md capitalize ${sourceOverlayClass(it.source)}`}
                     >
                       {it.source}
                     </span>

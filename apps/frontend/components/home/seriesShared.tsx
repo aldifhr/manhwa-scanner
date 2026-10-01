@@ -11,6 +11,7 @@ import { GenreChips } from "@/components/ui/GenreChips";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getChapterLabel } from "@/lib/utils";
+import { sourceChapterChipClass, sourceOverlayClass } from "@/lib/styles";
 
 // ── Shell — single seam for all series cards ──
 export function SeriesShell({
@@ -54,10 +55,7 @@ export function SeriesShell({
 }) {
   const href = safeUrl(seriesUrl) || "#";
   const s = (overlaySource || "").toLowerCase();
-  const pillCls =
-    s === "shinigami"
-      ? "bg-red-500 text-white"
-          : "bg-white/90 text-black";
+  const pillCls = sourceOverlayClass(s);
   return (
     <Card
       onTouchStart={onTouchStart}
@@ -392,10 +390,7 @@ export function ChapterChips({
               readUrls.has(ch.chapterUrl) ||
               readUrls.has(chHref))
           );
-          const chipColor =
-            src === "shinigami"
-              ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-                  : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
+          const chipColor = sourceChapterChipClass(src);
           return (
             <span key={ch.key} className="inline-flex items-center gap-1 min-w-0">
               <a
