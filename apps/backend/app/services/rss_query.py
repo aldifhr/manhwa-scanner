@@ -158,7 +158,10 @@ def map_result(
 
     _rating = _nr(sm.get("rating")) if sm.get("rating") not in (None, "") else (_nr(it.get("rating")) if it.get("rating") not in (None, "") else _nr(wl.get("rating")))
     _type = normalize_type(sm.get("type") or it.get("type") or wl.get("type") or None)
-    _raw_origin = it.get("origin") or wl.get("origin") or sm.get("origin") or ""
+    # `origin` is NULL on every Shinigami row, so fall back to the format
+    # (manhwa/manga/manhua), which normalize_origin also understands. Without
+    # this the FE gets country=null and has to guess from `format` itself.
+    _raw_origin = it.get("origin") or wl.get("origin") or sm.get("origin") or _type or ""
     origin = normalize_origin(_raw_origin)
 
     _raw_chapter_num = it.get("chapter_num")
