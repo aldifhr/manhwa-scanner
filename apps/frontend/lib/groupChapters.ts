@@ -9,8 +9,12 @@ export function normalizeTitleKey(k: string | null | undefined): string {
     .trim();
 }
 function coverPriority(source: string): number {
+  // Lower wins. Shinigami serves stable cover URLs; voratoon's are on a
+  // separate CDN but are equally stable, so it ranks second only as a
+  // tie-breaker, not as a fallback for broken images.
   const s = (source || "").toLowerCase();
   if (s === "shinigami") return 0;
+  if (s === "voratoon") return 1;
   return 10;
 }
 function isPresignedCoverExpired(cover: string): boolean {

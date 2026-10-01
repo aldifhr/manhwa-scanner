@@ -3,6 +3,7 @@
 import { PageShell } from "@/components/PageShell";
 import { useQuery } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
+import { ALL_SOURCES } from "@/lib/constants";
 import { WatchdogCard } from "./WatchdogCard";
 
 const badge = (s: string) => {
@@ -54,7 +55,7 @@ export default function StatusPage() {
   const list = (() => {
     const base = sources.length ? sources : (cron as any)?.sources ?? [];
     // ensure sources always shown
-    const want = ["shinigami"];
+    const want = [...ALL_SOURCES];
     const map = new Map<string, any>();
     for (const s of base) {
       const key = (s.name || s.source || "").toLowerCase();

@@ -34,7 +34,9 @@ import EmptyState from "@/components/EmptyState";
 import { ErrorFallback } from "@/components/ErrorFallback";
 import VirtualizedList from "@/components/home/VirtualizedList";
 import { groupChapters, type GroupedSeries } from "@/lib/groupChapters";
+import { sourceOverlayClass } from "@/lib/styles";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
+import { sourceBadgeClass, sourceChapterChipClass } from "@/lib/styles";
 import type { FlatChapter } from "@/components/home/AllTab";
 import { RatingRow } from "@/components/home/seriesShared";
 import { useFeedActions } from "@/components/home/hooks/useFeedActions";
@@ -72,10 +74,7 @@ function CoverImage({ src, alt }: { src: string | null; alt: string }) {
 
 function SourcePill({ source }: { source: string }) {
   const s = source?.toLowerCase();
-  const cls =
-    s === "shinigami"
-      ? "bg-red-500/15 text-red-400 border-red-500/20"
-          : "bg-white/10 text-white/80 border-white/10";
+  const cls = sourceBadgeClass(s);
   return (
     <span
       className={`text-[10px] font-semibold px-2.5 py-1 rounded-full capitalize backdrop-blur-md border shadow-sm ${cls}`}
@@ -181,10 +180,7 @@ function HomeGroupedCard({
   const firstSource = firstCh?.source ?? null;
   const sLower = (firstSource || "").toLowerCase();
   const down = firstSource ? !isHealthy(health[sLower]) : false;
-  const pillCls =
-    sLower === "shinigami"
-      ? "bg-red-500 text-white"
-          : "bg-white/90 text-black";
+  const pillCls = sourceOverlayClass(sLower);
 
   return (
     <div
@@ -283,10 +279,7 @@ function HomeGroupedCard({
             const href = safeUrl(ch.chapterUrl || ch.url || series.seriesUrl) || "#";
             const src = ch.source?.toLowerCase();
             const chDown = src ? !isHealthy(health[src]) : false;
-            const chipColor =
-              src === "shinigami"
-                ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-                    : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
+            const chipColor = sourceChapterChipClass(src);
             return (
               <a
                 key={ch.key}

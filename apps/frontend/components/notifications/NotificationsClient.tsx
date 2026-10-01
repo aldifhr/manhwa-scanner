@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { OriginFlag } from "@/components/ui/OriginFlag";
+import { ALL_SOURCES, type SourceName } from "@/lib/constants";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageShell } from "@/components/PageShell";
 import { Reader } from "@/lib/reader";
@@ -84,7 +85,7 @@ function LogRow({ log }: { log: ErrorLog }) {
 export default function NotificationsClient() {
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
-  const [source, setSource] = useState<"all" | "shinigami">("all");
+  const [source, setSource] = useState<"all" | SourceName>("all");
   const [pageChapters, setPageChapters] = useState(1);
   const [pageLog, setPageLog] = useState(1);
   const [qLog, setQLog] = useState("");
@@ -184,7 +185,7 @@ export default function NotificationsClient() {
             <input value={search} onChange={(e) => { setSearch(e.target.value); setPageChapters(1); }} placeholder="Search title..." className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
           <div className="flex gap-1">
-            {(["all", "shinigami"] as const).map((s) => (
+            {(["all", ...ALL_SOURCES] as const).map((s) => (
               <button key={s} onClick={() => setSource(s)} className={`px-2.5 py-1.5 text-xs rounded-lg border ${source === s ? "bg-accent-dim border-accent/30 text-accent" : "bg-surface border-border text-text-secondary"}`}>{s}</button>
             ))}
           </div>

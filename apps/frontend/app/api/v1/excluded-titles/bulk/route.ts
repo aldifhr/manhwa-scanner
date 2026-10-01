@@ -2,13 +2,14 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { backendUrl, authHeaders, TIMEOUT, catchError } from "@/lib/server-api";
+import { ALL_SOURCES } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as { source?: unknown };
     if (
       typeof body.source !== "string" ||
-      !["shinigami"].includes(body.source)
+      !(ALL_SOURCES as readonly string[]).includes(body.source)
     ) {
       return NextResponse.json(
         { success: false, error: "Invalid source" },

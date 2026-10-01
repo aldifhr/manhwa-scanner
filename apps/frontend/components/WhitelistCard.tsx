@@ -41,6 +41,10 @@ function resolveDetailUrl(item: WhitelistRouteItem): string | undefined {
       ? `https://11.shinigami.asia/series/${raw}`
       : `https://11.shinigami.asia/series/${slug}`;
   }
+  // Voratoon routes by slug too, so no uuid special case is needed.
+  if (sources.includes("voratoon")) {
+    return `https://v4.voratoon.com/series/${slug}`;
+  }
   return undefined;
 }
 import { useRef } from "react";

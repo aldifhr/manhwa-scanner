@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
+import { ALL_SOURCES } from "@/lib/constants";
+import { sourceBadgeClass } from "@/lib/styles";
 import type { ExcludedTitleItem } from "@/lib/types";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { useToast } from "@/lib/useToast";
@@ -20,10 +22,7 @@ import { PageShell } from "@/components/PageShell";
 const FILTER_ALL = "*";
 
 function SourceBadge({ source }: { source: string }) {
-  const color =
-    source === "shinigami"
-      ? "bg-violet-500/15 text-violet-400"
-      : "bg-surface-hover text-text-muted";
+  const color = sourceBadgeClass(source);
   return (
     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${color}`}>
       {source}
@@ -276,7 +275,7 @@ export function ExcludeListClient() {
 
       {isLoading ? (
         <div className="space-y-6">
-          {(sources.length ? sources : ["shinigami"]).map((src) => (
+          {(sources.length ? sources : [...ALL_SOURCES]).map((src) => (
             <div key={src} className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="skeleton h-5 w-12 rounded" />

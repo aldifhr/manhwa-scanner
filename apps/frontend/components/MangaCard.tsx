@@ -4,6 +4,7 @@ import { Star } from "@phosphor-icons/react";
 import { OriginFlag } from "@/components/ui/OriginFlag";
 import { decodeHtml, rewriteCoverUrl, safeUrl } from "@/lib/utils";
 import { timeAgo } from "@/lib/timeAgo";
+import { sourceOverlayClass } from "@/lib/styles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -164,10 +165,7 @@ function MangaCard({
               {allSources.map((src) => {
                 const s = src.toLowerCase();
                 const down = !isHealthy(health[s]);
-                const color =
-                  s === "shinigami"
-                    ? "bg-red-600/90 text-white"
-                      : "bg-black/70 text-white/90";
+                const color = sourceOverlayClass(s);
                 return (
                   <span
                     key={src}

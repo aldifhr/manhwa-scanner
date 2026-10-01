@@ -8,6 +8,7 @@ import { useLongPress } from "@/lib/hooks/useLongPress";
 import { useContinueReading } from "@/lib/continueReading";
 import { SeriesShell, Synopsis, CardActions, RatingRow } from "./seriesShared";
 import { timeAgo } from "@/lib/timeAgo";
+import { sourceChapterChipClass } from "@/lib/styles";
 import { OriginFlag } from "@/components/ui/OriginFlag";
 
 interface AllCardItem {
@@ -95,10 +96,7 @@ function AllCard({
     if (chapterHref !== "#") { doTrack(); window.open(chapterHref, "_blank", "noopener,noreferrer"); }
   };
   const src = item.source?.toLowerCase();
-  const chipColor =
-    src === "shinigami"
-      ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-        : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
+  const chipColor = sourceChapterChipClass(src);
 
   return (
     <div onMouseEnter={prefetch} onFocusCapture={prefetch}>

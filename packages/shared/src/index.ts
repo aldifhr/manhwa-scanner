@@ -8,6 +8,10 @@ export const OPENAPI_VERSION = "0.1.0";
 
 // TitleKey = canonical slug, Source = scraper origin
 export type Source = "shinigami" | "voratoon";
+
+/** Every configured source, in display order. Single source of truth for the
+ *  filter chips and any other place that needs to enumerate sources. */
+export const SOURCES: Source[] = ["shinigami", "voratoon"];
 export type Origin = "KR" | "CN" | "JP";
 
 export interface WhitelistItem {

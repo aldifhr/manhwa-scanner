@@ -5,6 +5,7 @@ import { BookOpen } from "@phosphor-icons/react";
 import { useContinueReading } from "@/lib/continueReading";
 import type { ContinueReadingEntry } from "@/lib/continueReading";
 import { decodeHtml, getChapterLabel, rewriteCoverUrl } from "@/lib/utils";
+import { sourceBadgeClass } from "@/lib/styles";
 import { motion } from "framer-motion";
 
 function CoverImage({ src, alt }: { src: string | null; alt: string }) {
@@ -27,10 +28,7 @@ function CoverImage({ src, alt }: { src: string | null; alt: string }) {
 
 function SourcePill({ source }: { source: string }) {
   const s = source?.toLowerCase();
-  const cls =
-    s === "shinigami"
-      ? "bg-red-500/15 text-red-400 border-red-500/20"
-        : "bg-white/10 text-white/80 border-white/10";
+  const cls = sourceBadgeClass(s);
   return (
     <span
       className={`text-[10px] font-semibold px-2.5 py-1 rounded-full capitalize backdrop-blur-md border shadow-sm ${cls}`}

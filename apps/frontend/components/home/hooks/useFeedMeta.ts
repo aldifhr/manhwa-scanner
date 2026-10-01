@@ -1,13 +1,14 @@
 "use client";
 import { useMemo } from "react";
 import { normalizeType } from "@/lib/feed";
+import { ALL_SOURCES } from "@/lib/constants";
 import type { FlatChapter } from "@/lib/feed";
 
 export function useFeedMeta(
   all: FlatChapter[],
   optimisticWhitelist: Set<string>
 ) {
-  const sources: string[] = useMemo(() => ["shinigami"], []);
+  const sources: string[] = useMemo(() => [...ALL_SOURCES], []);
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of all) {

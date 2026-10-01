@@ -9,6 +9,7 @@ import { useContinueReading } from "@/lib/continueReading";
 import { useReadItems } from "./useReadItems";
 import { SeriesShell, Synopsis, CardActions, RatingRow } from "./seriesShared";
 import { timeAgo } from "@/lib/timeAgo";
+import { sourceChapterChipClass } from "@/lib/styles";
 import { OriginFlag } from "@/components/ui/OriginFlag";
 
 interface GroupedSeries {
@@ -126,10 +127,7 @@ function GroupedSeriesCard({
             if (label === "?") return null;
             const href = ch.chapterUrl || ch.url || series.seriesUrl || "#";
             const src = ch.source?.toLowerCase();
-            const chipColor =
-              src === "shinigami"
-                ? "bg-red-500/15 text-red-400 hover:bg-red-500/25 border-red-500/20"
-                    : "bg-white/10 text-white/80 hover:bg-white/20 border-white/8";
+            const chipColor = sourceChapterChipClass(src);
             return (
               <a
                 key={ch.key}
