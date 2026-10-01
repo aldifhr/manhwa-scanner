@@ -7,7 +7,11 @@ import time as _time
 
 logger = logging.getLogger("tasks.scheduler")
 
-_RSS_SOURCES = ("shinigami", "voratoon")
+# voratoon is disabled: the API rate-limited this IP into a 403 on every
+# request (series, chapters and the v4 site alike). Re-enable once the
+# block clears, and keep the cache interval generous.
+_RSS_SOURCES = ("shinigami",)
+_RSS_DISABLED_SOURCES = ("voratoon",)
 
 
 def _disabled_sources() -> set[str]:
