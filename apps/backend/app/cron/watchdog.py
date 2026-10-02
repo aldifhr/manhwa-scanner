@@ -30,7 +30,12 @@ logger = get_logger("watchdog")
 
 # A chapter older than this inside the window is not a fresh blip, it means
 # dispatch has been failing for a long time and is worth waking someone for.
-_URGENT_AGE_H = 12
+# Dispatch runs every 120s (scheduler._DISPATCH_INTERVAL_S), so two hours is
+# 60 missed cycles -- enough that a warning means something is actually
+# stuck rather than one cycle running long. At 12h a single slow cycle
+# tripped it, which is why the log filled with warnings that cleared on
+# the very next run.
+_URGENT_AGE_H = 2
 
 # Dispatch runs every 2 minutes and the watchdog every 15, so the two
 # inevitably interleave: a chapter that landed seconds ago is always briefly
