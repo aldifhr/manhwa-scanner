@@ -24,6 +24,9 @@ logger = get_logger("gap-detector")
 
 GAP_THRESHOLD = 1.0     # newest_scraped - latest_sent must exceed this
 COOLDOWN_MIN = 240      # at most one gap alert every 4h
+# Same switch the watchdog uses. Gap metrics stay in the API and logs;
+# only the outbound notification is suppressed.
+_SEND_ALERTS = False
 _last_alert: float = 0.0
 _last_backfill_ts: float = 0.0
 _last_gaps_hash: str = ""
@@ -373,6 +376,17 @@ def maybe_alert_gaps() -> int:
     _last_gaps_hash = gaps_hash if not result.get("fixed") else ""
     fixed_names = set(result.get("fixed") or [])
 
+    # Alert only when something actually needs a human. A gap the auto-backfill
+    # already closed is not an incident -- the runs in the log all said
+    # "ok existing rows" yet still paged, which is what made this noisy.
+    unresolved = [g for g in gaps if f"{g['title_key'][:30]} ({g['source']})" not in fixed_names]
+    if not unresolved:
+        logger.info(
+            "gap auto-fixed, no alert needed",
+            series=len(fixed_names),
+        )
+        return len(gaps)
+
     cid = (settings.ADMIN_REPORT_CHANNEL_ID or "").strip()
     if not cid:
         try:
@@ -382,7 +396,7 @@ def maybe_alert_gaps() -> int:
             cid = str(rws[0]["channel_id"]) if rws and rws[0].get("channel_id") else ""
         except Exception:
             cid = ""
-    if cid and should_alert:
+    if cid and should_alert and _SEND_ALERTS:
         details_map = (result or {}).get("details") or {}
         lines = []
         for g in sorted(gaps, key=lambda x: x["scraped"] - x["sent"], reverse=True)[:8]:
