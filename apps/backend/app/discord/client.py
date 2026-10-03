@@ -47,8 +47,30 @@ def verify_interaction(raw_body: bytes, signature: str, timestamp: str) -> bool:
             logger.warn("verify_interaction returned False", sig_len=len(signature))
         return result
     except Exception as e:
-        logger.error("verify_interaction error", exc=e)
+        # Without these the line is undiagnosable: sig_len/ts_len say whether the
+        # headers arrived at all, and pk_format says whether the stored key is the
+        # hex verify_key() needs or the base64url the Discord Portal displays.
+        logger.error(
+            "verify_interaction error",
+            exc=e,
+            exc_type=type(e).__name__,
+            sig_len=len(signature or ""),
+            ts_len=len(timestamp or ""),
+            body_len=len(raw_body or b""),
+            pk_format="hex" if _is_hex(settings.DISCORD_PUBLIC_KEY) else "non-hex",
+        )
         return False
+
+def _is_hex(value: str) -> bool:
+    """True when every character is a hex digit and the length is even."""
+    if not value:
+        return False
+    try:
+        bytes.fromhex(value)
+        return True
+    except ValueError:
+        return False
+
 
 def _decode_discord_public_key(pk: str) -> bytes:
     """Decode Discord public key — handles both hex and base64url formats."""
@@ -84,8 +106,24 @@ def verify_interaction_v2(raw_body: bytes, signature: str, timestamp: str) -> bo
         logger.info("verify_interaction OK", sig_len=len(signature))
         return True
     except Exception as e:
-        logger.error("verify_interaction error", exc=e)
+        # Same diagnostics as verify_interaction -- the two failure modes here are
+        # a non-hex signature header and a malformed public key, and the bare
+        # exception name distinguishes neither.
+        logger.error(
+            "verify_interaction error",
+            exc=e,
+            exc_type=type(e).__name__,
+            sig_len=len(signature or ""),
+            pk_decoded_ok=_safe_decode_pk() is not None,
+        )
         return False
+
+def _safe_decode_pk():
+    try:
+        return _decode_discord_public_key(settings.DISCORD_PUBLIC_KEY)
+    except Exception:
+        return None
+
 
 def _discord_request(method: str, url: str, *, json_data: dict | None = None, files: dict | None = None, max_retries: int = 3) -> httpx.Response | None:
     """Send a Discord API request with 429 + Retry-After handling.
