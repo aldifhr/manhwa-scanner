@@ -3,10 +3,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
 
-function groupByDay(rows: { sent_at?: string; created_at?: string }[]): { day: string; count: number }[] {
+/**
+ * Group dispatch rows into the last three local days.
+ *
+ * The API serialises timestamps as `sentAt` in camelCase, so both spellings are
+ * accepted here — reading only `sent_at` made every bucket zero even when the
+ * response carried rows.
+ */
+function dayKey(value?: string): string {
+  if (!value) return "";
+  // Take the date portion off the raw string rather than re-serialising: the
+  // server sends UTC, and slice(0,10) on that string is what the day buckets
+  // are keyed by, so round-tripping through Date would shift it by the offset.
+  return value.slice(0, 10);
+}
+
+function groupByDay(
+  rows: { sentAt?: string; sent_at?: string; created_at?: string }[]
+): { day: string; count: number }[] {
   const map = new Map<string, number>();
   for (const r of rows) {
-    const iso = (r.sent_at || r.created_at || "").slice(0, 10);
+    const iso = dayKey(r.sentAt || r.sent_at || r.created_at);
     if (!iso) continue;
     map.set(iso, (map.get(iso) || 0) + 1);
   }
@@ -24,14 +41,26 @@ export default function DispatchChart() {
   const { data, isLoading } = useQuery({
     queryKey: ["dispatch-3d"],
     queryFn: async () => {
+      // dispatch-history is the only source with per-row timestamps, which is
+      // what the daily buckets need. The cron/health call used to short-circuit
+      // and return a {total, sent24h} shape that has no rows at all, so the
+      // chart rendered 0/0/0 forever. Keep it as a fallback for the summary
+      // number only.
+      try {
+        const res2 = await readerFetch<{ success: boolean; data: { results: any[] } }>(
+          "/api/v1/dispatch-history?limit=100&page=1&page_size=100"
+        );
+        const rows: any[] = (res2 as any)?.data?.results ?? (res2 as any)?.results ?? [];
+        if (rows.length) return { rows, total: null as number | null, sent24h: null as number | null };
+      } catch {}
+
       try {
         const res = await readerFetch<{ success: boolean; data: any }>("/api/v1/cron/health");
         const d = (res as any)?.data?.dispatch;
-        if (d) return { total: d.total ?? 0, sent24h: d.sent_24h ?? 0 };
+        if (d) return { rows: [] as any[], total: d.total ?? 0, sent24h: d.sent_24h ?? 0 };
       } catch {}
-      const res2 = await readerFetch<{ success: boolean; data: { results: any[] } }>("/api/v1/dispatch-history?limit=100&page=1&page_size=100");
-      const rows: any[] = (res2 as any)?.data?.results ?? (res2 as any)?.results ?? [];
-      return { rows };
+
+      return { rows: [] as any[], total: null as number | null, sent24h: null as number | null };
     },
     refetchInterval: 30000,
   });
