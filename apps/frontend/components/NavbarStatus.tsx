@@ -92,7 +92,7 @@ export default function NavbarStatus({
     <span
       title="System status"
       aria-label="System status"
-      className="hidden md:inline-flex w-fit shrink-0 items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sm font-medium leading-none text-white/70"
+      className="hidden md:inline-flex h-8 w-fit shrink-0 items-center gap-2 px-3 rounded-lg border border-white/10 text-xs font-medium leading-none text-white/70"
     >
       {dot}
       <span className="leading-none">{LABEL[agg]}</span>

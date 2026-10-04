@@ -90,19 +90,27 @@ export default function Navbar() {
             </div>
 
             <div className="flex-1" />
+            {/* Own group: the parent's gap-8 is meant for the nav links, and it
+                left the Search / Live / Logout cluster floating apart from each
+                other as well as from the links. */}
+            <div className="hidden md:flex items-center gap-3">
             <button
               type="button"
               onClick={() => openCommandMenu()}
-              className="hidden md:inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors text-xs"
+              className="hidden md:inline-flex h-8 w-fit shrink-0 items-center gap-2 px-3 rounded-lg bg-white/5 border border-white/10 text-xs font-medium leading-none text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
               aria-label="Open command menu"
             >
               <MagnifyingGlass size={14} />
               <span>Search</span>
-              <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono">⌘K</kbd>
+              {/* h-6 not h-5: the kbd inherits text-xs and px-1.5, so a 5
+                  would sit shorter than the Search text and read as clipped. */}
+              <kbd className="inline-flex h-6 items-center rounded bg-white/10 px-1.5 font-mono text-[10px] leading-none">
+                ⌘K
+              </kbd>
             </button>
             <NavbarStatus />
             <div
-              className="hidden md:block w-px h-6 bg-white/10 mx-2"
+              className="hidden md:block w-px h-8 shrink-0 bg-white/10"
               aria-hidden
             />
             {isLoggedIn ? (
@@ -111,18 +119,19 @@ export default function Navbar() {
                 onClick={logout}
                 title="Logout"
                 aria-label="Logout"
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 ml-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 text-xs font-medium transition-colors"
+                className="hidden md:inline-flex h-8 w-fit shrink-0 items-center gap-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs font-medium leading-none text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
               >
                 <SignOut size={14} /> Logout
               </button>
             ) : (
               <Link
                 href="/login"
-                className="hidden md:inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition-colors"
+                className="hidden md:inline-flex h-8 w-fit shrink-0 items-center gap-1.5 px-3.5 rounded-lg bg-white text-black text-xs font-medium leading-none hover:bg-white/90 transition-colors"
               >
                 Login
               </Link>
             )}
+            </div>
 
             <button
               onClick={() => setOpen(true)}
