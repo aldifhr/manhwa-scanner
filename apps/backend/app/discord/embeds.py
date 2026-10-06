@@ -71,11 +71,19 @@ def _proxy_cover(cover: str | None) -> str | None:
 
 
 SOURCE_COLORS = {
-    "shinigami": 0xEF4444,
+    # Mirrors the frontend source palette in apps/frontend/lib/styles.ts so a
+    # source reads the same colour in Discord and in the UI.
+    # A source missing here silently falls back to grey — add it with the
+    # others or it looks untracked.
+    "shinigami": 0xEF4444,  # red-500
+    "voratoon": 0xF97316,  # orange-500
+    "ikiru": 0x22C55E,  # green-500
 }
 
 SOURCE_LABELS = {
     "shinigami": "Shinigami",
+    "voratoon": "VoraToon",
+    "ikiru": "Ikiru",
 }
 
 STAR_FILLED = "⭐"
