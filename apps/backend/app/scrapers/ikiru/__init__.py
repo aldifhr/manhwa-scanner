@@ -120,7 +120,14 @@ def parse_ikiru_ts(value):
 
 
 def _chapter_url(slug: str, number) -> str:
-    return f"{_public()}/manga/{slug}/chapter/{number}"
+    """Reader URL for a chapter.
+
+    The separator is a HYPHEN, not a slash: /manga/<slug>/chapter-21 returns
+    200 while /manga/<slug>/chapter/21 returns 404. Verified against the live
+    site for several series. Getting this wrong makes every ikiru link in
+    Discord a dead 404 while the chapter itself still looks collected.
+    """
+    return f"{_public()}/manga/{slug}/chapter-{number}"
 
 
 def _series_url(slug: str) -> str:

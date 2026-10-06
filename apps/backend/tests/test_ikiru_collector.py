@@ -58,7 +58,8 @@ def chapter_and_series_urls_use_the_public_base():
     from app.scrapers.ikiru import _chapter_url, _series_url
 
     base = settings.IKIRU_PUBLIC_BASE.rstrip("/")
-    assert _chapter_url("some-slug", 12) == f"{base}/manga/some-slug/chapter/12"
+    # HYPHEN, not slash — /chapter/12 is a 404 on the live site.
+    assert _chapter_url("some-slug", 12) == f"{base}/manga/some-slug/chapter-12"
     assert _series_url("some-slug") == f"{base}/manga/some-slug"
 
 
