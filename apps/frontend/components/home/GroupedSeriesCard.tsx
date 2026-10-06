@@ -33,6 +33,8 @@ interface GroupedSeries {
   description?: string | null;
   isWhitelisted: boolean;
   type?: string | null;
+  sources?: string[];
+  whitelistedSources?: string[];
 }
 
 function GroupedSeriesCard({
@@ -42,6 +44,7 @@ function GroupedSeriesCard({
   adding,
   onToggleRead,
   onAdd,
+  onAddSource,
   isExcluded,
   excluding,
   onExclude,
@@ -56,6 +59,7 @@ function GroupedSeriesCard({
   adding: boolean;
   onToggleRead: () => void;
   onAdd: () => void;
+  onAddSource?: (source: string) => void;
   isExcluded: boolean;
   excluding: boolean;
   onExclude: () => void;
@@ -168,6 +172,9 @@ function GroupedSeriesCard({
 
         <CardActions
           isWhitelisted={isWhitelisted}
+          sources={series.sources}
+          whitelistedSources={series.whitelistedSources}
+          onAddSource={onAddSource}
           isExcluded={isExcluded}
           excluding={excluding}
           onExclude={onExclude}

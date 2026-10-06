@@ -123,6 +123,7 @@ function AllTabInner() {
     addingKey,
     handleAdd,
     handleAddGroup,
+    handleAddGroupSource,
     handleExclude,
     handleExcludeSeries,
   } = useFeedActions();
@@ -562,6 +563,7 @@ function AllTabInner() {
                   isExcluded={isExcludedSeries(s)}
                   excluding={excludingKey === s.titleKey}
                   onAdd={() => handleAddGroup(s)}
+                  onAddSource={(src: string) => handleAddGroupSource(s, src)}
                   isSentToDiscord={sCh.some(
                     (c) => c.isSent === true || sentKeys.has(c.key)
                   )}

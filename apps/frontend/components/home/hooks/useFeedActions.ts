@@ -269,6 +269,81 @@ export function useFeedActions() {
     onSettled: () => setAddingKey(null),
   });
 
+  /**
+   * Subscribe ONE source of a multi-source series.
+   *
+   * Needed because a card groups the same title across sources: when the series
+   * is already whitelisted on shinigami, the card shows "Verified" and the bulk
+   * addGroupMutation would skip the source that is still missing. This adds just
+   * the one the operator clicked.
+   */
+  const addGroupSourceMutation = useMutation({
+    mutationFn: async (args: { series: GroupedSeries; source: string }) => {
+      const { series, source } = args;
+      const src = source.toLowerCase();
+      const chapter = series.chapters.find(
+        (c) => (c.source || "").toLowerCase() === src
+      );
+      const titleKey = chapter?.titleKey || series.titleKey;
+      const optKey = `${titleKey}:${src}`;
+      const result = await Reader.addWhitelistEntry({
+        title: series.title,
+        seriesUrl: chapter?.seriesUrl || series.seriesUrl || undefined,
+        source: src,
+        title_key: titleKey,
+        cover: series.cover,
+        rating: series.rating,
+        origin: series.origin,
+        genres: series.genres,
+        description: series.description ?? undefined,
+      } as Record<string, unknown>);
+      return { result, optKey, series, source: src };
+    },
+    onMutate: ({ series }) => setAddingKey(series.titleKey),
+    onSuccess: ({ result, optKey, series, source }) => {
+      setOptimisticWhitelist((prev) => new Set(prev).add(optKey));
+      queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat"] });
+      queryClient.invalidateQueries({ queryKey: ["rss-feed-flat-infinite"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rssFeedInfinite() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSnapshot });
+      const isExists = (result as { status?: string })?.status === "already_exists";
+      toast(
+        isExists
+          ? `Already in whitelist (${source})`
+          : `Added ${series.title} (${source}) to whitelist`,
+        {
+          type: "success",
+          duration: 5000,
+          action: isExists
+            ? undefined
+            : {
+                label: "Undo",
+                onClick: () => {
+                  setOptimisticWhitelist((prev) => {
+                    const n = new Set(prev);
+                    n.delete(optKey);
+                    return n;
+                  });
+                  const [tk, src] = optKey.split(":");
+                  if (tk && src)
+                    Reader.removeWhitelistEntry({
+                      title_key: tk,
+                      source: src,
+                    } as Record<string, unknown>).catch(() => {});
+                  queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed });
+                },
+              },
+        }
+      );
+    },
+    onError: (err) =>
+      toast(err instanceof Error ? err.message : "Failed to add", "error"),
+    onSettled: () => setAddingKey(null),
+  });
+
   const excludeMutation = useMutation({
     mutationFn: async (item: FlatChapter) => {
       const src = (item.source || "").toLowerCase();
@@ -394,6 +469,11 @@ export function useFeedActions() {
 
   const handleAdd = useCallback((item: FlatChapter) => addMutation.mutate(item), [addMutation]);
   const handleAddGroup = useCallback((series: GroupedSeries) => addGroupMutation.mutate(series), [addGroupMutation]);
+  const handleAddGroupSource = useCallback(
+    (series: GroupedSeries, source: string) =>
+      addGroupSourceMutation.mutate({ series, source }),
+    [addGroupSourceMutation]
+  );
   const handleExclude = useCallback(
     (item: FlatChapter) => excludeMutation.mutate(item),
     [excludeMutation]
@@ -410,6 +490,7 @@ export function useFeedActions() {
     addingKey,
     handleAdd,
     handleAddGroup,
+    handleAddGroupSource,
     handleExclude,
     handleExcludeSeries,
   } as const;

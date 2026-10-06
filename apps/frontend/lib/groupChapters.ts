@@ -70,7 +70,20 @@ export interface GroupedSeries {
   rating?: string | number | null;
   genres?: string[];
   description?: string | null;
+  /**
+   * True when ANY source in the group is whitelisted. Kept for the filters and
+   * counters that ask "is this series tracked at all".
+   *
+   * Do NOT use this to decide whether to show the Add button — a series carried
+   * by two sources where only one is whitelisted would then hide the button for
+   * the other, which is exactly the bug this field caused. Use
+   * `whitelistedSources` per source instead.
+   */
   isWhitelisted: boolean;
+  /** Every source that has a chapter in this group. */
+  sources: string[];
+  /** The subset of `sources` that is whitelisted. */
+  whitelistedSources: string[];
   sentAt?: string;
   chapters: GroupedChapter[];
 }
@@ -105,6 +118,8 @@ export function groupChapters(items: FlatChapter[] | null | undefined): GroupedS
         genres: it.genres,
         description: it.description,
         isWhitelisted: it.isWhitelisted,
+        sources: it.source ? [it.source] : [],
+        whitelistedSources: it.isWhitelisted && it.source ? [it.source] : [],
         chapters: [],
       };
       map.set(gk, g!);
@@ -132,8 +147,17 @@ export function groupChapters(items: FlatChapter[] | null | undefined): GroupedS
     // track dedup
     if (!seenChapters.has(gk)) seenChapters.set(gk, new Set());
     seenChapters.get(gk)!.add(chapId);
-    // keep series-level whitelist flag if any chapter is whitelisted
-    if (it.isWhitelisted) g!.isWhitelisted = true;
+    // Per-source tracking. `isWhitelisted` stays a group-wide OR (filters and
+    // counters read it), but `whitelistedSources` is what the card renders —
+    // a series whitelisted on shinigami must still offer Add for its voratoon
+    // chapters.
+    if (it.source && !g!.sources.includes(it.source)) g!.sources.push(it.source);
+    if (it.isWhitelisted) {
+      g!.isWhitelisted = true;
+      if (it.source && !g!.whitelistedSources.includes(it.source)) {
+        g!.whitelistedSources.push(it.source);
+      }
+    }
     // prefer first non-empty description/rating/genres (RSS may have empty desc on one source)
     if (!g!.description && it.description) g!.description = it.description;
     if ((!g!.rating || g!.rating === "") && it.rating) g!.rating = it.rating;

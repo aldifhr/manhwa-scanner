@@ -50,3 +50,6 @@ verified_file.md
 apps/backend/relay/voratoon/relay.json
 apps/backend/relay/voratoon/relay_updates.json
 apps/backend/relay/voratoon/slug_map.json
+
+# wrangler local state (voratoon egress proxy)
+relay/voratoon/.wrangler/

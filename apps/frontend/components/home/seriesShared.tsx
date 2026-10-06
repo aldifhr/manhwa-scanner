@@ -11,7 +11,7 @@ import { GenreChips } from "@/components/ui/GenreChips";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getChapterLabel } from "@/lib/utils";
-import { sourceChapterChipClass, sourceOverlayClass } from "@/lib/styles";
+import { sourceBadgeClass, sourceChapterChipClass, sourceOverlayClass } from "@/lib/styles";
 
 // ── Shell — single seam for all series cards ──
 export function SeriesShell({
@@ -240,6 +240,9 @@ export function Synopsis({ text }: { text?: string | null }) {
 
 export function CardActions({
   isWhitelisted,
+  sources,
+  whitelistedSources,
+  onAddSource,
   isExcluded,
   excluding,
   onExclude,
@@ -251,6 +254,17 @@ export function CardActions({
   showAdd = true,
 }: {
   isWhitelisted: boolean;
+  /** Every source this series appears on. */
+  sources?: string[];
+  /**
+   * Sources of this series that ARE whitelisted. When the series is carried by
+   * several sources this is what decides the Add button, not `isWhitelisted`:
+   * a group whitelisted on shinigami alone must still offer Add for voratoon,
+   * otherwise the row is unreachable (the button is the only way to subscribe).
+   */
+  whitelistedSources?: string[];
+  /** Subscribe ONE source of a multi-source series. */
+  onAddSource?: (source: string) => void;
   isExcluded: boolean;
   excluding: boolean;
   onExclude: () => void;
@@ -306,9 +320,31 @@ export function CardActions({
           </button>
         ))}
       {isWhitelisted ? (
-        <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/12 text-green-400 border border-green-500/20 font-medium ml-auto">
-          <CheckCircle size={13} weight="fill" /> Verified
-        </span>
+        <>
+          <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-green-500/12 text-green-400 border border-green-500/20 font-medium ml-auto">
+            <CheckCircle size={13} weight="fill" /> Verified
+          </span>
+          {showAddEff &&
+            onAddSource &&
+            (sources ?? []).map((src) => {
+              if ((whitelistedSources ?? []).includes(src)) return null;
+              return (
+                <button
+                  key={src}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddSource(src);
+                  }}
+                  disabled={adding}
+                  title={`Add ${src} to whitelist`}
+                  className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors disabled:opacity-50 min-h-0 min-w-0 border ${sourceBadgeClass(src)}`}
+                >
+                  <Plus size={12} weight="bold" />
+                  {adding ? "..." : src}
+                </button>
+              );
+            })}
+        </>
       ) : (
         showAddEff && (
           <button
