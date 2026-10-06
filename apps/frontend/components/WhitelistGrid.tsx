@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Reader } from "@/lib/reader";
 import type { WhitelistRouteItem } from "@/lib/types";
 import { queryKeys, staleTimes, gcTimes } from "@/lib/queryKeys";
 import { MangaCardSkeleton } from "@/components/MangaCard";
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { useDebounced } from "@/lib/useDebounced";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/EmptyState";
@@ -16,6 +16,7 @@ import { CompactSearchInput } from "@/components/ui/SearchInput";
 import { useWhitelistFilters } from "@/components/home/hooks/useWhitelistFilters";
 import { WhitelistCard } from "@/components/WhitelistCard";
 import { useCustomLists, type ListName } from "@/hooks/useCustomLists";
+import { useToast } from "@/lib/useToast";
 
 export function WhitelistGrid() {
   const { data, isLoading, error, refetch } = useQuery({
@@ -47,6 +48,37 @@ export function WhitelistGrid() {
     enabled: debouncedCatalogSearch.length > 0,
     staleTime: staleTimes.catalogSearch,
     gcTime: gcTimes.catalogSearch,
+  });
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const addCatalog = useMutation({
+    mutationFn: (c: Record<string, unknown>) =>
+      Reader.addWhitelistEntry({
+        title: c.title,
+        seriesUrl: typeof c.url === "string" && c.url ? c.url : undefined,
+        source: c.source,
+        title_key: c.titleKey,
+        cover: typeof c.cover === "string" && c.cover ? c.cover : undefined,
+        rating: typeof c.rating === "number" ? c.rating : undefined,
+        origin: typeof c.origin === "string" && c.origin ? c.origin : undefined,
+        genres:
+          Array.isArray(c.genres) && c.genres.length
+            ? (c.genres as string[])
+            : undefined,
+        description:
+          typeof c.description === "string" && c.description
+            ? c.description
+            : undefined,
+      } as Record<string, unknown>) as Promise<{ status?: string }>,
+    onSuccess: (_d, c) => {
+      toast(`Added ${String(c.title)} to whitelist`, "success");
+      queryClient.invalidateQueries({ queryKey: queryKeys.whitelistAll });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whitelist(false) });
+    },
+    onError: (_e, c) => {
+      toast(`Failed to add ${String(c.title)}`, "error");
+    },
   });
 
   const items = data ?? [];
@@ -252,6 +284,31 @@ export function WhitelistGrid() {
                   <p className="text-xs text-text truncate">
                     {String(c.title ?? "Untitled")}
                   </p>
+                  <div className="mt-1.5 flex items-center justify-between gap-1">
+                    <span className="text-[10px] text-text-muted truncate">
+                      {String(c.source ?? "")}
+                      {typeof c.origin === "string" && c.origin
+                        ? ` · ${c.origin}`
+                        : ""}
+                    </span>
+                    {c.isInWhitelist ? (
+                      <span className="text-[10px] text-text-muted shrink-0">
+                        In whitelist
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={addCatalog.isPending}
+                        onClick={() =>
+                          addCatalog.mutate(c as Record<string, unknown>)
+                        }
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-white/10 hover:bg-white/20 text-text transition-colors disabled:opacity-50 shrink-0"
+                      >
+                        <Plus size={10} weight="bold" />
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

@@ -402,8 +402,16 @@ export const Reader = {
 
   searchCatalog: async (query: string) => {
     const p = new URLSearchParams({ q: query });
-    const data = await readerFetch<{ success: boolean; data: unknown }>(`/api/v1/catalog/search?${p}`);
-    return (data.data ?? null) as unknown;
+    const data = await readerFetch<{
+      success: boolean;
+      data: { results?: unknown[] } | unknown[] | null;
+    }>(`/api/v1/catalog/search?${p}`);
+    // Backend wraps rows as {results, count}; tolerate a bare array too.
+    const payload = data.data;
+    const rows = Array.isArray(payload)
+      ? payload
+      : ((payload as { results?: unknown[] } | null)?.results ?? null);
+    return rows as unknown;
   },
 
   getCatalogStats: async () => {

@@ -14,6 +14,96 @@ logger = get_logger("api:catalog")
 router = APIRouter()
 
 
+def _voratoon_catalog_rows(q: str, wl_keys: set[str]) -> list[dict]:
+    """Search relay-held voratoon data.
+
+    api.voratoon.com is Cloudflare-blocked from this VPS, so catalog search
+    can only cover what the relay cron has already fetched (slug map +
+    recent catalogue pages). Series that never updated recently will not
+    appear here — add those from the feed card instead.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+    from app.scrapers.voratoon import _derive_format
+    from app.utils.text import slugify_title_key
+
+    base = _Path(__file__).resolve().parents[3] / "relay" / "voratoon"
+    by_title: dict[str, dict] = {}
+    try:
+        smap = _json.loads((base / "slug_map.json").read_text())
+    except Exception:
+        smap = {}
+    if isinstance(smap, dict):
+        for title, row in smap.items():
+            if not isinstance(row, dict) or not row.get("slug"):
+                continue
+            slug = str(row["slug"])
+            ctype, origin = _derive_format(row.get("format"))
+            by_title[str(title)] = {
+                "title": str(title),
+                "titleKey": slugify_title_key(str(title)),
+                "cover": row.get("cover") or "",
+                "rating": row.get("rating"),
+                "origin": origin,
+                "type": ctype,
+                "genres": [],
+                "description": "",
+                "url": f"https://v4.voratoon.com/series/{slug}",
+            }
+    try:
+        upd = _json.loads((base / "relay_updates.json").read_text())
+    except Exception:
+        upd = {}
+    rows_in = (upd or {}).get("items") if isinstance(upd, dict) else None
+    if isinstance(rows_in, list):
+        for it in rows_in:
+            if not isinstance(it, dict):
+                continue
+            title = str(it.get("title") or "").strip()
+            if not title:
+                continue
+            row = by_title.get(title) or {
+                "title": title,
+                "titleKey": str(it.get("title_key") or slugify_title_key(title)),
+                "cover": "",
+                "rating": None,
+                "origin": "",
+                "type": "",
+                "genres": [],
+                "description": "",
+                "url": str(it.get("series_url") or ""),
+            }
+            by_title[title] = row
+            for k in ("cover", "rating", "origin", "type", "description", "genres"):
+                if it.get(k) and not row.get(k):
+                    row[k] = it.get(k)
+            if it.get("series_url") and not row.get("url"):
+                row["url"] = str(it["series_url"])
+
+    ql = (q or "").strip().lower()
+    out: list[dict] = []
+    for title, row in by_title.items():
+        if ql and ql not in title.lower():
+            continue
+        tk = str(row.get("titleKey") or slugify_title_key(title))
+        out.append(
+            {
+                "title": title,
+                "titleKey": tk,
+                "cover": row.get("cover") or "",
+                "source": "voratoon",
+                "url": row.get("url") or f"https://v4.voratoon.com/series/{tk}",
+                "origin": row.get("origin") or "",
+                "isInWhitelist": tk in wl_keys or normalize_title_key(title) in wl_keys,
+                "rating": row.get("rating"),
+                "genres": row.get("genres") or [],
+                "description": row.get("description") or "",
+            }
+        )
+    out.sort(key=lambda r: r["title"].lower())
+    return out[:10]
+
+
 @router.get("/catalog/search")
 async def catalog_search(request: Request):
     if not require_monitor_auth(request):
@@ -61,6 +151,10 @@ async def catalog_search(request: Request):
             "origin": _origin_cc,
             "isInWhitelist": _is_wl,
         })
+    try:
+        results.extend(_voratoon_catalog_rows(q, _wl_keys))
+    except Exception as exc:  # noqa: BLE001 — search must not die on relay IO
+        logger.debug("voratoon catalog search skipped", err=str(exc)[:120])
     return JSONResponse(content={"success": True, "data": {"results": results, "count": len(results)}})
 
 
