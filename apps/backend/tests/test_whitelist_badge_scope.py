@@ -109,6 +109,37 @@ def dispatch_matches_dashed_and_spaced_title_keys():
     assert len(filter_whitelisted(items, wl)) == 1
 
 
+@case
+def ikiru_url_does_not_contribute_a_title_key():
+    """Ikiru's slug drops apostrophes (a-gods-ascension); the collector keys off
+    the title (a-god-s-ascension). Adopting the URL slug would create a row that
+    can never match a scraped chapter, so the series would look whitelisted and
+    silently never notify. The helper must refuse it and let the title decide."""
+    from app.services.whitelist_service import _derive_title_key_from_url
+
+    url = "https://09.ikiru.wtf/manga/a-gods-ascension"
+    got = _derive_title_key_from_url(url, "A God's Ascension")
+    assert got == "", f"ikiru URL must not yield a key, got {got!r}"
+    assert got != "a-gods-ascension", "must not adopt ikiru's apostrophe-less slug"
+
+
+@case
+def empty_url_falls_through_to_the_title():
+    from app.services.whitelist_service import _derive_title_key_from_url
+
+    assert _derive_title_key_from_url("", "The Player Hides His Past") == ""
+
+
+@case
+def generic_url_uses_its_last_segment():
+    from app.services.whitelist_service import _derive_title_key_from_url
+
+    # NB: a "/series/" path is the shinigami branch and needs a UUID, so use a
+    # path that does not collide with a known source shape.
+    got = _derive_title_key_from_url("https://example.com/titles/some-title", "ignored")
+    assert got == "some-title", f"got {got!r}"
+
+
 def main() -> int:
     failed = 0
     for fn in CASES:

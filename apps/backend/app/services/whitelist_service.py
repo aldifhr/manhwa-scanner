@@ -159,32 +159,54 @@ def get_whitelist(source: str = "", title: str = "", page: int = 1, page_size: i
         },
     }
 
+def _derive_title_key_from_url(url: str, title: str = "") -> str:
+    """Best-effort title_key when the caller sent no explicit one.
+
+    Rules, in order:
+      * ikiru `/manga/<slug>` — do NOT adopt the URL slug. Ikiru's slug
+        generator drops apostrophes (`a-gods-ascension`) while the collector
+        keys off the title (`a-god-s-ascension`). A row stored under the URL
+        form can never match a scraped chapter, so the series would look
+        whitelisted and never notify. Fall through to the title.
+      * shinigami `/series/<uuid>` — resolve the UUID to its real title.
+      * anything else — last path segment, unless it is a chapter slug.
+
+    Returns "" when nothing usable is found; the caller then falls back to
+    normalize_title_key(title).
+    """
+    if not url:
+        return ""
+    u = url.rstrip("/")
+    key = ""
+    if "/manga/" in u:
+        key = ""
+    elif "/series/" in u or "/chapter/" in u:
+        _m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", u)
+        if _m:
+            try:
+                from app.scrapers import shinigami as _sh_get
+                _ser = _sh_get.get_shinigami_series(_m.group(1))
+                if _ser and _ser.get("title"):
+                    key = normalize_title_key(_ser["title"])
+            except Exception:
+                pass
+        if not key:
+            key = ""
+    else:
+        key = u.split("/")[-1]
+    if key.startswith("chapter-"):
+        key = ""
+    return key
+
+
 def post_whitelist(title: str, url: str, source: str = "shinigami", body: dict | None = None) -> dict:
     """Add a whitelist entry with enrichment.
 
     """
 
     title_key = body.get("title_key") or "" if body else ""
-    if not title_key and url:
-        u = url.rstrip("/")
-        if "/manga/" in u:
-            title_key = u.split("/manga/")[-1].split("/")[0]
-        elif "/series/" in u or "/chapter/" in u:
-            _m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", u)
-            if _m:
-                try:
-                    from app.scrapers import shinigami as _sh_get
-                    _ser = _sh_get.get_shinigami_series(_m.group(1))
-                    if _ser and _ser.get("title"):
-                        title_key = normalize_title_key(_ser["title"])
-                except Exception:
-                    pass
-            if not title_key:
-                title_key = ""
-        else:
-            title_key = u.split("/")[-1]
-        if title_key.startswith("chapter-"):
-            title_key = ""
+    if not title_key:
+        title_key = _derive_title_key_from_url(url, title)
     if not title_key:
         title_key = normalize_title_key(title)
 
