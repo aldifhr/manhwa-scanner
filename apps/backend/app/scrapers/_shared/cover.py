@@ -12,6 +12,12 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit, urlunsplit
 
+# Hosts where the presigned query is REQUIRED to fetch at all: stripping it
+# yields a 403 from the origin and the cover dies behind the proxy's 1x1
+# placeholder. Signed URLs on these hosts are short-lived read-only cover
+# tokens, so keeping them is safe.
+_SIGNED_REQUIRED_HOSTS = {"cvr.voratoon.id"}
+
 # AWS presign param names we strip (case-insensitive).
 # Includes the full set MinIO/S3 can emit, not just the signature-bearing
 # ones — e.g. X-Amz-Content-Sha256=UNSIGNED-PAYLOAD, x-amz-checksum-mode,
@@ -47,6 +53,9 @@ def scrub_cover(url: str | None) -> str:
 
     try:
         parts = urlsplit(url)
+        if (parts.hostname or "").lower() in _SIGNED_REQUIRED_HOSTS:
+            # Signed-only origin: keep the full presigned query verbatim.
+            return url
         from urllib.parse import parse_qsl, urlencode
         kept = [
             (k, v)
