@@ -220,6 +220,14 @@ def collect_recent_chapters(
 
 
 def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
+    """Keep items whose title is whitelisted on ANY source.
+
+    Intentionally cross-source: a series is one series regardless of which site
+    carries it, and FCFS (fcfs_key = title+chapter, source-agnostic) decides who
+    wins. Whichever source reports the chapter first gets dispatched; the other
+    is deduped. Matching per-source here would delay a notification until the
+    subscribed source happened to catch up.
+    """
     allowed: set[str] = set()
     for w in whitelist:
         wk = slugify_title_key(w.get("title_key", ""))
@@ -227,7 +235,7 @@ def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
             allowed.add(wk)
     result = []
     for it in items:
-        tk = slugify_title_key(it.get('title_key', ''))
+        tk = slugify_title_key(it.get("title_key", ""))
         if tk in allowed:
             result.append(it)
     return result
