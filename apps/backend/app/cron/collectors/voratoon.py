@@ -293,7 +293,22 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
     relay = _load_relay()
     relay_chapters: dict[str, list[dict]] = (relay or {}).get("chapters") or {}
 
-    genres_by_id = vt.get_voratoon_genres() if not relay else {}
+    # Only the fallback path below needs the genre-id table, and fetching it
+    # from api.voratoon.com ALWAYS 403s from this VPS (the IP is blocked at
+    # Cloudflare's edge), so calling it up front logged a warning on every
+    # cycle for a lookup nothing used. Resolve it lazily, and only when a
+    # series actually needs it.
+    _genres_cache: dict[int, str] | None = None
+
+    def _genre_name(gid: int) -> str | None:
+        nonlocal _genres_cache
+        if _genres_cache is None:
+            try:
+                _genres_cache = vt.get_voratoon_genres()
+            except Exception:
+                _genres_cache = {}
+        return _genres_cache.get(gid)
+
     items: list[dict] = []
 
     for series in _resolve_catalog(wanted):
@@ -322,9 +337,13 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
         genres = list(series.get("genres") or [])
         if not genres:
             genres = [
-                genres_by_id[g]
-                for g in (series.get("genre_ids") or [])
-                if isinstance(g, int) and genres_by_id.get(g)
+                name
+                for name in (
+                    _genre_name(g)
+                    for g in (series.get("genre_ids") or [])
+                    if isinstance(g, int)
+                )
+                if name
             ]
 
         meta_item: dict = {}
