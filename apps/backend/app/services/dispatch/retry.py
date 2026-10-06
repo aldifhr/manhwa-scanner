@@ -60,7 +60,8 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
     # Skip if Discord is down — retrying wastes attempts and burns backoff
     if not cb_discord.allow():
         logger.info("retry_failed: Discord circuit OPEN, skipping retry pass")
-        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0, "still_failed": 0}
+        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0,
+                "skipped_unsubscribed": 0, "still_failed": 0}
 
     try:
         rows = (
@@ -74,14 +75,17 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
         ).data or []
     except Exception as e:
         logger.error("retry_failed: load failed", exc=e)
-        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0, "still_failed": 0}
+        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0,
+                "skipped_unsubscribed": 0, "still_failed": 0}
 
     if not rows:
-        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0, "still_failed": 0}
+        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0,
+                "skipped_unsubscribed": 0, "still_failed": 0}
 
     channels = channel_ids or _load_channels()
     if not channels:
-        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0, "still_failed": len(rows)}
+        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0,
+                "skipped_unsubscribed": 0, "still_failed": len(rows)}
 
     # Build URL→row mapping
     url_to_row: dict[str, dict] = {}
@@ -115,9 +119,45 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
     skipped_permanent = 0
     still_failed = 0
 
+    # Whitelist gate. failed_dispatches rows can outlive the whitelist entry
+    # that produced them (the user unsubscribes while a send is parked), and
+    # this path previously re-sent whatever was parked — so a removed series
+    # kept notifying. Retry re-delivers a FAILED send; it must not resurrect a
+    # subscription the user cancelled.
+    from app.utils.text import slugify_title_key as _slugify
+    try:
+        wl_rows = (
+            get_supabase().table("whitelist").select("title_key, source").execute().data or []
+        )
+        # Cross-source on purpose: matches filter_whitelisted() in
+        # cron/collect.py, so retry and normal dispatch agree on what is
+        # subscribed (a series is one series; FCFS dedupes the sources).
+        wl_titles = {_slugify(str(w.get("title_key") or "")) for w in wl_rows}
+        wl_titles.discard("")
+    except Exception as e:
+        # Fail CLOSED: without the whitelist we cannot tell a live subscription
+        # from a cancelled one, and sending to a cancelled one is the bug.
+        logger.error("retry_failed: whitelist load failed, skipping pass", exc=e)
+        return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0,
+                "skipped_permanent": 0, "still_failed": len(rows)}
+
+    skipped_unsubscribed = 0
+
     for row in rows:
         url = str(row.get("chapter_url", ""))
         if not url:
+            continue
+
+        # Drop rows whose series is no longer whitelisted (see gate above).
+        if _slugify(str(row.get("title_key") or "")) not in wl_titles:
+            try:
+                get_supabase().table("failed_dispatches").update(
+                    {"status": "resolved", "updated_at": now.isoformat(),
+                     "error_message": "Series no longer whitelisted"}
+                ).eq("chapter_url", url).execute()
+                skipped_unsubscribed += 1
+            except Exception:
+                pass
             continue
 
         # Check permanent failure
@@ -224,11 +264,14 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
             still_failed += 1
 
     logger.info(
-        "retry_failed completed: retried=%d resent=%d skipped_cb=%d skipped_window=%d skipped_permanent=%d still_failed=%d",
-        retried, resent, skipped_cb, skipped_window, skipped_permanent, still_failed,
+        "retry_failed completed: retried=%d resent=%d skipped_cb=%d skipped_window=%d "
+        "skipped_permanent=%d skipped_unsubscribed=%d still_failed=%d",
+        retried, resent, skipped_cb, skipped_window, skipped_permanent,
+        skipped_unsubscribed, still_failed,
     )
     return {
         "retried": retried, "resent": resent,
         "skipped_cb": skipped_cb, "skipped_window": skipped_window,
-        "skipped_permanent": skipped_permanent, "still_failed": still_failed,
+        "skipped_permanent": skipped_permanent,
+        "skipped_unsubscribed": skipped_unsubscribed, "still_failed": still_failed,
     }
