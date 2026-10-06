@@ -14,6 +14,74 @@ logger = get_logger("api:catalog")
 router = APIRouter()
 
 
+def _ikiru_catalog_rows(q: str, wl_keys: set[str]) -> list[dict]:
+    """Search the ikiru catalogue.
+
+    Unlike voratoon there is no relay to read from: the VPS reaches ikiru
+    directly (curl_cffi), so this queries the live API. Only the shelves we
+    ingest are searched (MANHWA/MANHUA — see _SHELVES), so JP does not leak
+    back in through search after being dropped from collection.
+
+    Matching is client-side because the API has no search-by-title endpoint we
+    rely on; the catalogue is small enough (a few hundred rows per shelf) to
+    filter locally.
+    """
+    from app.scrapers.ikiru import _SHELVES, TYPE_TO_ORIGIN, get_library_page
+    from app.utils.text import slugify_title_key
+
+    needle = (q or "").strip().lower()
+    if not needle:
+        return []
+
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for shelf in _SHELVES:
+        content_type, origin = TYPE_TO_ORIGIN[shelf]
+        page = 1
+        scanned = 0
+        while page <= 20:
+            batch, total = get_library_page(page=page, limit=50, manga_type=shelf)
+            if not batch:
+                break
+            for m in batch:
+                if not isinstance(m, dict):
+                    continue
+                title = str(m.get("title") or "").strip()
+                slug = str(m.get("slug") or "").strip()
+                if not title or not slug or slug in seen:
+                    continue
+                if needle not in title.lower():
+                    continue
+                seen.add(slug)
+                meta = m.get("metadata") or {}
+                genres = [
+                    str(g.get("name"))
+                    for g in (meta.get("genre") or [])
+                    if isinstance(g, dict) and g.get("name")
+                ]
+                tk = slugify_title_key(title)
+                rows.append(
+                    {
+                        "title": title,
+                        "titleKey": tk,
+                        "cover": str(m.get("featuredImage") or ""),
+                        "source": "ikiru",
+                        "url": f"{settings.IKIRU_PUBLIC_BASE}/manga/{slug}",
+                        "origin": origin,
+                        "type": content_type,
+                        "rating": meta.get("score"),
+                        "genres": genres,
+                        "description": str(m.get("description") or "").strip(),
+                        "isInWhitelist": normalize_title_key(tk) in wl_keys,
+                    }
+                )
+            scanned += len(batch)
+            if total and scanned >= total:
+                break
+            page += 1
+    return rows
+
+
 def _voratoon_catalog_rows(q: str, wl_keys: set[str]) -> list[dict]:
     """Search relay-held voratoon data.
 
@@ -155,6 +223,10 @@ async def catalog_search(request: Request):
         results.extend(_voratoon_catalog_rows(q, _wl_keys))
     except Exception as exc:  # noqa: BLE001 — search must not die on relay IO
         logger.debug("voratoon catalog search skipped", err=str(exc)[:120])
+    try:
+        results.extend(_ikiru_catalog_rows(q, _wl_keys))
+    except Exception as exc:  # noqa: BLE001 — search must not die on upstream IO
+        logger.debug("ikiru catalog search skipped", err=str(exc)[:120])
     return JSONResponse(content={"success": True, "data": {"results": results, "count": len(results)}})
 
 
