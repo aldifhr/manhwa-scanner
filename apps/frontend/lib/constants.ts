@@ -1,7 +1,7 @@
 /** Every configured source, in display order.
  *  Single source of truth for filter chips and anything that enumerates
  *  sources — the backend already answers /api/v1/sources for dynamic cases. */
-export const ALL_SOURCES = ["shinigami", "voratoon"] as const;
+export const ALL_SOURCES = ["shinigami", "voratoon", "ikiru"] as const;
 export type SourceName = (typeof ALL_SOURCES)[number];
 
 /** Normalize backend origin names → canonical frontend names.

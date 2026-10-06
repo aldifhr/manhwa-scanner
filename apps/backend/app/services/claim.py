@@ -276,8 +276,19 @@ def claim_recent_chapters_for_dispatch(
                 for _r in _claim_rows:
                     _claim_vals.extend(_r)
                 cur.execute(
+                    # The unique index on fcfs_key has no expiry, so a stale
+                    # (expired) claim would make DO NOTHING swallow the re-claim
+                    # and the chapter could never be sent. Refresh the row when
+                    # the existing one has already expired; keep DO NOTHING while
+                    # another worker's claim is still live.
                     f"INSERT INTO dispatch_claims (title_key, chapter_url, fcfs_key, created_at, expires_at, status) "
-                    f"VALUES {_claim_ph} ON CONFLICT (fcfs_key) DO NOTHING "
+                    f"VALUES {_claim_ph} "
+                    f"ON CONFLICT (fcfs_key) DO UPDATE SET "
+                    f"chapter_url = EXCLUDED.chapter_url, "
+                    f"created_at = EXCLUDED.created_at, "
+                    f"expires_at = EXCLUDED.expires_at, "
+                    f"status = EXCLUDED.status "
+                    f"WHERE dispatch_claims.expires_at < EXCLUDED.created_at "
                     f"RETURNING fcfs_key",
                     _claim_vals,
                 )

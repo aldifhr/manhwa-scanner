@@ -45,6 +45,10 @@ function resolveDetailUrl(item: WhitelistRouteItem): string | undefined {
   if (sources.includes("voratoon")) {
     return `https://v4.voratoon.com/series/${slug}`;
   }
+  // Ikiru series pages live under /manga/<slug>.
+  if (sources.includes("ikiru")) {
+    return `https://09.ikiru.wtf/manga/${slug}`;
+  }
   return undefined;
 }
 import { useRef } from "react";

@@ -207,7 +207,13 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
                 _cur.execute(f"SELECT fcfs_key FROM dispatch_history WHERE fcfs_key IN ({ph2})", uniq)
                 fcfs_already |= {r["fcfs_key"] for r in _cur.fetchall() if r.get("fcfs_key")}
                 try:
-                    _cur.execute(f"SELECT fcfs_key FROM dispatch_claims WHERE fcfs_key IN ({ph2})", uniq)
+                    # Expiry filter is mandatory: a claim that already expired
+                    # is not held by anyone, and without this filter a stale row
+                    # blocks re-claiming the chapter forever.
+                    _cur.execute(
+                        f"SELECT fcfs_key FROM dispatch_claims WHERE fcfs_key IN ({ph2}) AND expires_at >= %s",
+                        uniq + [now.isoformat()],
+                    )
                     fcfs_already |= {r["fcfs_key"] for r in _cur.fetchall() if r.get("fcfs_key")}
                 except Exception as ce:
                     if "does not exist" not in str(ce):
@@ -265,14 +271,22 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
                     for row in with_fk:
                         cols = list(row.keys())
                         vals = [row[c] for c in cols]
-                        # Build INSERT ... ON CONFLICT (fcfs_key) DO NOTHING
-                        # P1 fix: DO UPDATE would let a second worker silently
-                        # overwrite an active claim; DO NOTHING means only the
-                        # first INSERT wins (caller checks which rows inserted).
+                        # Build INSERT ... ON CONFLICT (fcfs_key) DO UPDATE
+                        # P1 fix: an unconditional DO UPDATE would let a second
+                        # worker silently overwrite an ACTIVE claim. Guard the
+                        # update so it only refreshes a claim that has already
+                        # expired — a stale row otherwise blocks the re-claim
+                        # forever (the unique index has no expiry).
                         placeholders = ", ".join(["%s"] * len(cols))
                         col_list = ", ".join(cols)
-                        sql = f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) ON CONFLICT (fcfs_key) DO NOTHING"
-                        _cur.execute(sql, vals)
+                        sql = (
+                            f"INSERT INTO dispatch_claims ({col_list}) VALUES ({placeholders}) "
+                            f"ON CONFLICT (fcfs_key) DO UPDATE SET "
+                            f"chapter_url = EXCLUDED.chapter_url, "
+                            f"expires_at = EXCLUDED.expires_at "
+                            f"WHERE dispatch_claims.expires_at < %s"
+                        )
+                        _cur.execute(sql, vals + [now.isoformat()])
                 if without_fk:
                     for row in without_fk:
                         cols = list(row.keys())
