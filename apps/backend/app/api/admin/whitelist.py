@@ -22,7 +22,7 @@ router = APIRouter()
 class WhitelistCreate(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
     title: str = Field(..., min_length=1, max_length=200)
-    source: Literal["shinigami"] = Field(default="shinigami")
+    source: Literal["shinigami", "voratoon"] = Field(default="shinigami")
     title_key: Optional[str] = Field(default=None, max_length=200)
     titleKey: Optional[str] = Field(default=None, max_length=200)
     cover: Optional[str] = Field(default=None, max_length=2000)
