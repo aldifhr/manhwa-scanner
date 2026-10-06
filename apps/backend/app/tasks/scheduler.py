@@ -7,11 +7,11 @@ import time as _time
 
 logger = logging.getLogger("tasks.scheduler")
 
-# voratoon is disabled: the API rate-limited this IP into a 403 on every
-# request (series, chapters and the v4 site alike). Re-enable once the
-# block clears, and keep the cache interval generous.
-_RSS_SOURCES = ("shinigami",)
-_RSS_DISABLED_SOURCES = ("voratoon",)
+# voratoon runs through the Hermes relay: the VPS IP is Cloudflare-blocked
+# for api.voratoon.com, so a cron agent fetches the sorted catalogue via its
+# own egress and drops it into relay/voratoon/relay_updates.json. The direct
+# API walk stays as fallback in the collector if the relay file goes stale.
+_RSS_SOURCES = ("shinigami", "voratoon")
 
 
 def _disabled_sources() -> set[str]:

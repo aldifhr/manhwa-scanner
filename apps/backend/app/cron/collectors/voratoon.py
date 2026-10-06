@@ -42,6 +42,44 @@ MAX_CHAPTERS_PER_SERIES = 25
 _CATALOG_CACHE = Path("/tmp/voratoon_catalog_cache.json")
 _CATALOG_TTL_S = 3600.0
 
+# The VPS IP is Cloudflare-blocked for api.voratoon.com, so a Hermes cron job
+# fetches the payloads from its own egress and drops them here. Relay rows are
+# already normalized by relay/voratoon/build_relay.py; when the file is stale
+# or missing the code falls through to the direct API, which keeps working if
+# the IP block ever lifts.
+_RELAY_PATH = Path(__file__).resolve().parents[3] / "relay" / "voratoon" / "relay.json"
+_RELAY_TTL_S = 3600.0
+
+# The full sweep: every catalogue page the relay cron fetched (sorted latest,
+# takeChapter embedded), normalized by relay/voratoon/build_updates.py. This
+# is the primary source — it covers every series with a chapter inside the
+# lookback, not just whitelisted ones. relay.json stays as the enrichment
+# layer for whitelist titles (description/genres) and the fallback path.
+_UPDATES_PATH = Path(__file__).resolve().parents[3] / "relay" / "voratoon" / "relay_updates.json"
+
+
+def _load_updates_relay() -> list[dict] | None:
+    try:
+        data = json.loads(_UPDATES_PATH.read_text())
+        ts = _parse_ts(data.get("fetched_at"))
+        if ts is None or (datetime.now(timezone.utc) - ts).total_seconds() > _RELAY_TTL_S:
+            return None
+        items = data.get("items")
+        return items if isinstance(items, list) else None
+    except Exception:
+        return None
+
+
+def _load_relay() -> dict | None:
+    try:
+        data = json.loads(_RELAY_PATH.read_text())
+        ts = _parse_ts(data.get("fetched_at"))
+        if ts is None or (datetime.now(timezone.utc) - ts).total_seconds() > _RELAY_TTL_S:
+            return None
+        return data if isinstance(data.get("series"), dict) else None
+    except Exception:
+        return None
+
 
 def _load_catalog_cache() -> list[dict]:
     try:
@@ -66,7 +104,18 @@ def _store_catalog_cache(rows: list[dict]) -> None:
 
 
 def _resolve_catalog(wanted: dict[str, dict]) -> list[dict]:
-    """Whitelisted series rows, walking the API only when the cache is cold."""
+    """Whitelisted series rows: relay first, then the direct API walk."""
+    relay = _load_relay()
+    if relay:
+        matched = [
+            row
+            for row in relay["series"].values()
+            if isinstance(row, dict)
+            and slugify_title_key(str(row.get("title_key") or row.get("title") or "")) in wanted
+        ]
+        if matched:
+            logger.info("voratoon catalog from relay", matched=len(matched), whitelist=len(wanted))
+            return matched
     cached = _load_catalog_cache()
     if cached:
         return cached
@@ -122,6 +171,81 @@ def _parse_ts(value) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def _items_from_updates(
+    updates: list[dict],
+    cutoff: datetime,
+    latest_sent: dict,
+    fetch_meta: bool = True,
+) -> list[dict]:
+    """Normalize relay updates rows into collector items.
+
+    Rows arrive pre-built by relay/voratoon/build_updates.py (all fields the
+    pipeline needs). This applies the same gates the whitelist walk uses —
+    freshness cutoff and the dispatch ceiling — plus series_meta enrichment
+    for whatever the catalogue payload left empty.
+    """
+    items: list[dict] = []
+    for row in updates:
+        if not isinstance(row, dict):
+            continue
+        tk = str(row.get("title_key") or "").strip()
+        if not tk:
+            continue
+        dt = _parse_ts(row.get("updated_time"))
+        if dt is None or dt < cutoff:
+            continue
+
+        ch_str = str(row.get("chapter") or "").strip()
+        num = _parse_chapter_num(ch_str)
+        ceiling = latest_sent.get((tk, SOURCE), 0)
+        if num is not None and ceiling and num <= ceiling:
+            continue
+
+        rating = row.get("rating")
+        if rating in (None, ""):
+            rating = 0.0
+        description = str(row.get("description") or "").strip()
+        genres = list(row.get("genres") or [])
+        content_type = str(row.get("type") or "").lower()
+
+        if fetch_meta:
+            try:
+                meta_item = series_meta.get(SOURCE, tk) or {}
+            except Exception:
+                meta_item = {}
+            if isinstance(meta_item, dict):
+                if not rating and meta_item.get("rating") not in (None, ""):
+                    rating = normalize_rating(meta_item.get("rating")) or 0.0
+                if not description and meta_item.get("description"):
+                    description = str(meta_item.get("description") or "").strip()
+                if not genres and meta_item.get("genres"):
+                    genres = list(meta_item.get("genres") or [])
+                if not content_type and meta_item.get("type"):
+                    content_type = str(meta_item.get("type") or "").lower()
+
+        items.append(
+            {
+                "title": str(row.get("title") or "").strip(),
+                "title_key": tk,
+                "chapter": ch_str,
+                "chapter_num": num,
+                "url": str(row.get("url") or row.get("chapter_url") or ""),
+                "source": SOURCE,
+                "cover": str(row.get("cover") or ""),
+                "series_url": str(row.get("series_url") or ""),
+                "chapter_url": str(row.get("chapter_url") or row.get("url") or ""),
+                "origin": str(row.get("origin") or ""),
+                "updated_time": dt.isoformat(),
+                "release_date": dt.isoformat(),
+                "rating": rating,
+                "genres": genres,
+                "description": description,
+                "type": content_type,
+            }
+        )
+    return items
+
+
 def _walk_series(max_pages: int = MAX_PAGES):
     """Yield series rows from the paginated endpoint."""
     from app.scrapers import voratoon as vt
@@ -151,11 +275,25 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback)
 
     wanted = _whitelisted_keys()
+
+    # Primary path: the updates relay covers every series with a chapter in
+    # the lookback window, not just whitelisted ones. Whitelist gates
+    # dispatch downstream, not collection. Falls through to the whitelist
+    # walk when the relay file is stale or missing.
+    updates = _load_updates_relay()
+    if updates is not None:
+        items = _items_from_updates(updates, cutoff, latest_sent, fetch_meta)
+        logger.info("voratoon collect from updates relay", items=len(items), whitelist=len(wanted))
+        return attach_confidence(items, SOURCE)
+
     if not wanted:
         logger.debug("voratoon: empty whitelist, nothing to do")
         return []
 
-    genres_by_id = vt.get_voratoon_genres()
+    relay = _load_relay()
+    relay_chapters: dict[str, list[dict]] = (relay or {}).get("chapters") or {}
+
+    genres_by_id = vt.get_voratoon_genres() if not relay else {}
     items: list[dict] = []
 
     for series in _resolve_catalog(wanted):
@@ -180,12 +318,14 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
         if series.get("rating") not in (None, ""):
             rating = normalize_rating(series.get("rating")) or 0.0
 
-        description = ""
-        genres = [
-            genres_by_id[g]
-            for g in (series.get("genre_ids") or [])
-            if isinstance(g, int) and genres_by_id.get(g)
-        ]
+        description = str(series.get("description") or "").strip()
+        genres = list(series.get("genres") or [])
+        if not genres:
+            genres = [
+                genres_by_id[g]
+                for g in (series.get("genre_ids") or [])
+                if isinstance(g, int) and genres_by_id.get(g)
+            ]
 
         meta_item: dict = {}
         if fetch_meta:
@@ -207,7 +347,7 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
         slug = series.get("slug") or tk
         series_url = vt.series_url_for(slug)
 
-        chapters = vt.get_voratoon_chapters(sid)
+        chapters = relay_chapters.get(tk) or vt.get_voratoon_chapters(sid)
         if not chapters:
             continue
 
