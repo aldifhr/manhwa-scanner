@@ -48,6 +48,9 @@ TYPE_TO_ORIGIN = {
     "MANGA": ("manga", "JP"),
 }
 
+# Shelves actually ingested. MANGA (JP) is excluded — see iter_all_series().
+_SHELVES = ("MANHWA", "MANHUA")
+
 _cf = None
 
 
@@ -159,8 +162,14 @@ def get_series_detail(slug: str) -> dict | None:
 
 
 def iter_all_series(max_pages: int = MAX_PAGES):
-    """Walk every catalogue type, yielding raw series rows."""
-    for manga_type in TYPE_TO_ORIGIN:
+    """Walk the catalogue shelves we actually ingest.
+
+    MANGA (JP) is deliberately excluded: the JP shelf is the largest of the
+    three (183 of 287 rows) and the user does not want JP chapters scraped at
+    all — dropping it here also removes ~1/3 of the page requests. To bring JP
+    back, add "MANGA" to _SHELVES.
+    """
+    for manga_type in _SHELVES:
         page = 1
         seen = 0
         while page <= max_pages:

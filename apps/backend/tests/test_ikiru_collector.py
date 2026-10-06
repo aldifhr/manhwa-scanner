@@ -107,6 +107,28 @@ def ikiru_is_a_registered_source():
     assert "cdn.ikiru.id:443" in settings.get_proxy_hosts()
 
 
+@case
+def jp_shelf_is_not_scraped():
+    """MANGA (JP) is deliberately excluded — the user does not want JP chapters.
+    Dropping the shelf also removes ~1/3 of the page requests. If JP reappears
+    in the collector, this trips."""
+    from app.scrapers.ikiru import TYPE_TO_ORIGIN, _SHELVES
+
+    assert "MANGA" not in _SHELVES, "MANGA/JP shelf must not be walked"
+    assert _SHELVES == ("MANHWA", "MANHUA")
+    # the mapping stays complete so re-enabling is a one-line change
+    assert TYPE_TO_ORIGIN["MANGA"] == ("manga", "JP")
+
+
+@case
+def collector_output_never_contains_jp():
+    from app.scrapers.ikiru import _SHELVES, TYPE_TO_ORIGIN
+
+    for shelf in _SHELVES:
+        _type, origin = TYPE_TO_ORIGIN[shelf]
+        assert origin != "JP", f"{shelf} would emit JP rows"
+
+
 def main() -> int:
     failed = 0
     for fn in CASES:
