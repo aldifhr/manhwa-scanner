@@ -1,5 +1,6 @@
 """OpenAPI customizer — whitelist + RSS pagination params + dual format/country."""
 from fastapi.openapi.utils import get_openapi
+from app.config import VALID_SOURCES
 
 _openapi_schema = None
 
@@ -26,7 +27,7 @@ def custom_openapi(app):
     _wl_params = [
         {"name": "page", "in": "query", "required": False, "schema": {"type": "integer", "default": 1, "minimum": 1}, "description": "Page number (1-based)."},
         {"name": "page_size", "in": "query", "required": False, "schema": {"type": "integer", "default": 100, "minimum": 1, "maximum": 10000}, "description": "Rows per page (1..10000)."},
-        {"name": "source", "in": "query", "required": False, "schema": {"type": "string", "enum": ["shinigami", "voratoon"]}, "description": "Filter by source."},
+        {"name": "source", "in": "query", "required": False, "schema": {"type": "string", "enum": list(VALID_SOURCES)}, "description": "Filter by source."},
         {"name": "title", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Case-insensitive title search."},
         {"name": "cursor", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Keyset cursor (created_at ISO) for pagination — preferred over page for large tables."},
         {"name": "merge", "in": "query", "required": False, "schema": {"type": "boolean", "default": False}, "description": "Merge cross-source rows into one (groups sources into sources[] array)."},
@@ -44,7 +45,7 @@ def custom_openapi(app):
         {"name": "type", "in": "query", "required": False, "schema": {"type": "string", "enum": ["manhwa", "manhua", "manga"]}, "description": "Legacy alias for format. Prefer 'format'."},
         {"name": "country", "in": "query", "required": False, "schema": {"type": "string", "enum": ["KR", "CN", "JP"]}, "description": "Filter by country of origin. Dual-read: accepts 'origin' as legacy alias."},
         {"name": "origin", "in": "query", "required": False, "schema": {"type": "string", "enum": ["KR", "CN", "JP"]}, "description": "Legacy alias for country. Prefer 'country'."},
-        {"name": "source", "in": "query", "required": False, "schema": {"type": "string", "enum": ["shinigami", "voratoon"]}, "description": "Filter by source."},
+        {"name": "source", "in": "query", "required": False, "schema": {"type": "string", "enum": list(VALID_SOURCES)}, "description": "Filter by source."},
         {"name": "exclude", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Exclude country codes (comma-separated, e.g. JP)."},
         {"name": "exclude_origin", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Legacy alias for exclude."},
         {"name": "q", "in": "query", "required": False, "schema": {"type": "string", "maxLength": 100}, "description": "Search title (case-insensitive ILIKE)."},

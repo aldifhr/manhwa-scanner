@@ -7,6 +7,7 @@ Sets the `manhwa_dashboard_session` JWT cookie used by the FE gate.
 from __future__ import annotations
 
 import hmac
+from app.utils.request_auth import validation_422
 import time
 
 from fastapi import APIRouter, Request
@@ -124,7 +125,7 @@ async def auth_handler(request: Request):
     except Exception as ve:
         from pydantic import ValidationError as _VE
         if isinstance(ve, _VE):
-            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            return validation_422(ve)
         raise
     password = str(data.password).strip()
 

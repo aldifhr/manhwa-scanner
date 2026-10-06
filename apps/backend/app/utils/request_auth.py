@@ -68,3 +68,29 @@ def safe_error(e: Exception, message: str = "internal server error") -> dict:
     except Exception:
         pass
     return {"success": False, "error": message}
+
+
+def validation_422(ve):
+    """JSON-safe 422 response for a pydantic ValidationError.
+
+    `ve.errors()` embeds the raised exception under ctx.error for custom
+    validators ({"ctx": {"error": ValueError(...)}}). ValueError is not JSON
+    serializable, so json.dumps raises inside JSONResponse and every validation
+    failure becomes a 500 instead of a 422. Stringify anything exception-like.
+    """
+    from fastapi.responses import JSONResponse
+
+    details = []
+    for err in ve.errors():
+        e = dict(err)
+        ctx = e.get("ctx")
+        if isinstance(ctx, dict):
+            e["ctx"] = {
+                k: (str(v) if isinstance(v, BaseException) else v)
+                for k, v in ctx.items()
+            }
+        details.append(e)
+    return JSONResponse(
+        content={"success": False, "error": "validation_error", "details": details},
+        status_code=422,
+    )

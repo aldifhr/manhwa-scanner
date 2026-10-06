@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 
 from app.logger import get_logger
-from app.utils.request_auth import require_monitor_auth, int_safe, safe_error
+from app.utils.request_auth import require_monitor_auth, int_safe, safe_error, validation_422
 from app.services.audit import log_action, AuditAction
 
 
@@ -133,7 +133,7 @@ async def failed_dispatches_action(request: Request):
     except Exception as ve:
         from pydantic import ValidationError as _VE
         if isinstance(ve, _VE):
-            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            return validation_422(ve)
         raise
     dispatch_id = validated.id
     if not dispatch_id:
@@ -223,7 +223,7 @@ async def failed_dispatches_delete(request: Request):
             except Exception as ve:
                 from pydantic import ValidationError as _VE2
                 if isinstance(ve, _VE2):
-                    return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+                    return validation_422(ve)
                 raise
             chapter_url = validated_del.chapter_url or validated_del.id or ""
         except Exception as e:

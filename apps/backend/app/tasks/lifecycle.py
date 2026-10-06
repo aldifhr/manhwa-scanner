@@ -211,18 +211,24 @@ def run_cron_worker() -> None:
             _cleanup_orphaned_set_entries()
 
 def get_cron_status() -> dict:
-    """Snapshot of the internal cron scheduler for the /cron monitor page."""
+    """Snapshot of the internal cron scheduler for the /cron monitor page.
+
+    Every interval is read from the scheduler's own constants — hardcoding them
+    here silently lied (it reported a 600s scrape interval while the scheduler
+    ran at 300s, and listed only shinigami after two more sources were added).
+    Add a source or retune an interval and this follows automatically.
+    """
     from datetime import datetime, timezone
-    from app.tasks.scheduler import _SCHED_THREAD
+    from app.tasks import scheduler as _sched
 
     status: dict = {
-        "scheduler_alive": bool(_SCHED_THREAD and _SCHED_THREAD.is_alive()),
-        "source_interval_s": 600,
-        "dispatch_interval_s": 120,
-        "enrich_interval_s": 3600,
-        "enrich_missing_interval_s": 3600,
-        "enrich_refresh_interval_s": 604800,
-        "sources": ["shinigami"],
+        "scheduler_alive": bool(_sched._SCHED_THREAD and _sched._SCHED_THREAD.is_alive()),
+        "source_interval_s": _sched._SOURCE_INTERVAL_S,
+        "dispatch_interval_s": _sched._DISPATCH_INTERVAL_S,
+        "enrich_interval_s": _sched._ENRICH_INTERVAL_S,
+        "enrich_missing_interval_s": _sched._ENRICH_MISSING_INTERVAL_S,
+        "enrich_refresh_interval_s": _sched._ENRICH_REFRESH_INTERVAL_S,
+        "sources": list(_sched._RSS_SOURCES),
         "now": datetime.now(timezone.utc).isoformat(),
     }
     try:
@@ -243,7 +249,7 @@ def get_cron_status() -> dict:
     try:
         from app.db import get_supabase
         sb = get_supabase()
-        for src in ("shinigami",):
+        for src in _sched._RSS_SOURCES:
             last = None
             if r is not None:
                 try:
@@ -274,7 +280,7 @@ def get_cron_status() -> dict:
                     if lt.tzinfo is None:
                         lt = lt.replace(tzinfo=timezone.utc)
                     elapsed = (datetime.now(timezone.utc) - lt).total_seconds()
-                    next_in = max(0, 600 - elapsed)
+                    next_in = max(0, _sched._SOURCE_INTERVAL_S - elapsed)
                 except Exception:
                     next_in = None
             src_status[src] = {"last_scrape": last, "next_scrape_in_s": next_in}

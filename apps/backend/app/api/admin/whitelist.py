@@ -1,7 +1,7 @@
 """Auto-split from dashboard.py — whitelist routes."""
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Literal, Optional
 
 from app.logger import get_logger
@@ -13,16 +13,31 @@ from app.services.whitelist_service import (
     patch_whitelist,
     normalize_whitelist_urls,
 )
-from app.utils.request_auth import require_monitor_auth, int_safe, safe_error
+from app.utils.request_auth import require_monitor_auth, int_safe, safe_error, validation_422
 from app.services.audit import log_action, AuditAction
 
 logger = get_logger("api:whitelist")
 router = APIRouter()
 
+
 class WhitelistCreate(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
     title: str = Field(..., min_length=1, max_length=200)
-    source: Literal["shinigami", "voratoon"] = Field(default="shinigami")
+    # Validated against config.VALID_SOURCES rather than a hardcoded Literal.
+    # A source missing from the Literal was rejected with a 422 on POST, so the
+    # FE's "Add WL" silently failed for it even though every downstream layer
+    # supported it. Reading the config keeps this in step automatically.
+    source: str = Field(default="shinigami")
+
+    @field_validator("source")
+    @classmethod
+    def _known_source(cls, v: str) -> str:
+        from app.config import VALID_SOURCES
+
+        val = (v or "").strip().lower()
+        if val not in VALID_SOURCES:
+            raise ValueError(f"unknown source {v!r}; expected one of {list(VALID_SOURCES)}")
+        return val
     title_key: Optional[str] = Field(default=None, max_length=200)
     titleKey: Optional[str] = Field(default=None, max_length=200)
     cover: Optional[str] = Field(default=None, max_length=2000)
@@ -142,7 +157,7 @@ async def whitelist_post(request: Request):
     except Exception as ve:
         from pydantic import ValidationError as _VE
         if isinstance(ve, _VE):
-            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            return validation_422(ve)
         raise
     # normalize aliases: title_key/titleKey -> title_key, seriesUrl/series_url/url -> url
     title = data.title
@@ -183,7 +198,7 @@ async def whitelist_delete(request: Request):
     except Exception as ve:
         from pydantic import ValidationError as _VE
         if isinstance(ve, _VE):
-            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            return validation_422(ve)
         raise
     # Accept any identifier the FE might send (id/title_key/title/url/source).
     title_key = validated_del.title_key or validated_del.titleKey or ""
@@ -243,7 +258,7 @@ async def whitelist_patch(request: Request):
     except Exception as ve:
         from pydantic import ValidationError as _VE2
         if isinstance(ve, _VE2):
-            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            return validation_422(ve)
         raise
     # resolve title_key from aliases
     title_key = data.title_key or data.titleKey or ""
@@ -293,7 +308,7 @@ async def whitelist_normalize_urls(request: Request):
     except Exception as ve:
         from pydantic import ValidationError as _VE
         if isinstance(ve, _VE):
-            return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+            return validation_422(ve)
         raise
     dry_run = bool(validated_norm.dry_run)
     res = normalize_whitelist_urls(dry_run=dry_run)

@@ -16,7 +16,7 @@ from typing import Optional
 from app.logger import get_logger
 from app.storage import excluded_titles as excl_store
 from app.utils.text import slugify_title_key
-from app.utils.request_auth import require_monitor_auth, safe_error, int_safe
+from app.utils.request_auth import require_monitor_auth, safe_error, int_safe, validation_422
 from app.config import EXCLUDE_SOURCES
 from app.services.audit import log_action, AuditAction
 
@@ -163,7 +163,7 @@ async def post_excluded(request: Request):
         except Exception as ve:
             from pydantic import ValidationError as _VE
             if isinstance(ve, _VE):
-                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+                return validation_422(ve)
             raise
         title_key = slugify_title_key(data.title_key.strip())
         title = data.title
@@ -211,7 +211,7 @@ async def delete_excluded(request: Request):
         except Exception as ve:
             from pydantic import ValidationError as _VE
             if isinstance(ve, _VE):
-                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+                return validation_422(ve)
             raise
         title_key = data.title_key.strip()  # Don't slugify - use as-is to match DB
         source = data.source.strip().lower()
@@ -256,7 +256,7 @@ async def post_excluded_bulk(request: Request):
         except Exception as ve:
             from pydantic import ValidationError as _VE
             if isinstance(ve, _VE):
-                return JSONResponse(content={"success": False, "error": "validation_error", "details": ve.errors()}, status_code=422)
+                return validation_422(ve)
             raise
         source = data.source.strip()
         if source not in EXCLUDE_SOURCES:
