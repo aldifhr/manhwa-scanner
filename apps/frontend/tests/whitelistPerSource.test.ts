@@ -85,12 +85,12 @@ describe("groupChapters — per-source whitelist state", () => {
 
   it("does not duplicate a source that appears in several chapters", () => {
     const g = groupChapters([
-      ch({ source: "ikiru", isWhitelisted: true, chapter: "1", chapterNumber: 1 }),
-      ch({ source: "ikiru", isWhitelisted: true, chapter: "2", chapterNumber: 2 }),
+      ch({ source: "voratoon", isWhitelisted: true, chapter: "1", chapterNumber: 1 }),
+      ch({ source: "voratoon", isWhitelisted: true, chapter: "2", chapterNumber: 2 }),
     ])[0]!;
 
-    expect(g.sources).toEqual(["ikiru"]);
-    expect(g.whitelistedSources).toEqual(["ikiru"]);
+    expect(g.sources).toEqual(["voratoon"]);
+    expect(g.whitelistedSources).toEqual(["voratoon"]);
   });
 
   it("handles a source that only appears on a non-whitelisted chapter", () => {
