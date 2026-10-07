@@ -26,8 +26,19 @@ def normalize_title(title: str) -> str:
     return _slugify(str(title or ""))
 
 def normalize_chapter(ch_str: str | int | float | None) -> str:
-    """Canonical chapter token: 12.50 → 12.5, 160-2 → 160.2, 012 → 12."""
-    s = str(ch_str or "").strip()
+    """Canonical chapter token: 12.50 → 12.5, 160-2 → 160.2, 012 → 12.
+
+    `None` and "" collapse to "", but a numeric 0 stays "0": the previous
+    `str(ch_str or "")` treated int 0 as absent because 0 is falsy, so
+    normalize_chapter(0) returned "" while normalize_chapter("0") returned "0".
+    Those two produce DIFFERENT fcfs_keys, so the same chapter reported by one
+    source as a number and another as a string would not dedupe — a duplicate
+    notification. No chapter 0 exists in the data yet; this is a latent trap,
+    not an active bug.
+    """
+    if ch_str is None:
+        return ""
+    s = str(ch_str).strip()
     if not s:
         return s
     m = re.match(r"^(\d+)(?:[.\-](\d+))?$", s)

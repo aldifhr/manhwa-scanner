@@ -76,6 +76,16 @@ def run_cron_inline(action: str) -> None:
         check_and_alert()
         return
 
+    if action == "dispatch-watchdog":
+        # Separate from "watchdog" on purpose: that one reports on dispatch LAG
+        # per whitelisted series, this one answers "is the pipeline alive and is
+        # anything eligible but undelivered". Different questions, different
+        # cadence.
+        from app.cron.dispatch_watchdog import check_dispatch_starvation
+        result = check_dispatch_starvation()
+        logger.info("cron dispatch-watchdog done", **result)
+        return
+
     if action == "dashboard-snapshot":
         from app.api.admin.stats import build_snapshot_sync
         from app.storage import health

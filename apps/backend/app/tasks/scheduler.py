@@ -43,6 +43,9 @@ _ALERT_INTERVAL_S = 600
 # Watchdog runs on the scheduler's own beat, not as an external cron: it
 # reports on dispatch lag, so it has to live where dispatch is scheduled.
 _WATCHDOG_INTERVAL_S = 900
+# Pipeline liveness + undelivered chapters. Every 5 min so an outage is caught
+# well inside the 30-minute starvation threshold.
+_DISPATCH_WATCHDOG_INTERVAL_S = 300
 _VSERIES_REFRESH_INTERVAL_S = 3600
 
 _SCHED_THREAD: threading.Thread | None = None
@@ -61,6 +64,7 @@ def _scheduler_loop() -> None:
     last_retention = 0.0
     last_alert = 0.0
     last_watchdog = 0.0
+    last_dispatch_watchdog = 0.0
     logger.info("cron scheduler started",
                 sources=_RSS_SOURCES, source_interval=_SOURCE_INTERVAL_S,
                 dispatch_interval=_DISPATCH_INTERVAL_S,
@@ -153,6 +157,12 @@ def _scheduler_loop() -> None:
                 try:
                     enqueue_cron("watchdog")
                     last_watchdog = _now
+                except Exception:
+                    pass
+            if _now - last_dispatch_watchdog >= _DISPATCH_WATCHDOG_INTERVAL_S:
+                try:
+                    enqueue_cron("dispatch-watchdog")
+                    last_dispatch_watchdog = _now
                 except Exception:
                     pass
             if _now - last_dashboard >= _DASHBOARD_INTERVAL_S:
