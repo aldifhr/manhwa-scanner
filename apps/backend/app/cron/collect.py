@@ -24,6 +24,44 @@ import time as _time
 logger = get_logger("cron:collect")
 health_store = health
 
+# How many whitelisted shinigami series one tick may walk.
+#
+# The walk is serial and costs ~1.8s per series (measured against the live
+# API), so 246 whitelisted series need ~452s — which is what made an rss-fetch
+# tick take 116-153s and starve the single-worker queue until `update` never
+# ran. The budget must therefore fit both _SOURCE_TIMEOUT (120s) and the tick
+# interval; 40 series is ~72s, leaving headroom for the other collectors that
+# run in the same tick.
+#
+# Override with SHINIGAMI_WALK_BUDGET for a one-off full sweep.
+_WALK_BUDGET_PER_TICK = int(os.getenv("SHINIGAMI_WALK_BUDGET", "40") or 40)
+_WALK_CURSOR_KEY = "beag:shinigami_walk_cursor"
+
+
+def _load_walk_cursor() -> int:
+    """Read the rotating walk cursor. Missing/unparsable restarts at 0.
+
+    The walk is idempotent (chapters already sent are filtered by the
+    latest_sent ceiling), so a reset costs a repeated pass, never a lost
+    chapter.
+    """
+    try:
+        from app.tasks.queue import _get_redis
+        v = _get_redis().get(_WALK_CURSOR_KEY)
+        n = int(v) if v is not None else 0
+        return n if n >= 0 else 0
+    except Exception:
+        return 0
+
+
+def _save_walk_cursor(cursor: int) -> None:
+    """Persist the cursor. A failure only costs a repeated slice."""
+    try:
+        from app.tasks.queue import _get_redis
+        _get_redis().set(_WALK_CURSOR_KEY, max(0, int(cursor)), ex=86400)
+    except Exception as e:
+        logger.debug("walk cursor save failed", err=str(e)[:120])
+
 
 def collect_recent_chapters(
     with_whitelisted_shinigami: bool = False,
@@ -274,6 +312,32 @@ def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:
             continue
         seen_ids.add(mid)
         ids.append((mid, wk, w.get("title") or wk.replace("_", " ").title()))
+
+    # ── Bound the walk, and rotate through the rest ──
+    #
+    # This walk is SERIAL and costs ~1.8s per series against the live API.
+    # Measured: 246 whitelisted series => ~452s. That is the single reason an
+    # rss-fetch tick took 116-153s, which starved the worker (one job at a
+    # time) until the `update` job never reached the front of the queue — the
+    # 7-hour notification outage.
+    #
+    # The walk exists only to catch the chapters BETWEEN the latest_sent
+    # ceiling and the newest one, because the latest-updates feed collapses a
+    # batch release into a single row. So it does not need to cover everything
+    # every tick: it takes a bounded slice and resumes from a stored cursor.
+    # Worst case a middle chapter waits one full rotation, which is far better
+    # than the walk being killed outright and nothing being covered.
+    total = len(ids)
+    if total == 0:
+        return []
+    budget = max(1, _WALK_BUDGET_PER_TICK)
+    if total > budget:
+        start = _load_walk_cursor() % total
+        ids = [ids[(start + i) % total] for i in range(budget)]
+        _save_walk_cursor((start + len(ids)) % total)
+    else:
+        _save_walk_cursor(0)
+
     items: list[dict] = []
     API_CHAPTER_LIMIT = 100
     # Freshness scan: fetch pages only while chapters are still inside the

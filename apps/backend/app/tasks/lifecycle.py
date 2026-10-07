@@ -142,7 +142,16 @@ def _recover_processing() -> None:
         r = _get_redis()
         for proc_key, main_key in [(CRON_PROCESSING_KEY, CRON_QUEUE_KEY), (QUEUE_PROCESSING_KEY, QUEUE_KEY)]:
             while True:
-                job = r.rpoplpush(proc_key, main_key)
+                # lmove (Redis 6.2+) preserves FIFO: pop from the processing
+                # list's TAIL and push to the main list's HEAD, which is where
+                # enqueue_cron LPUSHes and the worker BRPOPLPUSHes from. The
+                # older rpoplpush pushed to the head of a list the worker reads
+                # from the tail, so recovered jobs were re-ordered behind
+                # everything already queued.
+                try:
+                    job = r.lmove(proc_key, main_key, "RIGHT", "LEFT")
+                except AttributeError:
+                    job = r.rpoplpush(proc_key, main_key)
                 if not job:
                     break
                 logger.debug("recovered orphaned job from processing", queue=main_key)

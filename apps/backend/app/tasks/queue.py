@@ -38,7 +38,17 @@ def _get_redis():
 
 
 def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
-    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload — atomic without RPOP compensation."""
+    """Push a cron pipeline job onto the Redis cron queue. Dedup by payload — atomic without RPOP compensation.
+
+    ORDERING: this LPUSHes and the worker BRPOPLPUSHes, which together are
+    FIFO. It used to RPUSH, and since BRPOPLPUSH takes from the same end, the
+    queue behaved as a LIFO stack: every newly scheduled job jumped ahead of
+    the ones already waiting. With `update` enqueued every 120s and three
+    rss-fetch jobs every 300s, `update` was buried by each new arrival and
+    never ran — a 7-hour notification outage with the job sitting in the queue
+    the whole time. Oldest-first is the only ordering under which a
+    repeatedly-enqueued job is guaranteed to reach the front.
+    """
     payload: dict = {"action": action}
     if source:
         payload["source"] = source
@@ -47,11 +57,11 @@ def enqueue_cron(action: str, source: str = "", title: str = "") -> None:
     payload_json = json.dumps(payload, sort_keys=True)
     try:
         r = _get_redis()
-        # Atomic SADD+RPUSH+EXPIRE via Lua — no outer RPOP needed (RPOP would pop чужой tail on race)
+        # Atomic SADD+LPUSH+EXPIRE via Lua — no outer RPOP needed (RPOP would pop чужой tail on race)
         # EXPIRE 86400 is orphan safety net for CRON_QUEUE_SET only (queue dedup), NOT dispatch_history ledger (30d in retention.py)
         _lua = """
 if redis.call('SADD', KEYS[1], ARGV[1]) == 1 then
-  redis.call('RPUSH', KEYS[2], ARGV[1])
+  redis.call('LPUSH', KEYS[2], ARGV[1])
   redis.call('EXPIRE', KEYS[1], 86400)
   return 1
 else
@@ -82,7 +92,7 @@ end
             try:
                 if hasattr(r, "pipeline"):
                     pipe = r.pipeline(transaction=True)
-                    pipe.rpush(CRON_QUEUE_KEY, payload_json)
+                    pipe.lpush(CRON_QUEUE_KEY, payload_json)
                     # expire may not exist on FakeRedis — best-effort
                     try:
                         pipe.expire(CRON_QUEUE_SET, 86400)
@@ -90,7 +100,7 @@ end
                         pass
                     pipe.execute()
                 else:
-                    r.rpush(CRON_QUEUE_KEY, payload_json)
+                    r.lpush(CRON_QUEUE_KEY, payload_json)
                     if hasattr(r, "expire"):
                         try:
                             r.expire(CRON_QUEUE_SET, 86400)
