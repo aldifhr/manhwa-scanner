@@ -30,8 +30,18 @@ async def sources_health(request: Request):
     hm = health_store.load_source_health_map(s.SOURCE_KEYS)
     # Return a flat ARRAY (not {results: dict}) so the frontend's
     # /api/reader/sources/health proxy can pass body.data straight to .map()
+    #
+    # Disabled sources are omitted entirely. A disabled source has no health
+    # row of its own to report — it is not failing, it is switched off — and
+    # listing it as "healthy" contradicts DISABLED_SOURCES and the frontend's
+    # own source list (ALL_SOURCES), which already excludes it. The frontend
+    # drove this list, so leaving a source here showed a status row for
+    # something the UI otherwise pretends does not exist.
+    _active = set(s.active_sources)
     results = []
     for src, row in (hm or {}).items():
+        if src not in _active:
+            continue
         results.append({
             "name": src,
             "source": src,
