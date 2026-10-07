@@ -258,23 +258,34 @@ def collect_recent_chapters(
 
 
 def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
-    """Keep items whose title is whitelisted on ANY source.
+    """Keep items whose (title, source) pair is whitelisted.
 
-    Intentionally cross-source: a series is one series regardless of which site
-    carries it, and FCFS (fcfs_key = title+chapter, source-agnostic) decides who
-    wins. Whichever source reports the chapter first gets dispatched; the other
-    is deduped. Matching per-source here would delay a notification until the
-    subscribed source happened to catch up.
+    Source-strict, matching the whitelist's own grain: `whitelist` has one row
+    per (title_key, source), so subscribing a series on shinigami does not
+    subscribe it on voratoon.
+
+    This used to match on the title alone, on the theory that a series is one
+    series and FCFS would pick whichever source reported first. In practice that
+    sent notifications from sources nobody subscribed to: 18 of 160 dispatches
+    (11%) were for a (title, source) pair absent from the whitelist. The user
+    sees a voratoon embed for a series they only track on shinigami — and the
+    per-source badge on /whitelist disagrees with the notification they got.
+
+    claim_recent_chapters_for_dispatch() and the SQL claim join already work
+    per (title_key, source); this function was the one path that did not, which
+    is why the bug only showed on some dispatches.
     """
-    allowed: set[str] = set()
+    allowed: set[tuple[str, str]] = set()
     for w in whitelist:
         wk = slugify_title_key(w.get("title_key", ""))
+        src = str(w.get("source") or "").lower()
         if wk:
-            allowed.add(wk)
+            allowed.add((wk, src))
     result = []
     for it in items:
         tk = slugify_title_key(it.get("title_key", ""))
-        if tk in allowed:
+        src = str(it.get("source") or "").lower()
+        if (tk, src) in allowed:
             result.append(it)
     return result
 

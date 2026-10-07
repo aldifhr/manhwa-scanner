@@ -58,19 +58,22 @@ def retry_fails_closed_when_the_whitelist_cannot_be_loaded():
 
 
 @case
-def retry_uses_the_same_cross_source_matching_as_dispatch():
+def retry_uses_the_same_matching_rule_as_dispatch():
     """retry and normal dispatch must agree on what 'subscribed' means, or one
-    notifies for something the other drops."""
+    notifies for something the other drops.
+
+    Both are source-strict on (title_key, source) — see filter_whitelisted().
+    """
     from app.services.dispatch.retry import retry_failed_dispatches
     from app.cron.collect import filter_whitelisted
 
     r_src = _src(retry_failed_dispatches)
     f_src = _src(filter_whitelisted)
     assert "slugify_title_key" in r_src and "slugify_title_key" in f_src
-    # both key on the title only (source-agnostic), by design
-    assert "source" not in f_src.split("allowed.add")[1].split("\n")[0], (
-        "filter_whitelisted must stay cross-source"
-    )
+    # Both must key on the PAIR, not the title alone: matching on the title
+    # sent notifications from sources nobody subscribed to.
+    assert "wl_pairs" in r_src, "retry must gate on (title_key, source)"
+    assert "(wk, src)" in f_src, "filter_whitelisted must gate on (title_key, source)"
 
 
 @case

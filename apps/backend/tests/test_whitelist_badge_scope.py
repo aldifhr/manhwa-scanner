@@ -76,18 +76,58 @@ def badge_is_true_once_that_source_is_also_added():
 
 
 @case
-def dispatch_still_matches_cross_source():
-    """Cross-source is intentional on the dispatch path — fastest source wins,
-    FCFS dedupes. Do not tighten this to per-source without the user asking."""
+def dispatch_is_source_strict():
+    """Dispatch must NOT fire for a source that is not subscribed.
+
+    This test used to assert the opposite ("cross-source is intentional on the
+    dispatch path"), which locked in a real bug: 18 of 160 dispatches were for
+    a (title, source) pair absent from the whitelist, so a voratoon embed
+    arrived for a series the user only tracked on shinigami — and the
+    per-source badge on /whitelist disagreed with the notification.
+
+    The whitelist has one row per (title_key, source); matching it per source
+    is what makes the badge and the notification tell the same story.
+    """
     from app.cron.collect import filter_whitelisted
 
     wl = [{"title_key": "absolute-dominion", "source": "shinigami"}]
     items = [
         {"title_key": "absolute-dominion", "source": "ikiru"},
         {"title_key": "absolute-dominion", "source": "voratoon"},
+        {"title_key": "absolute-dominion", "source": "shinigami"},
     ]
     kept = filter_whitelisted(items, wl)
-    assert len(kept) == 2, f"cross-source dispatch should keep both, kept {len(kept)}"
+    assert len(kept) == 1, f"only the subscribed source may dispatch, kept {len(kept)}"
+    assert kept[0]["source"] == "shinigami"
+
+
+@case
+def dispatch_matches_when_every_source_is_subscribed():
+    """A series carried by two sources and subscribed on both dispatches twice."""
+    from app.cron.collect import filter_whitelisted
+
+    wl = [
+        {"title_key": "absolute-dominion", "source": "shinigami"},
+        {"title_key": "absolute-dominion", "source": "voratoon"},
+    ]
+    items = [
+        {"title_key": "absolute-dominion", "source": "shinigami"},
+        {"title_key": "absolute-dominion", "source": "voratoon"},
+        {"title_key": "absolute-dominion", "source": "ikiru"},
+    ]
+    kept = filter_whitelisted(items, wl)
+    assert len(kept) == 2, f"both subscribed sources should keep, kept {len(kept)}"
+    assert {k["source"] for k in kept} == {"shinigami", "voratoon"}
+
+
+@case
+def dispatch_is_case_insensitive_on_source():
+    """Whitelist rows and scraped items must not disagree on case."""
+    from app.cron.collect import filter_whitelisted
+
+    wl = [{"title_key": "absolute-dominion", "source": "Voratoon"}]
+    items = [{"title_key": "absolute-dominion", "source": "voratoon"}]
+    assert len(filter_whitelisted(items, wl)) == 1
 
 
 @case
@@ -105,7 +145,7 @@ def dispatch_matches_dashed_and_spaced_title_keys():
     from app.cron.collect import filter_whitelisted
 
     wl = [{"title_key": "Absolute Dominion", "source": "shinigami"}]
-    items = [{"title_key": "absolute-dominion", "source": "ikiru"}]
+    items = [{"title_key": "absolute-dominion", "source": "shinigami"}]
     assert len(filter_whitelisted(items, wl)) == 1
 
 

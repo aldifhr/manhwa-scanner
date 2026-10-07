@@ -124,16 +124,21 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
     # this path previously re-sent whatever was parked — so a removed series
     # kept notifying. Retry re-delivers a FAILED send; it must not resurrect a
     # subscription the user cancelled.
+    #
+    # Source-strict, matching filter_whitelisted() in cron/collect.py: the
+    # whitelist has one row per (title_key, source), so a series subscribed on
+    # shinigami is NOT subscribed on voratoon. Matching on the title alone sent
+    # notifications from sources nobody subscribed to.
     from app.utils.text import slugify_title_key as _slugify
     try:
         wl_rows = (
             get_supabase().table("whitelist").select("title_key, source").execute().data or []
         )
-        # Cross-source on purpose: matches filter_whitelisted() in
-        # cron/collect.py, so retry and normal dispatch agree on what is
-        # subscribed (a series is one series; FCFS dedupes the sources).
-        wl_titles = {_slugify(str(w.get("title_key") or "")) for w in wl_rows}
-        wl_titles.discard("")
+        wl_pairs = {
+            (_slugify(str(w.get("title_key") or "")), str(w.get("source") or "").lower())
+            for w in wl_rows
+        }
+        wl_pairs.discard(("", ""))
     except Exception as e:
         # Fail CLOSED: without the whitelist we cannot tell a live subscription
         # from a cancelled one, and sending to a cancelled one is the bug.
@@ -148,8 +153,9 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
         if not url:
             continue
 
-        # Drop rows whose series is no longer whitelisted (see gate above).
-        if _slugify(str(row.get("title_key") or "")) not in wl_titles:
+        # Drop rows whose (title, source) is no longer whitelisted (see gate above).
+        _row_src = str(row.get("source") or "").lower()
+        if (_slugify(str(row.get("title_key") or "")), _row_src) not in wl_pairs:
             try:
                 get_supabase().table("failed_dispatches").update(
                     {"status": "resolved", "updated_at": now.isoformat(),
