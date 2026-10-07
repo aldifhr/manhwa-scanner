@@ -35,8 +35,11 @@ logger = get_logger("dispatch-watchdog")
 STARVE_AFTER_MIN = 30
 
 # An eligible chapter older than this without a ledger entry is treated as
-# dropped. The dispatcher runs every 2 minutes, so 15 is generous slack.
-UNDELIVERED_AFTER_MIN = 15
+# dropped. The dispatcher runs every 2 minutes, so 60 is generous slack.
+# Raised from 15 because a chapter that just entered the whitelist (e.g. user
+# subscribes a new source) can take up to an hour to be picked up by the
+# rotating walk — that is normal, not a failure.
+UNDELIVERED_AFTER_MIN = 60
 
 # Re-alert at most this often while a condition persists.
 COOLDOWN_MIN = 60
