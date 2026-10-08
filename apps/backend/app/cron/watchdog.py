@@ -134,6 +134,51 @@ def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
                 "age_h": float(r.get("age_h") or 0),
             }
         )
+
+    # Drop chapters the dispatch sanity guard deliberately refuses. Without
+    # this the watchdog reports them as lost forever: they are whitelisted,
+    # inside the window, and by definition have no dispatch record — the exact
+    # shape of a real loss. Live case: shinigami serves chapter_number '26596'
+    # for a series whose real chapters are 1..266, dispatch skips it on every
+    # pass, and the watchdog paged the operator every cycle for a chapter that
+    # is correctly never sent.
+    #
+    # Rejected under BOTH batch shapes means it can never dispatch: a 3-item
+    # renumber burst is the only thing the guard lets through above the band,
+    # so if it fails at batch_count=3 too, no future pass will send it.
+    if out:
+        try:
+            from app.cron.dispatch_mod import (
+                is_implausible_chapter,
+                load_chapter_ceilings,
+            )
+
+            pairs = list({
+                (str(c.get("title_key") or "").strip(), str(c.get("source") or "").strip())
+                for c in out
+                if c.get("title_key") and c.get("source")
+            })
+            ceilings = load_chapter_ceilings(pairs)
+            out = [
+                c
+                for c in out
+                if not (
+                    is_implausible_chapter(
+                        c.get("chapter"),
+                        ceilings.get((str(c.get("title_key") or "").strip(),
+                                      str(c.get("source") or "").strip())),
+                        1,
+                    )
+                    and is_implausible_chapter(
+                        c.get("chapter"),
+                        ceilings.get((str(c.get("title_key") or "").strip(),
+                                      str(c.get("source") or "").strip())),
+                        3,
+                    )
+                )
+            ]
+        except Exception as exc:  # fail open: over-reporting beats hiding a loss
+            logger.warn("watchdog: sanity-guard filter failed", error=str(exc)[:120])
     return out
 
 

@@ -150,6 +150,60 @@ def the_action_is_wired_into_the_cron_worker():
     )
 
 
+@case
+def stalled_drops_a_chapter_the_sanity_guard_will_never_dispatch():
+    """A chapter dispatch refuses on every pass must not be reported as lost.
+
+    shinigami serves chapter_number '26596' for a series whose real chapters are
+    1..266. dispatch skips it every cycle, so it is whitelisted, inside the
+    window, and has no dispatch record — the exact shape of a real loss. The
+    watchdog paged the operator every cycle for a chapter that is correctly
+    never sent.
+    """
+    from app.cron.dispatch_mod import is_implausible_chapter
+
+    # ceiling 266 for that series, so this is the live pair
+    assert is_implausible_chapter("26596", 266, 1) is True
+    assert is_implausible_chapter("26596", 266, 3) is True, (
+        "must be rejected under both batch shapes, or the filter would hide a "
+        "chapter a renumber burst could still legitimately deliver"
+    )
+
+
+@case
+def stalled_keeps_a_real_next_chapter():
+    """The filter must not swallow a genuine release."""
+    from app.cron.dispatch_mod import is_implausible_chapter
+
+    for ch in ("267", "268", "300", "400"):
+        assert not (
+            is_implausible_chapter(ch, 266, 1) and is_implausible_chapter(ch, 266, 3)
+        ), f"ch {ch} would be filtered out of the stalled report"
+
+
+@case
+def stalled_keeps_a_legitimate_renumber_burst():
+    """A 3-chapter burst above the band is deliverable, so it must still be
+    reported if it does not arrive."""
+    from app.cron.dispatch_mod import is_implausible_chapter
+
+    for ch in ("4000", "4001", "4002"):
+        assert not (
+            is_implausible_chapter(ch, 3999, 1) and is_implausible_chapter(ch, 3999, 3)
+        ), f"ch {ch} (renumber burst) would be filtered out"
+
+
+@case
+def stalled_filter_uses_the_shared_guard_not_a_copy():
+    """The watchdog must import the same predicate dispatch uses. A copy would
+    drift and re-open the false alarm."""
+    from app.cron import watchdog as w
+
+    src = inspect.getsource(w._stalled_chapters)
+    assert "is_implausible_chapter" in src, "not using the shared predicate"
+    assert "load_chapter_ceilings" in src, "not using the shared loader"
+
+
 def main() -> int:
     failed = 0
     for fn in CASES:
