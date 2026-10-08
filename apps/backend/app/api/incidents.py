@@ -71,6 +71,11 @@ async def incidents(request: Request):
             )
             for row in fd.data or []:
                 ts = row.get("created_at", "")
+                # Only UNRESOLVED failures are incidents. retry.py marks a row
+                # "resolved" once the chapter is resent or pruned, so counting
+                # every row made a fixed failure page as critical forever.
+                if str(row.get("status") or "failed").lower() != "failed":
+                    continue
                 msg = f"Failed to notify {row.get('source') or '?'} chapter: {(row.get('error_message') or 'unknown error')[:80]}"
                 timeline.append({"type": "Dispatch Failure", "message": msg, "timestamp": ts})
                 by_severity["critical"] += 1
@@ -85,7 +90,11 @@ async def incidents(request: Request):
             sh = sb.table("source_health").select("*").execute()
             for row in sh.data or []:
                 cf = row.get("consecutive_failures") or 0
-                status = row.get("status", "healthy")
+                # source_health.status is stored UPPERCASE ("HEALTHY"/"DEGRADED"/
+                # "DOWN"), so `status == "down"` never matched and a genuinely
+                # down source was reported as merely medium (or not at all).
+                # Normalise before comparing — same trap as the FE badges.
+                status = str(row.get("status") or "healthy").lower()
                 src = row.get("source", "?")
                 if status == "down" or cf >= 3:
                     by_severity["high"] += 1

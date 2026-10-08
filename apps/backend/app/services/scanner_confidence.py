@@ -129,7 +129,10 @@ def _score_reachability(source: str) -> int:
         from app.storage import health as health_store
         hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
         row = (hm or {}).get(source, {})
-        status = row.get("status", "unknown")
+        # source_health.status is UPPERCASE ("HEALTHY"/"DEGRADED"/"DOWN"); the
+        # lowercase comparisons below never matched it, so a DOWN source still
+        # scored full reachability. Normalise once.
+        status = str(row.get("status") or "unknown").lower()
         consec = row.get("consecutive_failures", 0)
         if status == "down" or consec >= 3:
             return 0

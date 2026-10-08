@@ -153,8 +153,11 @@ async def health_detailed(request: Request):
             "disabledUntil": row.get("disabled_until"),
         })
     overall = "healthy"
-    down_count = sum(1 for s in sources if s["status"] == "down")
-    degraded_count = sum(1 for s in sources if s["status"] == "degraded")
+    # source_health.status is stored UPPERCASE ("HEALTHY"/"DEGRADED"/"DOWN"),
+    # so comparing against lowercase literals never matched and a source that
+    # was actually DOWN still rolled up to overall "healthy". Normalise first.
+    down_count = sum(1 for s in sources if str(s["status"] or "").lower() == "down")
+    degraded_count = sum(1 for s in sources if str(s["status"] or "").lower() == "degraded")
     if down_count > 0:
         overall = "down"
     elif degraded_count > 0:
@@ -231,7 +234,9 @@ async def health_status(request: Request):
             ping = f"{_sb_ping}ms" if _sb_ping else None
         services.append({"name": name, "status": status, "ping": ping, "uptime": _fmt_uptime(_t.time() - APP_START_TS) if name == "api" else None})
     _has_degraded = any(s["status"] == "degraded" for s in services)
-    _has_down = any((r.get("status") == "down") for r in (hm or {}).values())
+    # hm holds the RAW source_health rows, whose status is UPPERCASE. Same trap
+    # as the roll-up above: a DOWN source left the overall at "healthy".
+    _has_down = any(str(r.get("status") or "").lower() == "down" for r in (hm or {}).values())
     _overall = "down" if _has_down else ("degraded" if _has_degraded else "healthy")
     return JSONResponse(content={"success": True, "data": {"services": services, "uptime": _fmt_uptime(_t.time() - APP_START_TS), "sources": hm or {}, "status": _overall}})
 
