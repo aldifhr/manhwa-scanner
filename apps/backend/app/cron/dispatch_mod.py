@@ -34,6 +34,96 @@ from app.services.fcfs import (  # noqa: F401
     normalize_title,
 )
 
+def load_chapter_ceilings(pairs: list[tuple[str, str]]) -> dict[tuple[str, str], float]:
+    """Max already-dispatched chapter per (title_key, source), cross-source.
+
+    Cross-source on purpose: the ceiling is "how far has this series already
+    been notified", and a series is one series regardless of which site it was
+    read from. Scoping it per source meant a brand new source started at zero,
+    so when one re-uploaded old chapters with a fresh release_date (ch 23/24/25
+    of a series already shipped through ch330 on shinigami) all of them passed
+    the ceiling and were notified.
+
+    Extracted from dispatch() so the loader is testable. It was not, and that
+    is exactly how `_row[0]` on a RealDictRow survived: the KeyError was caught
+    by a bare `except: pass`, so _ceilings stayed empty and this guard blocked
+    nothing for as long as it existed.
+
+    Returns {} on any DB problem — a missing ceiling must never stop dispatch,
+    because FCFS still covers the already-notified case.
+    """
+    out: dict[tuple[str, str], float] = {}
+    if not pairs:
+        return out
+    try:
+        from app.db import get_conn, put_conn
+
+        cc = get_conn()
+        try:
+            cur = cc.cursor()
+            for tk, src in pairs:
+                # NULLIF discards non-numeric labels; max() then ignores them,
+                # matching the float() guard in the sanity check.
+                cur.execute(
+                    "SELECT max(NULLIF(trim(chapter_title), '')::numeric) AS max_ch "
+                    "FROM dispatch_history WHERE title_key = %s",
+                    (tk,),
+                )
+                row = cur.fetchone()
+                # The pool uses RealDictCursor, so a row is a DICT. Read by
+                # column name; isinstance keeps a tuple cursor working too.
+                if row is None:
+                    val = None
+                elif isinstance(row, dict):
+                    val = row.get("max_ch")
+                else:
+                    val = row[0]
+                if val is not None:
+                    out[(tk, src)] = float(val)
+        finally:
+            # Return the borrowed connection — get_conn() holds a semaphore
+            # slot; dropping it without put_conn starves the pool.
+            try:
+                put_conn(cc)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return out
+
+
+def is_implausible_chapter(
+    chapter: object, ceiling: float | None, batch_count: int
+) -> bool:
+    """True when a chapter number is a bad label rather than a release.
+
+    Observed live: shinigami served chapter_number '26596' for a series whose
+    real chapters are 1..266 (its own chapter list shows 26596 sitting beside
+    265), and it was dispatched — spamming the channel AND poisoning the
+    ceiling to 26596, which then blocks every real chapter after it.
+
+    Two ways out, so a genuine renumbering is not silently lost:
+      * <= 2000 -> accept. Covers a normal jump and, more usefully, rejects a
+        date-as-number slip like 20261008.
+      * > 2000 and arriving as a ~3-chapter burst within 50 of the ceiling ->
+        accept, because a renumber legitimately emits 4000/4001/4002 together.
+    """
+    if ceiling is None:
+        return False
+    try:
+        n = float(str(chapter or 0))
+    except (ValueError, TypeError):
+        return False
+    if n <= 2000:
+        return False
+    is_renumber = (
+        batch_count == 3
+        and 0 < (n - ceiling) <= 50
+        and str(chapter or "").strip().isdigit()
+    )
+    return not is_renumber
+
+
 def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_run: bool = False, force: bool = False, guild_rows: list[dict] | None = None, skip_ceiling: bool = False) -> int:
     """Send Discord embeds for whitelisted chapters.
 
@@ -104,43 +194,21 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # it. A non-numeric chapter_title (e.g. 'OVA') is ignored rather than
     # raising, so it can never become a bogus ceiling.
     _ceilings: dict[tuple[str, str], float] = {}
-    try:
-        from app.db import get_conn as _get_conn, put_conn as _put_conn
-        _c_tks = list({(str(it.get("title_key") or "").strip(), str(it.get("source") or "").strip()) for it in to_send if it.get("title_key") and it.get("source")})
-        if _c_tks:
-            _cc = _get_conn()
-            try:
-                _cur = _cc.cursor()
-                for _tk, _src in _c_tks:
-                    # NULLIF discards non-numeric labels; max() then
-                    # ignores them, matching the Python float() guard.
-                    # Cross-source on purpose. The ceiling is "how far has this
-                    # series already been notified", and a series is one series
-                    # regardless of which site it was read from: fcfs_key() and the
-                    # watchdog both treat the two ch23 rows as the
-                    # same event. Scoping the ceiling per source meant a brand new
-                    # source started at zero, so when one re-uploaded old
-                    # chapters with a fresh release_date (ch 23/24/25 of a series
-                    # already shipped through ch330 on shinigami) all of them
-                    # passed the ceiling and were notified.
-                    _cur.execute(
-                        "SELECT max(NULLIF(trim(chapter_title), '')::numeric) FROM dispatch_history "
-                        "WHERE title_key = %s",
-                        (_tk,),
-                    )
-                    _row = _cur.fetchone()
-                    if _row and _row[0] is not None:
-                        _ceilings[(_tk, _src)] = float(_row[0])
-            finally:
-                # Return the borrowed connection to the pool — get_conn()
-                # holds a semaphore slot; dropping it without put_conn
-                # would starve the pool after enough ceiling queries.
-                try:
-                    _put_conn(_cc)
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    # How many items this batch carries per title_key. A legitimate renumbering
+    # arrives as a small burst (e.g. 4000/4001/4002 together); a lone absurd
+    # number is a bad label. Read by the sanity guard below.
+    _counts: dict[str, int] = {}
+    for _it in to_send:
+        _k = str(_it.get("title_key") or "").strip()
+        if _k:
+            _counts[_k] = _counts.get(_k, 0) + 1
+    _ceilings = load_chapter_ceilings(
+        list({
+            (str(it.get("title_key") or "").strip(), str(it.get("source") or "").strip())
+            for it in to_send
+            if it.get("title_key") and it.get("source")
+        })
+    )
 
     # FCFS dedupe: skip chapters ALREADY NOTIFIED (in dispatch_history).
     # NOTE: we intentionally do NOT consult dispatch_claims here. The deep-queue
@@ -304,6 +372,18 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                         continue
                 except (ValueError, TypeError):
                     pass
+            # Sanity: a chapter number far above everything the series has
+            # shipped is a bad label, not a release. See is_implausible_chapter
+            # for the live 26596 case and why a renumber burst still passes.
+            if not skip_ceiling and is_implausible_chapter(
+                it.get("chapter"), _ceil, _counts.get(_it_tk, 0)
+            ):
+                logger.warn(
+                    "dispatch: implausible chapter number, skipped",
+                    title_key=_it_tk, source=_it_src,
+                    chapter=str(it.get("chapter")), ceiling=_ceil,
+                )
+                continue
             norm = fcfs_key(it.get("title", ""), it.get("chapter", ""))
             if norm in claimed_keys or norm in seen_key_run or url in _claimed_urls_set:
                 continue
