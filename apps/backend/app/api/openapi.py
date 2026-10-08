@@ -12,7 +12,7 @@ def custom_openapi(app):
     schema = get_openapi(
         title="manhwa-backend",
         version="1.1.0",
-        description="Ikiru Bot manhwa scraper API. Backend runs fully on local VPS Postgres. Use Bearer token for protected endpoints. RSS feeds support dual-read params: format (manhwa/manhua/manga) + type (legacy alias), country (KR/CN/JP) + origin (legacy alias).",
+        description="Manhwa scanner API. Backend runs fully on local VPS Postgres. Use Bearer token for protected endpoints. RSS feeds support dual-read params: format (manhwa/manhua/manga) + type (legacy alias), country (KR/CN/JP) + origin (legacy alias).",
         routes=app.routes,
     )
     schema["servers"] = [{"url": "https://scanner.aldifhr.my.id", "description": "Production (VPS)"}]

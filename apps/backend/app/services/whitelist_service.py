@@ -163,11 +163,12 @@ def _derive_title_key_from_url(url: str, title: str = "") -> str:
     """Best-effort title_key when the caller sent no explicit one.
 
     Rules, in order:
-      * ikiru `/manga/<slug>` — do NOT adopt the URL slug. Ikiru's slug
-        generator drops apostrophes (`a-gods-ascension`) while the collector
-        keys off the title (`a-god-s-ascension`). A row stored under the URL
-        form can never match a scraped chapter, so the series would look
-        whitelisted and never notify. Fall through to the title.
+      * `/manga/<slug>` — do NOT adopt the URL slug. This is the ikiru-era
+        path shape (slug generator dropped apostrophes: `a-gods-ascension`
+        while the collector keyed off the title `a-god-s-ascension`), and no
+        live source uses it. A row stored under the URL form can never match a
+        scraped chapter, so the series would look whitelisted and never notify.
+        Fall through to the title. Kept for any caller still passing that shape.
       * shinigami `/series/<uuid>` — resolve the UUID to its real title.
       * anything else — last path segment, unless it is a chapter slug.
 

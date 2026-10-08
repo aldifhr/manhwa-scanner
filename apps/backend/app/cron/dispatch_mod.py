@@ -206,10 +206,8 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
 
     # Reject junk URLs that don't match known source patterns
     _vor_pub = getattr(settings, "VORATOON_PUBLIC_BASE", "https://v4.voratoon.com") or "https://v4.voratoon.com"
-    _iki_pub = getattr(settings, "IKIRU_PUBLIC_BASE", "https://09.ikiru.wtf") or "https://09.ikiru.wtf"
     _VALID_URL_PREFIXES = (
         f"{settings.SHINIGAMI_PUBLIC_BASE}{settings.SHINIGAMI_CHAPTER_PATH}",
-        f"{_iki_pub}/manga/",
         _vor_pub,
         "https://v4.voratoon.com",
         "https://voratoon.com",

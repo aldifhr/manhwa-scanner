@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "manhwa-backend",
-    "description": "Ikiru Bot manhwa scraper API. Backend runs fully on local VPS Postgres. Use Bearer token for protected endpoints. RSS feeds support dual-read params: format (manhwa/manhua/manga) + type (legacy alias), country (KR/CN/JP) + origin (legacy alias).",
+    "description": "Manhwa scanner API. Backend runs fully on local VPS Postgres. Use Bearer token for protected endpoints. RSS feeds support dual-read params: format (manhwa/manhua/manga) + type (legacy alias), country (KR/CN/JP) + origin (legacy alias).",
     "version": "1.1.0"
   },
   "paths": {
@@ -251,7 +251,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "shinigami"
+                "shinigami",
+                "voratoon"
               ]
             },
             "description": "Filter by source."
@@ -357,7 +358,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "shinigami"
+                "shinigami",
+                "voratoon"
               ]
             },
             "description": "Filter by source."
@@ -1124,7 +1126,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "shinigami"
+                "shinigami",
+                "voratoon"
               ]
             },
             "description": "Filter by source."
@@ -1363,7 +1366,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "shinigami"
+                "shinigami",
+                "voratoon"
               ]
             },
             "description": "Filter by source."

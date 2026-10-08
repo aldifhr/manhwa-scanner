@@ -54,14 +54,13 @@ def badge_is_true_for_the_whitelisted_source():
 @case
 def badge_is_false_for_a_different_source_with_the_same_title():
     """The regression that hid the Add button: a shinigami row made the
-    voratoon/ikiru row look subscribed."""
+    voratoon row look subscribed."""
     from app.services.rss_query import map_result
 
     wl = _wl_map([("absolute-dominion", "shinigami")])
-    for other in ("ikiru", "voratoon"):
-        it = {"title_key": "absolute-dominion", "source": other, "title": "Absolute Dominion"}
-        got = map_result(it, wl, {})["isWhitelisted"]
-        assert got is False, f"{other} row wrongly marked whitelisted (got {got})"
+    it = {"title_key": "absolute-dominion", "source": "voratoon", "title": "Absolute Dominion"}
+    got = map_result(it, wl, {})["isWhitelisted"]
+    assert got is False, f"voratoon row wrongly marked whitelisted (got {got})"
 
 
 @case
@@ -92,7 +91,6 @@ def dispatch_is_source_strict():
 
     wl = [{"title_key": "absolute-dominion", "source": "shinigami"}]
     items = [
-        {"title_key": "absolute-dominion", "source": "ikiru"},
         {"title_key": "absolute-dominion", "source": "voratoon"},
         {"title_key": "absolute-dominion", "source": "shinigami"},
     ]
@@ -113,7 +111,6 @@ def dispatch_matches_when_every_source_is_subscribed():
     items = [
         {"title_key": "absolute-dominion", "source": "shinigami"},
         {"title_key": "absolute-dominion", "source": "voratoon"},
-        {"title_key": "absolute-dominion", "source": "ikiru"},
     ]
     kept = filter_whitelisted(items, wl)
     assert len(kept) == 2, f"both subscribed sources should keep, kept {len(kept)}"
@@ -150,17 +147,18 @@ def dispatch_matches_dashed_and_spaced_title_keys():
 
 
 @case
-def ikiru_url_does_not_contribute_a_title_key():
-    """Ikiru's slug drops apostrophes (a-gods-ascension); the collector keys off
-    the title (a-god-s-ascension). Adopting the URL slug would create a row that
-    can never match a scraped chapter, so the series would look whitelisted and
-    silently never notify. The helper must refuse it and let the title decide."""
+def manga_path_does_not_contribute_a_title_key():
+    """The retired ikiru path shape (slug drops apostrophes: a-gods-ascension)
+    while the collector keys off the title (a-god-s-ascension). Adopting the URL
+    slug would create a row that can never match a scraped chapter, so the series
+    would look whitelisted and silently never notify. The helper must refuse it
+    and let the title decide — the guard stays even though the source is gone."""
     from app.services.whitelist_service import _derive_title_key_from_url
 
     url = "https://09.ikiru.wtf/manga/a-gods-ascension"
     got = _derive_title_key_from_url(url, "A God's Ascension")
-    assert got == "", f"ikiru URL must not yield a key, got {got!r}"
-    assert got != "a-gods-ascension", "must not adopt ikiru's apostrophe-less slug"
+    assert got == "", f"a /manga/ URL must not yield a key, got {got!r}"
+    assert got != "a-gods-ascension", "must not adopt the apostrophe-less slug"
 
 
 @case

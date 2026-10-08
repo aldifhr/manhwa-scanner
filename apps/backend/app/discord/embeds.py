@@ -50,7 +50,7 @@ def _proxy_cover(cover: str | None) -> str | None:
         _inner = _pqs(_up(cover).query).get("url", [""])[0]
         if _inner:
             cover = _uq(_inner)
-    # Shinigami/Ikiru public CDN — return direct URL so Discord fetches
+    # Shinigami public CDN — return direct URL so Discord fetches
     # without the extra cover-img hop (which can timeout on Discord's end).
     from urllib.parse import urlparse
     try:
@@ -77,13 +77,11 @@ SOURCE_COLORS = {
     # others or it looks untracked.
     "shinigami": 0xEF4444,  # red-500
     "voratoon": 0xF97316,  # orange-500
-    "ikiru": 0x22C55E,  # green-500
 }
 
 SOURCE_LABELS = {
     "shinigami": "Shinigami",
     "voratoon": "VoraToon",
-    "ikiru": "Ikiru",
 }
 
 STAR_FILLED = "⭐"

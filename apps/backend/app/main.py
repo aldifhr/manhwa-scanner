@@ -121,7 +121,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="manhwa-backend",
     version="1.0.0",
-    description="Ikiru Bot manhwa scraper API. Use Bearer token for protected endpoints.",
+    description="Manhwa scanner API. Use Bearer token for protected endpoints.",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

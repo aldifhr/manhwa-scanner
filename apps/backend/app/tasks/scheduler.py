@@ -11,7 +11,7 @@ logger = logging.getLogger("tasks.scheduler")
 # for api.voratoon.com, so a cron agent fetches the sorted catalogue via its
 # own egress and drops it into relay/voratoon/relay_updates.json. The direct
 # API walk stays as fallback in the collector if the relay file goes stale.
-_RSS_SOURCES = ("shinigami", "voratoon", "ikiru")
+_RSS_SOURCES = ("shinigami", "voratoon")
 
 
 def _disabled_sources() -> set[str]:

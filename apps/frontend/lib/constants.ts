@@ -2,9 +2,9 @@
  *  Single source of truth for filter chips and anything that enumerates
  *  sources — the backend already answers /api/v1/sources for dynamic cases.
  *
- *  ikiru is deliberately absent: it is disabled via DISABLED_SOURCES on the
- *  backend, so it produces no chapters and no notifications. Leaving it here
- *  renders a filter chip that can only ever return an empty list. */
+ *  Must match `settings.SOURCE_KEYS` in the backend. A source listed here that
+ *  the backend does not collect renders a filter chip that can only ever return
+ *  an empty list. */
 export const ALL_SOURCES = ["shinigami", "voratoon"] as const;
 export type SourceName = (typeof ALL_SOURCES)[number];
 

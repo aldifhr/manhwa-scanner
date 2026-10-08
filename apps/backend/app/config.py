@@ -43,11 +43,6 @@ class Settings(BaseSettings):
     VORATOON_API_BASE: str = "https://api.voratoon.com"
     VORATOON_PUBLIC_BASE: str = "https://v4.voratoon.com"
 
-    # Ikiru — Cloudflare-fronted, so every call goes through curl_cffi.
-    # API_BASE is the JSON host; PUBLIC_BASE builds reader-facing URLs.
-    IKIRU_API_BASE: str = "https://09.ikiru.wtf"
-    IKIRU_PUBLIC_BASE: str = "https://09.ikiru.wtf"
-
     # Discord toggle — set false to run locally without bot / disable dispatch
     DISCORD_ENABLED: bool = True
 
@@ -60,7 +55,7 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
-    SOURCE_KEYS: list[str] = ["shinigami", "voratoon", "ikiru"]
+    SOURCE_KEYS: list[str] = ["shinigami", "voratoon"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     DISABLED_SOURCES: str = ""
 
@@ -105,8 +100,6 @@ class Settings(BaseSettings):
         "shinigami.asia:443",
         "assets.shngm.id:443",
         "cvr.voratoon.id:443",
-        "cdn.ikiru.id:443",
-        "ikiru.id:443",
         "api.voratoon.com:443",
     ]
 
@@ -154,9 +147,9 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-_SOURCE_KEYS = ("shinigami", "voratoon", "ikiru")
-VALID_SOURCES = ("shinigami", "voratoon", "ikiru")
-VALID_SOURCES_WITH_ALL = ("shinigami", "voratoon", "ikiru", "all")
+_SOURCE_KEYS = ("shinigami", "voratoon")
+VALID_SOURCES = ("shinigami", "voratoon")
+VALID_SOURCES_WITH_ALL = ("shinigami", "voratoon", "all")
 # Sources an exclude row may target. Exclude has no 'all' scope — a row always
 # names one concrete source. Only sources that actually produce chapters.
 EXCLUDE_SOURCES = ("shinigami",)
@@ -164,7 +157,6 @@ CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:shinigami",
     "rss-fetch:voratoon",
-    "rss-fetch:ikiru",
     "enrich", "enrich-missing", "enrich-refresh", "failed-retry",
 )
 

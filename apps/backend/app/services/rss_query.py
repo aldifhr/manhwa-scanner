@@ -127,13 +127,14 @@ def map_result(
 
     # Source-strict badge: "Verified" means THIS (title, source) pair is
     # whitelisted. A title tracked on shinigami must not show Verified on its
-    # voratoon/ikiru row — that badge is what the user reads to decide whether
+    # voratoon row — that badge is what the user reads to decide whether
     # to add the series, and claiming it for a source they never subscribed to
     # is simply wrong (and hid the Add button, so the row could never be added).
     #
-    # Dispatch deliberately does NOT match this way: filter_whitelisted() in
-    # cron/collect.py stays cross-source so the fastest source wins the race
-    # (FCFS dedupes the rest). The badge reports subscription; dispatch races
+    # Dispatch matches the same way: filter_whitelisted() in cron/collect.py is
+    # per (title_key, source), so a notification can only arrive for a source
+    # the user actually subscribed to. Only FCFS (fcfs_key, title+chapter) stays
+    # cross-source — that answers "is this the same chapter", a different
     # delivery. They are different questions.
     is_wl = (tk, src) in wl_map or (nk, src) in wl_map
     _title_norm = normalize_title_key(it.get("title") or "")
