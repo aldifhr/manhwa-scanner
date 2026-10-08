@@ -276,5 +276,25 @@ def _build_embed(
     if desc:
         embed["description"] = desc
     if cover and (cover.startswith("http") or cover.startswith("/api/reader/") or cover.startswith("/api/v1/reader/") or cover.strip()):
-        embed["thumbnail"] = {"url": _proxy_cover(cover)}
+        _thumb = _proxy_cover(cover)
+        # Discord fetches an embed thumbnail asynchronously, AFTER accepting the
+        # message. Two messages carrying a BYTE-IDENTICAL thumbnail URL get two
+        # concurrent fetches of that URL, and one can come back empty — Discord
+        # then renders the embed with no image and does not retry. Observed
+        # live: ch 345 and 346 of one series dispatched 8ms apart
+        # (21:29:58.027 and .033) sharing the series cover, so both embeds
+        # referenced the exact same URL and 345 rendered blank while 346 got the
+        # image. A series releasing 2+ chapters in one pass is routine here
+        # (recent runs sent 2, 2, 4), so this was not a one-off.
+        #
+        # The buster goes BEFORE url=, never after. reader_proxy() takes the raw
+        # remainder when the query starts with "url=" (to preserve encoding), so
+        # anything appended after it leaks into the upstream URL and S3 rejects
+        # the signature — verified: that returns a 1x1 transparent PNG
+        # placeholder. Leading with v= makes the query start with "v=", so the
+        # proxy parses url= normally and the image is unaffected.
+        if _thumb and chapters:
+            _ch_tag = _urlquote(str(chapters[-1] or "0"), safe="")
+            _thumb = _thumb.replace("?", f"?v={_ch_tag}&", 1) if "?" in _thumb else f"{_thumb}?v={_ch_tag}"
+        embed["thumbnail"] = {"url": _thumb}
     return embed
