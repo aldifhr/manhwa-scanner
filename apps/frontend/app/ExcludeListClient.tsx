@@ -80,11 +80,27 @@ export function ExcludeListClient() {
     return present;
   }, [grouped]);
 
+  // The source a bulk-exclude would hit — one definition, read by both the
+  // handler and the button label so they can never disagree. Order: the
+  // explicit filter, else the source that actually has excluded rows (you are
+  // undoing what you can see), else the first targetable source.
+  const bulkTarget = useMemo(() => {
+    if (sourceFilter !== FILTER_ALL) return sourceFilter;
+    const present = [...new Set(items.map((i) => i.source).filter(Boolean))].sort();
+    return present[0] ?? ALL_SOURCES[0];
+  }, [sourceFilter, items]);
+
   const sources = useMemo(() => {
     const set = new Set<string>();
     items.forEach((i) => {
       if (i.source) set.add(i.source);
     });
+    // Union with the known sources: the dropdown must offer every source you can
+    // TARGET, not only the ones already carrying a row. Deriving it from `items`
+    // alone meant a source with zero excludes could never be picked — and since
+    // bulk-exclude falls back to sources[0], it could never be bulk-excluded
+    // either. ALL_SOURCES is the same list the backend's EXCLUDE_SOURCES accepts.
+    for (const s of ALL_SOURCES) set.add(s);
     return [...set].sort();
   }, [items]);
 
@@ -156,7 +172,9 @@ export function ExcludeListClient() {
 
   const handleBulk = async () => {
     // No "All" scope: bulk-exclude always targets one concrete source.
-    const src = sourceFilter !== FILTER_ALL ? sourceFilter : sources[0];
+    // bulkTarget is the single definition the button label also reads, so what
+    // you click is what runs.
+    const src = bulkTarget;
     if (!src) return;
     const ok = window.confirm(`Exclude ALL ${src} titles from recent (up to 2000)? This will hide them from RSS.`);
     if (!ok) return;
@@ -266,9 +284,10 @@ export function ExcludeListClient() {
             size="sm"
             onClick={handleBulk}
             disabled={busyKey === "bulk"}
+            title={`Exclude every title from ${bulkTarget}`}
           >
             <Plus size={14} />
-            {busyKey === "bulk" ? "Excluding..." : "Exclude all"}
+            {busyKey === "bulk" ? "Excluding..." : `Exclude all ${bulkTarget}`}
           </Button>
         </div>
       </div>

@@ -147,12 +147,18 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-_SOURCE_KEYS = ("shinigami", "voratoon")
 VALID_SOURCES = ("shinigami", "voratoon")
 VALID_SOURCES_WITH_ALL = ("shinigami", "voratoon", "all")
 # Sources an exclude row may target. Exclude has no 'all' scope — a row always
-# names one concrete source. Only sources that actually produce chapters.
-EXCLUDE_SOURCES = ("shinigami",)
+# names one concrete source, so the target set is exactly "every source that
+# produces chapters".
+#
+# Derived from VALID_SOURCES, never a literal: a literal list lags when a source
+# is added and silently makes the live source un-excludable. That is what
+# happened to voratoon — the DB CHECK constraint already allowed it
+# (chk_excluded_titles_source includes 'voratoon'), only this tuple blocked it,
+# so the API 400'd on a write the database would have accepted.
+EXCLUDE_SOURCES = VALID_SOURCES
 CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:shinigami",
