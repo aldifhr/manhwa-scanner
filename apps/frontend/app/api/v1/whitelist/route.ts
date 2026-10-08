@@ -45,6 +45,11 @@ interface WhitelistBackendItem {
   source_urls?: Record<string, string>;
   url?: string;
   origin?: string | null;
+  // The backend whitelist row carries `format` (manhwa|manhua|manga) and
+  // `country` (KR|CN|JP) — NOT `type`/`origin`. Reading only the latter made
+  // both fields null on every row, so the /whitelist type filter matched nothing.
+  format?: string | null;
+  country?: string | null;
   type?: string | null;
   description?: string | null;
   rating?: string | number | null;
@@ -243,8 +248,12 @@ export async function GET(request: NextRequest) {
         source: item.source || normalizedSources[0]?.source || "",
         sources: normalizedSources.map((s) => s.source),
         url: item.url || normalizedSources[0]?.url || "",
-        origin: item.origin || null,
-        type: item.type ? String(item.type).toLowerCase() : null,
+        // BE row carries `format`/`country`; accept `type`/`origin` too for
+        // callers that already normalized. Never emit null when format exists.
+        origin: item.origin || item.country || null,
+        type: item.type || item.format
+          ? String(item.type || item.format).toLowerCase()
+          : null,
         description: item.description || null,
         rating: item.rating || null,
         genres: item.genres || [],

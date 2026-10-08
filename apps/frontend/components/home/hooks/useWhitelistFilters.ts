@@ -22,7 +22,6 @@ export function useWhitelistFilters(
         return false;
       if (sourceFilter !== "All" && item.source !== sourceFilter) return false;
       if (typeFilter !== "All") {
-        const raw = String((item as any).format ?? item.type ?? "").toLowerCase().trim();
         const t = normalizeType((item as any).format ?? item.type);
         if (t !== String(typeFilter ?? "").toLowerCase()) return false;
       }
