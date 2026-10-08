@@ -42,18 +42,12 @@ async def rss_filter_metadata(request: Request):
             SELECT DISTINCT origin FROM recent_chapters WHERE origin IS NOT NULL AND origin != '' ORDER BY origin
         """)
 
-        # Whitelist statuses
-        statuses = q("""
-            SELECT DISTINCT status FROM whitelist WHERE status IS NOT NULL AND status != '' ORDER BY status
-        """)
-
         return JSONResponse(content={
             "success": True,
             "data": {
                 "genres": [g["genre"] for g in genres],
                 "sources": [s["source"] for s in sources],
                 "origins": [o["origin"] for o in origins],
-                "statuses": [s["status"] for s in statuses],
             }
         })
     except Exception as e:

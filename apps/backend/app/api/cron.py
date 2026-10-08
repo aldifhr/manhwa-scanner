@@ -117,6 +117,24 @@ async def cron_health(request: Request):
         scheduler["next_run"] = ss.get("next_run")
     except Exception:
         pass
+    # ROLE=api has no scheduler thread of its own (main.py only starts it when
+    # ROLE=cron), so the local snapshot is always alive=False there. Ask the
+    # cron worker directly before reporting the pipeline as down — otherwise
+    # /cron/health claims the scheduler is dead while dispatch runs every 120s.
+    if not scheduler["alive"]:
+        try:
+            req = urllib.request.Request(
+                _CRON_WORKER_URL,
+                headers={"Authorization": f"Bearer {settings.MONITOR_AUTH_TOKEN}"},
+            )
+            with urllib.request.urlopen(req, timeout=3) as _r:
+                _remote = json.loads(_r.read().decode())
+            if _remote.get("scheduler_alive"):
+                scheduler["alive"] = True
+                scheduler["last_run"] = _remote.get("last_run")
+                scheduler["next_run"] = _remote.get("next_run")
+        except Exception:
+            pass
     circuits = {}
     try:
         from app.services.resilience import cb_shinigami, cb_voratoon
