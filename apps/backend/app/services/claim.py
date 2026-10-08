@@ -61,14 +61,9 @@ def claim_recent_chapters_for_dispatch(
     # stops adding new rows for a disabled source, but the rows it already wrote
     # stay in recent_chapters for the whole 24h window and would still be
     # claimed and notified, so turning a source off only stopped the new stuff.
-    from app.config import settings as _settings
+    from app.config import disabled_sources as _disabled_sources
 
-    _disabled: set[str] = set()
-    try:
-        _raw = (getattr(_settings, "DISABLED_SOURCES", "") or "").strip().lower()
-        _disabled = {s.strip() for s in _raw.split(",") if s.strip()}
-    except Exception:
-        pass
+    _disabled: set[str] = _disabled_sources()
 
     allowed: set[tuple[str, str]] = set()
     _latest_sent: dict[tuple[str, str], float] = {}

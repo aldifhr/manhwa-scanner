@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time as _time
 
@@ -13,23 +12,9 @@ logger = logging.getLogger("tasks.scheduler")
 # API walk stays as fallback in the collector if the relay file goes stale.
 _RSS_SOURCES = ("shinigami", "voratoon")
 
-
-def _disabled_sources() -> set[str]:
-    """Sources turned off via DISABLED_SOURCES (process env, else .env).
-
-    pydantic loads .env into settings, not os.environ, so the process env is
-    checked first and settings is the fallback — otherwise a value set in .env
-    is silently ignored and the source keeps getting scheduled.
-    """
-    raw = (os.getenv("DISABLED_SOURCES", "") or "").strip().lower()
-    if not raw:
-        try:
-            from app.config import settings as _s
-
-            raw = (getattr(_s, "DISABLED_SOURCES", "") or "").strip().lower()
-        except Exception:
-            pass
-    return {s.strip() for s in raw.split(",") if s.strip()}
+# Single parser lives in config — see config.disabled_sources() for why the
+# module-level os.getenv-first pattern was dead code.
+from app.config import disabled_sources as _disabled_sources  # noqa: E402
 
 _SOURCE_INTERVAL_S = 300
 _DISPATCH_INTERVAL_S = 120
@@ -89,8 +74,8 @@ def _scheduler_loop() -> None:
     last_source = _time.monotonic()
     while True:
         try:
-            # Reload disabled sources each cycle. See _disabled_sources() for why
-            # os.getenv alone is not enough.
+            # Reload each cycle so an operator toggle takes effect without a
+            # restart. See config.disabled_sources().
             _disabled_set = _disabled_sources()
             if _stop.wait(_DISPATCH_INTERVAL_S):
                 break

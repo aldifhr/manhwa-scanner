@@ -9,6 +9,7 @@ import hashlib
 import threading
 
 from app.db import get_supabase
+from app.config import disabled_sources as _disabled_sources
 from app.logger import get_logger
 from app.utils.text import normalize_shinigami_url
 from app.utils.origin import normalize_origin
@@ -91,27 +92,6 @@ def get_trending(hours: int = 24, limit: int = 25) -> list[dict]:
         logger.error("get_trending failed", exc=e)
         return []
 
-def _disabled_sources() -> set[str]:
-    """Sources turned off via DISABLED_SOURCES (process env, else settings).
-
-    The RSS feed has to honour this: a disabled source stops being scraped, but
-    the rows it already wrote stay in recent_chapters for the whole freshness
-    window, so without this filter the feed keeps serving them and the source
-    looks active long after it was turned off.
-    """
-    import os as _os
-
-    raw = (_os.getenv("DISABLED_SOURCES", "") or "").strip().lower()
-    if not raw:
-        try:
-            from app.config import settings as _s
-
-            raw = (getattr(_s, "DISABLED_SOURCES", "") or "").strip().lower()
-        except Exception:
-            pass
-    return {s.strip() for s in raw.split(",") if s.strip()}
-
-
 def get_recent_chapters(hours: int = 24) -> list[dict]:
     """Load ALL chapters found within the last `hours` (used by dispatch /
     dashboard callers that need the full set). For web pagination use
@@ -181,7 +161,7 @@ def _fetch_recent_rows(
         if source:
             q = q.eq("source", source)
         else:
-            # Exclude disabled sources one at a time — see _disabled_sources().
+            # Exclude disabled sources one at a time — see config.disabled_sources().
             # Without this the feed serves rows from a source that was turned
             # off, until they age out of the window.
             for _off_src in sorted(_disabled_sources()):

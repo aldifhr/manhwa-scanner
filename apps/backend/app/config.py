@@ -162,6 +162,19 @@ CRON_ACTIONS = (
 
 settings = Settings()
 
+
+def disabled_sources() -> set[str]:
+    """Sources turned off via DISABLED_SOURCES — the single parser.
+
+    `settings.DISABLED_SOURCES` already reads a real process env var: pydantic-
+    settings resolves env vars before .env, so a module-level `os.getenv` first
+    is dead code, not a fallback. Verified: `DISABLED_SOURCES=voratoon python -c
+    "from app.config import settings; print(settings.DISABLED_SOURCES)"` prints
+    'voratoon'. Every consumer goes through here so the semantics cannot drift.
+    """
+    raw = (settings.DISABLED_SOURCES or "").strip().lower()
+    return {s.strip() for s in raw.split(",") if s.strip()}
+
 def _validate_settings(s: "Settings") -> None:
     """Refuse to boot if running in production without required secrets.
 

@@ -67,13 +67,11 @@ def collect_recent_chapters(
     source: str | None = None,
     fetch_meta: bool = True,
 ) -> tuple[list[dict], dict]:
-    _disabled: set[str] = set()
-    _env_disabled = (getattr(settings, "DISABLED_SOURCES", "") or "").strip()
-    if _env_disabled:
-        for _s in _env_disabled.split(","):
-            _s = _s.strip().lower()
-            if _s:
-                _disabled.add(_s)
+    # Two independent inputs: the operator toggle, plus the auto-cooldown
+    # written by save_source_health_map when consecutive_failures >= 3.
+    from app.config import disabled_sources as _disabled_sources
+
+    _disabled: set[str] = _disabled_sources()
     try:
         hm = health_store.load_source_health_map(settings.SOURCE_KEYS)
         _now = datetime.now(timezone.utc)
