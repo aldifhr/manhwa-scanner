@@ -65,6 +65,32 @@ def save_source_health_map(health_map: dict) -> None:
     except Exception as e:
         logger.error("saveSourceHealthMap upsert error", exc=e)
 
+def cron_status_is_ok(raw: object) -> bool:
+    """True when a cron_run_status.status value means success.
+
+    That column is JSONB and arrives in THREE shapes depending on the client:
+      * a dict            — psycopg2 with RealDictCursor
+      * a JSON string     — Supabase over PostgREST: '{"status": "ok"}'
+      * a bare string     — 'ok'
+    Comparing the raw value to "ok" is unequal for the first two, which is how
+    /incidents reported 200 "Cron Failure" entries while every row in the table
+    was ok, and how /dashboard-snapshot's cronStatus.outcome always said
+    "error". Single implementation so the next reader cannot pick a fourth way.
+    """
+    if isinstance(raw, dict):
+        return raw.get("status") == "ok"
+    s = str(raw or "").strip().lower()
+    if not s:
+        return False
+    if s.startswith("{"):
+        try:
+            import json as _json
+            return (_json.loads(s) or {}).get("status") == "ok"
+        except Exception:
+            return False
+    return s == "ok"
+
+
 def load_source_health_map(keys: list[str]) -> dict:
     try:
         res = (

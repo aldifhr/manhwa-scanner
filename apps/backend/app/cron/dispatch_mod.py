@@ -378,7 +378,13 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             if not skip_ceiling and is_implausible_chapter(
                 it.get("chapter"), _ceil, _counts.get(_it_tk, 0)
             ):
-                logger.warn(
+                # debug, not warn: the upstream keeps serving this label, so the
+                # row is re-scraped every cycle and a warn would repeat forever
+                # for a condition that is already handled. Live case: one series
+                # logged this 8x in 6h for a single chapter. The fact is still
+                # recorded — /incidents and the dispatch ledger show the chapter
+                # as never-sent — so nothing is lost by not paging on it.
+                logger.debug(
                     "dispatch: implausible chapter number, skipped",
                     title_key=_it_tk, source=_it_src,
                     chapter=str(it.get("chapter")), ceiling=_ceil,

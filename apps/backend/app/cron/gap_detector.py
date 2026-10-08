@@ -205,7 +205,10 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                 # single cover fetch per gap (was per chapter N+1) — cover canonical series_meta since 052
                 cur.execute("SELECT cover FROM series_meta WHERE title_key=%s AND source=%s", (tk, src))
                 wrow = cur.fetchone()
-                cover_val = (wrow[0] if wrow else "") or ""
+                # The pool cursor is a RealDictCursor, so a row is a DICT. `wrow[0]`
+                # raised KeyError and killed the whole per-series backfill (the
+                # caller's `except` logged "gap backfill: per-series failed").
+                cover_val = (wrow.get("cover") if wrow else "") or ""
                 # bulk existing check 1×
                 existing_urls: set[str] = set()
                 if uniq_candidates:
@@ -216,7 +219,7 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                         ph = ", ".join(["%s"] * len(chunk))
                         cur.execute(f"SELECT chapter_url FROM recent_chapters WHERE chapter_url IN ({ph})", chunk)
                         for r in cur.fetchall():
-                            existing_urls.add(r[0])
+                            existing_urls.add(r.get("chapter_url") or "")
                 # build bulk inserts for non-existing
                 to_insert: list[dict] = []
                 for num, url, title in uniq_candidates:
@@ -262,11 +265,14 @@ def _backfill_and_dispatch(gaps: list[dict]) -> dict:
                        ORDER BY chapter_num""",
                     (tk_norm, src, lo, hi),
                 )
-                names = ["title_key", "title", "chapter", "chapter_num", "source", "cover",
-                         "series_url", "origin", "updated_time", "description", "chapter_url"]
+                # Rows are RealDictRows. The previous `dict(zip(names, r))` zipped
+                # the column names against the row's KEYS, so every field became
+                # its own name — title literally "title", chapter "chapter". Any
+                # gap that reached dispatch would have posted that as the
+                # notification. dict(row) is the correct conversion.
                 items = []
                 for r in cur.fetchall():
-                    it = dict(zip(names, r))
+                    it = dict(r)
                     it["updated_time"] = fresh_stamp
                     # dispatch_mod expects 'url' (not 'chapter_url') — alias it
                     it["url"] = it.get("chapter_url") or it.get("url") or ""

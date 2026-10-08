@@ -193,6 +193,29 @@ def check_dispatch_starvation() -> dict:
             key = fcfs_key(r.get("title") or (r.get("title_key") or "").replace("-", " "), r.get("chapter"))
             if key in sent:
                 continue
+            # Skip chapters the dispatch sanity guard refuses. They are
+            # whitelisted, inside the window, and have no ledger entry — exactly
+            # this check's definition of "undelivered" — but dispatch will never
+            # send them, so alerting on them pages the operator forever. Live:
+            # shinigami serves chapter_number '26596' for a series whose real
+            # chapters are 1..266. Rejected under BOTH batch shapes means no
+            # future pass can deliver it; anything the guard could still send
+            # stays reported.
+            try:
+                from app.cron.dispatch_mod import (
+                    is_implausible_chapter,
+                    load_chapter_ceilings,
+                )
+
+                _tk = str(r.get("title_key") or "").strip()
+                _src = str(r.get("source") or "").strip()
+                _ceil = load_chapter_ceilings([(_tk, _src)]).get((_tk, _src))
+                if is_implausible_chapter(r.get("chapter"), _ceil, 1) and is_implausible_chapter(
+                    r.get("chapter"), _ceil, 3
+                ):
+                    continue
+            except Exception:
+                pass  # fail open: over-reporting beats hiding a real loss
             rd = r.get("release_date")
             if rd is None:
                 continue

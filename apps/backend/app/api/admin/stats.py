@@ -423,9 +423,12 @@ async def _build_snapshot() -> dict:
         try:
             if cron_stats:
                 lr = cron_stats[0]
-                # status is jsonb {"status": "ok"}, extract nested string
-                _lr_status = lr.get("status", {})
-                _lr_ok = (isinstance(_lr_status, dict) and _lr_status.get("status") == "ok") or str(_lr_status).lower() == "ok"
+                # See cron_status_is_ok — the column arrives as a dict OR a JSON
+                # string; the isinstance(dict) test alone missed the string form,
+                # so outcome was always "error" and the navbar read the pipeline
+                # as broken.
+                from app.storage.health import cron_status_is_ok as _cron_ok
+                _lr_ok = _cron_ok(lr.get("status"))
                 cron_status_data = {
                     "outcome": "ok" if _lr_ok else "error",
                     "timestamp": lr.get("created_at")
@@ -441,8 +444,9 @@ async def _build_snapshot() -> dict:
                     except (TypeError, ValueError):
                         _sent = 0
                     if _sent > 0:
-                        _r_status = _r.get("status", {})
-                        _r_ok = (isinstance(_r_status, dict) and _r_status.get("status") == "ok") or str(_r_status).lower() == "ok"
+                        # See cron_status_is_ok — same JSONB-shape trap.
+                        from app.storage.health import cron_status_is_ok as _cron_ok2
+                        _r_ok = _cron_ok2(_r.get("status"))
                         last_delivery = {
                             "outcome": "ok" if _r_ok else "error",
                             "timestamp": _r.get("created_at")

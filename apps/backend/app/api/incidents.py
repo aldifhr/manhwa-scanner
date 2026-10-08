@@ -41,7 +41,13 @@ async def incidents(request: Request):
                 .execute()
             )
             for row in cron.data or []:
-                if row.get("status") != "ok":
+                # See cron_status_is_ok: the column is JSONB and arrives as a
+                # dict, a JSON string, or a bare string. Comparing it to "ok"
+                # directly made every successful run look like a failure, so
+                # /incidents reported 200 "Cron Failure" entries against a table
+                # where all 2046 rows were ok.
+                from app.storage.health import cron_status_is_ok as _cron_ok
+                if not _cron_ok(row.get("status")):
                     ts = row.get("created_at", "")
                     dur = row.get("duration")
                     dur_s = f"{dur}s" if dur is not None else "unknown"
