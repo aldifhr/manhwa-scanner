@@ -223,10 +223,15 @@ async def catalog_search(request: Request):
         results.extend(_voratoon_catalog_rows(q, _wl_keys))
     except Exception as exc:  # noqa: BLE001 — search must not die on relay IO
         logger.debug("voratoon catalog search skipped", err=str(exc)[:120])
-    try:
-        results.extend(_ikiru_catalog_rows(q, _wl_keys))
-    except Exception as exc:  # noqa: BLE001 — search must not die on upstream IO
-        logger.debug("ikiru catalog search skipped", err=str(exc)[:120])
+    # Skip disabled sources: ikiru is off, but its catalogue walk still costs
+    # ~3.5s per keystroke (it pages the live API client-side), which is the
+    # whole latency of this endpoint — and it can only ever return rows for a
+    # source the app no longer ingests.
+    if "ikiru" in settings.active_sources:
+        try:
+            results.extend(_ikiru_catalog_rows(q, _wl_keys))
+        except Exception as exc:  # noqa: BLE001 — search must not die on upstream IO
+            logger.debug("ikiru catalog search skipped", err=str(exc)[:120])
     return JSONResponse(content={"success": True, "data": {"results": results, "count": len(results)}})
 
 
