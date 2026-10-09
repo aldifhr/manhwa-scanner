@@ -8,9 +8,23 @@ logger = logging.getLogger("tasks.retention")
 _DISPATCH_HISTORY_RETENTION_DAYS = 3
 _CRON_RUN_STATUS_RETENTION_DAYS = 7
 _FAILED_DISPATCHES_RETENTION_DAYS = 7
-_RECENT_CHAPTERS_RETENTION_DAYS = 7
+# recent_chapters holds the working set the feed, gap-detection and enrichment
+# all read. The feed itself only ever asks for 24h (every reader defaults to
+# hours=24), so 3 days is headroom for the backfill/gap paths rather than a
+# serving requirement.
+#
+# This used to be declared 7 here while lifecycle.py pruned at 72h, so the
+# tighter of the two always won and this constant was a lie: raising it changed
+# nothing. One definition now — lifecycle imports it.
+_RECENT_CHAPTERS_RETENTION_DAYS = 3
 _RETENTION_MAX_PER_SERIES = 500
 _SERIES_META_RETENTION_DAYS = 14
+# Audit is a compliance trail, not a log — keep it longer than the operational
+# tables. It was the only table with NO policy at all, so it grew unbounded
+# (2146 rows / 30 days at the time of writing). 30 days is enough to answer
+# "who changed this" for anything recent, and the table has an index on
+# created_at so the prune is cheap.
+_AUDIT_LOG_RETENTION_DAYS = 30
 _VACUUM_INTERVAL_S = 604800  # weekly
 
 
@@ -85,16 +99,24 @@ def _retention_loop(stop_event) -> None:
                 _null = _sb.table("dispatch_claims").delete().is_("created_at", "null").execute()
                 _null_count = len(_null.data) if _null.data else 0
                 if _stale_count or _null_count:
-                    logger.info("retention: cleaned stale dispatch_claims", expired=_stale_count, null_created=_null_count)
+                    logger.info("retention: cleaned stale dispatch_claims expired=%s null_created=%s", _stale_count, _null_count)
             except Exception as e:
                 logger.warning("retention: stale claims cleanup failed", exc_info=e)
             try:
                 from app.storage.error_logs import delete_older_than as _err_prune
                 _pruned = _err_prune(days=7)
                 if _pruned:
-                    logger.info("retention: pruned error_logs", deleted=_pruned, days=7)
+                    logger.info("retention: pruned error_logs deleted=%s days=7", _pruned)
             except Exception as e:
                 logger.warning("retention: error_logs cleanup failed", exc_info=e)
+            try:
+                _audit_cutoff = (datetime.now(timezone.utc) - timedelta(days=_AUDIT_LOG_RETENTION_DAYS)).isoformat()
+                _pruned_audit = _sb.table("audit_log").delete().lt("created_at", _audit_cutoff).execute()
+                _audit_count = len(_pruned_audit.data) if _pruned_audit.data else 0
+                if _audit_count:
+                    logger.info("retention: pruned audit_log deleted=%s days=%s", _audit_count, _AUDIT_LOG_RETENTION_DAYS)
+            except Exception as e:
+                logger.warning("retention: audit_log cleanup failed", exc_info=e)
             try:
                 cutoff = (datetime.now(timezone.utc) - timedelta(days=_SERIES_META_RETENTION_DAYS)).isoformat()
                 _wl = _sb.table("whitelist").select("title_key").execute()
@@ -106,7 +128,7 @@ def _retention_loop(stop_event) -> None:
                 to_del = [r.get("title_key") for r in (q.data or []) if r.get("title_key") and r.get("title_key") not in keep]
                 if to_del:
                     _sb.table("series_meta").delete().in_("title_key", to_del).execute()
-                    logger.info("retention: pruned series_meta", deleted=len(to_del), days=_SERIES_META_RETENTION_DAYS)
+                    logger.info("retention: pruned series_meta deleted=%s days=%s", len(to_del), _SERIES_META_RETENTION_DAYS)
             except Exception as e:
                 logger.warning("retention: series_meta cleanup failed", exc_info=e)
             try:
@@ -115,7 +137,7 @@ def _retention_loop(stop_event) -> None:
                     from app.storage.whitelist import auto_cleanup_stale_whitelist
                     _r = auto_cleanup_stale_whitelist(days=30)
                     if _r.get("removed"):
-                        logger.info("retention: pruned stale whitelist", removed=_r.get("removed"), days=30)
+                        logger.info("retention: pruned stale whitelist removed=%s days=30", _r.get("removed"))
                     _last_whitelist_prune = _t2.time()
             except Exception as e:
                 logger.warning("retention: whitelist 30d cleanup failed", exc_info=e)
@@ -124,7 +146,7 @@ def _retention_loop(stop_event) -> None:
                 _pruned_rc = _sb.table("recent_chapters").delete().lt("updated_time", _rc_cutoff).execute()
                 _rc_count = len(_pruned_rc.data) if _pruned_rc.data else 0
                 if _rc_count:
-                    logger.info("retention: pruned recent_chapters", deleted=_rc_count, days=_RECENT_CHAPTERS_RETENTION_DAYS)
+                    logger.info("retention: pruned recent_chapters deleted=%s days=%s", _rc_count, _RECENT_CHAPTERS_RETENTION_DAYS)
             except Exception as e:
                 logger.warning("retention: recent_chapters cleanup failed", exc_info=e)
         except Exception as e:

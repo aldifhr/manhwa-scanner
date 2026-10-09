@@ -101,11 +101,20 @@ def run_cron_inline(action: str) -> None:
         from app.db import get_supabase
         from app.storage import recent_chapters
         from datetime import datetime, timezone, timedelta
-        from app.tasks.retention import _DISPATCH_HISTORY_RETENTION_DAYS as _LEDGER_DAYS
-        recent_chapters.prune_older_than(72)  # feed 3d
-        recent_chapters.prune_dispatch_history_older_than(_LEDGER_DAYS * 24)  # ledger 30d — decoupled
+        # All windows come from app.tasks.retention — the single source of truth.
+        # These used to be hardcoded here (72h for recent_chapters, 2 days for
+        # cron_run_status) while retention.py declared 7 days for both. Both
+        # paths run hourly, the tighter one always won, and the constants in
+        # retention.py were therefore decorative: raising them changed nothing.
+        from app.tasks.retention import (
+            _DISPATCH_HISTORY_RETENTION_DAYS as _LEDGER_DAYS,
+            _RECENT_CHAPTERS_RETENTION_DAYS as _RC_DAYS,
+            _CRON_RUN_STATUS_RETENTION_DAYS as _CRON_DAYS,
+        )
+        recent_chapters.prune_older_than(_RC_DAYS * 24)
+        recent_chapters.prune_dispatch_history_older_than(_LEDGER_DAYS * 24)
         get_supabase().table("cron_run_status").delete().lt(
-            "created_at", (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+            "created_at", (datetime.now(timezone.utc) - timedelta(days=_CRON_DAYS)).isoformat()
         ).execute()
         return
 
