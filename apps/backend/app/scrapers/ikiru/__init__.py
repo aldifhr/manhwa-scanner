@@ -95,8 +95,15 @@ def series_url_for(slug: str) -> str:
     return f"{_public()}/manga/{slug}"
 
 
-def chapter_url_for(slug: str, chapter_number: int | str) -> str:
-    return f"{_public()}/manga/{slug}/chapter/{chapter_number}"
+def chapter_url_for(slug: str, chapter_number: int | str, chapter_slug: str = "") -> str:
+    """Build chapter URL.
+
+    Ikiru uses /manga/{slug}/chapter-{number} (dash, not slash).
+    If chapter_slug is provided from the API, use it directly.
+    """
+    if chapter_slug:
+        return f"{_public()}/manga/{slug}/{chapter_slug}"
+    return f"{_public()}/manga/{slug}/chapter-{chapter_number}"
 
 
 def _derive_format(raw: str) -> tuple[str, str]:
