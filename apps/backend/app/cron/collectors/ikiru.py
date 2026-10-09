@@ -82,34 +82,48 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
 
             genres = [g.get("name", "") for g in (meta.get("genre") or []) if isinstance(g, dict) and g.get("name")]
 
-            description = str(series.get("description") or "").strip()
-
+            # Check if any chapter is fresh before fetching per-series detail
             chapters = series.get("chapter") or []
             if not isinstance(chapters, list):
                 chapters = []
 
             ceiling = latest_sent.get((tk, SOURCE), 0)
-            kept = 0
-
+            fresh_chapters = []
             for ch in chapters:
-                if kept >= MAX_CHAPTERS_PER_SERIES:
-                    break
                 if not isinstance(ch, dict):
                     continue
-
                 ch_num_raw = ch.get("number")
                 if ch_num_raw is None:
                     continue
-
-                ch_str = str(ch_num_raw)
                 dt = _parse_ts(ch.get("updatedAt"))
                 if dt is None or dt < cutoff:
                     continue
-
-                num = _parse_chapter_num(ch_str)
+                num = _parse_chapter_num(str(ch_num_raw))
                 if num is not None and ceiling and num <= ceiling:
                     continue
+                fresh_chapters.append((ch_num_raw, dt, num))
 
+            if not fresh_chapters:
+                continue
+
+            # Fetch per-series detail for description + full chapter list
+            detail = ik.get_ikiru_series_detail(slug)
+            description = ""
+            if detail:
+                import html as _html
+                raw_desc = str(detail.get("description") or "").strip()
+                if raw_desc:
+                    # Strip HTML tags
+                    import re as _re
+                    description = _re.sub(r"<[^>]+>", "", raw_desc).strip()
+                    description = _html.unescape(description)
+
+            kept = 0
+            for ch_num_raw, dt, num in fresh_chapters:
+                if kept >= MAX_CHAPTERS_PER_SERIES:
+                    break
+
+                ch_str = str(ch_num_raw)
                 chapter_url = ik.chapter_url_for(slug, ch_num_raw)
                 kept += 1
 

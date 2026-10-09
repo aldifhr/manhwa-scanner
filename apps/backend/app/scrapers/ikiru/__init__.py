@@ -63,6 +63,20 @@ def get_ikiru_project_page(page: int = 1, limit: int = PAGE_SIZE) -> dict:
     return data
 
 
+def get_ikiru_series_detail(slug: str) -> dict:
+    """Fetch full series detail by slug.
+
+    Returns the raw data dict with description, metadata, chapters, etc.
+    """
+    url = f"{_api()}/api/public/manga/{slug}"
+    r = _get_client().get(url)
+    r.raise_for_status()
+    data = r.json()
+    if not data.get("success"):
+        return {}
+    return data.get("data", {})
+
+
 def get_ikiru_series_chapters(series_id: str) -> list[dict]:
     """Fetch chapters for a single series.
 
