@@ -179,7 +179,7 @@ def claim_recent_chapters_for_dispatch(
             return []
 
         urls = [c.get("chapter_url") for c in candidates if c.get("chapter_url")]
-        fcfs_keys = [fcfs_key(c.get("title") or "", c.get("chapter") or "") for c in candidates]
+        fcfs_keys = [fcfs_key(str(c.get("title_key") or "").replace("-", " "), c.get("chapter") or "") for c in candidates]
         already_urls: set[str] = set()
         already_fcfs: set[str] = set()
         if urls:
@@ -216,7 +216,7 @@ def claim_recent_chapters_for_dispatch(
         to_claim: list[dict] = []
         for c in candidates:
             u = c.get("chapter_url")
-            fk = fcfs_key(c.get("title") or "", c.get("chapter") or "")
+            fk = fcfs_key(str(c.get("title_key") or "").replace("-", " "), c.get("chapter") or "")
             if u in already_urls or fk in already_fcfs:
                 continue
             _tk_c = str(c.get("title_key") or "")
@@ -249,7 +249,7 @@ def claim_recent_chapters_for_dispatch(
                 _claim_rows: list[tuple] = []
                 _claim_expires = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
                 for c in to_claim:
-                    _fk = fcfs_key(c.get("title") or "", c.get("chapter") or "")
+                    _fk = fcfs_key(str(c.get("title_key") or "").replace("-", " "), c.get("chapter") or "")
                     if _fk in _seen_fcfs:
                         continue
                     _seen_fcfs.add(_fk)
@@ -299,7 +299,7 @@ def claim_recent_chapters_for_dispatch(
 
         # P1 fix: only return items whose INSERT actually succeeded (won the ON CONFLICT race)
         if to_claim and _inserted_fks:
-            _claimed_items = [c for c in to_claim if fcfs_key(c.get("title") or "", c.get("chapter") or "") in _inserted_fks]
+            _claimed_items = [c for c in to_claim if fcfs_key(str(c.get("title_key") or "").replace("-", " "), c.get("chapter") or "") in _inserted_fks]
         else:
             _claimed_items = []
         conn.commit()

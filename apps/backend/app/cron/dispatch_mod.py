@@ -233,7 +233,15 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # force=True only bypasses the in-run claim guard (dispatch_claims),
     # not the permanent notification record. A previously-sent chapter must
     # never be re-notified even with force=True.
-    _all_keys: list[str] = [fcfs_key(it.get("title", ""), it.get("chapter", "")) for it in to_send if it.get("url")]
+    # Same key builder as the ledger write below and as dispatch_watchdog.py:
+    # title_key with dashes -> spaces. Using the display title here made the
+    # in-run dedupe set disagree with dispatch_history, so a chapter already
+    # in the ledger could pass the dedupe and be re-sent.
+    _all_keys: list[str] = [
+        fcfs_key(str(it.get("title_key") or "").replace("-", " "), it.get("chapter", ""))
+        for it in to_send
+        if it.get("url")
+    ]
     if force:
         # Bypass ONLY dispatch_claims claim guard (already claimed in deep queue).
         # Still load claimed_keys from dispatch_history to prevent re-notifying
@@ -413,7 +421,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     chapter=str(it.get("chapter")), ceiling=_ceil,
                 )
                 continue
-            norm = fcfs_key(it.get("title", ""), it.get("chapter", ""))
+            norm = fcfs_key(str(it.get("title_key") or "").replace("-", " "), it.get("chapter", ""))
             if norm in claimed_keys or norm in seen_key_run or url in _claimed_urls_set:
                 continue
             # legacy title_key#chapter fallback
@@ -546,7 +554,15 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 _it = _by_url.get(_u)
                 if not _it:
                     continue
-                _norm = fcfs_key(_it.get("title", ""), _it.get("chapter", ""))
+                # fcfs_key MUST be built from title_key (dashes), not the display
+                # title. normalize_title() strips punctuation and uses spaces, so
+                # display title "The Margrave's Worthless Mage" yields
+                # "the margrave s worthless mage#31" while the watchdog
+                # (dispatch_watchdog.py) builds from title_key and gets
+                # "the-margrave-s-worthless-mage#31" — different keys, so chapters
+                # get delivered but the watchdog reports them undelivered forever.
+                # title_key -> spaces is the same input the watchdog uses.
+                _norm = fcfs_key(str(_it.get("title_key") or "").replace("-", " "), _it.get("chapter", ""))
                 try:
                     _ds_flush.complete_dispatch_claim(
                         chapter_url=_u, duplicate_url=None, instance_id=instance_id,

@@ -60,7 +60,7 @@ def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
        record of "this exact chapter of this exact source was sent".
 
     2. fcfs_key in dispatch_history — the cross-source rule. fcfs_key is
-       built from the display title and deliberately excludes the source, so
+       built from title_key and deliberately excludes the source, so
        a chapter that already shipped from one source is considered
        delivered even when a second source later surfaces the same chapter.
        Without this, every chapter that shipped on shinigami is reported as
@@ -105,7 +105,10 @@ def _stalled_chapters(age_hours: float) -> list[dict[str, Any]]:
         return []
     from app.services.fcfs import fcfs_key
 
-    keys = [fcfs_key(r.get("title") or "", r.get("chapter") or "") for r in rows]
+    # Build from title_key (dashes -> spaces) to match dispatch_mod, claim.py
+    # and dispatch_watchdog.py. The display title normalizes differently,
+    # so history lookups silently missed and rows looked undelivered.
+    keys = [fcfs_key(str(r.get("title_key") or "").replace("-", " "), r.get("chapter") or "") for r in rows]
     delivered: set[str] = set()
     uniq = list(dict.fromkeys(k for k in keys if k))
     if uniq:
@@ -200,7 +203,7 @@ def _aged_out_count(lookback_hours: float) -> int:
         cur = conn.cursor()
         cur.execute(
             """
-            select rc.title, rc.chapter
+            select rc.title, rc.title_key, rc.chapter
             from recent_chapters rc
             join whitelist w
               on w.title_key = rc.title_key and w.source = rc.source
@@ -224,7 +227,10 @@ def _aged_out_count(lookback_hours: float) -> int:
 
     from app.services.fcfs import fcfs_key
 
-    keys = [fcfs_key(r.get("title") or "", r.get("chapter") or "") for r in rows]
+    # Build from title_key (dashes -> spaces) to match dispatch_mod, claim.py
+    # and dispatch_watchdog.py. The display title normalizes differently,
+    # so history lookups silently missed and rows looked undelivered.
+    keys = [fcfs_key(str(r.get("title_key") or "").replace("-", " "), r.get("chapter") or "") for r in rows]
     uniq = list(dict.fromkeys(k for k in keys if k))
     if not uniq:
         return 0
