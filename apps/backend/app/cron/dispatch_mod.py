@@ -198,6 +198,18 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     # arrives as a small burst (e.g. 4000/4001/4002 together); a lone absurd
     # number is a bad label. Read by the sanity guard below.
     _counts: dict[str, int] = {}
+    # All fcfs_keys already in dispatch_history — used by the ceiling guard
+    # to distinguish "already sent, skip" from "never sent, allow through".
+    _sent_keys_global: set[str] = set()
+    try:
+        from app.db import get_supabase as _sb_g
+        _rows_g = _sb_g().table("dispatch_history").select("fcfs_key").execute().data or []
+        for _r in _rows_g:
+            _fk = _r.get("fcfs_key")
+            if _fk:
+                _sent_keys_global.add(str(_fk))
+    except Exception:
+        pass
     for _it in to_send:
         _k = str(_it.get("title_key") or "").strip()
         if _k:
@@ -371,7 +383,16 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 try:
                     _it_ch = float(it.get("chapter") or "0")
                     if _it_ch <= _ceil:
-                        continue
+                        # Ceiling blocks re-sends, not first-sends. If this
+                        # chapter was never delivered (no dispatch_history
+                        # row), let it through — otherwise a high chapter
+                        # shipped earlier permanently blocks every lower
+                        # chapter that was never sent.
+                        _fk = fcfs_key(_it_tk.replace("-", " "), it.get("chapter"))
+                        if _fk not in _sent_keys_global:
+                            pass  # never sent — allow
+                        else:
+                            continue
                 except (ValueError, TypeError):
                     pass
             # Sanity: a chapter number far above everything the series has
