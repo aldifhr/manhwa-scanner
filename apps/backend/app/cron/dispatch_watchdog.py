@@ -22,6 +22,7 @@ still alerts.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from app.logger import get_logger
@@ -40,6 +41,20 @@ STARVE_AFTER_MIN = 30
 # subscribes a new source) can take up to an hour to be picked up by the
 # rotating walk — that is normal, not a failure.
 UNDELIVERED_AFTER_MIN = 60
+
+# Send the UNDELIVERED alert? Off by default.
+#
+# Why: it paged 5x in 24h on chapters that were in fact delivered. The
+# definition ("whitelisted, inside 24h window, no dispatch_history row")
+# has too many ways to disagree with reality — a source renumbering, a
+# backlog being drained, a chapter that is deliberately held back. Every
+# occurrence needed manual DB work to disprove, which is a worse deal
+# than the outages it was built to catch: dispatch_history showed the
+# chapters arriving minutes after each alert.
+#
+# The number is still computed and logged every run, so the data is
+# there if it is ever needed. Set ALERT_UNDELIVERED=1 to re-enable.
+ALERT_UNDELIVERED = os.environ.get("ALERT_UNDELIVERED", "0") == "1"
 
 # Re-alert at most this often while a condition persists.
 COOLDOWN_MIN = 60
@@ -235,7 +250,7 @@ def check_dispatch_starvation() -> dict:
     result["undelivered"] = undelivered
 
     if undelivered > 0:
-        if _should_alert("undelivered"):
+        if ALERT_UNDELIVERED and _should_alert("undelivered"):
             _send(
                 f"⚠️ **{undelivered} chapter(s) eligible but UNDELIVERED** — "
                 f"oldest {oldest_min:.0f} min. They are whitelisted and inside the "
@@ -243,6 +258,13 @@ def check_dispatch_starvation() -> dict:
             )
             logger.error("undelivered chapters", count=undelivered, oldest_min=round(oldest_min, 1))
             result["alerted"].append("undelivered")
+        else:
+            # Logged at warn, not error: it is no longer a page, and the log
+            # is where the count is meant to be read now.
+            logger.warn(
+                "undelivered chapters (alert suppressed)",
+                count=undelivered, oldest_min=round(oldest_min, 1),
+            )
     else:
         _clear_alert_state("undelivered")
 
