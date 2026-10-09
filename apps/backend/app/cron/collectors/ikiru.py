@@ -270,14 +270,17 @@ def _collect_ikiru_source(latest_sent: dict, disabled: set, fetch_meta: bool = T
 
         # ponytail: 6 workers. Raise only if a poll cycle gets slower than the
         # 120s source timeout; ikiru has not rate-limited us at 13 titles.
+        _poll_added = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as _ex:
             for _res in _ex.map(lambda tk: _poll(tk), [t for t, _ in wl_series]):
                 if _res:
                     items.append(_res)
+                    _poll_added += 1
         logger.info(
             "ikiru whitelist poll done",
             polled=len(wl_series),
-            added=len(items),
+            added=_poll_added,
+            total_items=len(items),
         )
 
     return attach_confidence(items, SOURCE)
