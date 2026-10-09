@@ -30,7 +30,11 @@ def _public() -> str:
 BASE = _base()  # type: ignore
 API = _api()  # type: ignore
 PUBLIC = _public()  # type: ignore
-TIMEOUT = 10.0
+# Shinigami's API answers in ~290ms normally. 10s was the ceiling for the
+# httpx attempt, so a hung socket stalled the whole collect for a full 10
+# seconds before the fallback ran. 4s is still 13x the normal latency and
+# keeps one slow endpoint from eating the 2-minute pipeline budget.
+TIMEOUT = 4.0
 
 _HEADERS = {
     "User-Agent": settings.HTTP_USER_AGENT,
@@ -43,8 +47,23 @@ _HEADERS = {
 _CLIENT = httpx.Client(timeout=TIMEOUT, headers=_HEADERS, verify=True)
 
 def _fetch(url: str):
-    """Fetch URL, fallback to curl_cffi if httpx blocked by TLS fingerprint."""
-    r = _CLIENT.get(url)
+    """Fetch URL, falling back to curl_cffi when httpx cannot get through.
+
+    The curl_cffi fallback must cover BOTH non-200 responses AND transport
+    failures. It previously only ran on a status code, so an httpx
+    ConnectTimeout/ReadTimeout raised out of the call and the whole path
+    was abandoned — no curl_cffi attempt at all. Measured live: the second
+    shinigami collect in each cycle took ~10.3s (exactly TIMEOUT=10.0)
+    while the first took ~290ms. httpx was hanging until the deadline and
+    curl_cffi, which succeeds where httpx is TLS-fingerprinted, was never
+    tried. Retry the whole fetch once via curl_cffi on any transport error;
+    the caller's own retry loop handles repeated failures.
+    """
+    try:
+        r = _CLIENT.get(url)
+    except Exception as e:
+        logger.debug("shinigami httpx transport error, trying curl_cffi", err=str(e)[:120])
+        return cffi_req.get(url, headers=_HEADERS, impersonate="chrome", timeout=TIMEOUT)
     if r.status_code == 200:
         return r
     logger.debug("shinigami httpx blocked, trying curl_cffi", status=r.status_code)
