@@ -28,6 +28,7 @@ export function filterButtonClass(
 const SOURCE_COLOR: Record<string, string> = {
   shinigami: "red",
   voratoon: "orange",
+  ikiru: "green",
 };
 const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
   shinigami: {
@@ -37,6 +38,10 @@ const SOURCE_MAP: Record<string, { badge: string; chip: string }> = {
   voratoon: {
     badge: "bg-orange-500/15 text-orange-400 border border-orange-500/20",
     chip: "bg-orange-500/15 text-orange-400",
+  },
+  ikiru: {
+    badge: "bg-green-500/15 text-green-400 border border-green-500/20",
+    chip: "bg-green-500/15 text-green-400",
   },
 };
 export function sourceBadgeClass(source: string | null | undefined): string {
@@ -54,6 +59,7 @@ export function sourceChipClass(source: string | null | undefined): string {
 const SOURCE_OVERLAY_MAP: Record<string, string> = {
   shinigami: "bg-red-500 text-white",
   voratoon: "bg-orange-500 text-white",
+  ikiru: "bg-green-500 text-white",
 };
 
 export function sourceOverlayClass(source: string | null | undefined): string {

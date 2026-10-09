@@ -186,16 +186,16 @@ async def reader_cover(request: Request):
             c = r.get("cover")
             if c and isinstance(c, str) and c.startswith("http"):
                 return await _fetch_image(c)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("cover: recent_chapters cover lookup failed", err=str(e)[:120])
     try:
         res2 = sb.table("series_meta").select("cover,title").in_("title_key", list(candidates)).limit(10).execute()
         for r in (res2.data or []):
             c = r.get("cover")
             if c and isinstance(c, str) and c.startswith("http"):
                 return await _fetch_image(c)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("cover: series_meta cover lookup failed", err=str(e)[:120])
     return FastResponse(status_code=404)
 
 
@@ -278,8 +278,8 @@ async def reader_refresh_cover(request: Request):
                     break
             except Exception:
                 continue
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("cover: series_meta cover lookup failed", err=str(e)[:120])
 
     if not stored_cover:
         return JSONResponse(content={"success": False, "error": "no cover found"}, status_code=404)

@@ -5,7 +5,7 @@
  *  Must match `settings.SOURCE_KEYS` in the backend. A source listed here that
  *  the backend does not collect renders a filter chip that can only ever return
  *  an empty list. */
-export const ALL_SOURCES = ["shinigami", "voratoon"] as const;
+export const ALL_SOURCES = ["shinigami", "voratoon", "ikiru"] as const;
 export type SourceName = (typeof ALL_SOURCES)[number];
 
 /** Normalize backend origin names → canonical frontend names.

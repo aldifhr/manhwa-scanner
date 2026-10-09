@@ -63,8 +63,8 @@ async def rss(request: Request):
         if _gr2().get("rss:invalidate"):
             _RSS_CACHE.clear()
             _gr2().delete("rss:invalidate")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("rss: redis cache invalidation failed", err=str(e)[:120])
     return await _rss_impl(request)
 
 @router.get("/reader/rss")
@@ -175,13 +175,13 @@ async def _rss_impl(request: Request):
         if sort_f == "rating":
             try:
                 results.sort(key=lambda x: float(x.get("rating") or 0), reverse=True)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
         elif sort_f == "popular":
             # popularity via rating as proxy (dispatch_count not in rss map)
             try:
                 results.sort(key=lambda x: float(x.get("rating") or 0), reverse=True)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
         # sources/origins plural (from /rss/custom)
         sources_f = request.query_params.get("sources", "")
@@ -190,7 +190,7 @@ async def _rss_impl(request: Request):
                 wanted_src = {s.strip().lower() for s in sources_f.split(",") if s.strip()}
                 if wanted_src:
                     results = [r for r in results if str(r.get("source") or "").lower() in wanted_src]
-            except Exception:
+            except (ValueError, TypeError):
                 pass
         origins_f = request.query_params.get("origins", "")
         if origins_f:
@@ -198,7 +198,7 @@ async def _rss_impl(request: Request):
                 wanted_o = {o.strip().upper() for o in origins_f.split(",") if o.strip()}
                 if wanted_o:
                     results = [r for r in results if str(r.get("origin") or "").upper() in wanted_o]
-            except Exception:
+            except (ValueError, TypeError):
                 pass
 
         # Per-source split: dedupe by (canonicalTitleKey, chapterNumber, source) — keep per-source rows
@@ -267,7 +267,7 @@ async def _rss_impl(request: Request):
         try:
             import hashlib as _hl2, json as _js2
             etag = 'W/"' + _hl2.sha256(_js2.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16] + '"'
-        except Exception:
+        except (TypeError, ValueError):
             pass
         headers = {"Cache-Control": "private, max-age=30, stale-while-revalidate=60", "Vary": "Cookie"}
         if etag:
@@ -291,7 +291,7 @@ async def rss_new(request: Request):
         if val > 1e12:
             val = val / 1000.0
         since = datetime.fromtimestamp(val, tz=timezone.utc).isoformat()
-    except Exception:
+    except (ValueError, TypeError, OSError):
         pass
 
     distinct = request.query_params.get("distinct", "all")

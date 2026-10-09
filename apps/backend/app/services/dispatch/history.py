@@ -109,8 +109,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
                     rc_map[(_tk, _src)] = _row
                     if _row.get("title"):
                         rc_title_map[_tk] = str(_row["title"])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warn("dispatch_history: rc lookup failed", err=str(e)[:120])
     if urls:
         rc = (
             sb.table("recent_chapters")
@@ -140,8 +140,8 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
         )
         for _s in (_sm.data or []):
             sm_map[(_s.get("title_key"), _s.get("source"))] = _s
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("dispatch_history: series_meta lookup failed", err=str(e)[:120])
 
 
     results = []

@@ -76,8 +76,8 @@ async def catalog_chapters(title_key: str, request: Request):
                         cid = ch.get("chapter_id") or ch.get("id") or ""
                         url = f"{_s.SHINIGAMI_PUBLIC_BASE.rstrip('/')}/chapter/{cid}" if cid else ""
                         rows.append({"title_key": norm_tk, "title": "", "source": "shinigami", "chapter": num, "chapter_url": url, "cover": "", "series_url": f"{_s.SHINIGAMI_PUBLIC_BASE.rstrip('/')}/series/{title_key}", "origin": "KR", "updated_time": ch.get("created_at") or ch.get("updated_at") or ""})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("catalog_chapters: shinigami fetch failed", title_key=title_key[:40], err=str(e)[:120])
         payload = {"success": True, "data": {"results": rows, "total": len(rows), "titleKey": norm_tk}}
         _CAT_CH_CACHE[norm_tk] = (_qtime.monotonic(), payload)
         _CAT_CH_CACHE.move_to_end(norm_tk)

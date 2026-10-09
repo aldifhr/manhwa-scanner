@@ -117,8 +117,8 @@ async def catalog_list(request: Request):
                     tk = row.get("title_key", "")
                     if tk not in latest_rows:
                         latest_rows[tk] = row
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("catalog_list: recent_chapters latest lookup failed", err=str(e)[:120])
     covers = batch_cover_ref(tks) if paged else {}
     results = []
     for r in paged:

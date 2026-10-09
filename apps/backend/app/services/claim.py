@@ -292,8 +292,8 @@ def claim_recent_chapters_for_dispatch(
                 logger.warn("dispatch_claims insert failed", err=str(e)[:120])
                 try:
                     conn.rollback()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warn("claim: rollback failed", err=str(e)[:120])
                 conn.commit()
                 return []
 
@@ -308,8 +308,8 @@ def claim_recent_chapters_for_dispatch(
         if conn:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("claim: rollback failed", err=str(e)[:120])
         # P2 fix: fail-closed — on any error, return [] (never fall back to
         # get_recent_chapters which would bypass the claim guard and send
         # unclaimed chapters).
@@ -319,5 +319,5 @@ def claim_recent_chapters_for_dispatch(
         if conn:
             try:
                 put_conn(conn)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("claim: put_conn failed", err=str(e)[:120])

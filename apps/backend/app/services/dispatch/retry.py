@@ -162,8 +162,8 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
                      "error_message": "Series no longer whitelisted"}
                 ).eq("chapter_url", url).execute()
                 skipped_unsubscribed += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("retry: failed_dispatches update failed url=%s err=%s", url[:80], str(e)[:120])
             continue
 
         # Check permanent failure
@@ -179,8 +179,8 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
                     {"status": "permanent_failure", "updated_at": now.isoformat()}
                 ).eq("chapter_url", url).execute()
                 skipped_permanent += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("retry: failed_dispatches update failed url=%s err=%s", url[:80], str(e)[:120])
             continue
 
         # Check backoff
@@ -206,8 +206,8 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
                     {"status": "resolved", "updated_at": now.isoformat(), "error_message": "Chapter pruned from 24h window"}
                 ).eq("chapter_url", url).execute()
                 skipped_window += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("retry: failed_dispatches update failed url=%s err=%s", url[:80], str(e)[:120])
             continue
 
         # Attempt send

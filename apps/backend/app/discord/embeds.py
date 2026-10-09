@@ -77,11 +77,13 @@ SOURCE_COLORS = {
     # others or it looks untracked.
     "shinigami": 0xEF4444,  # red-500
     "voratoon": 0xF97316,  # orange-500
+    "ikiru": 0x22C55E,  # green-500
 }
 
 SOURCE_LABELS = {
     "shinigami": "Shinigami",
     "voratoon": "VoraToon",
+    "ikiru": "Ikiru",
 }
 
 STAR_FILLED = "⭐"

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 # harus dibatasi ke allowed domains, jangan 127.0.0.1 / 169.254.169.254 / localhost
 ALLOWED_HOSTS = {
     "shinigami.asia", "11.shinigami.asia", "f.shinigami.asia", "api.shngm.io", "assets.shngm.id",
+    "ikiru.wtf", "cdn.ikiru.id",
     "discord.com", "cdn.discordapp.com",
     "imgkc1.my.id", "minio.imgkc1.my.id",
     "scanner.aldifhr.my.id", "manhwa.aldifhr.my.id",

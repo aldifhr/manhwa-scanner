@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # Voratoon — site moved to v4, /api/v1/comics replaced by /series
     VORATOON_API_BASE: str = "https://api.voratoon.com"
     VORATOON_PUBLIC_BASE: str = "https://v4.voratoon.com"
+    IKIRU_API_BASE: str = "https://09.ikiru.wtf"
+    IKIRU_PUBLIC_BASE: str = "https://09.ikiru.wtf"
 
     # Discord toggle — set false to run locally without bot / disable dispatch
     DISCORD_ENABLED: bool = True
@@ -104,6 +106,8 @@ class Settings(BaseSettings):
         "assets.shngm.id:443",
         "cvr.voratoon.id:443",
         "api.voratoon.com:443",
+        "09.ikiru.wtf:443",
+        "cdn.ikiru.id:443",
     ]
 
     def get_proxy_hosts(self) -> list[str]:
@@ -150,8 +154,8 @@ class Settings(BaseSettings):
     # To detect typos, run: python3 -c "from app.config import settings; print(settings.model_dump())"
 
 # Module-level constants (not Settings fields) — import from here to avoid Pydantic "non-annotated attribute" errors
-VALID_SOURCES = ("shinigami", "voratoon")
-VALID_SOURCES_WITH_ALL = ("shinigami", "voratoon", "all")
+VALID_SOURCES = ("shinigami", "voratoon", "ikiru")
+VALID_SOURCES_WITH_ALL = ("shinigami", "voratoon", "ikiru", "all")
 # Sources an exclude row may target. Exclude has no 'all' scope — a row always
 # names one concrete source, so the target set is exactly "every source that
 # produces chapters".
@@ -166,6 +170,7 @@ CRON_ACTIONS = (
     "update", "rss-fetch", "dispatch", "health",
     "rss-fetch:shinigami",
     "rss-fetch:voratoon",
+    "rss-fetch:ikiru",
     "enrich", "enrich-missing", "enrich-refresh", "failed-retry",
 )
 

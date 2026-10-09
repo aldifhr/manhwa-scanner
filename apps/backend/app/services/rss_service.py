@@ -160,8 +160,8 @@ def _fetch_rss_data_sync(
                 nk = normalize_title_key(tk)
                 if nk != tk:
                     dh_sent.add((nk, cn))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("rss_service: dispatch_history load failed", err=str(e)[:120])
 
     try:
         from app.storage import excluded_titles as _excl_store
@@ -182,19 +182,19 @@ def _fetch_rss_data_sync(
             wanted = {g.strip().lower() for g in genres_f.split(",") if g.strip()}
             if wanted:
                 results = [r for r in results if wanted & {str(g).lower() for g in (r.get("genres") or [])}]
-        except Exception:
+        except (ValueError, TypeError):
             pass
     if min_rating:
         try:
             mv = float(min_rating)
             results = [r for r in results if r.get("rating") is not None and float(r.get("rating") or 0) >= mv]
-        except Exception:
+        except (ValueError, TypeError):
             pass
     if max_rating:
         try:
             mv = float(max_rating)
             results = [r for r in results if r.get("rating") is not None and float(r.get("rating") or 0) <= mv]
-        except Exception:
+        except (ValueError, TypeError):
             pass
     return results, wl_map, sm_map, dh_sent
 

@@ -28,6 +28,7 @@ _W_META = 10
 # Source host patterns (for reachability heuristic when health store unavailable)
 _SOURCE_HOSTS = {
     "shinigami": ("shinigami.asia", "shngm.io", "api.shngm.io"),
+    "ikiru": ("ikiru.wtf", "cdn.ikiru.id"),
 }
 
 # origin → valid type set (for metadata consistency check)

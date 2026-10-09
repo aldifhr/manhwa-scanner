@@ -307,6 +307,7 @@ def _probe_source_health(force: bool = False) -> dict:
 
     probes = {
         "shinigami": str(_s.SECONDARY_SOURCE_URL).rstrip("/") + "/v1/manga/list?page=1&page_size=1&is_update=true&sort=latest",
+        "ikiru": str(_s.IKIRU_API_BASE).rstrip("/") + "/api/public/manga/project?page=1&layout=vertical&limit=1",
     }
     _probe_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

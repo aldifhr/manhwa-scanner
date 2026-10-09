@@ -8,6 +8,9 @@ from app.utils.text import normalize_title_key, slugify_title_key
 from app.utils.origin import normalize_origin
 from app.utils.cover_scrub import scrub_cover
 from app.config import settings
+from app.logger import get_logger
+
+logger = get_logger("services:rss_query")
 
 def normalize_type(raw) -> str | None:
     if not raw:
@@ -241,17 +244,17 @@ def group_results(results: list[dict]) -> list[dict]:
             try:
                 if float(r.get("lastCheckedChapter") or 0) > float(cur.get("lastCheckedChapter") or 0):
                     cur["lastCheckedChapter"] = r["lastCheckedChapter"]
-            except Exception:
+            except (ValueError, TypeError):
                 pass
             try:
                 if r.get("latestSentChapter") is not None and (cur.get("latestSentChapter") is None or float(r["latestSentChapter"]) > float(cur["latestSentChapter"] or 0)):
                     cur["latestSentChapter"] = r["latestSentChapter"]
-            except Exception:
+            except (ValueError, TypeError):
                 pass
             try:
                 if float(r.get("latestChapter") or 0) > float(cur.get("latestChapter") or 0):
                     cur["latestChapter"] = r["latestChapter"]
-            except Exception:
+            except (ValueError, TypeError):
                 pass
         groups[gk]["chapters"].append({
             "chapterLabel": r["chapterLabel"],

@@ -54,8 +54,8 @@ async def catalog_item(title_key: str, request: Request):
                     while len(_CATALOG_CACHE) > _CATALOG_CACHE_MAX:
                         _CATALOG_CACHE.popitem(last=False)
                     return JSONResponse(content=_resp)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warn("catalog_item: shinigami fetch failed", title_key=title_key[:40], err=str(e)[:120])
     tk_norm = normalize_title_key(title_key)
     slug = slugify_title_key(title_key)
     sb = get_supabase()
@@ -68,8 +68,8 @@ async def catalog_item(title_key: str, request: Request):
                 title_key = uuid_row.data[0].get("title_key") or title_key
                 tk_norm = normalize_title_key(title_key)
                 slug = slugify_title_key(title_key)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warn("catalog_item: uuid whitelist lookup failed", title_key=title_key[:40], err=str(e)[:120])
     meta = None
     try:
         mres = sb.table("whitelist").select("*").in_("title_key", [title_key, tk_norm, slug]).limit(5).execute()
@@ -79,8 +79,8 @@ async def catalog_item(title_key: str, request: Request):
                 break
         if not meta and (mres.data or []):
             meta = mres.data[0]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("catalog_item: whitelist lookup failed", title_key=title_key[:40], err=str(e)[:120])
     sources = []
     wl_row = None
     try:
@@ -89,8 +89,8 @@ async def catalog_item(title_key: str, request: Request):
             if w.get("title_key") in (title_key, tk_norm):
                 wl_row = w
                 break
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("catalog_item: whitelist row lookup failed", title_key=title_key[:40], err=str(e)[:120])
     try:
         rc_res = sb.table("recent_chapters").select("source, series_url").in_("title_key", [title_key, deslugify_title_key(title_key), tk_norm, slug]).execute()
         seen = {}
@@ -101,8 +101,8 @@ async def catalog_item(title_key: str, request: Request):
                 seen[s] = su
         for s, su in seen.items():
             sources.append({"source": s, "url": su})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("catalog_item: recent_chapters source lookup failed", title_key=title_key[:40], err=str(e)[:120])
     if not sources and wl_row:
         _src = wl_row.get("source") or "shinigami"
         _url = wl_row.get("series_url") or wl_row.get("url") or f"{settings.SHINIGAMI_PUBLIC_BASE}/series/{slug}"
