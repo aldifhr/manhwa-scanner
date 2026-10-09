@@ -131,10 +131,16 @@ def get_dispatch_history(page: int = 1, page_size: int = 50, search: str = "") -
         wl_map[f"title:{normalize_title_key((wl_row.get('title_key') or ''))}"] = wl_row
     # BUG4 fallback: series_meta carries static metadata per (title_key, source)
     sm_map: dict[tuple[str, str], dict] = {}
+    # `title` is not a column on series_meta — the schema is
+    # title_key, source, rating, genres, description, cover, author, type,
+    # updated_at, origin. Selecting it raised UndefinedColumn, which the
+    # except below swallowed into a warn, so sm_map stayed empty and every
+    # dispatch_history row lost its metadata fallback (cover/rating/description)
+    # for as long as the bug was live.
     try:
         _sm = (
             sb.table("series_meta")
-            .select("title_key, source, title, genres, description, rating, cover, type")
+            .select("title_key, source, genres, description, rating, cover, type")
             .in_("title_key", [r.get("title_key") or "" for r in rows if r.get("title_key")])
             .execute()
         )

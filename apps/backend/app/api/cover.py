@@ -189,7 +189,11 @@ async def reader_cover(request: Request):
     except Exception as e:
         logger.warn("cover: recent_chapters cover lookup failed", err=str(e)[:120])
     try:
-        res2 = sb.table("series_meta").select("cover,title").in_("title_key", list(candidates)).limit(10).execute()
+        # `title` is not a column on series_meta. Selecting it made this query
+        # raise UndefinedColumn every time, so the fallback never ran and the
+        # request fell straight to 404 — the one path meant to still find a
+        # cover when recent_chapters had none.
+        res2 = sb.table("series_meta").select("cover").in_("title_key", list(candidates)).limit(10).execute()
         for r in (res2.data or []):
             c = r.get("cover")
             if c and isinstance(c, str) and c.startswith("http"):
