@@ -190,7 +190,11 @@ def check_dispatch_starvation() -> dict:
         put_conn(conn)
 
         for r in rows:
-            key = fcfs_key(r.get("title") or (r.get("title_key") or "").replace("-", " "), r.get("chapter"))
+            # Must match the dispatch write path exactly: dispatch_mod builds
+            # fcfs_key from it["title"], and the pipeline passes title=title_key
+            # for voratoon/ikiru items. recent_chapters.title is a display string
+            # that can differ, so compute from title_key (spaces) instead.
+            key = fcfs_key((r.get("title_key") or "").replace("-", " "), r.get("chapter"))
             if key in sent:
                 continue
             # Skip chapters the dispatch sanity guard refuses. They are
