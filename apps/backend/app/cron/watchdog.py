@@ -316,7 +316,12 @@ def check_and_alert() -> dict[str, Any]:
                 by_source[c["source"] or "?"] = by_source.get(c["source"] or "?", 0) + 1
             # Observation, not an alarm. Most of these are chapters that landed
             # since the last dispatch cycle and are simply next in line.
-            (logger.warn if urgent else logger.info)(
+            # Only the urgent ones are worth a warn: they have been waiting
+            # past _URGENT_AGE_H, which is long enough that a dropped
+            # chapter — not normal queueing — is the likelier explanation.
+            # Logging the whole set at warn filled the log with a warning
+            # that fired every cycle for a condition that resolves itself.
+            logger.info(
                 "watchdog: whitelisted chapters inside the 24h window not yet dispatched",
                 stalled=len(stalled),
                 urgent=len(urgent),
@@ -326,6 +331,12 @@ def check_and_alert() -> dict[str, Any]:
                 processing=stats.get("processing"),
                 claims=stats.get("claims"),
             )
+            if urgent:
+                logger.warn(
+                    "watchdog: urgent backlog, chapters past %sh undispatched",
+                    urgent=len(urgent),
+                    oldest_h=round(max(c["age_h"] for c in urgent), 1),
+                )
             if _SEND_ALERTS:
                 _notify(stalled, urgent, stats)
     except Exception as exc:
