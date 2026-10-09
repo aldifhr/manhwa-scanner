@@ -189,8 +189,8 @@ def _derive_title_key_from_url(url: str, title: str = "") -> str:
                 _ser = _sh_get.get_shinigami_series(_m.group(1))
                 if _ser and _ser.get("title"):
                     key = normalize_title_key(_ser["title"])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("derive_title_key: shinigami fetch failed", err=str(e)[:120])
         if not key:
             key = ""
     else:
@@ -256,8 +256,8 @@ def post_whitelist(title: str, url: str, source: str = "shinigami", body: dict |
         try:
             from app.db import get_supabase as _sm_sb
             _sm_sb().table("series_meta").upsert({"title_key": title_key, "source": source, **_series_meta_extra}, on_conflict="title_key,source").execute()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warn("post_whitelist: series_meta upsert failed", title_key=title_key, source=source, err=str(e)[:120])
     _needs_enrich = not _series_meta_extra.get("description") or not _series_meta_extra.get("cover") or not _series_meta_extra.get("genres")
     if _needs_enrich:
         try:
@@ -275,13 +275,13 @@ def post_whitelist(title: str, url: str, source: str = "shinigami", body: dict |
                         try:
                             from app.db import get_supabase as _sm2
                             _sm2().table("series_meta").upsert({"title_key": title_key, "source": source, **_sm_update}, on_conflict="title_key,source").execute()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                        except Exception as e:
+                            logger.warn("post_whitelist: bg enrich series_meta upsert failed", title_key=title_key, source=source, err=str(e)[:120])
+                except Exception as e:
+                    logger.warn("post_whitelist: bg enrich failed", title_key=title_key, source=source, err=str(e)[:120])
             threading.Thread(target=_bg_enrich, daemon=True).start()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warn("post_whitelist: bg enrich thread start failed", title_key=title_key, source=source, err=str(e)[:120])
     return res
 
 def delete_whitelist(title_key: str = "", source: str = "", id: str = "", title: str = "", url: str = "") -> dict:
@@ -517,8 +517,8 @@ def normalize_whitelist_urls(dry_run: bool = False) -> dict:
         for rid, patch in rc_updates:
             try:
                 _sb().table("recent_chapters").update(patch).eq("id", rid).execute()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warn("sync_whitelist_metadata: recent_chapters update failed", rid=rid, err=str(e)[:120])
 
     return {
         "success": True,
@@ -562,10 +562,10 @@ def enrich_whitelist_entry(entry: dict, url: str, source: str, title: str) -> di
                                         if not entry.get(k) and m2.get(k):
                                             entry[k] = m2[k]
                                     break
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    logger.warn("enrich_whitelist_entry: search fallback failed", title=title[:40], source=source, err=str(e)[:120])
+        except Exception as e:
+            logger.warn("enrich_whitelist_entry: enrich failed", title=title[:40], source=source, err=str(e)[:120])
     return entry
 
 def build_whitelist_mapped_row(r: dict, rc_map: dict, meta_desc: dict, meta_cover: dict, meta_rating: dict, meta_genres: dict, meta_type: dict, meta_origin: dict, last_notified: dict) -> dict:
@@ -700,8 +700,8 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
             o = m.get("origin")
             if o:
                 meta_origin[m.get("title_key", "")] = str(o)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("build_whitelist_mapped_row: meta load failed", err=str(e)[:120])
     try:
         _dh_data = (dh_rows.data if (dh_rows and getattr(dh_rows, "data", None)) else [])
         for d in _dh_data:
@@ -709,8 +709,8 @@ def _fetch_whitelist_enrichment(sb, rows: list[dict], all_tks: list[str]):
             ts = d.get("sent_at") or ""
             if tk and (tk not in last_notified or ts > last_notified[tk]):
                 last_notified[tk] = ts
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warn("build_whitelist_mapped_row: dispatch_history load failed", err=str(e)[:120])
     return rc_map, meta_desc, meta_cover, meta_rating, meta_genres, meta_type, meta_origin, last_notified
 
 def auto_cleanup_stale_whitelist(days: int = 30, dry_run: bool = False) -> dict:
