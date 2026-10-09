@@ -67,6 +67,9 @@ class Settings(BaseSettings):
 
     # Scraper
     RSS_LOOKBACK_HOURS: int = 24
+    # Voratoon hosts KR, CN and JP titles. Set VORATOON_EXCLUDE_ORIGINS=JP to
+    # keep Japanese titles out of recent_chapters. Comma-separated, e.g. "JP,CN".
+    VORATOON_EXCLUDE_ORIGINS: str = ""
 
     # Cron
     CRON_SECRET: str = ""

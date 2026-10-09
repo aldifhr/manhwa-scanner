@@ -171,6 +171,17 @@ def _parse_ts(value) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def _excluded_origins() -> set[str]:
+    """Origins to skip, from VORATOON_EXCLUDE_ORIGINS (e.g. "JP" or "JP,CN")."""
+    try:
+        raw = getattr(settings, "VORATOON_EXCLUDE_ORIGINS", "") or ""
+    except Exception:
+        raw = ""
+    if not isinstance(raw, str):
+        raw = str(raw)
+    return {x.strip().upper() for x in raw.split(",") if x.strip()}
+
+
 def _items_from_updates(
     updates: list[dict],
     cutoff: datetime,
@@ -184,6 +195,7 @@ def _items_from_updates(
     freshness cutoff and the dispatch ceiling — plus series_meta enrichment
     for whatever the catalogue payload left empty.
     """
+    excluded = _excluded_origins()
     items: list[dict] = []
     for row in updates:
         if not isinstance(row, dict):
@@ -207,6 +219,9 @@ def _items_from_updates(
         description = str(row.get("description") or "").strip()
         genres = list(row.get("genres") or [])
         content_type = str(row.get("type") or "").lower()
+        origin = str(row.get("origin") or "").upper()
+        if origin and origin in excluded:
+            continue
 
         if fetch_meta:
             try:
@@ -275,6 +290,7 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback)
 
     wanted = _whitelisted_keys()
+    excluded = _excluded_origins()
 
     # Primary path: the updates relay covers every series with a chapter in
     # the lookback window, not just whitelisted ones. Whitelist gates
@@ -328,6 +344,8 @@ def _collect_voratoon_source(latest_sent: dict, disabled: set, fetch_meta: bool 
             continue
 
         content_type, origin = vt._derive_format(series.get("format"))
+        if origin and origin in excluded:
+            continue
         cover = series.get("cover") or ""
         rating = 0.0
         if series.get("rating") not in (None, ""):
