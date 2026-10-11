@@ -216,9 +216,12 @@ export default function UndeliveredPage() {
             return (
               <li key={i.chapterUrl} className="flex items-center gap-3 p-3">
                 {i.cover ? (
+                  // /api/v1/cover takes ?series=<title_key>, NOT ?url=<upstream>.
+                  // Sending url returns 400 "Missing series", and the upstream
+                  // host is never exposed to the browser by design (BE-3c).
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/api/v1/cover?url=${encodeURIComponent(i.cover)}`}
+                    src={`/api/v1/cover?series=${encodeURIComponent(i.titleKey)}`}
                     alt=""
                     className="h-14 w-10 shrink-0 rounded object-cover"
                   />
