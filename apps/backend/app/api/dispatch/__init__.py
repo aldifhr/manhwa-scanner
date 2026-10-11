@@ -25,6 +25,14 @@ class FailedDispatchDeleteBody(BaseModel):
 logger = get_logger("api:dispatches")
 router = APIRouter()
 
+# /dispatch/undelivered lives in its own module: it is a different question
+# from failed-dispatches (which is "sent and bounced") — this one is
+# "eligible and never attempted at all", including chapters the 24h window
+# dropped before the dispatcher ever saw them.
+from app.api.dispatch.undelivered import router as _undelivered_router
+
+router.include_router(_undelivered_router)
+
 
 @router.get("/failed-dispatches")
 async def failed_dispatches(request: Request):
