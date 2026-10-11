@@ -58,7 +58,7 @@ def _scheduler_loop() -> None:
                 enrich_refresh_interval=_ENRICH_REFRESH_INTERVAL_S)
     for i, src in enumerate(_RSS_SOURCES):
         if src in _disabled_sources():
-            logger.info("scheduler skip disabled source at startup: %s", src)
+            logger.info("scheduler skip disabled source at startup", source=src)
             continue
         try:
             enqueue_cron(f"rss-fetch:{src}", source=src)

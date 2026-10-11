@@ -332,9 +332,14 @@ def check_and_alert() -> dict[str, Any]:
                 claims=stats.get("claims"),
             )
             if urgent:
+                # No %s placeholder: Logger.warn(msg, **fields) is a custom
+                # emitter, not stdlib logging, so the message is never
+                # %-formatted. A %s here printed literally as "%s" in the
+                # warn. Pass the threshold as a field instead.
                 logger.warn(
-                    "watchdog: urgent backlog, chapters past %sh undispatched",
+                    "watchdog: urgent backlog, chapters past the urgent age undispatched",
                     urgent=len(urgent),
+                    urgent_age_h=_URGENT_AGE_H,
                     oldest_h=round(max(c["age_h"] for c in urgent), 1),
                 )
             if _SEND_ALERTS:

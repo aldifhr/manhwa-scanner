@@ -57,7 +57,11 @@ class Settings(BaseSettings):
     SECONDARY_PUBLIC_BASE: str = "https://11.shinigami.asia"
 
     # All available sources. Active sources = SOURCE_KEYS - DISABLED_SOURCES.
-    SOURCE_KEYS: list[str] = ["shinigami", "voratoon"]
+    # ikiru must stay in this list: SOURCE_KEYS drives load_source_health_map
+    # and save_source_health_map, so leaving it out meant ikiru never got a
+    # source_health row at all — /sources/health showed only 2 of 3 sources,
+    # and the consecutive_failures >= 3 auto-cooldown could never fire for it.
+    SOURCE_KEYS: list[str] = ["shinigami", "voratoon", "ikiru"]
     # Comma-separated sources to skip in collection (ops toggle, no code change).
     DISABLED_SOURCES: str = ""
 
