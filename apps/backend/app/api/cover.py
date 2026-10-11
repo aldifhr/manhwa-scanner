@@ -143,7 +143,11 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
 @router.get("/reader/cover")
 async def reader_cover(request: Request):
     series = (request.query_params.get("series", "") or "").strip()
-    if not series or len(series) > 80:
+    # 80 was too tight: real title_keys reach 108 chars (long translated KR
+    # series names), so every cover for those returned 400. 200 is still far
+    # below any query size limit; the character-class check below is the actual
+    # injection guard.
+    if not series or len(series) > 200:
         return FastResponse(status_code=400)
     if not re.match(r"^[a-zA-Z0-9\-_ ]+$", series):
         return FastResponse(status_code=400)
@@ -256,7 +260,9 @@ async def reader_refresh_cover(request: Request):
     """Return fresh cover URL for a series — used by FE to refresh expired presigned URLs."""
     series = (request.query_params.get("series", "") or "").strip()
     source = (request.query_params.get("source", "") or "").strip().lower()
-    if not series or len(series) > 80:
+    # See reader_cover(): real title_keys exceed 80 chars (max seen 108), so
+    # this rejected every cover refresh for long KR series names.
+    if not series or len(series) > 200:
         return JSONResponse(content={"success": False, "error": "invalid series"}, status_code=400)
 
     from app.db import get_supabase, q
