@@ -5,6 +5,7 @@ import {
   EyeSlash,
   Bell,
   ChartBar,
+  PaperPlaneTilt,
 } from "@phosphor-icons/react";
 
 /** Central nav definition — single source for Navbar + mobile bottom nav */
@@ -15,6 +16,7 @@ export const NAV = [
   { href: "/exclude-list", label: "Exclude", icon: EyeSlash } as const,
   { href: "/notifications", label: "Notifications", icon: Bell } as const,
   { href: "/status", label: "Status", icon: ChartBar } as const,
+  { href: "/undelivered", label: "Terlewat", icon: PaperPlaneTilt } as const,
 ] as const;
 
 /** Sidebar / nav active-state helper (single source of truth).
