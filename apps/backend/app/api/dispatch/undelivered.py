@@ -217,18 +217,22 @@ async def resend_undelivered(request: Request):
         if not channels:
             return JSONResponse(content={"success": True, "data": {"sent": 0, "reason": "no channels configured"}})
 
-        # force=True skips only the transient claim guard and the permanent
-        # URL guard. skip_ceiling=True is the explicit escape hatch for a
-        # manual resend of a chapter that sits below its series ceiling —
-        # exactly this feature's case. The dispatch_history dedupe still
-        # applies inside dispatch(): a chapter already sent returns 0, so a
-        # double-click cannot double-post.
+        # Three explicit escape hatches, all required for this path:
+        #   force         - transient claim + permanent URL guards
+        #   skip_ceiling  - the chapter sits below its series ceiling
+        #   bypass_window - the chapter is OLDER than 24h, so without this it
+        #                   lands in the silent backfill bucket and gets a
+        #                   ledger row but no Discord post. That was why these
+        #                   chapters could be listed but never actually resent.
+        # The dispatch_history dedupe still applies inside dispatch(): an
+        # already-sent chapter returns 0, so a double-click cannot double-post.
         sent = _dispatch(
             items,
             channels,
             f"undelivered-resend-{int(time.time())}",
             force=True,
             skip_ceiling=True,
+            bypass_window=True,
         )
         return JSONResponse(
             content={

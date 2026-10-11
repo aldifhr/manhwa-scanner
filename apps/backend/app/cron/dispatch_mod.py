@@ -124,7 +124,11 @@ def is_implausible_chapter(
     return not is_renumber
 
 
-def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_run: bool = False, force: bool = False, guild_rows: list[dict] | None = None, skip_ceiling: bool = False) -> int:
+def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_run: bool = False, force: bool = False,
+    guild_rows: list[dict] | None = None,
+    skip_ceiling: bool = False,
+    bypass_window: bool = False,
+) -> int:
     """Send Discord embeds for whitelisted chapters.
 
     Dedupe: FCFS via fcfs_key (normalized title+chapter) in dispatch_history.
@@ -137,6 +141,12 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
 
     skip_ceiling=True is a separate, explicit escape hatch for a manual
     backfill or resend of a chapter that is genuinely below the ceiling.
+
+    bypass_window=True treats every item as a real send, skipping the strict
+    24h split. Without it a chapter older than 24h lands in to_backfill and
+    only gets a silent ledger row -- no Discord post -- which is exactly why
+    /dispatch/undelivered showed chapters for days and could never resend
+    them. Only the manual resend path sets it.
     """
     if not getattr(settings, "DISCORD_ENABLED", True):
         logger.info("dispatch: skipped (DISCORD_ENABLED=false)")
@@ -147,7 +157,10 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         guild_rows = load_guild_settings()
     from app.utils.text import normalize_title_key, slugify_title_key
 
-    to_send, to_backfill = _split_send_backfill(items)
+    if bypass_window:
+        to_send, to_backfill = list(items), []
+    else:
+        to_send, to_backfill = _split_send_backfill(items)
 
     # Sort: ascending chapter per series for ordered Discord delivery
     import re as _re

@@ -59,6 +59,12 @@ check(
     "skip_ceiling is the escape hatch this feature exists to use",
 )
 check(
+    "bypass_window=True is set (else old chapters only get a silent ledger row)",
+    "bypass_window=True" in src,
+    "without it _split_send_backfill routes >24h items to to_backfill, which "
+    "writes dispatch_history but sends no Discord post -- verified sent:0",
+)
+check(
     "chapter rows are re-read from the DB, not taken from the request",
     '.table("recent_chapters")' in src,
     "trusting caller-supplied title/cover would allow an injected embed",
