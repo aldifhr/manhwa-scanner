@@ -38,6 +38,10 @@ router = APIRouter()
 # they are counted separately and reported, not offered as resendable.
 _MAX_RESEND_LIMIT = 200
 
+# Must match _RECENT_CHAPTERS_RETENTION_DAYS in app/tasks/retention.py. A
+# chapter older than this is pruned and can never be listed or resent.
+_MAX_WINDOW_H = 24 * 7
+
 
 @router.get("/undelivered")
 async def undelivered(request: Request, hours: int = 168, limit: int = 100):
@@ -46,12 +50,20 @@ async def undelivered(request: Request, hours: int = 168, limit: int = 100):
     `hours` bounds how far back to look; the default is 7 days, which is
     wider than the 24h dispatch window on purpose — the point is to surface
     what the window dropped.
+
+    Capped at the recent_chapters retention window (7 days). Past that the
+    rows are pruned and there is nothing left to list, so the response says
+    so rather than returning a short list that reads as complete.
     """
     if not require_monitor_auth(request):
         return JSONResponse(content={"success": False, "error": "unauthorized"}, status_code=401)
 
+    # Cap at the retention window. Offering 30 days when recent_chapters is
+    # pruned at 7 makes the 30-day tab silently return the same rows as 7 days,
+    # which reads as "we checked and there was nothing" when the truth is the
+    # data is gone.
     try:
-        hours = max(1, min(int(hours), 720))
+        hours = max(1, min(int(hours), _MAX_WINDOW_H))
         limit = max(1, min(int(limit), _MAX_RESEND_LIMIT))
     except (TypeError, ValueError):
         return JSONResponse(content={"success": False, "error": "invalid params"}, status_code=400)
@@ -133,6 +145,10 @@ async def undelivered(request: Request, hours: int = 168, limit: int = 100):
                 "count": len(items),
                 "skippedAlreadySent": skipped_already_sent,
                 "hours": hours,
+                # True when the caller asked for a window wider than the data
+                # survives. The FE must not present this as "nothing missed".
+                "truncatedAtRetention": hours >= _MAX_WINDOW_H,
+                "maxWindowHours": _MAX_WINDOW_H,
             },
         }
     )

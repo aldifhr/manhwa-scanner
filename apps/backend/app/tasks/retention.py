@@ -16,7 +16,11 @@ _FAILED_DISPATCHES_RETENTION_DAYS = 7
 # This used to be declared 7 here while lifecycle.py pruned at 72h, so the
 # tighter of the two always won and this constant was a lie: raising it changed
 # nothing. One definition now — lifecycle imports it.
-_RECENT_CHAPTERS_RETENTION_DAYS = 3
+# 7 days, not 3. /dispatch/undelivered can only surface what recent_chapters
+# still holds, and a 3-day retention meant a pipeline gap of 2 days made every
+# missed chapter permanently unrecoverable — invisible to the very page built
+# to list misses. The table is ~650 rows at 3 days, so 7 costs almost nothing.
+_RECENT_CHAPTERS_RETENTION_DAYS = 7
 _RETENTION_MAX_PER_SERIES = 500
 _SERIES_META_RETENTION_DAYS = 14
 # Audit is a compliance trail, not a log — keep it longer than the operational

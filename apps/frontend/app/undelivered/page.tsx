@@ -20,15 +20,17 @@ interface UndeliveredItem {
   origin: string;
 }
 
+// No 30-day tab: recent_chapters is pruned at 7 days server-side, so it would
+// return exactly the same rows as 7 hari while looking like it searched deeper.
 const WINDOWS = [
   { hours: 24, label: "24 jam" },
   { hours: 168, label: "7 hari" },
-  { hours: 720, label: "30 hari" },
 ] as const;
 
 export default function UndeliveredPage() {
   const [items, setItems] = useState<UndeliveredItem[]>([]);
   const [skippedSent, setSkippedSent] = useState(0);
+  const [maxWindowHours, setMaxWindowHours] = useState(168);
   const [hours, setHours] = useState<number>(168);
   const [source, setSource] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,7 @@ export default function UndeliveredPage() {
       if (!res.ok || !json?.success) throw new Error(json?.error || `HTTP ${res.status}`);
       setItems(json.data.items || []);
       setSkippedSent(json.data.skippedAlreadySent || 0);
+      setMaxWindowHours(json.data.maxWindowHours || 168);
       setSent(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat");
@@ -176,6 +179,11 @@ export default function UndeliveredPage() {
         </div>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Data tersedia {Math.round(maxWindowHours / 24)} hari ke belakang. Chapter yang lebih
+        lama dari itu sudah dihapus dan tidak bisa dikembalikan.
+      </p>
+
       {skippedSent > 0 && (
         <p className="text-xs text-muted-foreground">
           {skippedSent} chapter lain disembunyikan — sudah terkirim lewat source lain
@@ -202,7 +210,7 @@ export default function UndeliveredPage() {
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {items.length === 0
-              ? "Semua chapter langganan dalam rentang ini sudah terkirim."
+              ? `Tidak ada yang terlewat dalam ${Math.round(hours / 24)} hari terakhir.`
               : "Coba pilih source lain."}
           </p>
         </div>
