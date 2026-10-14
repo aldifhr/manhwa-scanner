@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { CSRF_COOKIE, SESSION_COOKIE, readCsrfCookie, readSessionCookie } from "@/lib/cookies";
 import { withCsrf } from "@/lib/csrf";
-import { openapi } from "@manhwa-scanner/shared";
 
 /**
  * Server-side backend URL for FE→backend fetches (proxy/image/auth routes).
@@ -16,6 +15,11 @@ import { openapi } from "@manhwa-scanner/shared";
  *   1. BACKEND_URL  — server-only runtime env, the correct knob for prod.
  *   2. NEXT_PUBLIC_API_BASE — only if it is NOT a localhost address.
  *   3. https://scanner.aldifhr.my.id — safe remote default.
+ *
+ * NOTE: shared/openapi.json servers[0].url is hardcoded here instead of
+ * imported. Importing `@manhwa-scanner/shared` pulls its zod schemas into
+ * the client bundle via `export * from "./schemas"` — 484 KB of dead weight
+ * for one fallback string. Re-sync if the OpenAPI spec's server URL changes.
  */
 export function backendUrl(): string {
   const fromEnv = process.env.BACKEND_URL?.trim();
@@ -28,10 +32,6 @@ export function backendUrl(): string {
   if (publicBase && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(publicBase)) {
     return publicBase.replace(/\/$/, "");
   }
-  // Single source from shared/openapi.json servers[0].url
-  const sharedBase = (openapi as { servers?: { url: string }[] })?.servers?.[0]
-    ?.url;
-  if (sharedBase) return sharedBase.replace(/\/$/, "");
   return "https://scanner.aldifhr.my.id";
 }
 

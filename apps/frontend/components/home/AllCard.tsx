@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { safeUrl, getChapterLabel } from "@/lib/utils";
 import { decodeHtml } from "@/lib/utils";
 import { ContextMenu } from "@/components/ui/ContextMenu";
@@ -195,4 +195,4 @@ function AllCard({
   );
 }
 
-export default AllCard;
+export default React.memo(AllCard);
