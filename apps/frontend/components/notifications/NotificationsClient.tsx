@@ -29,8 +29,10 @@ interface ErrorLog {
   id: string;
   level: string;
   source: string;
+  scope?: string;
   message: string;
   created_at: string;
+  meta?: { scope?: string; source?: string; [k: string]: unknown };
 }
 
 // Reuse rows
@@ -70,11 +72,22 @@ function ChapterRow({ item }: { item: DispatchHistoryItem }) {
 }
 
 function LogRow({ log }: { log: ErrorLog }) {
+  const src = log.source;
+  const isProvider = ALL_SOURCES.includes(src as SourceName);
+  const scopeLabel = log.meta?.scope ?? "system";
   return (
     <div className="bg-surface rounded-lg p-3 border border-border">
       <div className="flex items-center gap-2 text-xs">
         <span className={`px-2 py-0.5 rounded font-bold ${log.level === "error" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>{log.level}</span>
-        <span className="text-white/50">{log.source}</span>
+        {isProvider ? (
+          <>
+            <span className="text-white/40">{scopeLabel}</span>
+            <span className="text-white/30">→</span>
+            <SourceBadge source={src} />
+          </>
+        ) : (
+          <span className="text-white/50">{src}</span>
+        )}
         <span className="ml-auto text-white/30">{new Date(log.created_at).toLocaleString()}</span>
       </div>
       <p className="text-sm text-white/80 mt-1 break-words">{log.message}</p>
@@ -89,6 +102,7 @@ export default function NotificationsClient() {
   const [pageChapters, setPageChapters] = useState(1);
   const [pageLog, setPageLog] = useState(1);
   const [qLog, setQLog] = useState("");
+  const [logSource, setLogSource] = useState<"all" | SourceName>("all");
   const debouncedSearch = useDebounced(search, 300);
   const debouncedQLog = useDebounced(qLog, 300);
   const queryClient = useQueryClient();
@@ -105,10 +119,11 @@ export default function NotificationsClient() {
 
   // Log query
   const logQ = useQuery({
-    queryKey: ["error-logs", pageLog, debouncedQLog] as const,
+    queryKey: ["error-logs", pageLog, debouncedQLog, logSource] as const,
     queryFn: async () => {
       const p = new URLSearchParams({ page: String(pageLog), page_size: "50" });
       if (debouncedQLog) p.set("q", debouncedQLog);
+      if (logSource !== "all") p.set("source", logSource);
       const res = await readerFetch<{ success: boolean; data: { results: ErrorLog[]; total: number } }>(`/api/v1/logs/errors?${p}`);
       return res.data;
     },
@@ -198,7 +213,12 @@ export default function NotificationsClient() {
             <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input value={qLog} onChange={(e) => { setQLog(e.target.value); setPageLog(1); }} placeholder="Search source/message" className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-muted" />
           </div>
-          <button onClick={() => logQ.refetch()} className="px-2.5 py-1.5 text-xs rounded-lg bg-surface border border-border">Refresh</button>
+          <div className="flex gap-1">
+            {(["all", ...ALL_SOURCES] as const).map((s) => (
+              <button key={s} onClick={() => { setLogSource(s); setPageLog(1); }} className={`px-2.5 py-1.5 text-xs rounded-lg border ${logSource === s ? "bg-accent-dim border-accent/30 text-accent" : "bg-surface border-border text-text-secondary"}`}>{s}</button>
+            ))}
+          </div>
+          <button onClick={() => logQ.refetch()} className="ml-auto px-2.5 py-1.5 text-xs rounded-lg bg-surface border border-border">Refresh</button>
           <button onClick={() => clearMutation.mutate()} disabled={clearMutation.isPending} className="px-2.5 py-1.5 text-xs rounded-lg bg-red-500/15 text-red-300 disabled:opacity-50">{clearMutation.isPending ? "Clearing…" : "Clear All"}</button>
         </div>
       )}

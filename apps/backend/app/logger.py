@@ -46,7 +46,10 @@ def _worker():
             level, scope, msg, stack, path, cid, meta = _q.get()
             try:
                 from app.storage.error_logs import insert_error
-                insert_error(level=level, source=scope, message=msg[:2000], stack=stack, path=path, correlation_id=cid, meta=meta)
+                src_field = (meta or {}).get("source")
+                row_meta = dict(meta or {})
+                row_meta["scope"] = scope
+                insert_error(level=level, source=src_field or scope, message=msg[:2000], stack=stack, path=path, correlation_id=cid, meta=row_meta)
             except Exception: pass
             _q.task_done()
         except Exception: pass
