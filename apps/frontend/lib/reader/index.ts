@@ -18,6 +18,7 @@ function buildRssParams(
     whitelist?: boolean;
     source?: string | null;
     type?: string | null;
+    slim?: boolean;
   }
 ) {
   const p = new URLSearchParams({
@@ -29,6 +30,7 @@ function buildRssParams(
   if (opts.whitelist) p.set("whitelist", "true");
   if (opts.source) p.set("source", opts.source);
   if (opts.type) { p.set("type", opts.type); p.set("format", opts.type); }
+  if (opts.slim) p.set("slim", "true");
   return p;
 }
 
@@ -348,6 +350,7 @@ export const Reader = {
       whitelist?: boolean;
       source?: string | null;
       type?: string | null;
+      slim?: boolean;
     } = {}
   ): Promise<{
     results: Record<string, unknown>[];
