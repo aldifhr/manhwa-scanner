@@ -37,10 +37,9 @@ function cacheKey(
   source: string,
   whitelist: string,
   exclude: string,
-  type: string,
-  slim: string
+  type: string
 ) {
-  return `rss:${session}:${page}:${limit}:${group}:${source}:${whitelist}:${exclude}:${type}:${slim}`;
+  return `rss:${session}:${page}:${limit}:${group}:${source}:${whitelist}:${exclude}:${type}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -72,14 +71,6 @@ export async function GET(request: NextRequest) {
     .slice(0, 20);
   const clampedLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
 
-  // slim=true strips the `description` field from each row. The list cards
-  // render it via <Synopsis> which is line-clamp-2 — ~80 visible chars out
-  // of ~540 shipped. It is 42% of the payload. Pass slim=true from list
-  // views (AllTab feed); whitelist-add-from-feed saves the entry without a
-  // description, which is fine — the catalog search path supplies the full
-  // text when adding from there.
-  const slim = request.nextUrl.searchParams.get("slim") === "true";
-
   // Cek cache dulu — hash session biar JWT tidak bocor di memory
   const key = cacheKey(
     hashSession(session),
@@ -89,8 +80,7 @@ export async function GET(request: NextRequest) {
     source,
     whitelist,
     exclude,
-    type,
-    String(slim)
+    type
   );
   // 10s TTL cache: absorbs repeat page loads + protects the backend from
   // redundant cold-start hits (which caused intermittent 504s).
@@ -182,13 +172,6 @@ export async function GET(request: NextRequest) {
         return tb - ta;
       });
       data.results = normalized;
-    }
-
-    // slim: drop description from every row (see slim flag above).
-    if (slim && data && results) {
-      data.results = (data.results as Array<Record<string, unknown>>).map(
-        ({ description: _drop, ...rest }) => rest
-      );
     }
 
     if (!body.success) {

@@ -48,7 +48,6 @@ export function useInfiniteFeed(opts: {
         whitelist: whitelistParam,
         source: sourceFilter || null,
         type: typeParam,
-        slim: true,
       });
     },
     staleTime: staleTimes.rss,
@@ -123,7 +122,6 @@ export function useInfiniteFeed(opts: {
         whitelist: whitelistParam,
         source: sourceFilter || null,
         type: typeParam,
-        slim: true,
       });
       const results: FlatChapter[] = Array.isArray(res?.results) ? res.results : [];
       const hm = typeof res?.hasMore === "boolean" ? res.hasMore : results.length === PAGE_SIZE;
