@@ -57,7 +57,17 @@ class DispatchService:
             result = fetch_cover(cover_url)
             if result:
                 content_bytes, content_type = result
-                ext = cover_url.rsplit(".", 1)[-1].split("?")[0]
+                # Derive extension from the ACTUAL content type, not the URL.
+                # _resize_cover re-encodes everything to JPEG, so a .png URL
+                # yields image/jpeg bytes — naming the file .png makes Discord
+                # reject the attachment and the thumbnail renders blank.
+                ext_map = {
+                    "image/jpeg": "jpg",
+                    "image/png": "png",
+                    "image/webp": "webp",
+                    "image/gif": "gif",
+                }
+                ext = ext_map.get(content_type, "jpg")
                 attachment_filename = f"cover_{fcfs_key(item.get('title', ''), item.get('chapter', ''))[:20]}.{ext}"
                 attachment = (attachment_filename, content_bytes, content_type)
 
