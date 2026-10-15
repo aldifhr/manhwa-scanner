@@ -46,6 +46,39 @@ def _is_cover_allowed(url: str) -> bool:
         return False
 
 
+def _resize_cover(data: bytes, content_type: str) -> tuple[bytes, str]:
+    """Downscale oversized covers so Discord renders the attachment thumbnail.
+
+    Discord silently drops attachment:// thumbnails when the uploaded file
+    is very large — observed: a 1.4MB PNG (960x1246) uploaded fine but the
+    embed rendered with no image, while a 95KB webp rendered correctly.
+    Resize to max 512px on the long edge and re-encode as JPEG (smallest
+    reliable format for Discord).
+    """
+    try:
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(data))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        max_dim = 512
+        if max(img.size) > max_dim:
+            ratio = max_dim / max(img.size)
+            new_size = (round(img.width * ratio), round(img.height * ratio))
+            img = img.resize(new_size, Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85, optimize=True)
+        out = buf.getvalue()
+        # Only use the resized version if it's actually smaller
+        if len(out) < len(data):
+            return out, "image/jpeg"
+    except Exception:
+        pass
+    return data, content_type
+
+
 def fetch_cover(url: str) -> tuple[bytes, str] | None:
     """Fetch cover image bytes + content-type. Returns None on any error or SSRF.
 
@@ -69,7 +102,10 @@ def fetch_cover(url: str) -> tuple[bytes, str] | None:
         if r.status_code == 200 and r.content:
             # cap 10MB
             data = r.content[: 10 * 1024 * 1024]
-            return (data, r.headers.get("content-type", "image/jpeg"))
+            content_type = r.headers.get("content-type", "image/jpeg")
+            # Resize oversized covers so Discord renders the attachment thumbnail
+            data, content_type = _resize_cover(data, content_type)
+            return (data, content_type)
     except Exception:
         pass
     return None
