@@ -234,7 +234,11 @@ function AllTabInner() {
       );
     const q = searchQuery.trim().toLowerCase();
     if (q) f = f.filter((c) => (c.title || "").toLowerCase().includes(q));
-    return f.map((c) => ({ ...c, seriesUrl: resolveSeriesUrl(c) }));
+    // Avoid allocating a cloned array of N objects on every filter change.
+    // resolveSeriesUrl is `seriesUrl || chapterUrl`, so only items missing
+    // seriesUrl need a new object — the rest pass through by reference,
+    // which also keeps React.memo hits high in the card components.
+    return f.map((c) => (c.seriesUrl ? c : { ...c, seriesUrl: resolveSeriesUrl(c) }));
   }, [
     all,
     optimisticExcluded,

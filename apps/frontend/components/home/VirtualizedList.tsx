@@ -90,6 +90,14 @@ export default function VirtualizedList<T>({
     gap,
     scrollMargin,
     initialOffset: initialScrollOffset,
+    // Auto-tune measurement: dynamic measurement (`measureRef` +
+    // `virtualizer.measureElement`) keeps item sizes exact, so the
+    // virtualizer can also use a dynamic fallback estimate when a row is
+    // not yet measured. Without this it sticks with the static estimate
+    // for every unmeasured row and every fast-scroll session begins with
+    // jittery blanks until `measureRef` catches up.
+    measureElement: (el) =>
+      el.getBoundingClientRect().height + (gap || 0),
   });
 
   // Dynamic measurement: content height unknown until rendered (cover + text)
