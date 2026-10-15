@@ -237,9 +237,9 @@ def _build_embed(
     _chapter_links = []
     for _ch, _url in _chapters_sorted:
         if _url:
-            _chapter_links.append(f"[ch {_ch}]({_escape_discord_md(_url)})")
+            _chapter_links.append(f"[Chapter {_ch}]({_escape_discord_md(_url)})")
         else:
-            _chapter_links.append(f"ch {_ch}")
+            _chapter_links.append(f"Chapter {_ch}")
     _latest_url = _chapters_sorted[-1][1] if _chapters_sorted else ""
     _latest_tracked = _latest_url
     _multi = len(_chapters_sorted) > 1
