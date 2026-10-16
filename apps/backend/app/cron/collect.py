@@ -159,7 +159,12 @@ def collect_recent_chapters(
                 _src_items = _collect_ikiru_source(_latest_sent, _disabled, fetch_meta)
             return SourceResult.ok(src, _src_items, started)
         except Exception as exc:
-            logger.warn("collect provider failed", source=src, err=str(exc)[:300])
+            # ikiru upstream is chronically flaky (502/timeout) — downgrade to
+            # debug so it doesn't spam warn. Other sources keep warn.
+            if src == "ikiru":
+                logger.debug("collect provider failed", source=src, err=str(exc)[:300])
+            else:
+                logger.warn("collect provider failed", source=src, err=str(exc)[:300])
             return SourceResult.failed(src, started, exc)
 
     _sources_to_run: list[str] = []
@@ -187,19 +192,28 @@ def collect_recent_chapters(
                         result = _future.result(timeout=5)
                         if not result.success:
                             _health_end(_src, _t0, False, result.error or "provider failed")
-                            logger.warn("collect failed", source=_src, err=result.error or "provider failed")
+                            if _src == "ikiru":
+                                logger.debug("collect failed", source=_src, err=result.error or "provider failed")
+                            else:
+                                logger.warn("collect failed", source=_src, err=result.error or "provider failed")
                             continue
                         items.extend(result.items)
                         _health_end(_src, _t0, True)
                         logger.info("collect done", source=_src, count=len(result.items), response_time_ms=result.latency_ms)
                     except Exception as e:
                         _health_end(_src, _t0, False, str(e)[:300])
-                        logger.warn("collect failed", source=_src, err=str(e)[:200])
+                        if _src == "ikiru":
+                            logger.debug("collect failed", source=_src, err=str(e)[:200])
+                        else:
+                            logger.warn("collect failed", source=_src, err=str(e)[:200])
             except concurrent.futures.TimeoutError:
                 for _future, _src in _futures.items():
                     if not _future.done():
                         _health_end(_src, _t0_map.get(_src, _health_start(_src)), False, f"timeout after {_SOURCE_TIMEOUT}s")
-                        logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
+                        if _src == "ikiru":
+                            logger.debug("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
+                        else:
+                            logger.warn("collect TIMEOUT", source=_src, timeout=_SOURCE_TIMEOUT)
                         try:
                             _future.cancel()
                         except Exception:
