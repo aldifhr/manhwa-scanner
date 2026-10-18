@@ -259,12 +259,23 @@ def check_dispatch_starvation() -> dict:
             logger.error("undelivered chapters", count=undelivered, oldest_min=round(oldest_min, 1))
             result["alerted"].append("undelivered")
         else:
-            # Logged at warn, not error: it is no longer a page, and the log
-            # is where the count is meant to be read now.
-            logger.warn(
-                "undelivered chapters (alert suppressed)",
-                count=undelivered, oldest_min=round(oldest_min, 1),
-            )
+            # The count is already carried by the "dispatch watchdog ok" info
+            # line below. A single chapter that is merely late (the rotating
+            # walk can legitimately take a while, and a source renumbering
+            # shows up here first) self-resolves within a pass or two — warn
+            # only when it is a real backlog: several chapters, or one that
+            # has been stuck well past the pickup window.
+            _is_backlog = undelivered >= 3 or oldest_min >= 180
+            if _is_backlog:
+                logger.warn(
+                    "undelivered chapters (alert suppressed)",
+                    count=undelivered, oldest_min=round(oldest_min, 1),
+                )
+            else:
+                logger.info(
+                    "undelivered chapters (transient)",
+                    count=undelivered, oldest_min=round(oldest_min, 1),
+                )
     else:
         _clear_alert_state("undelivered")
 
