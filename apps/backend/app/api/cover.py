@@ -124,8 +124,27 @@ async def _fetch_image(url: str, cache_control: str = "public, max-age=86400") -
                         break
             if r.status_code == 200:
                 content = r.content[:_RESPONSE_SIZE_CAP]
+                # Discord drops large remote thumbnails silently. Normalize covers
+                # at the public proxy so embed fetches stay small and predictable.
+                try:
+                    from io import BytesIO
+                    from PIL import Image
+                    image = Image.open(BytesIO(content)).convert("RGB")
+                    if max(image.size) > 512 or len(content) > 1_000_000:
+                        scale = min(1.0, 512 / max(image.size))
+                        if scale < 1.0:
+                            image = image.resize(
+                                (max(1, round(image.width * scale)), max(1, round(image.height * scale))),
+                                getattr(getattr(Image, "Resampling", Image), "LANCZOS"),
+                            )
+                        out = BytesIO()
+                        image.save(out, format="JPEG", quality=82, optimize=True)
+                        if out.tell() < len(content):
+                            content = out.getvalue()
+                except Exception:
+                    pass
                 _cache_put(url, content)
-                ctype = r.headers.get("content-type") or _detect_ctype(content)
+                ctype = "image/jpeg" if content[:2] == b"\\xff\\xd8" else (r.headers.get("content-type") or _detect_ctype(content))
                 headers_out = {"Cache-Control": cache_control, "X-Cache": "MISS"}
                 if "86400" in cache_control:
                     headers_out["Expires"] = "Thu, 31 Dec 2026 23:59:59 GMT"
