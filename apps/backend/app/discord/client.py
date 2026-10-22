@@ -181,16 +181,21 @@ def _discord_request(method: str, url: str, *, json_data: dict | None = None, fi
     cb_discord.record_failure()
     return None
 
-def send_channel_message(channel_id: str, content: str | None = None, embeds: list | None = None):
+def send_channel_message(channel_id: str, content: str | None = None, embeds: list | None = None, components: list | None = None):
     """Send a message to a channel via bot token.
 
     Primary path: Discord REST API. If that fails (e.g. VPS IP banned at
     the REST layer — Cloudflare 1010 / Discord 40333), fall back to the
     gateway websocket sender.
 
+    `components` (button rows) only travel on the REST path. The gateway
+    fallback cannot carry components, so a component-bearing send that lands
+    on the fallback returns None instead of posting a message stripped of its
+    button — the caller treats None as a failed send and retries, which is the
+    correct outcome for a button whose absence makes the message useless.
     """
     try:
-        r = _discord_request("POST", f"https://discord.com/api/v10/channels/{channel_id}/messages", json_data=_build_payload(content, embeds))
+        r = _discord_request("POST", f"https://discord.com/api/v10/channels/{channel_id}/messages", json_data=_build_payload(content, embeds, components))
         if r is not None and r.status_code < 400:
             return r.json()
         if r is not None and r.status_code not in (403, 404):
@@ -206,7 +211,10 @@ def send_channel_message(channel_id: str, content: str | None = None, embeds: li
         # exception unknown → jangan gateway
         return None
 
-    # Fallback: gateway websocket (not IP-banned like REST) — hanya untuk 403
+    # Fallback: gateway websocket (not IP-banned like REST)
+    if components:
+        logger.warn("send_channel_message: gateway fallback cannot carry components, skipping", channel=channel_id)
+        return None
     try:
         from app.discord.gateway_sender import send_via_gateway
         if send_via_gateway(channel_id, content=content, embeds=embeds):
@@ -215,12 +223,14 @@ def send_channel_message(channel_id: str, content: str | None = None, embeds: li
         logger.error("send_channel_message gateway fallback failed", channel=channel_id, err=str(e)[:160])
     return None
 
-def _build_payload(content, embeds):
+def _build_payload(content, embeds, components=None):
     payload: dict = {}
     if content is not None:
         payload["content"] = content
     if embeds:
         payload["embeds"] = embeds
+    if components:
+        payload["components"] = components
     return payload
 
 def send_channel_message_with_attachments(

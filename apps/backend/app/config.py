@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     DISCORD_CLIENT_SECRET: str = ""
     DISCORD_OAUTH_REDIRECT_URI: str = "https://scanner.aldifhr.my.id/api/auth/discord/callback"
     OUTBOUND_WEBHOOK_URLS: str = ""
+    # Two-channel feed: RAW gets every new chapter (with an "Add to whitelist"
+    # button), WHITELIST gets only whitelisted series. Channel ids in the same
+    # order as guild_settings rows. Both optional — a channel set to "" is
+    # simply never used, so single-channel setups keep working unchanged.
+    RAW_DISCORD_CHANNEL_ID: str = ""
+    WHITELIST_DISCORD_CHANNEL_ID: str = ""
     DISCORD_GUILD_ID: str = ""
     DISCORD_APPLICATION_ID: str = ""
     ERROR_WEBHOOK_URL: str = ""

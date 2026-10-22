@@ -34,6 +34,63 @@ from app.services.fcfs import (  # noqa: F401
     normalize_title,
 )
 
+def raw_channel_id() -> str:
+    """The channel every NEW chapter is announced on.
+
+    Set `RAW_DISCORD_CHANNEL_ID` in the deploy env. Empty ⇒ raw announcements
+    are off and only whitelisted series notify, which is exactly the previous
+    behaviour — so an unset variable changes nothing.
+    """
+    return str(getattr(settings, "RAW_DISCORD_CHANNEL_ID", "") or "").strip()
+
+
+def whitelist_channel_id() -> str:
+    """The channel whitelisted series are announced on.
+
+    Falls back to `WHITELIST_DISCORD_CHANNEL_ID`; when neither is set the
+    whitelist feed is off rather than aliased to the raw channel, so enabling
+    raw cannot silently also start notifying the old single channel.
+    """
+    return str(getattr(settings, "WHITELIST_DISCORD_CHANNEL_ID", "") or "").strip()
+
+
+def split_dispatch_targets(
+    channel_ids: list[str],
+) -> tuple[list[str], list[str]]:
+    """Partition a channel list into (raw, whitelist).
+
+    Dispatch used to send every chapter to every channel in `guild_settings`.
+    With a raw feed that is wrong: the raw channel would carry the
+    "Add to whitelist" button AND the whitelist's own notifications, so a
+    series would appear on both feeds the moment it was subscribed.
+
+    The raw channel is identified by RAW_DISCORD_CHANNEL_ID, the whitelist one
+    by WHITELIST_DISCORD_CHANNEL_ID. Channels in neither stay on the whitelist
+    half so a third (or legacy single) channel keeps receiving what it
+    received before.
+    """
+    raw_ids = {raw_channel_id()}
+    wl_ids = {whitelist_channel_id()}
+    raw: list[str] = []
+    wl: list[str] = []
+    for ch in channel_ids:
+        c = str(ch).strip()
+        if not c:
+            continue
+        # A raw channel is only the explicitly configured one. When RAW is
+        # unset the set is {""} and matches nothing — the whole list falls
+        # through to the whitelist half, which is the previous behaviour.
+        if c in raw_ids:
+            if c not in raw:
+                raw.append(c)
+        else:
+            # whitelist_channel_id() is deduped against raw below; here it is
+            # simply "not the raw channel".
+            if c not in wl:
+                wl.append(c)
+    return raw, wl
+
+
 def load_chapter_ceilings(pairs: list[tuple[str, str]]) -> dict[tuple[str, str], float]:
     """Max already-dispatched chapter per (title_key, source), cross-source.
 
@@ -370,7 +427,68 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         logger.warn("dispatch: series_meta map build failed", err=str(_e)[:120])
 
     sent = 0
+    # Two feeds, two channel sets. `to_send` carries `subscribed` per item from
+    # collect()/split_raw_and_whitelisted(); dispatch re-derives it here from
+    # the same (title_key, source) rule so an item that arrived without the tag
+    # is still routed correctly. See split_dispatch_targets().
+    _raw_ch, _wl_ch = split_dispatch_targets(channel_ids)
+    # Raw announcements are opt-in: with no raw channel configured every
+    # channel is a whitelist channel, which is the previous single-feed
+    # behaviour. Otherwise a raw feed would start publishing on a deployment
+    # that never asked for it.
+    _has_raw = bool(_raw_ch)
+    try:
+        from app.storage import whitelist as wl_store
+        _wl_rows = wl_store.load_whitelist()
+    except Exception:
+        _wl_rows = []
+    _wl_pairs = {
+        (slugify_title_key(w.get("title_key", "")), str(w.get("source") or "").lower())
+        for w in _wl_rows
+    }
+    for _it in to_send:
+        _it_tk_r = slugify_title_key(str(_it.get("title_key") or ""))
+        _it_src_r = str(_it.get("source") or "").lower()
+        if _it_tk_r and (_it_tk_r, _it_src_r) in _wl_pairs:
+            _it["subscribed"] = True
+            continue
+        if "subscribed" in _it:
+            continue
+        # Untagged item: treat it as WHITELISTED, i.e. as it was before the raw
+        # feed existed. Two reasons, and both are about not breaking a running
+        # deployment:
+        #
+        #   * With no raw channel configured every channel is a whitelist
+        #     channel, so routing untagged items to raw would send NOTHING at
+        #     all — the failure test_dispatch_keys.py caught exactly that.
+        #   * A caller that never heard of the split (an API endpoint, a manual
+        #     resend, a backfill) passes items straight through; those are the
+        #     same items the whitelist filter used to admit.
+        #
+        # The only way an item lands on raw is the raw feed's own tagging, which
+        # is split_raw_and_whitelisted()/pipeline.py.
+        _it["subscribed"] = True
+
     for ch in channel_ids:
+        _is_raw_ch = _has_raw and ch in _raw_ch
+        # Raw channel: only items NOT whitelisted (every new chapter, minus the
+        # ones that already have a whitelist feed). Whitelist channel: the
+        # opposite set. Splitting here rather than upstream means one batch and
+        # one claim serve both feeds — a second pass would have to re-claim the
+        # same URLs and fight the claim guard.
+        #
+        # `subscribed == (not _is_raw_ch)`: raw ⇒ subscribed is False,
+        # whitelist ⇒ subscribed is True. Written as an equality rather than
+        # "!= _is_raw_ch" because the two read the same but only this one is
+        # obviously symmetric — the inverted form silently routes every
+        # whitelisted chapter to raw and every stray one to whitelist.
+        _feed = [
+            it for it in to_send
+            if bool(it.get("subscribed")) == (not _is_raw_ch)
+        ]
+        if not _feed:
+            logger.info("dispatch: feed empty", channel=ch, feed="raw" if _is_raw_ch else "whitelist")
+            continue
         # Per-guild filters (multi-server). Falls back to empty filters when
         # the channel has no guild_settings row (e.g. explicit channel_ids arg).
         _gs_row = next((g for g in guild_rows if str(g.get("channel_id")) == str(ch)), {})
@@ -378,7 +496,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _excl_titles = {slugify_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
         seen_key_run: set[str] = set()
         _consec_fail = 0
-        for it in to_send:
+        for it in _feed:
             url = it.get("url", "")
             if not url or not _acq_map.get(url):
                 continue
@@ -481,11 +599,23 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                 updated_time=it.get("updated_time", ""),
             )
             content = f"🔔 New Release on **{html.unescape(it.get('title', 'Unknown'))}** — Chapter {it.get('chapter', '?')}"
+            # Raw feed only: the button is what makes a raw announcement
+            # actionable. A whitelisted series gets the same notification on the
+            # whitelist feed, where the button would be a no-op.
+            _components = None
+            if _is_raw_ch:
+                from app.discord.embeds import add_whitelist_button
+                _components = add_whitelist_button(
+                    source=str(it.get("source") or ""),
+                    title_key=str(it.get("title_key") or ""),
+                    title=str(it.get("title") or ""),
+                    series_url=str(it.get("series_url") or ""),
+                ) or None
             if dry_run:
                 sent += 1
                 continue
             try:
-                resp = discord.send_channel_message(channel_id=ch, content=content, embeds=[embed])
+                resp = discord.send_channel_message(channel_id=ch, content=content, embeds=[embed], components=_components)
                 if resp is None:
                     _consec_fail += 1
                     logger.warn("dispatch: send returned None", title=(it.get("title") or "")[:40], consecutive=_consec_fail, channel=ch)

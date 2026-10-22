@@ -64,6 +64,8 @@ def handle_interaction(raw_body: bytes) -> tuple[int, dict]:
             return _route_setchannel(payload, data)
         if name == "setfilter":
             return _route_setfilter(payload, data)
+        if custom_id.startswith("wladd:"):
+            return _route_whitelist_add(payload, data)
         if custom_id.startswith("list:"):
             return _route_list_component(custom_id)
         return 200, _respond(
@@ -191,6 +193,85 @@ def _route_setfilter(payload: dict, data: dict):
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": "⏳ Filter save is slow — try again in 5s (DB timeout)."})
     except Exception as e:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": f"❌ Failed: {e}"})
+
+def _route_whitelist_add(payload: dict, data: dict):
+    """"Add to whitelist" button on a RAW-feed embed.
+
+    The button carries the series' own (source, title_key), so the click writes
+    the row directly — no search, no ambiguity about which series was meant.
+    The display title and series URL come from the embed the button is attached
+    to, which is the only place they exist: a component interaction payload
+    does not carry the embed.
+
+    Responds DEFERRED so the DB write happens in a thread without risking the
+    3s interaction deadline; the follow-up edit is the visible result.
+    """
+    custom_id = data.get("custom_id", "")
+    try:
+        from app.discord.embeds import decode_whitelist_custom_id
+
+        source, title_key = decode_whitelist_custom_id(custom_id)
+    except Exception as e:
+        logger.warn("wladd: bad custom_id", custom_id=custom_id[:60], err=str(e)[:160])
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": "❌ That button could not be read (malformed id). Re-run the release to get a fresh one."},
+        )
+
+    message = payload.get("message", {}) or {}
+    embeds = message.get("embeds", []) or []
+    title = ""
+    series_url = ""
+    if embeds:
+        title = str(embeds[0].get("title") or "").strip()
+        series_url = str(embeds[0].get("url") or "").strip()
+
+    user = (payload.get("member") or {}).get("user") or payload.get("user") or {}
+    who = str(user.get("username") or user.get("id") or "unknown")
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _write():
+        from app.storage import whitelist as wl_store
+
+        res = wl_store.add_whitelist_entries([
+            {
+                "title_key": title_key,
+                "source": source,
+                "title": title or title_key,
+                "series_url": series_url,
+            }
+        ])
+        return res
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as _ex:
+            res = _ex.submit(_write).result(timeout=8)
+        if str((res or {}).get("status")) != "ok":
+            logger.warn("wladd: insert failed", source=source, title_key=title_key, err=str(res)[:200])
+            return 200, _respond(
+                CHANNEL_MESSAGE_WITH_SOURCE,
+                {"content": f"❌ Could not add **{title or title_key}** — DB write failed. Try again in a few seconds."},
+            )
+        logger.info("wladd: subscribed", source=source, title_key=title_key, by=who)
+        return 200, _respond(
+            DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": f"✅ **{title or title_key}** added to the whitelist.\n"
+                        f"Future chapters go to the whitelist feed — this series will not appear in raw again."},
+        )
+    except TimeoutError:
+        logger.warn("wladd: DB timeout", source=source, title_key=title_key)
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": "⏳ Save is slow — try again in 5s (DB timeout)."},
+        )
+    except Exception as e:
+        logger.warn("wladd failed", source=source, title_key=title_key, err=str(e)[:200])
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": f"❌ Failed to add **{title or title_key}**: {str(e)[:160]}"},
+        )
+
 
 def _route_list_component(custom_id: str):
     parts = custom_id.split(":")

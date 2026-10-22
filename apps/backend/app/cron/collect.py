@@ -37,6 +37,16 @@ health_store = health
 _WALK_BUDGET_PER_TICK = int(os.getenv("SHINIGAMI_WALK_BUDGET", "40") or 40)
 _WALK_CURSOR_KEY = "beag:shinigami_walk_cursor"
 
+# Last split of the collected batch into (raw, whitelist) counts. Purely
+# telemetry: collect() has no other channel to report it, and "raw announced 0"
+# is indistinguishable from "raw was never computed" without it.
+_last_split: dict[str, int] = {"raw": 0, "whitelist": 0}
+
+
+def last_split() -> dict[str, int]:
+    """The raw/whitelist counts from the most recent collect() call."""
+    return dict(_last_split)
+
 
 def _load_walk_cursor() -> int:
     """Read the rotating walk cursor. Missing/unparsable restarts at 0.
@@ -266,11 +276,28 @@ def collect_recent_chapters(
     except Exception as e:
         logger.warn("collect: exclude filter failed", err=str(e)[:200])
 
+    # ── Subscribed split ──
+    #
+    # The raw feed announces EVERY new chapter; the whitelist feed announces
+    # only series the operator subscribed to. Both read the same rows, so the
+    # subscription flag is computed here, once, from the same (title_key,
+    # source) rule filter_whitelisted() uses — a second, divergent matcher here
+    # is how raw and whitelist came to disagree in the first place.
+    #
+    # The batch is re-ordered raw-first: dispatch() walks `to_send` in order
+    # and keeps sending the first chapter it can, so leading with raw means a
+    # whitelisted series still gets its notification even when the raw feed
+    # produced a bigger burst.
+    if with_whitelisted_shinigami:
+        _raw, _wls = split_raw_and_whitelisted(items, wl_store.load_whitelist())
+        _last_split.update({"raw": len(_raw), "whitelist": len(_wls)})
+        items = _raw + _wls
+
     return items, _hm
 
 
 def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
-    """Keep items whose (title, source) pair is whitelisted.
+    """Keep items whose (title_key, source) pair is whitelisted.
 
     Source-strict, matching the whitelist's own grain: `whitelist` has one row
     per (title_key, source), so subscribing a series on shinigami does not
@@ -293,13 +320,39 @@ def filter_whitelisted(items: list[dict], whitelist: list[dict]) -> list[dict]:
         src = str(w.get("source") or "").lower()
         if wk:
             allowed.add((wk, src))
-    result = []
+    return [
+        it
+        for it in items
+        if (slugify_title_key(it.get("title_key", "")), str(it.get("source") or "").lower())
+        in allowed
+    ]
+
+
+def split_raw_and_whitelisted(
+    items: list[dict], whitelist: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Split a batch into (raw, whitelisted) using the SAME rule dispatch uses.
+
+    Returns the two lists, each item tagged `subscribed`. Raw is everything not
+    whitelisted — the raw feed announces every new chapter, so a series nobody
+    subscribed to still gets announced, with an "Add to whitelist" button on its
+    embed. Whitelist is the opposite set.
+
+    Both halves are computed by one pass over `items` against one set of pairs,
+    so they cannot disagree about whether a (title_key, source) is subscribed.
+    """
+    pairs = {
+        (slugify_title_key(w.get("title_key", "")), str(w.get("source") or "").lower())
+        for w in whitelist
+    }
+    raw_items: list[dict] = []
+    wl_items: list[dict] = []
     for it in items:
         tk = slugify_title_key(it.get("title_key", ""))
         src = str(it.get("source") or "").lower()
-        if (tk, src) in allowed:
-            result.append(it)
-    return result
+        it["subscribed"] = (tk, src) in pairs
+        (wl_items if it["subscribed"] else raw_items).append(it)
+    return raw_items, wl_items
 
 
 def collect_whitelisted_shinigami_chapters(whitelist: list[dict]) -> list[dict]:

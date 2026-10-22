@@ -204,12 +204,31 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
             except Exception as e:
                 logger.warn("unclaim_stale failed", err=str(e)[:160])
             whitelist = wl_store.load_whitelist()
-            # ALWAYS filter whitelisted — both paths (claimed + recent) need it
-            # causing non-whitelisted chapters to dispatch to Discord
-            if _use_claimed:
-                to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
-            else:
-                to_dispatch = collect.filter_whitelisted(enriched_all, whitelist) if whitelist else []
+            # Both feeds need EVERY item: the raw feed is "all new chapters",
+            # the whitelist feed is "whitelisted new chapters". Filtering to the
+            # whitelist here would starve raw entirely — it is the feed that
+            # exists precisely for series not on the whitelist.
+            #
+            # The whitelist filter still has to be applied somewhere, or a
+            # whitelisted series would be announced on the raw feed too and
+            # carry an "Add to whitelist" button for a series already added.
+            # dispatch() applies it per channel (split_dispatch_targets +
+            # the subscribed flag), which is the one place that knows which
+            # channel is which.
+            to_dispatch = enriched_all
+            # Tag the feed each item belongs to, using the SAME (title_key,
+            # source) rule dispatch() re-derives it with. `subscribed` is what
+            # dispatch reads to route, so it must be present even for items
+            # that came through a path which never called
+            # split_raw_and_whitelisted (e.g. the deep-queue claim).
+            _wl_pairs = {
+                (collect.slugify_title_key(w.get("title_key", "")), str(w.get("source") or "").lower())
+                for w in whitelist
+            }
+            for _it in to_dispatch:
+                _itk = collect.slugify_title_key(str(_it.get("title_key") or ""))
+                _its = str(_it.get("source") or "").lower()
+                _it["subscribed"] = bool(_itk) and (_itk, _its) in _wl_pairs
             channels = channel_ids or dispatch_mod._load_channels()
             # When the deep-queue claim path (_use_claimed) was used, the URLs
             # were ALREADY written to dispatch_claims by

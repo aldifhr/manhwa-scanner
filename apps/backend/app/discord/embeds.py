@@ -202,6 +202,84 @@ def build_multi_chapter_embed(
     )
 
 
+def add_whitelist_button(
+    source: str = "",
+    title_key: str = "",
+    title: str = "",
+    series_url: str = "",
+) -> list[dict]:
+    """The "Add to whitelist" button row for a RAW-feed chapter embed.
+
+    Carries `source` + `title_key` — the whitelist's composite PK — plus the
+    display title and series URL so the click handler can write the row without
+    a second lookup. Both are needed: title_key alone is not unique across
+    sources (one series can exist on shinigami and ikiru), and the whitelist
+    key is (title_key, source), not title_key.
+
+    Returns [] when the series is already whitelisted, or when the embed has
+    nothing stable to key on. An empty list is the caller's signal to send the
+    message without components — the previous shape of every dispatch.
+    """
+    if not title_key or not source:
+        return []
+    return [
+        {
+            "type": 1,  # ACTION_ROW
+            "components": [
+                {
+                    "type": 2,  # BUTTON
+                    "style": 3,  # SUCCESS (green)
+                    "label": "Add to whitelist",
+                    "custom_id": encode_whitelist_custom_id(source, title_key),
+                }
+            ],
+        }
+    ]
+
+
+def encode_whitelist_custom_id(source: str, title_key: str) -> str:
+    """`wladd:<source>:<slug>` — the whitelist's composite key, URL-safe.
+
+    The slug is base64url'd because a title_key is derived from the series
+    title and can contain any character the source puts in a URL; raw
+    `:`-joined text would let a title like "a:b" shift the field boundaries and
+    whitelist the WRONG series. The whitelist's own title_key is a slug
+    ([a-z0-9-]), so this is normally a no-op — it exists so a stray
+    non-canonical key cannot corrupt the parse.
+    """
+    import base64
+    from app.utils.text import slugify_title_key
+
+    slug = slugify_title_key(title_key)
+    if re.fullmatch(r"[a-z0-9-]+", slug or ""):
+        payload = slug
+    else:
+        payload = "b64:" + base64.urlsafe_b64encode(slug.encode()).decode().rstrip("=")
+    return f"wladd:{source}:{payload}"
+
+
+def decode_whitelist_custom_id(custom_id: str) -> tuple[str, str]:
+    """Inverse of encode_whitelist_custom_id → (source, title_key).
+
+    Raises ValueError on a malformed id. The handler must not guess here: a
+    bad id means the button was authored by an older build or hand-edited, and
+    silently defaulting would whitelist an arbitrary series.
+    """
+    import base64
+    from app.utils.text import slugify_title_key
+
+    parts = (custom_id or "").split(":")
+    if len(parts) != 3 or parts[0] != "wladd":
+        raise ValueError(f"malformed custom_id: {custom_id!r}")
+    source, payload = parts[1], parts[2]
+    if not source or not payload:
+        raise ValueError(f"empty source or title_key in custom_id: {custom_id!r}")
+    if payload.startswith("b64:"):
+        pad = "=" * (-len(payload[4:]) % 4)
+        payload = base64.urlsafe_b64decode(payload[4:] + pad).decode()
+    return source, slugify_title_key(payload)
+
+
 # Pre-compiled regex for chapter number extraction (called 2x per embed build).
 _CHAPTER_NUM_RE = re.compile(r"(\d+(?:\.\d+)?)")
 
