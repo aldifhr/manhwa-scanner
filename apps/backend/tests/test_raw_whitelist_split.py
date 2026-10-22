@@ -298,6 +298,28 @@ def the_interaction_handler_is_registered():
 
 
 @case
+def the_button_response_is_immediate_not_deferred():
+    """A deferred response with no follow-up edit renders as an EMPTY message.
+
+    Observed live: the click landed and the row was written ("wladd: subscribed"
+    in the log), but the channel showed a blank bubble because the handler
+    returned DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE (type 5) and nothing ever
+    called the interaction follow-up endpoint. The operator saw a click that
+    appeared to do nothing.
+
+    type 4 = CHANNEL_MESSAGE_WITH_SOURCE renders immediately.
+    """
+    from app.discord.router import _route_whitelist_add
+
+    src = _src(_route_whitelist_add)
+    assert "DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE" not in src, (
+        "the handler must not defer: a deferred response without a follow-up "
+        "edit shows an empty message in Discord"
+    )
+    assert "CHANNEL_MESSAGE_WITH_SOURCE" in src
+
+
+@case
 def the_handler_writes_to_the_whitelist_table():
     from app.discord.router import _route_whitelist_add
 

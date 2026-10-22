@@ -306,8 +306,20 @@ def _route_whitelist_add(payload: dict, data: dict):
         return res
 
     try:
+        # Respond with type 4 (immediate), NOT type 5 (deferred).
+        #
+        # A deferred response MUST be followed by a call to the interaction's
+        # follow-up endpoint, or Discord renders an EMPTY message — which is
+        # exactly what the operator saw: the click landed, the row was written
+        # (log: "wladd: subscribed"), and the channel showed a blank bubble.
+        # Nothing in this handler ever issued the follow-up edit, so the
+        # confirmation never appeared.
+        #
+        # The write is a single upsert measured at ~7ms (see the access log),
+        # comfortably inside Discord's 3s interaction deadline, so there is no
+        # need to defer at all. A deferral would only add a failure mode.
         with ThreadPoolExecutor(max_workers=1) as _ex:
-            res = _ex.submit(_write).result(timeout=8)
+            res = _ex.submit(_write).result(timeout=2.5)
         if str((res or {}).get("status")) != "ok":
             logger.warn("wladd: insert failed", source=source, title_key=title_key, err=str(res)[:200])
             return 200, _respond(
@@ -316,7 +328,7 @@ def _route_whitelist_add(payload: dict, data: dict):
             )
         logger.info("wladd: subscribed", source=source, title_key=title_key, by=who)
         return 200, _respond(
-            DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+            CHANNEL_MESSAGE_WITH_SOURCE,
             {"content": f"✅ **{title or title_key}** added to the whitelist.\n"
                         f"Future chapters go to the whitelist feed — this series will not appear in raw again."},
         )
