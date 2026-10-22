@@ -295,7 +295,8 @@ async def rss_new(request: Request):
         pass
 
     distinct = request.query_params.get("distinct", "all")
-    cache_key = f"{since}_{distinct}"
+    raw_only = request.query_params.get("raw_only", "0") == "1"
+    cache_key = f"{since}_{distinct}_{raw_only}"
     _now = _time.monotonic()
     if cache_key in _rss_new_cache:
         _cache_ts, _cache_val = _rss_new_cache[cache_key]
@@ -306,10 +307,13 @@ async def rss_new(request: Request):
 
     try:
         from app.db import q
+        raw_clause = ""
+        if raw_only:
+            raw_clause = " AND NOT EXISTS (SELECT 1 FROM whitelist w WHERE w.title_key = recent_chapters.title_key AND LOWER(w.source) = LOWER(recent_chapters.source))"
         if distinct == "title":
-            sql = "SELECT COUNT(DISTINCT title_key) as cnt, MAX(updated_time) as latest FROM recent_chapters WHERE updated_time >= %s"
+            sql = f"SELECT COUNT(DISTINCT title_key) as cnt, MAX(updated_time) as latest FROM recent_chapters WHERE updated_time >= %s{raw_clause}"
         else:
-            sql = "SELECT COUNT(*) as cnt, MAX(updated_time) as latest FROM recent_chapters WHERE updated_time >= %s"
+            sql = f"SELECT COUNT(*) as cnt, MAX(updated_time) as latest FROM recent_chapters WHERE updated_time >= %s{raw_clause}"
         result = q(sql, [since])
         count = result[0]["cnt"] if result else 0
         latest = result[0]["latest"] if result else since
