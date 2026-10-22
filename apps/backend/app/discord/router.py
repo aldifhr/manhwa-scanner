@@ -62,6 +62,10 @@ def handle_interaction(raw_body: bytes) -> tuple[int, dict]:
             )
         if name == "setchannel":
             return _route_setchannel(payload, data)
+        if name == "setrawchannel":
+            return _route_setrawchannel(payload, data)
+        if name == "setwhitelistchannel":
+            return _route_setwhitelistchannel(payload, data)
         if name == "setfilter":
             return _route_setfilter(payload, data)
         if custom_id.startswith("wladd:"):
@@ -113,6 +117,63 @@ def _route_stats(data: dict):
         CHANNEL_MESSAGE_WITH_SOURCE,
         {"content": f"📊 Whitelist: **{len(rows)}** manga tracked"},
     )
+
+def _route_setrawchannel(payload: dict, data: dict):
+    """/setrawchannel — the feed every new chapter lands on, with the button."""
+    return _route_set_feed_channel(payload, data, feed="raw")
+
+
+def _route_setwhitelistchannel(payload: dict, data: dict):
+    """/setwhitelistchannel — the feed only whitelisted series land on."""
+    return _route_set_feed_channel(payload, data, feed="whitelist")
+
+
+def _route_set_feed_channel(payload: dict, data: dict, feed: str):
+    """Shared body for /setrawchannel and /setwhitelistchannel."""
+    opts = _extract_options(data)
+    channel_id = str(opts.get("channel", "") or "").strip()
+    guild_id = str(payload.get("guild_id", "") or "").strip()
+    if not channel_id or not guild_id:
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": "❌ Missing channel or guild"},
+        )
+    # Defense: only accept guilds in the allowlist.
+    _raw = getattr(settings, "DISCORD_GUILD_ID", "") or ""
+    allowed = [g.strip() for g in _raw.split(",") if g.strip()]
+    if allowed and guild_id not in allowed:
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": "❌ Channel must belong to an authorized server"},
+        )
+    try:
+        from app.cron.dispatch_mod import _set_feed_channel
+
+        def _do_upsert():
+            return _set_feed_channel(guild_id, channel_id, feed)
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=1) as _ex:
+            _ex.submit(_do_upsert).result(timeout=2.5)
+        label = "raw (every new chapter + Add to whitelist button)" if feed == "raw" else "whitelist (whitelisted series only)"
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": f"✅ **{feed.capitalize()}** feed will use <#{channel_id}> — {label}."},
+        )
+    except TimeoutError:
+        logger.warn("setfeed DB timeout", feed=feed, guild=guild_id)
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": "⏳ Channel save is slow — try again in 5s (DB timeout)."},
+        )
+    except Exception as e:
+        logger.warn("setfeed failed", feed=feed, err=str(e)[:200])
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": f"❌ Failed to set the {feed} channel: {str(e)[:160]}"},
+        )
+
 
 def _route_setchannel(payload: dict, data: dict):
     opts = _extract_options(data)

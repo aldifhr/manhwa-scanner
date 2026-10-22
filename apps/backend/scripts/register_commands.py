@@ -54,6 +54,34 @@ COMMANDS = [
             }
         ],
     },
+    {
+        "name": "setrawchannel",
+        "description": "Set the channel for RAW announcements (every new chapter + Add to whitelist button)",
+        "default_member_permissions": "32",
+        "options": [
+            {
+                "name": "channel",
+                "description": "Channel that receives every new chapter, including non-whitelisted series",
+                # type:7 = CHANNEL — Discord scopes the picker to THIS guild,
+                # so a member can't pass an arbitrary ID from another server.
+                "type": 7,
+                "required": True,
+            }
+        ],
+    },
+    {
+        "name": "setwhitelistchannel",
+        "description": "Set the channel for WHITELIST announcements (only whitelisted series)",
+        "default_member_permissions": "32",
+        "options": [
+            {
+                "name": "channel",
+                "description": "Channel that receives only whitelisted series",
+                "type": 7,
+                "required": True,
+            }
+        ],
+    },
 ]
 
 

@@ -108,7 +108,12 @@ def raw_feed_is_opt_in():
 
 @case
 def configured_raw_channel_is_split_out():
-    """With a raw channel configured it is removed from the whitelist half."""
+    """With a raw channel configured, it is removed from the whitelist half.
+
+    The raw channel stays in the whitelist half as well, so a deployment with a
+    raw channel but no separate whitelist channel still receives whitelisted
+    series instead of silently dropping them.
+    """
     from app.cron import dispatch_mod
 
     saved = dispatch_mod.settings.RAW_DISCORD_CHANNEL_ID
@@ -116,9 +121,66 @@ def configured_raw_channel_is_split_out():
     try:
         raw, wl = dispatch_mod.split_dispatch_targets(["111", "222"])
         assert raw == ["111"]
-        assert wl == ["222"], "the raw channel must not also receive whitelist notifications"
+        assert wl == ["111", "222"], "the raw channel must also carry the whitelist feed"
     finally:
         object.__setattr__(dispatch_mod.settings, "RAW_DISCORD_CHANNEL_ID", saved)
+
+
+@case
+def a_guild_override_wins_over_the_env_default():
+    """/setrawchannel on a guild must override the env value.
+
+    The env is the fallback for a single-server deploy, not an override for a
+    guild that picked its own channel.
+    """
+    from app.cron import dispatch_mod as dm
+
+    saved = dm.settings.RAW_DISCORD_CHANNEL_ID
+    object.__setattr__(dm.settings, "RAW_DISCORD_CHANNEL_ID", "111")
+    target = ""
+    try:
+        rows = dm.load_guild_settings()
+        target = str(rows[0]["guild_id"])
+        dm._set_feed_channel(target, "222", "raw")
+        raw, wl = dm.split_dispatch_targets(["111", "222"])
+        assert raw == ["222"], f"the guild's own raw channel must win, got {raw}"
+        assert dm.guild_setting(target, "raw") == "222"
+    finally:
+        from app.db import q
+
+        if target:
+            q("UPDATE guild_settings SET raw_channel_id = NULL WHERE guild_id = %s", [target])
+        object.__setattr__(dm.settings, "RAW_DISCORD_CHANNEL_ID", saved)
+
+
+@case
+def the_feed_channel_commands_are_routed_and_registered():
+    import pathlib
+
+    import app.discord.router as router
+
+    src = pathlib.Path(router.__file__).read_text()
+    assert 'name == "setrawchannel"' in src, "/setrawchannel must be routed"
+    assert 'name == "setwhitelistchannel"' in src, "/setwhitelistchannel must be routed"
+
+    reg = pathlib.Path("scripts/register_commands.py").read_text()
+    assert '"name": "setrawchannel"' in reg, (
+        "/setrawchannel must be registered with Discord or it never appears in the picker"
+    )
+    assert '"name": "setwhitelistchannel"' in reg, (
+        "/setwhitelistchannel must be registered with Discord or it never appears in the picker"
+    )
+    # Both take a CHANNEL option (type 7) so the picker is scoped to this guild.
+    assert '"name": "setrawchannel"' in reg and '"type": 7' in reg
+
+
+@case
+def the_feed_channel_commands_write_the_matching_column():
+    from app.discord.router import _route_setrawchannel, _route_setwhitelistchannel
+
+    for fn, col in ((_route_setrawchannel, "raw"), (_route_setwhitelistchannel, "whitelist")):
+        src = _src(fn)
+        assert f'feed="{col}"' in src, f"{fn.__name__} must write the {col} column"
 
 
 @case

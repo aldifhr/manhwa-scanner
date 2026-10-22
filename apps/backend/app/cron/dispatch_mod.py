@@ -37,9 +37,9 @@ from app.services.fcfs import (  # noqa: F401
 def raw_channel_id() -> str:
     """The channel every NEW chapter is announced on.
 
-    Set `RAW_DISCORD_CHANNEL_ID` in the deploy env. Empty ⇒ raw announcements
-    are off and only whitelisted series notify, which is exactly the previous
-    behaviour — so an unset variable changes nothing.
+    `RAW_DISCORD_CHANNEL_ID` in the deploy env; per-guild override wins (see
+    guild_setting()). Empty everywhere ⇒ raw announcements are off and only
+    whitelisted series notify, which is the previous behaviour.
     """
     return str(getattr(settings, "RAW_DISCORD_CHANNEL_ID", "") or "").strip()
 
@@ -47,11 +47,51 @@ def raw_channel_id() -> str:
 def whitelist_channel_id() -> str:
     """The channel whitelisted series are announced on.
 
-    Falls back to `WHITELIST_DISCORD_CHANNEL_ID`; when neither is set the
+    `WHITELIST_DISCORD_CHANNEL_ID` in the deploy env. When it is unset the
     whitelist feed is off rather than aliased to the raw channel, so enabling
-    raw cannot silently also start notifying the old single channel.
+    raw cannot silently start notifying a channel that never asked for it.
     """
     return str(getattr(settings, "WHITELIST_DISCORD_CHANNEL_ID", "") or "").strip()
+
+
+def _set_feed_channel(guild_id: str, channel_id: str, feed: str) -> None:
+    """Persist one feed's channel for a guild into guild_settings.
+
+    `feed` is "raw" or "whitelist". Written as its own column rather than
+    derived from channel_id, because the two feeds are identified by the
+    channel they point at and a channel can be pointed at twice.
+    """
+    from app.db import q
+
+    col = "raw_channel_id" if feed == "raw" else "whitelist_channel_id"
+    # The row may not exist yet (/setchannel creates it) — upsert on guild_id.
+    q(
+        f"""INSERT INTO guild_settings (guild_id, {col})
+            VALUES (%s, %s)
+            ON CONFLICT (guild_id) DO UPDATE SET {col} = EXCLUDED.{col}""",
+        [guild_id, channel_id],
+    )
+
+
+def guild_setting(guild_id: str, feed: str) -> str:
+    """The configured channel for one feed on one guild, env fallback included.
+
+    Returns "" when neither the guild row nor the env has a channel for that
+    feed. The env is the fallback so a single-server deploy needs no DB row,
+    while a guild that set its own channel is not overridden by a later env
+    change.
+    """
+    try:
+        from app.db import q
+
+        col = "raw_channel_id" if feed == "raw" else "whitelist_channel_id"
+        rows = q(f"SELECT {col} FROM guild_settings WHERE guild_id = %s", [str(guild_id)])
+        val = str((rows[0].get(col) if rows else "") or "").strip()
+        if val:
+            return val
+    except Exception:
+        pass
+    return raw_channel_id() if feed == "raw" else whitelist_channel_id()
 
 
 def split_dispatch_targets(
@@ -64,30 +104,28 @@ def split_dispatch_targets(
     "Add to whitelist" button AND the whitelist's own notifications, so a
     series would appear on both feeds the moment it was subscribed.
 
-    The raw channel is identified by RAW_DISCORD_CHANNEL_ID, the whitelist one
-    by WHITELIST_DISCORD_CHANNEL_ID. Channels in neither stay on the whitelist
-    half so a third (or legacy single) channel keeps receiving what it
-    received before.
+    A channel is raw when it is the configured raw channel for its guild
+    (guild_setting(guild, "raw"), env fallback included). Everything else —
+    the configured whitelist channel, the legacy channel_id, or a channel with
+    no configuration at all — stays on the whitelist half, which is what it
+    received before the split.
     """
-    raw_ids = {raw_channel_id()}
-    wl_ids = {whitelist_channel_id()}
     raw: list[str] = []
     wl: list[str] = []
     for ch in channel_ids:
         c = str(ch).strip()
         if not c:
             continue
-        # A raw channel is only the explicitly configured one. When RAW is
-        # unset the set is {""} and matches nothing — the whole list falls
-        # through to the whitelist half, which is the previous behaviour.
-        if c in raw_ids:
-            if c not in raw:
-                raw.append(c)
-        else:
-            # whitelist_channel_id() is deduped against raw below; here it is
-            # simply "not the raw channel".
-            if c not in wl:
-                wl.append(c)
+        if c not in wl:
+            wl.append(c)
+        # A guild's own raw channel wins over the env default: the env is the
+        # fallback for a single-server deploy, not an override for a guild that
+        # picked its own channel.
+        for g in load_guild_settings():
+            if str(g.get("guild_id") or "") and c == guild_setting(str(g["guild_id"]), "raw"):
+                if c not in raw:
+                    raw.append(c)
+                break
     return raw, wl
 
 
