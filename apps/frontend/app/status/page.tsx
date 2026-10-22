@@ -1,6 +1,9 @@
 "use client";
 
 import { PageShell } from "@/components/PageShell";
+import { BentoGrid } from "@/components/ui/bento-grid";
+import { useToast } from "@/lib/useToast";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { readerFetch } from "@/lib/reader/transport";
 import { ALL_SOURCES } from "@/lib/constants";
@@ -23,6 +26,26 @@ function formatNext(sec: number | null | undefined): string {
 }
 
 export default function StatusPage() {
+  const { toast } = useToast();
+  const [since] = useState(() => Date.now());
+  const announcedAt = useRef(since);
+  const { data: rawNews } = useQuery({
+    queryKey: ["raw-news", since],
+    queryFn: async () => {
+      const res: any = await readerFetch<any>(`/api/v1/rss/new?since=${since}&distinct=title&raw_only=1`);
+      return res?.data ?? res ?? {};
+    },
+    refetchInterval: 15000,
+  });
+  useEffect(() => {
+    const count = Number(rawNews?.newCount ?? 0);
+    const latest = rawNews?.latestUpdatedTime ? new Date(rawNews.latestUpdatedTime).getTime() : 0;
+    if (count > 0 && latest > announcedAt.current) {
+      announcedAt.current = latest;
+      toast(`${count} chapter baru masuk RAW`, { type: "info", duration: 6000 });
+    }
+  }, [rawNews, toast]);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["sources-health"],
     queryFn: async () => {
@@ -100,6 +123,13 @@ export default function StatusPage() {
         <div className="text-center py-12 text-white/50">No health data</div>
       ) : (
         <div className="space-y-3">
+          <BentoGrid className="auto-rows-auto grid-cols-1 md:grid-cols-3">
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <div className="text-xs text-white/50">RAW baru sejak halaman dibuka</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{rawNews?.newCount ?? 0}</div>
+              <div className="mt-1 text-xs text-white/40">dipantau setiap 15 detik</div>
+            </div>
+          </BentoGrid>
           <WatchdogCard />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {list.map((s: any) => (

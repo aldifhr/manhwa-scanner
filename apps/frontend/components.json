@@ -26,6 +26,7 @@
       "headers": {
         "Authorization": "Bearer ${KOBRA_TOKEN}"
       }
-    }
+    },
+    "@magicui": "https://magicui.design/r/{name}"
   }
 }

@@ -23,11 +23,13 @@ export async function GET(request: NextRequest) {
   const since = request.nextUrl.searchParams.get("since");
   const distinct = request.nextUrl.searchParams.get("distinct") ?? "title";
   const group = request.nextUrl.searchParams.get("group");
+  const rawOnly = request.nextUrl.searchParams.get("raw_only");
   try {
     const params = new URLSearchParams();
     if (since) params.set("since", since);
     params.set("distinct", distinct);
     if (group) params.set("group", group);
+    if (rawOnly) params.set("raw_only", rawOnly);
 
     const res = await fetch(`${rssBaseUrl()}/new?${params}`, {
       headers: authHeaders(request),
