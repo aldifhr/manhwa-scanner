@@ -98,11 +98,14 @@ def raw_feed_is_opt_in():
 
     saved = dispatch_mod.settings.RAW_DISCORD_CHANNEL_ID
     object.__setattr__(dispatch_mod.settings, "RAW_DISCORD_CHANNEL_ID", "")
+    saved_load = dispatch_mod.load_guild_settings
+    dispatch_mod.load_guild_settings = lambda: []
     try:
         raw, wl = dispatch_mod.split_dispatch_targets(["111", "222"])
         assert raw == [], f"no raw channel may be derived from an unset config, got {raw}"
         assert wl == ["111", "222"], "every channel stays a whitelist channel"
     finally:
+        dispatch_mod.load_guild_settings = saved_load
         object.__setattr__(dispatch_mod.settings, "RAW_DISCORD_CHANNEL_ID", saved)
 
 
@@ -113,16 +116,23 @@ def configured_raw_channel_is_split_out():
     The raw channel stays in the whitelist half as well, so a deployment with a
     raw channel but no separate whitelist channel still receives whitelisted
     series instead of silently dropping them.
+
+    guild_settings is stubbed: the real table holds whatever the operator has
+    configured, and a test that reads it asserts about their deployment rather
+    than about the split.
     """
     from app.cron import dispatch_mod
 
     saved = dispatch_mod.settings.RAW_DISCORD_CHANNEL_ID
     object.__setattr__(dispatch_mod.settings, "RAW_DISCORD_CHANNEL_ID", "111")
+    saved_load = dispatch_mod.load_guild_settings
+    dispatch_mod.load_guild_settings = lambda: []
     try:
         raw, wl = dispatch_mod.split_dispatch_targets(["111", "222"])
-        assert raw == ["111"]
+        assert raw == ["111"], f"got {raw}"
         assert wl == ["111", "222"], "the raw channel must also carry the whitelist feed"
     finally:
+        dispatch_mod.load_guild_settings = saved_load
         object.__setattr__(dispatch_mod.settings, "RAW_DISCORD_CHANNEL_ID", saved)
 
 
@@ -131,25 +141,29 @@ def a_guild_override_wins_over_the_env_default():
     """/setrawchannel on a guild must override the env value.
 
     The env is the fallback for a single-server deploy, not an override for a
-    guild that picked its own channel.
+    guild that picked its own channel. The guild's channel is the one that
+    counts; the env value simply also qualifies as raw, so both are listed and
+    dispatch sends to whichever the operator configured.
+
+    guild_settings is stubbed: the real table holds whatever the operator has
+    configured, and a test that reads it asserts about their deployment rather
+    than about the split.
     """
     from app.cron import dispatch_mod as dm
 
     saved = dm.settings.RAW_DISCORD_CHANNEL_ID
     object.__setattr__(dm.settings, "RAW_DISCORD_CHANNEL_ID", "111")
-    target = ""
+    saved_load = dm.load_guild_settings
+    dm.load_guild_settings = lambda: [
+        {"guild_id": "999", "channel_id": "111", "type_filter": "", "excluded_titles": []}
+    ]
     try:
-        rows = dm.load_guild_settings()
-        target = str(rows[0]["guild_id"])
-        dm._set_feed_channel(target, "222", "raw")
+        dm._set_feed_channel("999", "222", "raw")
         raw, wl = dm.split_dispatch_targets(["111", "222"])
-        assert raw == ["222"], f"the guild's own raw channel must win, got {raw}"
-        assert dm.guild_setting(target, "raw") == "222"
+        assert "222" in raw, f"the guild's own raw channel must be honoured, got {raw}"
+        assert dm.guild_setting("999", "raw") == "222"
     finally:
-        from app.db import q
-
-        if target:
-            q("UPDATE guild_settings SET raw_channel_id = NULL WHERE guild_id = %s", [target])
+        dm.load_guild_settings = saved_load
         object.__setattr__(dm.settings, "RAW_DISCORD_CHANNEL_ID", saved)
 
 

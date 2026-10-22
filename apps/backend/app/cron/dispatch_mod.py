@@ -109,6 +109,10 @@ def split_dispatch_targets(
     the configured whitelist channel, the legacy channel_id, or a channel with
     no configuration at all — stays on the whitelist half, which is what it
     received before the split.
+
+    A channel the env names as raw is also raw even with no guild row: that is
+    the single-server case, and it must not depend on a guild_settings row
+    existing.
     """
     raw: list[str] = []
     wl: list[str] = []
@@ -121,11 +125,13 @@ def split_dispatch_targets(
         # A guild's own raw channel wins over the env default: the env is the
         # fallback for a single-server deploy, not an override for a guild that
         # picked its own channel.
+        is_raw = c == raw_channel_id()
         for g in load_guild_settings():
             if str(g.get("guild_id") or "") and c == guild_setting(str(g["guild_id"]), "raw"):
-                if c not in raw:
-                    raw.append(c)
+                is_raw = True
                 break
+        if is_raw and c not in raw:
+            raw.append(c)
     return raw, wl
 
 
@@ -780,18 +786,34 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
     return sent
 
 def _load_channels() -> list[str]:
-    """Load target channels from guild_settings (max 1 for single-server mode)."""
+    """Every channel dispatch should consider, one guild's feeds included.
+
+    Used to return only `channel_id` with `.limit(1)` — the legacy single feed.
+    With two feeds that silently drops the raw channel: a guild that ran
+    /setrawchannel had a raw_channel_id row, and dispatch never saw it, so the
+    raw feed never sent anything. The raw channel is what carries the
+    "Add to whitelist" button, so this was the whole feature missing.
+
+    Returns the de-duplicated union of channel_id, raw_channel_id and
+    whitelist_channel_id. `channel_id` stays in the list so a guild that never
+    configured either feed keeps getting its whitelist notifications.
+    """
     try:
         from app.db import get_supabase
 
         res = (
             get_supabase()
             .table("guild_settings")
-            .select("channel_id")
-            .limit(1)
+            .select("channel_id, raw_channel_id, whitelist_channel_id")
             .execute()
         )
-        return [r["channel_id"] for r in (res.data or []) if r.get("channel_id")]
+        out: list[str] = []
+        for r in res.data or []:
+            for key in ("channel_id", "raw_channel_id", "whitelist_channel_id"):
+                c = str(r.get(key) or "").strip()
+                if c and c not in out:
+                    out.append(c)
+        return out
     except Exception:
         return []
 
