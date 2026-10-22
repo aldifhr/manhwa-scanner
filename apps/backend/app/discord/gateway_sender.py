@@ -34,32 +34,45 @@ async def main():
     intents = discord.Intents.default()
     intents.guilds = True
     client = discord.Client(intents=intents)
-    await client.login(tok)
-    try:
-        await asyncio.wait_for(client.wait_until_ready(), timeout=10)
-    except Exception:
-        pass
-    ch = client.get_channel(int(cid))
-    if ch is None:
-        for g in client.guilds:
-            ch = discord.utils.get(g.text_channels, id=int(cid))
-            if ch:
-                break
-    if ch is None:
-        await client.close()
-        sys.exit(1)
-    disc_embeds = []
-    for e in embeds:
+    sent = asyncio.Event()
+    failure = []
+
+    @client.event
+    async def on_ready():
         try:
-            disc_embeds.append(discord.Embed.from_dict(e))
-        except Exception:
-            pass
+            ch = client.get_channel(int(cid))
+            if ch is None:
+                for g in client.guilds:
+                    ch = discord.utils.get(g.text_channels, id=int(cid))
+                    if ch:
+                        break
+            if ch is None:
+                failure.append("channel_not_found")
+                return
+            disc_embeds = []
+            for e in embeds:
+                try:
+                    disc_embeds.append(discord.Embed.from_dict(e))
+                except Exception:
+                    pass
+            await ch.send(content=content, embeds=disc_embeds or None)
+        except Exception as exc:
+            failure.append(type(exc).__name__)
+        finally:
+            sent.set()
+
     try:
-        await ch.send(content=content, embeds=disc_embeds or None)
-    except Exception:
-        if disc_embeds:
-            await ch.send(content=content or "(new chapter)")
-    await client.close()
+        await asyncio.wait_for(client.start(tok), timeout=30)
+    except Exception as exc:
+        failure.append(type(exc).__name__)
+    finally:
+        if not sent.is_set() and not failure:
+            failure.append("not_ready")
+        if not client.is_closed():
+            await client.close()
+    if failure:
+        print(failure[0], file=sys.stderr)
+        sys.exit(1)
 
 asyncio.run(main())
 """
