@@ -1,7 +1,7 @@
 """Register Discord slash commands for be-ag-py.
 
 Discord only delivers interactions for commands that are registered via
-PUT /applications/{application_id}/commands. Without this, /setchannel etc.
+PUT /applications/{application_id}/commands. Without this, /setrawchannel etc.
 never appear in the Discord client picker.
 
 Run:  python register_commands.py
@@ -23,24 +23,6 @@ COMMANDS = [
     {"name": "search", "description": "Search titles across sources"},
     {"name": "stats", "description": "Show dispatch + source-health stats"},
     {"name": "help", "description": "Show available commands"},
-    {
-        "name": "setchannel",
-        "description": "Set the channel where notifications are sent",
-        # Restrict to guild managers (same as /add).
-        "default_member_permissions": "32",
-        "options": [
-            {
-                "name": "channel",
-                "description": "Channel to receive notifications",
-                # type:7 = CHANNEL — Discord scopes the picker to
-                # channels in THIS guild, so a member can't pass an
-                # arbitrary ID from another server the bot happens to
-                # be in.
-                "type": 7,
-                "required": True,
-            }
-        ],
-    },
     {
         "name": "setfilter",
         "description": "Restrict which content types this server receives (empty = all)",

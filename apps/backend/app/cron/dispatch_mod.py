@@ -64,7 +64,7 @@ def _set_feed_channel(guild_id: str, channel_id: str, feed: str) -> None:
     from app.db import q
 
     col = "raw_channel_id" if feed == "raw" else "whitelist_channel_id"
-    # The row may not exist yet (/setchannel creates it) — upsert on guild_id.
+    # The row may not exist yet — upsert on guild_id.
     q(
         f"""INSERT INTO guild_settings (guild_id, {col})
             VALUES (%s, %s)

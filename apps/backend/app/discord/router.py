@@ -58,10 +58,8 @@ def handle_interaction(raw_body: bytes) -> tuple[int, dict]:
         if name == "help":
             return 200, _respond(
                 CHANNEL_MESSAGE_WITH_SOURCE,
-                {"content": "Available: /add, /search, /stats, /help, /setchannel"},
+                {"content": "Available: /add, /search, /stats, /help, /setrawchannel, /setwhitelistchannel"},
             )
-        if name == "setchannel":
-            return _route_setchannel(payload, data)
         if name == "setrawchannel":
             return _route_setrawchannel(payload, data)
         if name == "setwhitelistchannel":
@@ -74,7 +72,7 @@ def handle_interaction(raw_body: bytes) -> tuple[int, dict]:
             return _route_list_component(custom_id)
         return 200, _respond(
             CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": f"Unknown command `/{name}`. Available: `/add`, `/search`, `/stats`, `/help`, `/setchannel`, `/setfilter`"},
+            {"content": f"Unknown command `/{name}`. Available: `/add`, `/search`, `/stats`, `/help`, `/setrawchannel`, `/setwhitelistchannel`, `/setfilter`"},
         )
 
     return 400, {"error": "unsupported_interaction"}
@@ -174,51 +172,6 @@ def _route_set_feed_channel(payload: dict, data: dict, feed: str):
             {"content": f"❌ Failed to set the {feed} channel: {str(e)[:160]}"},
         )
 
-
-def _route_setchannel(payload: dict, data: dict):
-    opts = _extract_options(data)
-    channel_id = opts.get("channel", "")
-    guild_id = payload.get("guild_id", "")
-    if not channel_id or not guild_id:
-        return 200, _respond(
-            CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": "❌ Missing channel or guild"},
-        )
-    # Defense: only accept guilds in the allowlist.
-    _raw = getattr(settings, "DISCORD_GUILD_ID", "") or ""
-    allowed = [g.strip() for g in _raw.split(",") if g.strip()]
-    if allowed and guild_id not in allowed:
-        return 200, _respond(
-            CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": "❌ Channel must belong to an authorized server"},
-        )
-    # Respond within 3s — do DB upsert in thread, fallback to deferred on slow DB
-    try:
-        from app.db import get_supabase
-        def _do_upsert():
-            return get_supabase().table("guild_settings").upsert(
-                {"guild_id": guild_id, "channel_id": str(channel_id)},
-                on_conflict="guild_id",
-            ).execute()
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=1) as _ex:
-            _ex.submit(_do_upsert).result(timeout=2.5)
-        return 200, _respond(
-            CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": f"✅ Notifications will be sent to <#{channel_id}>\nUse `/setfilter` to restrict types (manhwa/manga/manhua) for this server."},
-        )
-    except TimeoutError:
-        logger.warn("setchannel DB timeout", guild=guild_id, channel=channel_id)
-        return 200, _respond(
-            CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": "⏳ Channel save is slow — try again in 5s (DB timeout). If persists, check /health."},
-        )
-    except Exception as e:
-        logger.warn("setchannel failed", err=str(e)[:200])
-        return 200, _respond(
-            CHANNEL_MESSAGE_WITH_SOURCE,
-            {"content": f"❌ Failed to set channel: {e}"[:1900]},
-        )
 
 def _route_setfilter(payload: dict, data: dict):
     """Per-guild type filter: /setfilter types:manhwa,manhua — empty = all."""
