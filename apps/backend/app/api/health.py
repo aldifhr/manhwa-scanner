@@ -55,19 +55,7 @@ async def api_health(request: Request):
 
         hm = _h.load_source_health_map(_s.SOURCE_KEYS)
         sources = []
-        # Add disabled sources first
-        for src in _s.SOURCE_KEYS:
-            if src not in _s.active_sources:
-                sources.append({
-                    "name": src,
-                    "status": "disabled",
-                    "lastScrape": "",
-                    "lastSuccess": "",
-                    "errorRate24h": 0.0,
-                    "consecutiveFailures": 0,
-                    "lastError": "disabled via DISABLED_SOURCES",
-                    "disabledUntil": None,
-                })
+        # Disabled sources are operationally absent from the tracker.
         for src, row in (hm or {}).items():
             if src not in _s.active_sources:
                 continue

@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./gold.css";
-import Navbar from "@/components/Navbar";
-import Announcement from "@/components/Announcement";
+import RouteChrome from "@/components/RouteChrome";
 import QueryProvider from "@/components/QueryProvider";
 import { ToastProvider } from "@/lib/useToast";
-import { CommandPalette } from "@/components/CommandPalette";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -57,9 +55,7 @@ export default function RootLayout({
       <body className="min-h-dvh bg-black text-white overflow-x-hidden">
         <QueryProvider>
           <ToastProvider>
-            <Announcement />
-            <Navbar />
-            <CommandPalette />
+            <RouteChrome />
             <main className="min-h-dvh pb-safe">{children}</main>
           </ToastProvider>
         </QueryProvider>
