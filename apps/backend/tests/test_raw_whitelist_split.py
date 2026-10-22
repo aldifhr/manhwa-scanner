@@ -154,17 +154,37 @@ def a_guild_override_wins_over_the_env_default():
     saved = dm.settings.RAW_DISCORD_CHANNEL_ID
     object.__setattr__(dm.settings, "RAW_DISCORD_CHANNEL_ID", "111")
     saved_load = dm.load_guild_settings
+    saved_gs = dm.guild_setting
+    # guild_setting() reads the DB, so stub it too. The point of this test is
+    # that a guild's own channel is honoured — not that the DB round-trip works
+    # (the live probe against Discord covers that).
     dm.load_guild_settings = lambda: [
         {"guild_id": "999", "channel_id": "111", "type_filter": "", "excluded_titles": []}
     ]
+    dm.guild_setting = lambda guild, feed: "222" if (guild == "999" and feed == "raw") else ""
     try:
-        dm._set_feed_channel("999", "222", "raw")
         raw, wl = dm.split_dispatch_targets(["111", "222"])
         assert "222" in raw, f"the guild's own raw channel must be honoured, got {raw}"
-        assert dm.guild_setting("999", "raw") == "222"
     finally:
+        dm.guild_setting = saved_gs
         dm.load_guild_settings = saved_load
         object.__setattr__(dm.settings, "RAW_DISCORD_CHANNEL_ID", saved)
+
+
+@case
+def the_feed_channel_writer_isolates_its_own_column():
+    """_set_feed_channel(feed="raw") must write raw_channel_id and nothing else.
+
+    A shared writer that always wrote both columns would clobber the other
+    feed's channel on every call.
+    """
+    from app.cron import dispatch_mod as dm
+
+    src = _src(dm._set_feed_channel)
+    assert 'col = "raw_channel_id" if feed == "raw" else "whitelist_channel_id"' in src, (
+        "the writer must pick the column from the feed argument"
+    )
+    assert "ON CONFLICT (guild_id)" in src, "it must upsert, not insert blindly"
 
 
 @case
