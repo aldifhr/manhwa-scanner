@@ -145,9 +145,37 @@ def enrich(items: list[dict], persist_cache: bool = False, skip_api: bool = Fals
                 it["type"] = s["type"]
 
     # Final safety: ensure every item's origin is a canonical country code
+    # and metadata keeps the types the Discord embed builder expects.
+    #
+    # The claim path can receive jsonb genres as a string representation and
+    # missing ratings as the literal string "None". Passing those through made
+    # the embed iterate genre characters (", A, c...") and render a valid rating
+    # as `No rating`. Normalize once at the seam instead of adding source-specific
+    # fixes in every collector.
+    import ast as _ast
+    import json as _json
     for it in items:
         if it.get("origin"):
             it["origin"] = normalize_origin(it["origin"])
+        _genres = it.get("genres")
+        if isinstance(_genres, str):
+            _parsed = None
+            try:
+                _parsed = _json.loads(_genres)
+            except (TypeError, ValueError):
+                try:
+                    _parsed = _ast.literal_eval(_genres)
+                except (ValueError, SyntaxError):
+                    _parsed = None
+            if isinstance(_parsed, list):
+                _genres = _parsed
+            elif _genres.strip():
+                _genres = [g.strip() for g in _genres.split(",") if g.strip()]
+            else:
+                _genres = []
+        it["genres"] = [str(g).strip() for g in (_genres or []) if str(g).strip()]
+        if str(it.get("rating") or "").strip().lower() in {"none", "null", "n/a"}:
+            it["rating"] = ""
 
     return items
 
