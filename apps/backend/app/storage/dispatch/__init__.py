@@ -126,12 +126,20 @@ def unclaim(chapter_url: str) -> None:
         logger.error("unclaim dispatch_claims failed", exc=e)
 
 def unclaim_stale(cutoff_iso: str) -> int:
-    """Delete dispatch_claims rows created before `cutoff_iso` (ISO timestamp).
+    """Delete dispatch_claims rows that are no longer held by any live run.
 
-    Used by the pipeline to auto-release STUCK claims: a prior cron run may have
-    claimed URLs then failed to send (Discord hiccup, bug), leaving active claims
-    (48h TTL) that block all future retries. Claims older than the cutoff are
-    presumed stuck and released so the next dispatch can re-acquire + send.
+    The cutoff is applied to `expires_at`, NOT `created_at`.
+
+    `created_at` used to be the filter and it matched nothing: migration 057
+    recreated dispatch_claims without a DEFAULT on created_at, so the column was
+    NULL on every row and `created_at < cutoff` was never true. Stuck claims
+    therefore never expired — they held a URL until dispatch's guard rejected
+    the item as already-claimed, which is how cron came to report sent:0 while
+    nothing was delivered.
+
+    Filtering on `expires_at` is also the semantically right choice: a claim is
+    "stuck" when its TTL has run out, which is exactly expires_at < cutoff. It
+    works whether or not created_at is populated.
 
     Returns count deleted.
     """
@@ -142,7 +150,7 @@ def unclaim_stale(cutoff_iso: str) -> int:
             get_supabase()
             .table("dispatch_claims")
             .delete()
-            .lt("created_at", cutoff_iso)
+            .lt("expires_at", cutoff_iso)
             .execute()
         )
         return len(res.data or [])
@@ -243,7 +251,20 @@ def claim_and_record(urls: list[str], title_keys: list[str], sources: list[str],
         # suppressed forever). Claim KEY = fcfs_key when available, so a
         # different source scraping the SAME title+chapter (different URL)
         # cannot claim it a second time -> no cross-source double-send.
-        row = {"chapter_url": u, "title_key": tk or "unknown", "expires_at": expires}
+        #
+        # `created_at` is set EXPLICITLY. dispatch_claims was recreated by
+        # migration 057 without a DEFAULT on that column, so omitting it stored
+        # NULL — and unclaim_stale() filters `created_at < cutoff`, which then
+        # matched nothing. Claims accumulated as live rows (10-60 min
+        # expires_at) with no way to be released, so dispatch's URL guard
+        # rejected every item and cron reported sent:0 indefinitely.
+        # Observed live: 3 rows, 3 NULL created_at, 0 rows matching the filter.
+        row = {
+            "chapter_url": u,
+            "title_key": tk or "unknown",
+            "created_at": now.isoformat(),
+            "expires_at": expires,
+        }
         if fk:
             row["fcfs_key"] = fk
             claimed_fk.add(fk)
