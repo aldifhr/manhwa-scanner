@@ -15,7 +15,12 @@ function getCsrfToken(): string {
   try {
     const escaped = CSRF_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
-    const raw = match ? decodeURIComponent(match[2]) : "";
+    // `match[1]` — the capture group. Reading match[2] was undefined (the group
+    // is the first and only one), so the token was ALWAYS empty and no
+    // X-CSRF-Token header was ever sent on a mutating request. The backend
+    // rejects a mutation without a valid token, so every Add/remove from the
+    // dashboard stayed in its pending state ("is thinking…") forever.
+    const raw = match ? decodeURIComponent(match[1]) : "";
     // guard: token "undefined"/"null"/empty harus dianggap kosong (bug lama kirim header "undefined")
     if (!raw || raw === "undefined" || raw === "null" || raw.length < 5) return "";
     return raw;
