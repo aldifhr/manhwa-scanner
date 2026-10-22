@@ -2,6 +2,7 @@
 
 import { PageShell } from "@/components/PageShell";
 import { BentoGrid } from "@/components/ui/bento-grid";
+import { AnimatedListItem } from "@/components/ui/animated-list";
 import { useToast } from "@/lib/useToast";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -124,11 +125,13 @@ export default function StatusPage() {
       ) : (
         <div className="space-y-3">
           <BentoGrid className="auto-rows-auto grid-cols-1 md:grid-cols-3">
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <div className="text-xs text-white/50">RAW baru sejak halaman dibuka</div>
-              <div className="mt-2 text-3xl font-semibold text-white">{rawNews?.newCount ?? 0}</div>
-              <div className="mt-1 text-xs text-white/40">dipantau setiap 15 detik</div>
-            </div>
+            <AnimatedListItem>
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="text-xs text-white/50">RAW baru sejak halaman dibuka</div>
+                <div className="mt-2 text-3xl font-semibold text-white">{rawNews?.newCount ?? 0}</div>
+                <div className="mt-1 text-xs text-white/40">dipantau setiap 15 detik</div>
+              </div>
+            </AnimatedListItem>
           </BentoGrid>
           <WatchdogCard />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
