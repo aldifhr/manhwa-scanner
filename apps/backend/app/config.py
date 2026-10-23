@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # simply never used, so single-channel setups keep working unchanged.
     RAW_DISCORD_CHANNEL_ID: str = ""
     WHITELIST_DISCORD_CHANNEL_ID: str = ""
+    # Comma-separated role IDs allowed to press "Add to whitelist".
+    # Empty = anyone in the channel (previous behaviour).
+    WHITELIST_ROLE_IDS: str = ""
     DISCORD_GUILD_ID: str = ""
     DISCORD_APPLICATION_ID: str = ""
     ERROR_WEBHOOK_URL: str = ""

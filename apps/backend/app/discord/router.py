@@ -208,6 +208,23 @@ def _route_setfilter(payload: dict, data: dict):
     except Exception as e:
         return 200, _respond(CHANNEL_MESSAGE_WITH_SOURCE, {"content": f"❌ Failed: {e}"})
 
+def _wl_add_allowed(payload: dict) -> bool:
+    """Role gate for the "Add to whitelist" button.
+
+    Empty WHITELIST_ROLE_IDS keeps the old behaviour (anyone may click). A
+    non-empty list is authoritative: a clicker must carry at least one of those
+    role ids. Discord sends them in member.roles for component interactions in
+    a guild.
+    """
+    from app.config import settings
+
+    allowed = {r.strip() for r in str(settings.WHITELIST_ROLE_IDS or "").split(",") if r.strip()}
+    if not allowed:
+        return True
+    roles = {str(r) for r in ((payload.get("member") or {}).get("roles") or [])}
+    return bool(roles & allowed)
+
+
 def _route_whitelist_add(payload: dict, data: dict):
     """"Add to whitelist" button on a RAW-feed embed.
 
@@ -220,6 +237,12 @@ def _route_whitelist_add(payload: dict, data: dict):
     Responds DEFERRED so the DB write happens in a thread without risking the
     3s interaction deadline; the follow-up edit is the visible result.
     """
+    if not _wl_add_allowed(payload):
+        return 200, _respond(
+            CHANNEL_MESSAGE_WITH_SOURCE,
+            {"content": "❌ You do not have the role required to add series to the whitelist."},
+        )
+
     custom_id = data.get("custom_id", "")
     try:
         from app.discord.embeds import decode_whitelist_custom_id
