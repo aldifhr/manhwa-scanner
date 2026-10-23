@@ -50,17 +50,8 @@ def _proxy_cover(cover: str | None) -> str | None:
         _inner = _pqs(_up(cover).query).get("url", [""])[0]
         if _inner:
             cover = _uq(_inner)
-    # Shinigami public CDN — return direct URL so Discord fetches
-    # without the extra cover-img hop (which can timeout on Discord's end).
-    from urllib.parse import urlparse
-    try:
-        host = (urlparse(cover).hostname or "").lower()
-        if host in ("assets.shngm.id", "imgkc1.my.id", "minio.imgkc1.my.id", "cdn.ikiru.id"):
-            # Ikiru covers use signed CDN URLs; direct embeds avoid proxy fetch
-            # variability and preserve the upstream signature as-is.
-            return cover
-    except Exception:
-        pass
+    # Route source covers through our public proxy. Discord accepted some direct
+    # CDN URLs but stored width=0/height=0 on real messages, leaving blank covers.
     # Direct URLs — wrap in public cover-img proxy
     # Fix double-encode: RSS cover already %2F-encoded (X-Amz-Credential), _urlquote with safe='' would %→%25. Normalize first.
     from urllib.parse import unquote as _uq2

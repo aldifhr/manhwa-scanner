@@ -12,7 +12,12 @@ def test_ikiru_thumbnail_preserves_signed_url():
         source="ikiru",
         cover=cover,
     )
-    assert embed["thumbnail"]["url"] == cover
+    from urllib.parse import parse_qs, urlparse
+
+    thumb = embed["thumbnail"]["url"]
+    assert thumb.startswith("https://scanner.aldifhr.my.id/api/v1/reader/cover-img?")
+    assert parse_qs(urlparse(thumb).query)["url"][0] == cover
+    assert "v=67" in thumb
 
 
 def test_shinigami_cover_still_uses_proxy_and_cache_buster():
@@ -24,9 +29,11 @@ def test_shinigami_cover_still_uses_proxy_and_cache_buster():
         source="shinigami", cover=cover,
     )
     thumbnail = embed["thumbnail"]["url"]
-    assert thumbnail.startswith("https://assets.shngm.id/")
-    assert "?v=12" in thumbnail
-    assert "cover.jpg" in thumbnail
+    from urllib.parse import parse_qs, urlparse
+
+    assert "/api/v1/reader/cover-img" in thumbnail
+    assert "v=12" in thumbnail
+    assert parse_qs(urlparse(thumbnail).query)["url"][0] == cover
 
 
 if __name__ == "__main__":
