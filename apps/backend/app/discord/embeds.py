@@ -109,6 +109,8 @@ def _short_synopsis(text: str) -> str | None:
     d = str(text).strip()
     if d.lower() in ("unknown", "n/a"):
         return None
+    # Shinigami's API provides concise aliases like "Pemain Beku", which are
+    # valid synopses, not URLs/slugs; retain them as the RAW feed description.
     # strip html tags
     import re
     clean = re.sub(r"<[^>]*>", "", d).strip()
