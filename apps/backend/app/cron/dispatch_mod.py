@@ -116,22 +116,23 @@ def split_dispatch_targets(
     """
     raw: list[str] = []
     wl: list[str] = []
+    guilds = load_guild_settings()
     for ch in channel_ids:
         c = str(ch).strip()
         if not c:
             continue
-        if c not in wl:
-            wl.append(c)
-        # A guild's own raw channel wins over the env default: the env is the
-        # fallback for a single-server deploy, not an override for a guild that
-        # picked its own channel.
+        # A raw destination must never be included in retry's whitelist list.
+        # The previous implementation put every channel in wl as well as raw;
+        # retry_failed_dispatches() then re-sent a failed subscribed chapter to
+        # the RAW channel. Route each channel to exactly one feed instead.
         is_raw = c == raw_channel_id()
-        for g in load_guild_settings():
+        for g in guilds:
             if str(g.get("guild_id") or "") and c == guild_setting(str(g["guild_id"]), "raw"):
                 is_raw = True
                 break
-        if is_raw and c not in raw:
-            raw.append(c)
+        target = raw if is_raw else wl
+        if c not in target:
+            target.append(c)
     return raw, wl
 
 

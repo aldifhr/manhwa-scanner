@@ -130,7 +130,7 @@ def configured_raw_channel_is_split_out():
     try:
         raw, wl = dispatch_mod.split_dispatch_targets(["111", "222"])
         assert raw == ["111"], f"got {raw}"
-        assert wl == ["111", "222"], "the raw channel must also carry the whitelist feed"
+        assert wl == ["222"], "raw channel must not be included in retry whitelist targets"
     finally:
         dispatch_mod.load_guild_settings = saved_load
         object.__setattr__(dispatch_mod.settings, "RAW_DISCORD_CHANNEL_ID", saved)
