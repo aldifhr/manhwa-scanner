@@ -184,9 +184,9 @@ def run_pipeline(channel_ids: list[str] | None = None, do_dispatch: bool = True,
                 else:
                     raise ValueError("no claimed rows, fallback")
             except Exception as e:
-                logger.debug("claim queue fallback to get_recent_chapters", err=str(e)[:80])
-                items = recent_chapters.get_recent_chapters(hours=24)
-                enriched_all = enrich_mod.enrich(items, persist_cache=False)
+                logger.debug("claim queue unavailable — nothing to dispatch", err=str(e)[:80])
+                items = []
+                enriched_all = []
                 _use_claimed = False
         # Persist health (both modes)
         try:

@@ -53,8 +53,6 @@ def claim_recent_chapters_for_dispatch(
     whitelist: list[dict] | None = None, hours: int = 24, limit: int = 500
 ) -> list[dict]:
     """Deep queue claim — see storage/recent_chapters.py docstring."""
-    if not whitelist:
-        return []
     now = datetime.now(timezone.utc).isoformat()
 
     # DISABLED_SOURCES has to be honoured here, not only in collect(). Collect
@@ -65,17 +63,14 @@ def claim_recent_chapters_for_dispatch(
 
     _disabled: set[str] = _disabled_sources()
 
-    allowed: set[tuple[str, str]] = set()
     _latest_sent: dict[tuple[str, str], float] = {}
-    for w in whitelist:
+    for w in whitelist or []:
         from app.utils.text import slugify_title_key as _ntk
 
         tk = _ntk(str(w.get("title_key") or ""))
         src = str(w.get("source") or "")
         if src and src in _disabled:
             continue
-        if tk:
-            allowed.add((tk, src))
         try:
             _ls = float(w.get("latest_sent_chapter") or 0)
         except (ValueError, TypeError):
@@ -105,7 +100,9 @@ def claim_recent_chapters_for_dispatch(
         # get_recent_chapters fallback).
         #
         # Now the cheap, exactly-indexable predicates run in SQL:
-        #   - whitelist join on (title_key, source)   [idx_whitelist_source_title_key]
+        #   - LEFT JOIN whitelist on (title_key, source), so both RAW and
+        #     whitelist chapters can be claimed; whitelist metadata supplies
+        #     the ceiling only for subscribed series.
         #   - NOT EXISTS dispatch_history on chapter_url [dispatch_history_pkey]
         #   - NOT EXISTS dispatch_claims on chapter_url [dispatch_claims_chapter_url_key]
         #   - ceiling vs whitelist.latest_sent_chapter
@@ -116,14 +113,9 @@ def claim_recent_chapters_for_dispatch(
         cur.execute(
             """
             SELECT rc.* FROM recent_chapters rc
-            JOIN whitelist w
+            LEFT JOIN whitelist w
               ON w.source = rc.source
              AND (w.title_key = rc.title_key
-                  -- Normalized fallback, mirroring the Python guard. Costs
-                  -- ~0.04ms at 266 whitelist rows (whitelist is hash-joined
-                  -- either way, so the index is not lost) and prevents a
-                  -- silent permanent skip if a scraper ever writes
-                  -- space-form title_key while the whitelist holds dash-form.
                   OR replace(normalize_title_key(w.title_key), ' ', '-')
                      = replace(normalize_title_key(rc.title_key), ' ', '-'))
             WHERE rc.release_date >= %s
@@ -160,7 +152,7 @@ def claim_recent_chapters_for_dispatch(
             from app.utils.text import slugify_title_key as _ntk2
 
             ntk = _ntk2(tk)
-            if (tk, src) not in allowed and (ntk, src) not in allowed:
+            if src in _disabled:
                 continue
             _cu = str(r.get("chapter_url") or "")
             _su = str(r.get("series_url") or "")
