@@ -87,6 +87,14 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
         return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0, "skipped_permanent": 0,
                 "skipped_unsubscribed": 0, "still_failed": len(rows)}
 
+    # Route each retry to the same feed dispatch() would use. Without this the
+    # retry pass sent to EVERY channel, so a whitelisted series whose first
+    # send failed was re-delivered on the raw channel — a whitelisted chapter
+    # showing up in RAW, with the raw feed's own copy nowhere.
+    from app.cron.dispatch_mod import split_dispatch_targets
+
+    _raw_ch, _wl_ch = split_dispatch_targets(channels)
+
     # Build URL→row mapping
     url_to_row: dict[str, dict] = {}
     for r in rows:
@@ -238,7 +246,9 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
 
         sent_ok = False
         retried += 1
-        for ch in channels:
+        # Retry rows are whitelist-gated above, so only whitelist channels are
+        # valid destinations. Never fall back to raw here.
+        for ch in _wl_ch:
             try:
                 resp = discord.send_channel_message(channel_id=ch, content=content, embeds=[embed])
                 if resp is not None:

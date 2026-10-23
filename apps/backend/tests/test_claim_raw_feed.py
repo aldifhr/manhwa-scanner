@@ -60,6 +60,15 @@ def pipeline_never_falls_back_to_the_whole_window():
         "empty claim falls back to the 24h window again — the to_send:92/sent:0 bug"
     )
 
+@case
+def failed_retries_never_broadcast_to_raw():
+    from app.services.dispatch import retry as retry_mod
+
+    src = inspect.getsource(retry_mod.retry_failed_dispatches)
+    assert "split_dispatch_targets(channels)" in src, "retry path doesn't split feed channels"
+    assert "for ch in _wl_ch:" in src, "whitelist retry still sends to raw channel"
+    assert "for ch in channels:" not in src, "retry still broadcasts to every feed"
+
 
 def main():
     failed = 0
