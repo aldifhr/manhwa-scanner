@@ -8,6 +8,32 @@ from app.logger import get_logger, get_correlation_id
 
 logger = get_logger("storage:error_logs")
 
+# insert_error must never log through the app logger. The app logger feeds
+# error_logs back into itself (logger._worker calls insert_error), so a failing
+# insert produced a warn, which was queued, which called insert_error again,
+# which failed again — a tight loop that wrote 140k lines in five minutes while
+# the DB circuit was open. Report to stderr at most once a minute instead.
+_LAST_WARN = 0.0
+
+
+def _warn_once(err: str) -> None:
+    global _LAST_WARN
+    import time
+
+    now = time.monotonic()
+    if now - _LAST_WARN < 60:
+        return
+    _LAST_WARN = now
+    try:
+        import sys
+
+        sys.stderr.write(f'{{"level": "warn", "scope": "storage:error_logs", '
+                         f'"msg": "insert_error failed", "err": {err[:200]!r}}}\n')
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
 
 def insert_error(
     level: str = "error",
@@ -32,7 +58,7 @@ def insert_error(
         }
         get_supabase().table("error_logs").insert(row).execute()
     except Exception as e:
-        logger.warn("insert_error failed", err=str(e)[:200])
+        _warn_once(str(e))
 
 
 def query_errors(
