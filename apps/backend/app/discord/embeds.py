@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 # Same-origin image proxy so Discord can load covers that would
 # otherwise 403 on hotlink (sources block cross-origin img).
 # Mirror of the frontend rewriteCoverUrl() logic.
-from urllib.parse import quote as _urlquote
+from urllib.parse import quote as _urlquote, urlparse
 
 
 try:
@@ -55,7 +55,9 @@ def _proxy_cover(cover: str | None) -> str | None:
     from urllib.parse import urlparse
     try:
         host = (urlparse(cover).hostname or "").lower()
-        if host in ("assets.shngm.id", "imgkc1.my.id", "minio.imgkc1.my.id"):
+        if host in ("assets.shngm.id", "imgkc1.my.id", "minio.imgkc1.my.id", "cdn.ikiru.id"):
+            # Ikiru covers use signed CDN URLs; direct embeds avoid proxy fetch
+            # variability and preserve the upstream signature as-is.
             return cover
     except Exception:
         pass
@@ -376,7 +378,11 @@ def _build_embed(
         # placeholder. Leading with v= makes the query start with "v=", so the
         # proxy parses url= normally and the image is unaffected.
         if _thumb and chapters:
-            _ch_tag = _urlquote(str(chapters[-1] or "0"), safe="")
-            _thumb = _thumb.replace("?", f"?v={_ch_tag}&", 1) if "?" in _thumb else f"{_thumb}?v={_ch_tag}"
+            # Keep signed Ikiru CDN URLs byte-for-byte intact; adding a cache
+            # buster changes their signed query and invalidates the image URL.
+            _host = (urlparse(_thumb).hostname or "").lower()
+            if _host != "cdn.ikiru.id":
+                _ch_tag = _urlquote(str(chapters[-1] or "0"), safe="")
+                _thumb = _thumb.replace("?", f"?v={_ch_tag}&", 1) if "?" in _thumb else f"{_thumb}?v={_ch_tag}"
         embed["thumbnail"] = {"url": _thumb}
     return embed
