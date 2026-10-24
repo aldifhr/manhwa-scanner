@@ -147,6 +147,34 @@ def load_whitelist(force: bool = False) -> list[dict]:
         logger.error("Failed to load whitelist", exc=e)
         return []
 
+def get_whitelist_entry(title_key: str, source: str) -> Optional[dict]:
+    """One whitelist row by its composite PK, read straight from the DB.
+
+    Deliberately NOT cached: the caller uses this to distinguish "already
+    subscribed" from "newly added", and the 600s load_whitelist() snapshot would
+    answer from before the write. Returns None when the row is absent or the
+    lookup fails — a failed check must not block the write.
+    """
+    if not title_key or not source:
+        return None
+    try:
+        rows = (
+            get_supabase()
+            .table("whitelist")
+            .select("title_key, source, title, series_url")
+            .eq("title_key", str(title_key))
+            .eq("source", str(source))
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        return dict(rows[0]) if rows and isinstance(rows[0], dict) else None
+    except Exception as e:
+        logger.error("get_whitelist_entry failed", exc=e)
+        return None
+
+
 def add_whitelist_entries(rows: list[dict]) -> dict:
     """Upsert whitelist rows via direct adapter (NOT the sync_whitelist RPC).
 

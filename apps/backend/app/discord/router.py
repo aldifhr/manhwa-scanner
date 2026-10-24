@@ -271,6 +271,18 @@ def _route_whitelist_add(payload: dict, data: dict):
     def _write():
         from app.storage import whitelist as wl_store
 
+        # The button lives on a RAW embed, which by definition means the series
+        # is not whitelisted — but a re-click (or a retry) used to write the row
+        # again and still answer "added", which reads as "I just added something
+        # that already existed". Report the already-subscribed case instead.
+        try:
+            _existing = wl_store.get_whitelist_entry(title_key, source)
+        except Exception:
+            _existing = None
+        if _existing:
+            logger.info("wladd: already subscribed", source=source, title_key=title_key, by=who)
+            return {"status": "ok", "already": True}
+
         res = wl_store.add_whitelist_entries([
             {
                 "title_key": title_key,
@@ -301,6 +313,15 @@ def _route_whitelist_add(payload: dict, data: dict):
             return 200, _respond(
                 CHANNEL_MESSAGE_WITH_SOURCE,
                 {"content": f"❌ Could not add **{title or title_key}** — DB write failed. Try again in a few seconds."},
+            )
+        if (res or {}).get("already"):
+            logger.info("wladd: already subscribed", source=source, title_key=title_key, by=who)
+            return 200, _respond(
+                CHANNEL_MESSAGE_WITH_SOURCE,
+                {
+                    "content": f"ℹ️ **{title or title_key}** is already in the whitelist.\n"
+                               f"Future chapters go to the whitelist feed — this series will not appear in raw."
+                },
             )
         logger.info("wladd: subscribed", source=source, title_key=title_key, by=who)
         return 200, _respond(
