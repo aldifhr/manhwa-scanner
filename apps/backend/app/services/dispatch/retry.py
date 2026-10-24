@@ -110,7 +110,7 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
             rc = (
                 get_supabase()
                 .table("recent_chapters")
-                .select("chapter_url, title_key, title, chapter, cover, series_url, source, origin, description")
+                .select("chapter_url, title_key, title, chapter, cover, series_url, source, origin, description, updated_time, rating, genres")
                 .in_("chapter_url", urls)
                 .execute()
             )
@@ -154,11 +154,68 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
         return {"retried": 0, "resent": 0, "skipped_cb": 0, "skipped_window": 0,
                 "skipped_permanent": 0, "still_failed": len(rows)}
 
+    # Static series metadata (cover/rating/genres/description/type) lives in
+    # series_meta, NOT recent_chapters. A retry built only from recent_chapters
+    # produced an embed with no description, no genres and "Released: Unknown" —
+    # the exact degraded duplicate the operator reported.
+    sm_by_key: dict[tuple[str, str], dict] = {}
+    try:
+        _tks = list({str(r.get("title_key") or "").strip() for r in rc_by_url.values() if r.get("title_key")})
+        if _tks:
+            for i in range(0, len(_tks), 100):
+                chunk = _tks[i:i + 100]
+                _rows = (
+                    get_supabase()
+                    .table("series_meta")
+                    .select("title_key, source, cover, rating, description, genres, type")
+                    .in_("title_key", chunk)
+                    .execute()
+                    .data
+                    or []
+                )
+                for r in _rows:
+                    k = (str(r.get("title_key") or "").strip(), str(r.get("source") or "").strip())
+                    if k[0] and k[1]:
+                        sm_by_key[k] = r
+    except Exception as e:
+        logger.warning("retry_failed: series_meta lookup failed err=%s", str(e)[:120])
+
+    # Already-notified guard. dispatch_history is the permanent record of a
+    # delivered message. A failed row left by a dead channel (Discord 404) sits
+    # next to a successful send on the live channel; retrying it posts the
+    # chapter a second time.
+    already_sent: set[str] = set()
+    try:
+        _dh = (
+            get_supabase()
+            .table("dispatch_history")
+            .select("chapter_url")
+            .in_("chapter_url", urls)
+            .execute()
+            .data
+            or []
+        )
+        already_sent = {str(r.get("chapter_url") or "") for r in _dh}
+    except Exception as e:
+        logger.warning("retry_failed: dispatch_history lookup failed err=%s", str(e)[:120])
+
     skipped_unsubscribed = 0
+    skipped_duplicate = 0
 
     for row in rows:
         url = str(row.get("chapter_url", ""))
         if not url:
+            continue
+
+        if url in already_sent:
+            try:
+                get_supabase().table("failed_dispatches").update(
+                    {"status": "resolved", "updated_at": now.isoformat(),
+                     "error_message": "Already notified on a live channel"}
+                ).eq("chapter_url", url).execute()
+                skipped_duplicate += 1
+            except Exception as e:
+                logger.warning("retry: failed_dispatches update failed url=%s err=%s", url[:80], str(e)[:120])
             continue
 
         # Drop rows whose (title, source) is no longer whitelisted (see gate above).
@@ -222,6 +279,8 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
         title = str(meta.get("title") or row.get("title_key") or "Unknown")
         chapter = str(meta.get("chapter") or row.get("chapter_number") or row.get("chapter_title") or "?")
         source = str(meta.get("source") or row.get("source", ""))
+        _sm = sm_by_key.get((str(meta.get("title_key") or "").strip(), source.strip()), {})
+        _rating = meta.get("rating") if meta.get("rating") not in (None, "", 0, "0", 0.0) else _sm.get("rating")
 
         item = {
             "title": title,
@@ -229,18 +288,19 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
             "url": url,
             "series_url": str(meta.get("series_url", "")),
             "source": source,
-            "cover": str(meta.get("cover", "")),
+            "cover": str(meta.get("cover") or _sm.get("cover") or ""),
             "status": "",
-            "rating": "",
-            "genres": [],
-            "description": str(meta.get("description", "")),
+            "rating": str(_rating if _rating not in (None, "") else ""),
+            "genres": meta.get("genres") or _sm.get("genres") or [],
+            "description": str(meta.get("description") or _sm.get("description") or ""),
+            "updated_time": str(meta.get("updated_time") or ""),
         }
 
         embed = build_chapter_embed(
             title=item["title"], chapter=item["chapter"], url=url,
             series_url=item["series_url"], source=item["source"], cover=item["cover"],
             rating=item["rating"], genres=item["genres"],
-            description=item["description"],
+            description=item["description"], updated_time=item["updated_time"],
         )
         content = f"🔔 New Release on **{title}** — Chapter {item['chapter']}"
 
@@ -281,13 +341,14 @@ def retry_failed_dispatches(channel_ids: list[str] | None = None) -> dict:
 
     logger.info(
         "retry_failed completed: retried=%d resent=%d skipped_cb=%d skipped_window=%d "
-        "skipped_permanent=%d skipped_unsubscribed=%d still_failed=%d",
+        "skipped_permanent=%d skipped_unsubscribed=%d skipped_duplicate=%d still_failed=%d",
         retried, resent, skipped_cb, skipped_window, skipped_permanent,
-        skipped_unsubscribed, still_failed,
+        skipped_unsubscribed, skipped_duplicate, still_failed,
     )
     return {
         "retried": retried, "resent": resent,
         "skipped_cb": skipped_cb, "skipped_window": skipped_window,
         "skipped_permanent": skipped_permanent,
-        "skipped_unsubscribed": skipped_unsubscribed, "still_failed": still_failed,
+        "skipped_unsubscribed": skipped_unsubscribed,
+        "skipped_duplicate": skipped_duplicate, "still_failed": still_failed,
     }

@@ -26,6 +26,15 @@ from app.cron.enrich import _split_send_backfill, backfill_dispatch_history
 
 logger = get_logger("cron:dispatch")
 
+# Channels that keep failing are skipped instead of retried forever. The legacy
+# `channel_id` column holds a deleted channel (Discord 404) for this deploy, so
+# every run recorded it as a burst failure, the retry pass then re-sent the
+# chapter to the whitelist channel — a duplicate message with a degraded embed.
+# TTL so a genuinely transient outage does not stay blocked for the process life.
+_DEAD_CHANNELS: dict[str, float] = {}
+_DEAD_CHANNEL_TTL = 6 * 3600.0
+_DEAD_CHANNEL_MAX_FAILS = 3
+
 # Centralized FCFS — single source of truth (app/services/fcfs.py). Re-export for callers that import from dispatch_mod.
 from app.services.fcfs import (  # noqa: F401
     claimed_fcfs_keys as _claimed_titles,
@@ -134,6 +143,24 @@ def split_dispatch_targets(
         if c not in target:
             target.append(c)
     return raw, wl
+
+
+def _prune_dead_channels(channels: list[str]) -> list[str]:
+    """Drop channels whose failure block has not expired."""
+    now = time.monotonic()
+    out: list[str] = []
+    for c in channels:
+        c = str(c or "").strip()
+        if not c:
+            continue
+        blocked_at = _DEAD_CHANNELS.get(c)
+        if blocked_at is not None and now - blocked_at < _DEAD_CHANNEL_TTL:
+            continue
+        if blocked_at is not None:
+            _DEAD_CHANNELS.pop(c, None)
+        if c not in out:
+            out.append(c)
+    return out
 
 
 def load_chapter_ceilings(pairs: list[tuple[str, str]]) -> dict[tuple[str, str], float]:
@@ -540,7 +567,7 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
         _type_f = {t.strip().lower() for t in str(_gs_row.get("type_filter") or "").split(",") if t.strip()}
         _excl_titles = {slugify_title_key(t) for t in (_gs_row.get("excluded_titles") or []) if t}
         seen_key_run: set[str] = set()
-        _consec_fail = 0
+        _ch_fail: dict[str, int] = {}
         for it in _feed:
             url = it.get("url", "")
             if not url or not _acq_map.get(url):
@@ -662,10 +689,11 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
             try:
                 resp = discord.send_channel_message(channel_id=ch, content=content, embeds=[embed], components=_components)
                 if resp is None:
-                    _consec_fail += 1
-                    logger.warn("dispatch: send returned None", title=(it.get("title") or "")[:40], consecutive=_consec_fail, channel=ch)
+                    _fails = _ch_fail.get(ch, 0) + 1
+                    _ch_fail[ch] = _fails
+                    logger.warn("dispatch: send returned None", title=(it.get("title") or "")[:40], consecutive=_fails, channel=ch)
                     dispatch_store.unclaim(url)
-                    if _consec_fail >= 3:
+                    if _fails >= _DEAD_CHANNEL_MAX_FAILS:
                         try:
                             dispatch_store.record_failed(
                                 chapter_url=url, title_key=it.get("title_key", ""),
@@ -675,12 +703,16 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                             )
                         except Exception:
                             pass
-                        logger.error("dispatch: burst threshold hit, stopping channel", channel=ch)
+                        # Block this channel for the TTL: a channel that 404s
+                        # fails every run, and the retry pass then re-sends the
+                        # chapter to a live channel — a duplicate notification.
+                        _DEAD_CHANNELS[ch] = time.monotonic()
+                        logger.error("dispatch: burst threshold hit, blocking channel", channel=ch, ttl_s=_DEAD_CHANNEL_TTL)
                         time.sleep(0.8)
                         break
                     time.sleep(0.8)
                     continue
-                _consec_fail = 0
+                _ch_fail[ch] = 0
                 sent += 1
                 _sent_urls.add(url)
                 try:
@@ -702,7 +734,8 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     pass
                 time.sleep(0.8)
             except Exception as derr:
-                _consec_fail += 1
+                _fails = _ch_fail.get(ch, 0) + 1
+                _ch_fail[ch] = _fails
                 try:
                     from app.metrics_prometheus import track_dispatch_error
                     track_dispatch_error(error_type=type(derr).__name__)
@@ -715,8 +748,9 @@ def dispatch(items: list[dict], channel_ids: list[str], instance_id: str, dry_ru
                     error_code="DISCORD_SEND_FAILED",
                 )
                 dispatch_store.unclaim(url)
-                if _consec_fail >= 3:
-                    logger.error("dispatch: burst threshold hit (exception), stopping channel", channel=ch, consecutive=_consec_fail)
+                if _fails >= _DEAD_CHANNEL_MAX_FAILS:
+                    _DEAD_CHANNELS[ch] = time.monotonic()
+                    logger.error("dispatch: burst threshold hit (exception), blocking channel", channel=ch, consecutive=_fails, ttl_s=_DEAD_CHANNEL_TTL)
                     time.sleep(0.8)
                     break
                 time.sleep(0.8)
@@ -814,7 +848,7 @@ def _load_channels() -> list[str]:
                 c = str(r.get(key) or "").strip()
                 if c and c not in out:
                     out.append(c)
-        return out
+        return _prune_dead_channels(out)
     except Exception:
         return []
 
